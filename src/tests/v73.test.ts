@@ -236,7 +236,8 @@ function fast() {
   ok('ownership transfer changes the real record and keeps the history, the books and the obligation', () => {
     const w = fresh(); const b = shop(w); const old = w.chars[b.ownerId]; const col = b.protection!.collectorId;
     advance(w, w.now + 2 * WEEK);
-    const heir = Object.values(w.chars).find((c) => c.rank === 'civilian' && c.alive && c.id !== old.id)!;
+    // (a man with no business of his own: one who already owns a shop would be found by ownerBiz under that one)
+    const heir = Object.values(w.chars).find((c) => c.rank === 'civilian' && c.alive && c.id !== old.id && !ownerBiz(w, c.id))!;
     const acct = JSON.stringify(b.acct);
     assert.ok(transferBusiness(w, b, heir.id, 'sale'));
     assert.equal(b.ownerId, heir.id); assert.equal(ownerBiz(w, heir.id)?.id, b.id);

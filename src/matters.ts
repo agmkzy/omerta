@@ -14,7 +14,8 @@
 // which of those moves each side weighs (by who he is, what he knows and how he stands with the others), and what the player can
 // say or do about it from where he stands: in it, close to someone in it, or only hearing about it.
 import { perform, tension } from './actions';
-import { openAsk, ASKS, askee, asker } from './asks';
+import { openAsk, amendsAsk, favoursWeek, layoffFor, move as askMove, askee, asker } from './asks';
+import { ASKS } from './askkinds'; // (the registry itself: it exists however the program is entered)
 import { clamp, factHooks, learn, money, regard, peek, rel, repute, witnessesAt } from './core';
 import { addEnc, addFavour } from './encounters';
 import { agencyOf, goalHooks } from './goals';
@@ -161,6 +162,7 @@ function rivalryStep(w: World, s: Situation) {
   const heat = num(s, 'heat');
   const cool = peek(a, b.id).grudge < 0.12 && peek(b, a.id).grudge < 0.12;
   if (cool && s.weeks >= 1) return closeSit(w, s, 'cooled', ['it blew over'], 8);
+  { const made = s.m?.['child:amends']; if (made === 'agreed' || made === 'gave in') return closeSit(w, s, 'made peace', ['amends were accepted'], 8); if (made) delete s.m!['child:amends']; } // (V89)
   if (w.now - s.since > 16 * WEEK) return closeSit(w, s, 'faded', [], 8);
   // the man above them hears what is being said in front of people, and a careful one will not have it in his crew
   const up = commonSuper(w, a, b);
@@ -202,7 +204,13 @@ function rivalryStep(w: World, s: Situation) {
       // blows end the quarrel as a quarrel: what follows is payback, a dispute between families, or a sit-down
       if (retaliate(w, s, x, y, 'beat')) return closeSit(w, s, 'came to blows', [`${first(x)} put ${first(y)} in the hospital`, x.familyId !== y.familyId ? 'two families are in it now' : 'the crew is watching'], 10);
     } else if (k === 'ally') ally(w, s, x);
-    else if (k === 'peace') { if (reconcile(w, s, x, y)) return closeSit(w, s, 'made peace', [`${first(x)} made peace`], 8); }
+    else if (k === 'peace') {
+      // V89: making peace is an offer of amends (asks.ts): the other man may take it, name his price, or not; it runs on its own
+      // clock and comes back here with the answer. (If the world has no room for one more matter, the old single answer stands in.)
+      const am = amendsAsk(w, x, y, { parent: s.id, why: `${x.name} wants to make peace with ${y.name}` });
+      if (am) { M(s).amends = am.id; if (isOpen(am)) { askMove(w, am, 'ask'); if (!isOpen(am)) return closeSit(w, s, 'made peace', [`${first(x)} made peace`], 8); } }
+      else if (reconcile(w, s, x, y)) return closeSit(w, s, 'made peace', [`${first(x)} made peace`], 8);
+    }
     else if (k === 'upstairs' && up) return ruleOn(w, s, up, x, y);
     else { M(s).heat = clamp(num(s, 'heat') - 0.08); rel(x, y.id).grudge = clamp(peek(x, y.id).grudge - 0.04); M(s).quiet = num(s, 'quiet') + 1; }
   }
@@ -249,8 +257,17 @@ MATTERS.rivalry = {
   act: (w, s, p, code, who) => {
     mark(w, p, s, code);
     const r = rivals(w, s), other = r.find((x) => x.id !== p.id);
-    if (code === 'peace' || code === 'peace200') { if (!other) return []; const ok = reconcile(w, s, p, other, code === 'peace200' ? 200 : 0); if (ok) closeSit(w, s, 'made peace', ['you made peace'], 8); return [ok ? `${first(other)} looks at you a long moment, then takes your hand. "All right. It's done."` : `${first(other)} hears you out and says nothing you'd want repeated.`]; }
-    if (code === 'face' && other) { const res = confront(w, s, p, other, peek(other, p.id).grudge > 0.3); M(s).heat = clamp(num(s, 'heat') + (res === 'defy' ? 0.2 : -0.1)); return [res === 'defy' ? `${first(other)} squares up. "You want to do something about it?" People are watching.` : res === 'admit' ? `${first(other)} shrugs. "Maybe I said some things." It's not an apology, but it's something.` : `"I don't know what you heard," ${first(other)} says. "I never said a word about you."`]; }
+    if (code === 'peace' || code === 'peace200') {
+      if (!other) return [];
+      // V89: an offer of amends (asks.ts) that stays open between you if he won't take it: you can come back with more, or let it go
+      const am = amendsAsk(w, p, other, { parent: s.id, amt: code === 'peace200' ? 200 : 0, why: `${p.name} wants to make peace with ${other.name}` });
+      if (!am) return [`${first(other)} isn't ready to hear it from you yet.`];
+      if (am.terms && code === 'peace200') am.terms.amt = Math.max(am.terms.amt ?? 0, 200);
+      const o = askMove(w, am, 'ask');
+      if (o.answer === 'yes') { closeSit(w, s, 'made peace', ['you made peace'], 8); return [...o.lines, `${first(other)} looks at you a long moment, then takes your hand. "All right. It's done."`]; }
+      return o.lines.length ? o.lines : [`${first(other)} hears you out and says nothing you'd want repeated.`];
+    }
+    if (code === 'face' && other) { const res = confront(w, s, p, other, rel(other, p.id).grudge > 0.3); M(s).heat = clamp(num(s, 'heat') + (res === 'defy' ? 0.2 : -0.1)); return [res === 'defy' ? `${first(other)} squares up. "You want to do something about it?" People are watching.` : res === 'admit' ? `${first(other)} shrugs. "Maybe I said some things." It's not an apology, but it's something.` : `"I don't know what you heard," ${first(other)} says. "I never said a word about you."`]; }
     if (code === 'upstairs' && other && who) { ruleOn(w, s, who, p, other); return [s.cons?.at(-2) ?? 'He hears you both and rules.', ...(s.cons?.slice(-1) ?? [])]; }
     if (code === 'rule' && r.length === 2) { ruleOn(w, s, p, r[0], r[1]); return ['You hear them both and give your ruling.', ...(s.cons?.slice(-1) ?? [])]; }
     if (!who) return [];
@@ -432,6 +449,7 @@ function revengeStep(w: World, s: Situation) {
   const av = live(w, role(s, 'avenger')), wronged = w.chars[role(s, 'wronged') ?? ''];
   const target = live(w, s.m?.target as string | undefined);
   if (s.phase === 'struck') return closeSit(w, s, 'avenged', [`${av ? first(av) : 'He'} paid ${target ? first(target) : 'him'} back`], 12);
+  { const made = s.m?.['child:amends']; if (made === 'agreed' || made === 'gave in') return closeSit(w, s, 'made amends', ['amends were accepted'], 12); if (made) delete s.m!['child:amends']; } // (V89)
   if (!av || !free(w, av) && s.phase !== 'seething') { if (!av) return closeSit(w, s, 'gone', [], 8); return at(w, s, s.phase ?? 'seething', 5); }
   if (w.now - s.since > 10 * WEEK) return closeSit(w, s, 'let go', [`${first(av)} let it go in the end`], 8);
   const root = w.facts[String(s.m?.fact ?? '')];
@@ -536,9 +554,13 @@ MATTERS.revenge = {
     }
     if (code === 'amends' && av) {
       const fee = root?.kind === 'murder' ? 2000 : 400;
-      const ok = reconcile(w, s, p, av, fee);
-      if (ok) { closeSit(w, s, 'made amends', ['you paid for what was done'], 12); return [`${first(av)} counts it in front of you, slowly. "This doesn't make us friends. But it's finished."`]; }
-      return [`${first(av)} takes the money and looks at you. "This is a start." It is not the end of it.`];
+      // V89: an offer of amends (asks.ts): he takes it, names what it would take, or turns it down, and it stays open between you
+      const am = amendsAsk(w, p, av, { parent: s.id, fact: root?.id, amt: fee, why: `${p.name} offered ${av.name} amends` });
+      if (!am) return [`${first(av)} won't hear it from you yet.`];
+      if (am.terms) am.terms.amt = Math.max(am.terms.amt ?? 0, fee);
+      const o = askMove(w, am, 'ask');
+      if (o.answer === 'yes') { closeSit(w, s, 'made amends', ['you paid for what was done'], 12); return [`${first(av)} counts it in front of you, slowly. "This doesn't make us friends. But it's finished."`]; }
+      return o.lines;
     }
     if (code === 'deny') {
       const guilty = root?.actor === p.id;
@@ -580,7 +602,13 @@ function onHurt(w: World, f: Fact) {
   const av = kin.sort((a, b) => b.traits.violence - a.traits.violence)[0];
   if (!av) return;
   const wantIt = 0.15 + av.traits.violence * 0.45 + (f.kind === 'murder' ? 0.4 : 0) - av.traits.caution * 0.25 + (kinTie(w, av, v) === 'brother' ? 0.15 : 0);
-  if (!w.rng.chance(clamp(wantIt, 0, 0.9))) return;
+  if (!w.rng.chance(clamp(wantIt, 0, 0.9))) {
+    // V89: a man who won't go after the one who hurt his own does the next thing, if his brother can tell him who it was: he has a
+    // word with him (asks.ts 'layoff'), and the other man answers like anyone asked anything
+    const x = live(w, f.actor);
+    if (x && f.kind !== 'murder' && v.alive && v.known[f.id]?.knowsActor && !f.hiddenActor && x.id !== av.id) { learn(w, av.id, f, 'family', true); if (layoffFor(w, av, x, v, f.id)) bump(w, 'layoff.kin'); }
+    return;
+  }
   const s = spawn(w, 'revenge', 'revenge:' + f.id, av.id, { cause: `${f.text.replace(/\.$/, '')}, and ${av.name} is ${v.isPlayer ? 'family' : 'his ' + (kinTie(w, av, v) ?? 'kin')}`, parties: [{ id: av.id, role: 'avenger' }, { id: v.id, role: 'wronged' }], sev: f.kind === 'murder' ? 0.5 : 0.35, phase: 'seething', next: w.now + w.rng.int(1, 3) * DAY, orgs: av.familyId ? [av.familyId] : [], m: { fact: f.id } });
   if (!s) return;
   learn(w, av.id, f, 'family', !f.hiddenActor);
@@ -729,5 +757,4 @@ factHooks().push((w, f) => {
 });
 goalHooks().push(onGoal);
 // weekly, from the engine
-export function mattersWeek(w: World) { rivalryScan(w); }
-void asker; void askee;
+export function mattersWeek(w: World) { rivalryScan(w); favoursWeek(w); } // (V89: and favours owed between men are called in, asks.ts)

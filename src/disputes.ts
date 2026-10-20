@@ -283,6 +283,13 @@ export function againstMe(w: World, p: Character, x: Character): Dispute[] {
 export function touchDispute(w: World, p: Character, x: Character, text?: string) {
   for (const d of [...mineAgainst(w, p, x), ...againstMe(w, p, x)]) { d.handled = w.now; d.seen = true; if (text) log(w, d, text); }
 }
+// V89: amends that were accepted (asks.ts 'amends') end every quarrel between the two men that is still open.
+export function settleBetween(w: World, p: Character, x: Character, text: string): number {
+  const ds = [...againstMe(w, p, x), ...mineAgainst(w, p, x)];
+  for (const d of ds) { d.handled = w.now; d.seen = true; d.status = 'settled'; log(w, d, text); }
+  return ds.length;
+}
+export const quarrelsWith = (w: World, p: Character, x: Character) => [...againstMe(w, p, x), ...mineAgainst(w, p, x)];
 // Making amends to the man you wronged: what you say and what you pay changes where the quarrel stands.
 export function amends(w: World, p: Character, x: Character, how: 'own' | 'pay' | 'start' | 'defy'): void {
   const rng = w.rng;

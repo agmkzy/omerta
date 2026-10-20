@@ -1,13 +1,13 @@
 import { matterAct, matterTitle, topicsWith } from './matters';
 import { addr, nudgeOf, subjectRows, talkAbout } from './talk';
-import { askBetween, openAsk, openAsks as openMatters, playerMove, playerMoves, read as mRead, titleOf as mTitle, type AskMove } from './asks';
+import { amendsAsk, askBetween, callFavour, rateAsk, openAsk, openAsks as openMatters, playerMove, playerMoves, read as mRead, titleOf as mTitle, type AskMove } from './asks';
 import { historyLines } from './powers2';
 import { askAbout, helpWith, sitOf } from './situations';
 // Conversations. Options are generated from what the other man knows, how he feels about you and what has happened.
 // What you learn becomes available later: a name, an amount, a witness. What you promise is remembered.
 import { readiness } from './career';
 import { share, confide } from './actions';
-import { react, envelopeDue, handOver, kickWindow, envelopeText, askRate } from './books';
+import { react, envelopeDue, handOver, kickWindow, envelopeText, rateView } from './books';
 import { addFact, clamp, createDebt, earn, factText, famName, flavour, isResolved, learn, money, ownerBiz, payDebt, rel, shortTime } from './core';
 import { standingWord, mkJob, oppFrom, tipFrom, bossOffer, traitWords } from './jobs';
 import { openSitdown, Meeting } from './meetings';
@@ -428,7 +428,7 @@ function flatRoot(w: World, p: Character, t: Character, c: Convo): DOpt[] {
     if (!leaves.length) add({ ...root }, CAT[n]); else for (const o of leaves) add(o, CAT[n]);
   }
   // The opening: how he is, how his business is, what's been going on. Always there, so you can simply talk.
-  if (t.prospect && t.rank === 'civilian' && RK(p.rank) >= 1) items.push({ o: { code: 'recruit_offer', label: 'Offer him a place with you', hint: `Costs $150 to start. He becomes your responsibility.` }, cat: 'Do something for him' });
+  if (t.prospect && t.rank === 'civilian' && RK(p.rank) >= 1 && !askBetween(w, 'recruit', p.id, t.id)) items.push({ o: { code: 'recruit_offer', label: 'Offer him a place with you', hint: `Costs $150 to start. He becomes your responsibility.` }, cat: 'Do something for him' });
   for (const x of items) x.cat = intentOf(x.o.code, x.cat);
   if (talkedToday < 2 && !items.some((x) => x.o.code === 'how') && raw.some((o) => o.code === 'n:personal')) items.push({ o: { code: 'how', label: 'Ask how he’s holding up', hint: AUTO.how }, cat: 'Personal matters' });
   if (!items.some((x) => x.o.code === 'chat')) items.push({ o: { code: 'chat', label: 'What’s been going on?' }, cat: INTENTS[0] });
@@ -445,7 +445,10 @@ function flatRoot(w: World, p: Character, t: Character, c: Convo): DOpt[] {
   // He told you it wasn't him, and you have since learned it was. That is a matter between you now.
   const lied = Object.keys(t.denied ?? {}).map((id) => w.facts[id]).find((f) => f && f.actor === t.id && p.known[f.id]?.knowsActor && p.known[f.id].from !== t.id);
   const broken = brokenWord(w, p, t);
-  if (broken) contextual.unshift({ code: 'word_make', label: 'I let you down. I want to make it right.', hint: 'It will cost you something, and he will remember that you came.', story: 'go', big: true });
+  if (broken && !askBetween(w, 'amends', p.id, t.id)) contextual.unshift({ code: 'word_make', label: 'I let you down. I want to make it right.', hint: 'It will cost you something, and he will remember that you came.', story: 'go', big: true });
+  // V89: a favour he owes you can be called in (asks.ts 'favour'): money, quietly. He may pay, offer part, put you off, or refuse.
+  const owesMe = !t.isPlayer && !askBetween(w, 'favour', p.id, t.id) ? w.favours.find((f) => !f.settled && f.from === p.id && f.to === t.id && (w.sitcool?.[`ask:favour:${p.id}:${t.id}:${f.id}`] ?? 0) <= w.now) : undefined;
+  if (owesMe) contextual.push({ code: 'favcall:' + owesMe.id, label: `Call in the favour he owes you: ${money(150 * Math.max(1, owesMe.size))}`, hint: 'He owes you. What he does about it says what he is.', story: 'go' });
   if (lied) contextual.unshift({ code: 'confront:' + lied.id, label: 'You told me it wasn’t you.', hint: 'You know it was. How he takes it says a lot.', story: 'go', big: true });
   // LAYER 1: what is going on between you. Things that carry a story first; a quiet man has an empty list and that is fine.
   const rank = (x: Item) => (x.o.story === 'go' ? 0 : x.o.story ? 1 : x.o.code === 'b_envelope' ? 2 : 9);
@@ -893,6 +896,13 @@ export function say(w: World, p: Character, t: Character, c: Convo, code: string
     const r = matterAct(w, p, sid, mc, t.id);
     return fresh({ lines: r.lines.map((l) => speechFor(w, p, t, l)), minutes: r.minutes, convo: { ...c, node: 'root', used: [...(c.used ?? []), usedKey(c, code)] } });
   }
+  if (code.startsWith('favcall:')) { // V89: calling in a favour he owes you (asks.ts 'favour')
+    const f = w.favours.find((x) => x.id === code.slice(8) && !x.settled && x.from === p.id && x.to === t.id);
+    const s = f ? callFavour(w, p, t, f, 'money', 150 * Math.max(1, f.size)) : undefined;
+    if (!f || !s) return { lines: ['“We’ve been over that.”'], minutes: 3, convo: { ...c, node: 'root' } };
+    const r = playerMove(w, p, s.id, 'ask');
+    return { lines: [`You remind ${t.name.split(' ')[0]} of ${f.what}.`, ...r.lines].map((l) => speechFor(w, p, t, l)), minutes: r.minutes, convo: { ...c, node: 'root', used: [...(c.used ?? []), usedKey(c, code)] } };
+  }
   if (code.startsWith('mv:')) {
     const [, sid, mv] = code.split(':');
     const r = playerMove(w, p, sid, mv as AskMove);
@@ -1168,9 +1178,12 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
     case 'rate_ask': {
       if (t.id !== p.bossId) return stay('business', 5);
       p.cooldown['rate:ask'] = w.now + 4 * 7 * DAY;
-      const r = askRate(w, p, t, true);
-      lines.push(...r.lines);
-      return stay('business', 30);
+      // V89: asking to pass up less is a matter between you (asks.ts 'rate'): he may agree, meet you part way with the reason he has
+      // (a levy, his own people to pay, your arrears), put you off, or refuse; you can ask for less of a cut, make your case, or drop it.
+      const s = askBetween(w, 'rate', p.id, t.id) ?? rateAsk(w, p, t);
+      if (!s) { lines.push(p.kickRate <= rateView(w, p, t).floor + 0.001 ? `${t.name.split(' ')[0]} points out you already pass up less than most. There's nothing left to give.` : `${t.name.split(' ')[0]}: “We had this conversation. Give it a while.”`); return stay('business', 10); }
+      lines.push(...playerMove(w, p, s.id, 'ask').lines);
+      return { lines, minutes: 30, convo: { id: c.id, node: 'root', ctx: c.ctx } };
     }
     case 'partner_chop': {
       if (p.cash < 2000) {
@@ -1555,33 +1568,29 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
       return stay('incident', 15);
     }
     case 'a_own':
-    case 'a_start':
-    case 'a_pay':
-    case 'a_defy': {
+    case 'a_pay': {
+      // V89: owning up, or paying for what you did, is an offer of amends (asks.ts 'amends'): he may accept it, name what it would
+      // take and why (what it cost him), or turn it away; and it stays between you, so you can come back with more.
       const f = w.facts[arg];
       c.ctx.asked.push(c0);
-      amends(w, p, t, c0 === 'a_own' ? 'own' : c0 === 'a_pay' ? 'pay' : c0 === 'a_start' ? 'start' : 'defy');
-      if (c0 === 'a_own') {
-        lines.push(`"I was wrong," you say. ${t.name} says nothing for a while. "That cost me. But I respect a man who says it."`);
-        r.grudge = clamp(r.grudge - 0.2);
-        tweak(0.04, 0.02, 0.03);
-      } else if (c0 === 'a_start') {
+      const amt = c0 === 'a_pay' ? Math.max(200, Math.round((f?.amount ?? 0) * 1.2)) : 0;
+      if (amt && p.cash < amt) { lines.push('You reach for your money and come up short. Better to wait until you can do it properly.'); c.ctx.asked.pop(); return stay('amends', 5); }
+      const s = askBetween(w, 'amends', p.id, t.id) ?? amendsAsk(w, p, t, { fact: f?.id, amt, why: `${p.name} came to make it right with ${t.name}` });
+      if (!s) { lines.push(`${t.name}: “We’ve been through it. Leave it a while.”`); return stay('amends', 5); }
+      if (s.terms) s.terms.amt = Math.max(s.terms.amt ?? 0, amt);
+      lines.push(c0 === 'a_own' ? '"I was wrong," you say.' : `You put ${money(amt)} on the table.`);
+      lines.push(...playerMove(w, p, s.id, 'ask').lines);
+      return stay('amends', 20);
+    }
+    case 'a_start':
+    case 'a_defy': {
+      c.ctx.asked.push(c0);
+      amends(w, p, t, c0 === 'a_start' ? 'start' : 'defy');
+      if (c0 === 'a_start') {
         const ok = t.traits.violence < 0.6 || rng.chance(0.4);
         lines.push(ok ? `"You started it," you remind him. ${t.name} looks away. "Maybe. Maybe I did."` : `"You started it," you say. ${t.name}'s face hardens. "Don’t put this on me."`);
         r.grudge = clamp(r.grudge + (ok ? -0.12 : 0.1));
         tweak(ok ? 0.02 : -0.03);
-      } else if (c0 === 'a_pay') {
-        const amt = Math.max(200, Math.round((f.amount ?? 0) * 1.2));
-        if (p.cash < amt) {
-          lines.push(`You reach for your money and come up short. Better to wait until you can do it properly.`);
-          c.ctx.asked.pop();
-        } else {
-          p.cash -= amt;
-          t.cash += amt;
-          lines.push(`You put ${money(amt)} on the table. ${t.name} counts it without picking it up. "We’re square. Mostly."`);
-          r.grudge = clamp(r.grudge - 0.3);
-          tweak(0.05, 0.02);
-        }
       } else {
         lines.push(`"I would do it again," you tell him. ${t.name} nods once, slowly, the way a man does when he has decided something.`);
         r.grudge = clamp(r.grudge + 0.2);
