@@ -20,7 +20,7 @@ A single-player sandbox mafia RPG in **1970 New York**. The pitch: a world that 
 
 ## Hard requirements
 - **Save compatibility:** `serialize/deserialize` (SCHEMA 7). Never break loading of older saves; new fields must be optional with safe defaults; add migrations, never delete them. `src/tests/oldsave.test.ts` loads genuine old saves (`src/tests/fixtures/`, incl. a schema-2 save) – keep it passing and add a fixture whenever the schema changes.
-- **Portraits must not change.** They are procedurally painted in `src/ui/portrait.ts` (`portraits_pack.ts` is an intentionally empty override slot). Do not modify portrait code or output.
+- **Portraits** are procedurally painted in `src/ui/portrait.ts` (`portraits_pack.ts` is an intentionally empty override slot). From V88 the owner has asked for them to be reworked (rank shown through dress, more variety and options). Keep them deterministic (same character, same face) and save-compatible: the existing `Look` fields keep their meaning, and new options are optional with defaults.
 - Preserve V72–V76 mechanics, the ledger, NPC information restrictions and the conversation overhaul.
 - Don't add gameplay systems or change balance unless asked; report integration gaps instead of hiding them.
 
