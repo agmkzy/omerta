@@ -5,7 +5,7 @@ export function ambitionCard(): string {
   const w = W(), p = P();
   const a = p.ambition;
   const pick = `<div class="list">${AMBS.map((d) => `<button class="opt" data-a="amb:${d.kind}"><b>${esc(d.label)}</b><span class="because">${esc(d.blurb)}</span></button>`).join('')}</div>`;
-  if (!a) return `<div class="card"><h2>What are you after?<small>pick one</small></h2><p class="muted">Choose a goal and the game will point you at the people and chances that serve it.</p>${pick}</div>`;
+  if (!a) return `<div class="card"><h2>What are you after?<small>pick one</small></h2><p class="muted">Choose a goal and the game will point you at the people and chances that serve it.</p><details class="fold"><summary class="btn">Choose an ambition</summary>${pick}</details></div>`;
   const d = AMBS.find((x) => x.kind === a.kind)!;
   const pr = ambProgress(w, p, a.kind as AmbKind);
   if (a.done) return `<div class="card"><h2>Ambition<small>done</small></h2><p><b>${esc(d.label)}.</b> You did it.</p><details><summary class="muted">Choose the next one</summary>${pick}</details></div>`;

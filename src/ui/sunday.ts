@@ -6,6 +6,7 @@ import { envelopeSum, kickWindow } from '../books';
 import { crewOf, openSunday, WANT_SHORT, knows } from '../crewlife';
 import { previous, statement } from '../ledger';
 import { back } from './common';
+import { toSide } from './layout';
 import { esc, lk, P, pl, S, W } from './links';
 
 export function sundayDue(): boolean {
@@ -31,7 +32,7 @@ function manCard(c: import('../types').Character): string {
   const pill = settled ? '<span class="tag green">Settled</span>' : light ? `<span class="tag red">Light${s.short ? ' by ' + money(s.short) : ''}</span>` : '<span class="tag green">In order</span>';
   const d = prev ? s.handed - prev.handed : 0;
   const vs = prev ? ` &middot; <span class="${d > 0 ? 'good' : d < 0 ? 'warn' : 'muted'}">${d > 0 ? '+' : d < 0 ? '−' : ''}${money(Math.abs(d))} vs last week</span>` : '';
-  let out = `<div class="card sunman${light && !settled ? ' light' : ''}"><div class="sunhead"><a href="#" class="nm" data-a="ent:${c.id}">${pl(c)}</a>${pill}</div>`;
+  let out = `<div class="card sunman${light && !settled ? ' light' : ''}"><div class="sunhead">${pl(c)}${pill}</div>`;
   out += `<p class="sunline">Handed up <b>${money(s.handed)}</b> of ${money(s.due)} due${vs}</p>`;
   if (c.books.missed > 1 && !settled) out += `<p class="muted sunline">${c.books.missed} short weeks in a row.</p>`;
   if (checked) out += `<div class="note">${checked.map((l) => `<p>${lk(l)}</p>`).join('')}</div>`;
@@ -45,7 +46,8 @@ function manCard(c: import('../types').Character): string {
     row.push(BTN(`srule:${c.id}|accept`, 'Take what’s here', `The ${money(s.short)} stays on his tab.`, 'primary'), BTN(`srule:${c.id}|warn`, 'Warn him', 'A quiet word. He knows you’re watching.'), BTN(`srule:${c.id}|demand`, `Make him pay the ${money(Math.max(s.short, p.books.flags[c.id]?.amt ?? 0))}`, 'Adds it to what he owes. He won’t like it.'), BTN(`srule:${c.id}|forgive`, 'Let it slide', 'Clears it. Some will take that as weakness.'));
     row.push(BTN(`srule:${c.id}|shout`, 'Shout at him', 'Humiliate him in front of the room. Others take note.', 'bad'), BTN(`srule:${c.id}|raise`, 'Raise his share (+5%)', 'He pays more from now on. He resents it.', 'bad'), BTN(`srule:${c.id}|beat`, 'Have him beaten', 'Violence. He won’t forget and the family hears.', 'bad'), BTN(`srule:${c.id}|cut`, 'Cut him loose', 'He’s out of your crew, and he knows what he knew.', 'bad'));
   }
-  out += `<div class="sunbtns">${row.join('')}</div></div>`;
+  // The likeliest two answers in reach; the rest a tap away, so a room of men isn't a wall of buttons.
+  out += `<div class="sunbtns">${row.slice(0, 2).join('')}</div>${row.length > 2 ? `<details class="fold sunmore"><summary class="more">More ways to answer him</summary><div class="sunbtns">${row.slice(2).join('')}</div></details>` : ''}</div>`;
   return out;
 }
 
@@ -56,7 +58,7 @@ export function sundayView(): string {
   const crew = crewOf(w, p);
   if (!S.sundayHeard || S.sundayHeard !== s?.t) { S.sundayLines = openSunday(w, p); S.sundayHeard = s?.t ?? 0; S.sundayRes = {}; S.sundayBooks = {}; S.sundayMine = []; }
   S.sundaySeen = s?.t ?? w.now;
-  let out = back() + `<div class="card"><h2>SUNDAY &middot; THE SOCIAL CLUB</h2><p class="muted">Your men come in with an envelope each. You can look through any man’s books and answer him, all from here.</p></div>`;
+  let out = back() + `<header class="g-meet"><h1 class="page">Sunday at the social club</h1><p class="g-just g-just--small"><span>Your men come in with an envelope each. Look through any man’s books and answer him, all from here.</span></p></header>`;
 
   // the table: what came in against what was due
   const stm = crew.map((c) => ({ c, s: statement(w, c) }));
@@ -69,7 +71,7 @@ export function sundayView(): string {
 
   if (S.sundayLines?.length) out += `<h2 class="sect">Somebody has something to tell you</h2><div class="card">${S.sundayLines.map((l) => `<p class="say">${lk(l)}</p>`).join('')}</div>`;
   const rows = crew.map((c) => (knows(p, c.id, 'want') && c.want ? `<li><span>${esc(c.name.split(' ')[0])}</span><span class="v">${esc(WANT_SHORT[c.want.kind])}</span></li>` : '')).join('');
-  if (rows) out += `<h2 class="sect">What you’ve worked out</h2><div class="card"><ul class="rows">${rows}</ul></div>`;
+  if (rows) toSide(`<h2 class="sect">What you’ve worked out</h2><div class="card"><ul class="rows">${rows}</ul></div>`);
 
   // your own envelope, handed over right here
   const boss = p.bossId ? w.chars[p.bossId] : undefined;

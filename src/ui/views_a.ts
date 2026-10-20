@@ -5,10 +5,10 @@ import { waiting } from '../club';
 // Today, sheets (people, shops, incidents) and the family trees.
 import { grudgeWord } from '../actions';
 import { effectiveRate, SOURCE_LABEL, visibleSources } from '../books';
-import { queueOf } from './family';
+import { queueOf, queueView } from './family';
 import { pathCard, powersCard } from './pathview';
 import { pathInfo } from '../path';
-import { capOf, isRunner, members, promoSteps, seats, standingTable, vacancy } from '../career';
+import { capOf, careerLines, isRunner, members, promoSteps, seats, standingTable, vacancy } from '../career';
 import { factText, famName, money, ownerBiz, shortTime } from '../core';
 import { KIND_LABEL, standingWord, staleReason } from '../jobs';
 import { GIG_LABEL } from '../gigs';
@@ -24,12 +24,14 @@ import { hustleLine } from '../hustle';
 import { myDisputes, playerMoved } from './views_c';
 import { storiesTab, storiesOf } from './stories';
 import { ambitionCard } from './ambview';
+import { AMBS } from '../ambition';
 import { whereIs } from '../where';
 import { TAGS, noteOf } from '../notebook';
 import { WANT_LINE } from '../crewlife';
 import { comingUp } from './brief';
 import { sundayDue } from './sunday';
-import { avatar, banner, back, meterRow, skillBars, skillLine, strip, traitTags } from './common';
+import { avatar, banner, back, chevron, meterRow, skillBars, skillLine, traitTags } from './common';
+import { toSide } from './layout';
 import { bl, chip, esc, fl, known, lk, P, pl, S, statusOf, W, who } from './links';
 
 const word = (v: number, a: string[]) => a[Math.min(a.length - 1, Math.floor(v * a.length))];
@@ -85,48 +87,41 @@ function guideCard(): string {
   const done = steps.filter((x) => x[2]).length;
   if (done === steps.length) return '';
   const next = steps.findIndex((x) => !x[2]);
-  return `<div class="card guide"><h2>Your first week<small>${done} of ${steps.length}</small></h2><ul class="gl">${steps.map((x, i) => `<li class="${x[2] ? 'ok' : i === next ? 'now' : ''}">${x[2] ? '✓ ' : i === next ? '→ ' : '· '}<b>${esc(x[0])}</b>${i === next ? `<span class="s">${esc(x[1])}</span>` : ''}</li>`).join('')}</ul>${steps[next][3] ? `<button class="btn primary" data-a="${steps[next][3]}">${next === 0 ? 'Go and find him' : 'Take me there'}</button>` : ''}<button class="more" data-a="guideoff:">Skip the guide</button></div>`;
+  // One step at a time: the step in front of you, a way to get there, and the rest folded away.
+  const rest = steps.map((x, i) => `<li class="${x[2] ? 'ok' : i === next ? 'now' : ''}">${x[2] ? '✓ ' : i === next ? '→ ' : '· '}${esc(x[0])}</li>`).join('');
+  return `<div class="card guide g-guide"><h2>Your first week<small>${done} of ${steps.length}</small></h2><p class="g-guide__step">${esc(steps[next][0])}</p><p class="muted">${esc(steps[next][1])}</p><div class="g-guide__acts">${steps[next][3] ? `<button class="btn primary" data-a="${steps[next][3]}">${next === 0 ? 'Go and find him' : 'Take me there'}</button>` : ''}<details class="fold"><summary class="more">All six steps</summary><ul class="gl">${rest}</ul></details><button class="more" data-a="guideoff:">Skip the guide</button></div></div>`;
 }
 
 export function todayView(): string {
   const w = W();
   const p = P();
-  let out = strip();
-  if (!p.alive) return out + `<div class="card"><h2>You’re dead</h2><p>The world goes on without you.</p><button class="btn primary" data-a="reset:go">Start a new game</button></div>`;
-  if (S.log.length) out += `<div class="card"><h2>Just now</h2>${S.log.map((l) => `<p>${l}</p>`).join('')}</div>`;
-  if (S.chips.length) out += `<div class="chips">${S.chips.map((c) => `<span class="chip2 ${c.tone}">${esc(c.t)}</span>`).join('')}</div>`;
-  if (S.news.length) out += `<div class="card"><h2>Word reaches you</h2><ul class="news">${S.news.map((n) => `<li>${n}</li>`).join('')}</ul>${S.routine ? `<p class="muted" style="margin:8px 0 0">${S.routine} routine matter${S.routine > 1 ? 's' : ''} besides, filed under History.</p>` : ''}</div>`;
-
+  let out = '';
+  if (!p.alive) return `<div class="card"><h2>You’re dead</h2><p>The world goes on without you.</p><button class="btn primary" data-a="reset:go">Start a new game</button></div>`;
+  // V88: the street first. What happened, what is said, what wants you, where you can go. Where you stand goes to the side.
   const dg = dangerLevel(w);
   if (dg.level > 0 && dg.who) out += `<div class="callout bad"><b>Watch your back.</b> ${lk(dg.who.name)} is after you: ${esc(LADDER_WORDS[dg.level])}. It won’t stop by itself.</div>`;
-  out += timeBar();
+  if (S.log.length) out += `<section class="g-just" aria-label="Just now">${S.log.map((l) => `<p>${l}</p>`).join('')}</section>`;
+  if (S.chips.length) out += `<div class="chips">${S.chips.map((c) => `<span class="chip2 ${c.tone}">${esc(c.t)}</span>`).join('')}</div>`;
+  if (S.news.length) out += `<section class="g-word"><h3 class="sub">Word reaches you</h3><ul class="news">${S.news.map((n) => `<li>${n}</li>`).join('')}</ul>${S.routine ? `<p class="muted" style="margin:8px 0 0">${S.routine} routine matter${S.routine > 1 ? 's' : ''} besides, filed under History.</p>` : ''}</div>`;
   if (w.scene) out += `<button class="need" data-a="place:club"><span class="dot amber"></span><span><span class="t">In the middle of a conversation</span><span class="s" style="display:block">${esc(w.chars[w.scene.npc]?.name ?? 'Someone')} at the club.</span></span></button>`;
-  out += guideCard() + ambitionCard();
+  out += `<div class="g-pass"><h3 class="sub">Let time pass</h3>${timeBar()}</div>`;
+  out += guideCard();
   const ns = needs();
   const attn = ns.filter(isAttn);
   const opps = ns.filter((n) => !attn.includes(n));
   const needHtml = (n: (typeof ns)[number]) => `<button class="need" data-a="${n.a}"><span class="dot ${n.dot}"></span><span><span class="t">${lk(n.title).replace(/<a [^>]*>(.*?)<\/a>/g, '$1')}</span><span class="s" style="display:block">${esc(n.sub)}</span></span></button>`;
-  out += `<h2 class="sect">Needs your attention<small>${attn.length ? attn.length + ' waiting' : 'nothing urgent'}</small></h2>`;
+  out += `<h2 class="sect">Needs you<small>${attn.length ? attn.length + ' waiting' : 'nothing urgent'}</small></h2>`;
   if (!attn.length) out += `<p class="muted pad">Nothing is demanding you. Use the quiet to build something.</p>`;
-  out += (S.open.needs ? attn : attn.slice(0, 4)).map(needHtml).join('');
+  out += `<div class="g-rows">${(S.open.needs ? attn : attn.slice(0, 4)).map(needHtml).join('')}</div>`;
   if (attn.length > 4) out += `<button class="more" data-a="tog:needs">${S.open.needs ? 'Show fewer' : `Show ${attn.length - 4} more`}</button>`;
-  if (opps.length) out += `<h2 class="sect">Opportunities<small>${opps.length}</small></h2>` + opps.slice(0, 4).map(needHtml).join('');
-  { const mine = Object.values(w.ops).filter((o) => o.owner === p.id).length + Object.values(w.biz).filter((x) => x.protection?.collectorId === p.id).length;
-    const crewN = Object.values(w.chars).filter((c) => c.alive && c.bossId === p.id).length;
-    const wk = Math.round(Object.values(p.books.gross).reduce((a, v) => a + v, 0));
-    out += `<h2 class="sect">Your interests</h2><button class="card" data-a="tab:rackets" style="text-align:left"><b>${mine} operation${mine === 1 ? '' : 's'}</b> &middot; <b>${crewN} ${crewN === 1 ? 'man' : 'men'}</b> &middot; ${money(wk)} this week so far</button>`; }
-
-  { const cu = comingUp(); if (cu.length) out += `<div class="card"><h2>Coming up</h2><ul class="rows">${cu.slice(0, 3).map((c) => `<li><span>${esc(shortTime(c.t))}</span><span class="v" style="text-align:left;margin-left:12px">${esc(c.text)}</span></li>`).join('')}</ul></div>`; }
-  if ((w.snaps ?? []).length) out += `<button class="more" data-a="brief:">This week’s Herald and your week &rsaquo;${(S.seenBrief ?? 0) < w.snaps![w.snaps!.length - 1].t ? ' <b class="tag amber">new</b>' : ''}</button>`;
-  { const run = storiesOf(w).filter((s) => !s.closed); if (run.length) out += `<button class="more" data-a="tab:stories">${run.length} ${run.length > 1 ? 'stories' : 'story'} running &rsaquo;</button>`; }
-  out += `<h2 class="sect">Go and do something</h2><div class="grid">`;
-  const crew = Object.values(w.chars).filter((c) => c.alive && c.bossId === p.id);
-  const out_ = w.jobs.filter((j) => j.status === 'active' && j.assignee !== p.id && crew.some((c) => c.id === j.assignee)).length;
-  out += `<button class="tile" data-a="place:club"><span class="t">Social Club</span><span class="s">${esc(clubHint())}</span></button><button class="tile" data-a="places:"><span class="t">Around town</span><span class="s">Barber shop, corner bar</span></button>`;
-  out += `<button class="tile" data-a="tab:crew"><span class="t">Your crew</span><span class="s">${crew.length} men${out_ ? ` · ${out_} out on jobs` : ''}</span></button>`;
+  if (opps.length) {
+    out += `<h2 class="sect">Opportunities<small>${opps.length}</small></h2><div class="g-rows">${(S.open.opps ? opps : opps.slice(0, 3)).map(needHtml).join('')}</div>`;
+    if (opps.length > 3) out += `<button class="more" data-a="tog:opps">${S.open.opps ? 'Show fewer' : `Show ${opps.length - 3} more`}</button>`;
+  }
+  // Where to go. Crew and Rackets are their own sections, so they are not repeated here.
+  out += `<h2 class="sect">Go and do something</h2><div class="grid g-places">`;
+  out += `<button class="tile" data-a="place:club"><span class="t">Social Club</span><span class="s">${esc(clubHint())}</span></button><button class="tile" data-a="places:"><span class="t">Around town</span><span class="s">Barber shop, corner bar</span></button><button class="tile" data-a="people:"><span class="t">Find someone</span><span class="s">Who’s where, right now</span></button>`;
   out += `<button class="tile" data-a="orders:"><span class="t">Give orders</span><span class="s">Put a man to work</span></button>`;
-  out += `<button class="tile" data-a="tab:rackets"><span class="t">Rackets</span><span class="s">Open a new line. Check the take.</span></button>`;
-  out += `<button class="tile" data-a="people:"><span class="t">Find someone</span><span class="s">Who’s where, right now</span></button>`;
   out += p.job
     ? `<button class="tile hot" data-a="shift:"><span class="t">Work a shift</span><span class="s">${esc(p.job.kind)} · ${p.job.biz ? esc(w.biz[p.job.biz].name) : esc(w.chars[p.job.boss].name)}</span></button>`
     : `<button class="tile" data-a="dayjob:"><span class="t">Legit work</span><span class="s">A clean job buys cover.</span></button>`;
@@ -134,7 +129,35 @@ export function todayView(): string {
   out += `<button class="tile" data-a="bj:"><span class="t">Gamble</span><span class="s">Blackjack at the family casinos</span></button>`;
   if (p.heat > 0.15) out += `<button class="tile" data-a="cat:work"><span class="t">Lay low</span><span class="s">Heat is on you. Let it fade.</span></button>`;
   out += `</div>`;
+  // the papers and the stories the city is telling, always one tap away
+  { const run = storiesOf(w).filter((s) => !s.closed); const fresh = (w.snaps ?? []).length && (S.seenBrief ?? 0) < w.snaps![w.snaps!.length - 1].t;
+    out += `<div class="g-links">${(w.snaps ?? []).length ? `<button class="more" data-a="brief:">The Herald, and your week &rsaquo;${fresh ? ' <b class="tag amber">new</b>' : ''}</button>` : ''}<button class="more" data-a="tab:stories">${run.length ? `${run.length} ${run.length > 1 ? 'stories' : 'story'} running` : 'Stories'} &rsaquo;</button></div>`; }
 
+  // ---- beside it: where you stand
+  let side = `<h2 class="sect g-side__title">Where you stand</h2>`;
+  { let out = '';
+  { const mine = Object.values(w.ops).filter((o) => o.owner === p.id).length + Object.values(w.biz).filter((x) => x.protection?.collectorId === p.id).length;
+    const crewN = Object.values(w.chars).filter((c) => c.alive && c.bossId === p.id).length;
+    const wk = Math.round(Object.values(p.books.gross).reduce((a, v) => a + v, 0));
+    out += `<button class="card" data-a="tab:rackets" style="text-align:left"><b>${mine} operation${mine === 1 ? '' : 's'}</b> &middot; <b>${crewN} ${crewN === 1 ? 'man' : 'men'}</b> &middot; ${money(wk)} this week so far</button>`; }
+    side += out; }
+  // Your career is a page of its own in Life (rank progress and ambition together); here, just where it stands.
+  { const steps = promoSteps(w, p), a = p.ambition, amb = a ? AMBS.find((x) => x.kind === a.kind) : undefined;
+    const now = steps ? `being considered: ${steps.filter((x) => x.state === 'done').length} of ${steps.length} steps` : pathInfo(w, p) ? 'on the path' : `reputation ${standingWord(p.standing)}`;
+    side += `<button class="card g-career" data-a="career:"><h2>Your career<small>&rsaquo;</small></h2><p><b class="g-cap">${esc(p.rank)}</b> · ${esc(now)}</p><p class="muted">${amb ? `Ambition: ${esc(amb.label)}${a?.done ? ' (done)' : ''}` : 'No ambition chosen yet.'}</p></button>`; }
+  { const cu = comingUp(); if (cu.length) side += `<div class="card"><h2>Coming up</h2><ul class="rows">${cu.slice(0, 3).map((c) => `<li><span>${esc(shortTime(c.t))}</span><span class="v" style="text-align:left;margin-left:12px">${esc(c.text)}</span></li>`).join('')}</ul></div>`; }
+  const gross = Object.values(p.books.gross).reduce((a, v) => a + v, 0);
+  side += `<details class="fold"><summary class="more">This week: ${money(Math.round(gross))} so far</summary><div class="card"><ul class="rows">${Object.entries(p.books.gross).filter(([, v]) => v > 0).map(([s, v]) => `<li><span>${esc(SOURCE_LABEL[s] ?? s)}</span><span class="v good">+${money(Math.round(v))}</span></li>`).join('') || '<li class="muted">Nothing earned yet this week.</li>'}</ul></div></details>`;
+  toSide(side);
+  return out;
+}
+
+// Life > Career: where you stand in the family and what you are after, in one place.
+export function careerView(): string {
+  const w = W();
+  const p = P();
+  let out = '';
+  if (p.familyId) out += queueView();
   // where you stand
   const st = standingTable(w, p);
   if (st.rows.length) {
@@ -144,10 +167,10 @@ export function todayView(): string {
     else out += `<div class="card"><h2>Your standing in the ${esc(famName(w, p))} family</h2><ul class="rows">${st.rows.map((r) => `<li><span>${esc(r.label)}</span><span class="v ${r.tone}">${esc(r.value)}</span></li>`).join('')}</ul><div class="callout ${st.verdict.startsWith('Held') ? '' : 'info'}">${esc(st.verdict)}</div></div>`;
   }
 
+  out += ambitionCard();
   { const pc = powersCard(); if (pc) out += `<details class="fold"><summary class="more">What your rank lets you do</summary>${pc}</details>`; }
+  { const cl = careerLines(w, p); if (cl.length) out += `<div class="card"><h2>Your record</h2>${cl.map((l) => `<p>${lk(l)}</p>`).join('')}</div>`; }
   out += `<button class="more" data-a="goals:">Milestones &rsaquo;</button>`;
-  const gross = Object.values(p.books.gross).reduce((a, v) => a + v, 0);
-  out += `<details class="fold"><summary class="more">This week: ${money(Math.round(gross))} so far</summary><div class="card"><ul class="rows">${Object.entries(p.books.gross).filter(([, v]) => v > 0).map(([s, v]) => `<li><span>${esc(SOURCE_LABEL[s] ?? s)}</span><span class="v good">+${money(Math.round(v))}</span></li>`).join('') || '<li class="muted">Nothing earned yet this week.</li>'}</ul></div></details>`;
   return out;
 }
 
@@ -191,12 +214,14 @@ export function personView(id: Id): string {
   out += `<div class="tags"><span class="tag ${st.dot}">${st.word}</span>${kn ? traitTags(c) : ''}${kn && c.problem?.revealed ? `<span class="tag amber">${esc(PROBLEM_LABEL[c.problem.kind])}</span>` : ''}${c.prospect ? '<span class="tag blue">looking for a start</span>' : ''}</div>`;
 
   if (kn && !isMe) for (const t of personTexture(w, p, c)) out += `<div class="callout">${esc(t)}</div>`;
+  const headEnd = out.length;
   if (kn && !isMe) {
     out += `<div class="card"><h2>How he sees you</h2>${(() => {
       const wd = relWords(c, p);
       return meterRow('Trust', wd.trust, r?.trust ?? 0.05) + meterRow('Respect', wd.respect, r?.respect ?? 0.05, 'brass') + meterRow('Grudge', wd.grudge, r?.grudge ?? 0.03, 'red');
     })()}</div>`;
   }
+  const infoStart = out.length;
   if (kn) {
     out += `<div class="card"><h2>Where he fits</h2><ul class="rows">`;
     if (boss) out += `<li><span>Answers to</span><span class="v">${pl(boss)}</span></li>`;
@@ -234,6 +259,7 @@ export function personView(id: Id): string {
     const facts = Object.entries(p.known).filter(([fid]) => w.facts[fid] && (w.facts[fid].actor === c.id || w.facts[fid].victim === c.id) && (!w.facts[fid].minor || w.facts[fid].kind === 'trouble')).sort((a, b) => w.facts[b[0]].t - w.facts[a[0]].t).slice(0, 6);
     out += `<div class="card"><h2>What you know</h2>${facts.length ? facts.map(([fid, k]) => `<div class="note"><a href="#" class="nm" data-a="fact:${fid}" style="text-decoration:none">${lk(factText(w.facts[fid], k.knowsActor))}</a><div class="src">${esc(shortTime(w.facts[fid].t))}</div></div>`).join('') : '<p class="muted">Nothing worth repeating.</p>'}</div>`;
   }
+  const infoEnd = out.length;
 
   const k = kinOf(w, c.id);
   if (k && c.alive) out += `<div class="callout info">${kinWord(k)}. ${warmthWord(k.warmth)}. Last seen ${Math.max(0, Math.floor((w.now - k.lastSeen) / DAY))} days ago.</div><div class="row2"><button class="btn primary" data-a="visit:${c.id}">Spend an hour</button><button class="btn" data-a="tab:life">Your life</button></div>`;
@@ -252,7 +278,9 @@ export function personView(id: Id): string {
   }
   if (isMe) out += `<button class="btn" data-a="tab:life">Your life</button>`;
   void arch;
-  return out;
+  // V88: who he is, then what you can do with him, then how he sees you. His place, your notes and what you know go beside.
+  toSide(out.slice(infoStart, infoEnd));
+  return out.slice(0, headEnd) + `<div class="g-acts">${out.slice(infoEnd)}</div>` + out.slice(headEnd, infoStart);
 }
 
 export function encView(id: string, lines: string[]): string {
@@ -361,7 +389,13 @@ export function treeView(famId: Id): string {
   out += `<div class="crews">`;
   capos.forEach((cp, i) => {
     const kids = kidsOf(cp.id);
-    out += `<div class="crew"><div class="hd"><span>The ${esc(cp.name.split(' ').slice(1).join(' ') || cp.name)} Crew</span><span>${all.filter((c) => { let b = c.bossId; for (let n = 0; b && n < 4; n++) { if (b === cp.id) return true; b = w.chars[b]?.bossId ?? null; } return false; }).length} under him</span></div>${node(cp, 'top').replace('node top', 'node')}`;
+    // A crew opens when it is yours (or, in another family, the first); any crew opens or closes with a tap and stays that way.
+    const below = (c: Character) => { let b = c.bossId; for (let n = 0; b && n < 4; n++) { if (b === cp.id) return true; b = w.chars[b]?.bossId ?? null; } return false; };
+    const dflt = fam.id === p.familyId ? below(p) || cp.id === p.id : i === 0;
+    const key = (dflt ? 'crewx:' : 'crew:') + cp.id;
+    const open = dflt ? !S.open[key] : !!S.open[key];
+    out += `<div class="crew ${open ? 'open' : ''}"><button class="hd" data-a="tog:${key}" aria-expanded="${open}"><span>The ${esc(cp.name.split(' ').slice(1).join(' ') || cp.name)} Crew</span><span>${all.filter(below).length} under him ${chevron}</span></button>${node(cp, 'top').replace('node top', 'node')}`;
+    if (!open) { out += `</div>`; return; }
     const soldiers = kids.filter((k) => k.rank !== 'associate');
     const direct = kids.filter((k) => k.rank === 'associate');
     for (const s of soldiers) {

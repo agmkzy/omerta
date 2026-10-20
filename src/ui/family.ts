@@ -27,7 +27,7 @@ export function queueView(): string {
   const mine = rows.findIndex((x) => x.c.id === p.id);
   let out = `<h2 class="sect">Next in line for ${to === 'soldier' ? 'soldier' : 'capo'}<small>${open ? open + ' seat' + (open > 1 ? 's' : '') + ' open' : 'no seat open'}</small></h2>`;
   out += `<p class="muted pad">The family weighs what a man has earned, how the boss trusts him, his name and who will vouch for him. ${mine === 0 ? 'Right now that’s you.' : mine > 0 ? `${mine} ahead of you.` : ''}</p>`;
-  out += `<div class="card"><ul class="rows q">` + rows.map((x, i) => ({ ...x, i })).filter((x) => x.i < 5 || Math.abs(x.i - mine) <= 1).map(({ c, r, i }, k, arr) => {
+  out += `<div class="card"><ul class="rows q">` + rows.map((x, i) => ({ ...x, i })).filter((x) => x.i < 3 || Math.abs(x.i - mine) <= 1).map(({ c, r, i }, k, arr) => {
     const you = c.id === p.id;
     const boss = c.bossId ? w.chars[c.bossId] : undefined;
     const pct = Math.round(r.score * 100);
