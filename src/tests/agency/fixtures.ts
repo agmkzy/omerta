@@ -1,14 +1,19 @@
 // Fixtures for the NPC-goal checks (from the V74 suite).
 import assert from 'node:assert';
-import { advance } from '../../engine';
+import { advance, deserialize, serialize } from '../../engine';
 import { createWorld } from '../../world';
 import { DAY, Business, Character, Goal, World } from '../../types';
 import { ownerBiz, rel } from '../../core';
 import { agencyOf, begin, stepGoal } from '../../goals';
 
-/** World `seed` run for `days` days, then with every NPC goal, cooldown and statistic cleared, so a check starts its own
- * goals from nothing. Not cached: each call simulates again. */
-export const agencyWorld = (seed: number, days: number) => { const w = createWorld(seed, 'Tony Marino'); advance(w, w.now + days * DAY); const a = agencyOf(w); a.goals = []; a.cool = {}; a.stats = {}; a.ended = []; return w; };
+const cache = new Map<string, string>();
+/** World `seed` run for `days` days (built once per file and cached as a save), then with every NPC goal, cooldown and
+ * statistic cleared, so a check starts its own goals from nothing. */
+export const agencyWorld = (seed: number, days: number) => {
+  const k = seed + ':' + days;
+  if (!cache.has(k)) { const b = createWorld(seed, 'Tony Marino'); advance(b, b.now + days * DAY); cache.set(k, serialize(b)); }
+  const w = deserialize(cache.get(k)!); const a = agencyOf(w); a.goals = []; a.cool = {}; a.stats = {}; a.ended = []; return w;
+};
 
 // run one goal to its end (or `max` reviews) without moving the rest of the world
 export function drive(w: World, g: Goal, max = 80): boolean {
