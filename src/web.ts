@@ -827,7 +827,7 @@ document.addEventListener('click', (e) => {
     S.stack = [];
   }
   render();
-  const inPlace = ['tog', 'gpick', 'lsub', 'pf', 'stance', 'tree', 'opdist', 'oprun', 'hjpick'].includes(raw.slice(0, i)) || /^om:(both|first|last|bg|shuffle|look|keep|new)/.test(raw);
+  const inPlace = ['tog', 'gpick', 'lsub', 'pf', 'stance', 'tree', 'opdist', 'oprun', 'hjpick'].includes(raw.slice(0, i)) || /^om:(both|first|last|bg|shuffle|look|keep|new|lg)/.test(raw);
   window.scrollTo(0, inPlace ? before : 0);
   // On the opening screens a keyboard user keeps their place: the control they pressed has focus again after the redraw.
   if (!S.w && e.detail === 0) (document.querySelector(`[data-a="${CSS.escape(raw)}"]`) as HTMLElement | null)?.focus();

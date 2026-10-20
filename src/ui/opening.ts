@@ -7,7 +7,7 @@ import { SKILL_LABEL } from '../people';
 import { KEY } from '../storage';
 import type { Character, Look, World } from '../types';
 import { esc, S } from './links';
-import { HAIR_LIST, portrait, SKIN_LIST } from './portrait';
+import { LOOK_OPTIONS, portrait, randomLook as rollLook, type LookOption, type LookX } from './portrait';
 
 // ------------------------------------------------------------------ the saved game, read without opening it
 export interface SaveSummary { name: string; place: string; when: string; days: number; ended: boolean; char: Character; w: Pick<World, 'fam' | 'now'> }
@@ -43,7 +43,7 @@ function savedPortrait(s: SaveSummary): string {
 }
 
 // ------------------------------------------------------------------ the draft
-export const randomLook = (): Look => ({ skin: Math.floor(Math.random() * 6), hairColour: Math.floor(Math.random() * 6), style: Math.floor(Math.random() * 4), beard: Math.floor(Math.random() * 6), glasses: Math.random() < 0.7 ? 0 : 1 + Math.floor(Math.random() * 2), jaw: Math.floor(Math.random() * 3), seed: 'you' + Math.floor(Math.random() * 1e6) });
+export const randomLook = (): LookX => rollLook(Math.random);
 function freshDraft() {
   const n = rollName(Math.random);
   S.draft = { first: n.first, last: n.last, bg: BACKGROUNDS[Math.floor(Math.random() * BACKGROUNDS.length)].id, sec: 'name' };
@@ -75,6 +75,7 @@ export function openingAct(v: string): void {
     case 'last': D().last = rollSurname(Math.random, D().last); return;
     case 'bg': if (bgOf(x)) D().bg = x; return;
     case 'shuffle': S.look = { ...randomLook() }; return;
+    case 'lg': D().lg = x as 'Face' | 'Hair' | 'Details'; return;
     case 'look': { const [key, val] = x.split(':'); (S.look as Record<string, number | string>)[key] = Number(val); return; }
   }
 }
@@ -131,18 +132,12 @@ function titleView(n: string): string {
 }
 
 // ------------------------------------------------------------------ the man
-const LOOK_ROWS: { key: keyof Look; label: string; opts: string[] }[] = [
-  { key: 'style', label: 'Hair', opts: ['Slicked', 'Long', 'Receding', 'Bald'] },
-  { key: 'beard', label: 'Facial hair', opts: ['Clean', 'Moustache', 'Stubble', 'Goatee', 'Sideburns', 'Mutton chops'] },
-  { key: 'glasses', label: 'Eyewear', opts: ['None', 'Spectacles', 'Dark glasses'] },
-  { key: 'jaw', label: 'Jaw', opts: ['Square', 'Even', 'Lean'] },
-];
-const SKIN_NAMES = ['Fair', 'Light', 'Olive', 'Tan', 'Brown', 'Dark'];
-const HAIR_NAMES = ['Black', 'Dark brown', 'Brown', 'Chestnut', 'Auburn', 'Grey'];
 const radio = (on: boolean) => `role="radio" aria-checked="${on}"`;
-const chips = (key: keyof Look, opts: string[]) => `<div class="om-chips" role="radiogroup">${opts.map((o, i) => `<button class="om-chip" ${radio(S.look[key] === i)} data-a="om:look|${key}:${i}">${o}</button>`).join('')}</div>`;
-const swatches = (key: 'skin' | 'hairColour', list: string[], names: string[], label: string) =>
-  `<div class="om-swatches" role="radiogroup" aria-label="${label}">${list.map((c, i) => `<button class="om-swatch" ${radio(S.look[key] === i)} style="--sw:${c}" data-a="om:look|${key}:${i}" aria-label="${names[i]}" title="${names[i]}"><i></i></button>`).join('')}</div>`;
+// The appearance controls come from the portrait painter's own list (LOOK_OPTIONS), so every option it can paint is offered.
+const val = (key: string) => (S.look as LookX & Record<string, unknown>)[key];
+const control = (o: LookOption) => o.kind === 'swatch'
+  ? `<div class="om-swatches" role="radiogroup" aria-label="${o.label}">${o.options.map((x, i) => `<button class="om-swatch" ${radio(val(o.key) === i)} style="--sw:${x.colour}" data-a="om:look|${o.key}:${i}" aria-label="${x.label}" title="${x.label}"><i></i></button>`).join('')}</div>`
+  : `<div class="om-chips" role="radiogroup" aria-label="${o.label}">${o.options.map((x, i) => `<button class="om-chip" ${radio(val(o.key) === i)} data-a="om:look|${o.key}:${i}">${esc(x.label)}</button>`).join('')}</div>`;
 const group = (label: string, inner: string) => `<div class="om-group"><div class="om-group__label">${label}</div>${inner}</div>`;
 const next = (sec: string, label: string) => `<button class="om-next" data-a="om:sec|${sec}"><span>Next</span> ${label} ${ARROW}</button>`;
 
@@ -156,14 +151,16 @@ function namePanel(): string {
   return `${field('om-first', 'First name', d.first, 'first', 'Another first name')}${field('om-last', 'Surname', d.last, 'last', 'Another surname')}
     <div class="om-row om-row--split"><button class="om-btn om-btn--ghost" data-a="om:both">${DICE}<span>Another name</span></button>${next('look', 'Appearance')}</div>`;
 }
+const GROUPS = ['Face', 'Hair', 'Details'] as const;
 function lookPanel(): string {
-  const r = (k: keyof Look) => LOOK_ROWS.find((x) => x.key === k)!;
+  // One group at a time, so twelve choices never sit on the screen together.
+  const g = D().lg ?? 'Face';
+  const tabs = `<div class="om-subtabs" role="tablist">${GROUPS.map((x) => `<button class="om-chip" role="tab" aria-selected="${g === x}" data-a="om:lg|${x}">${x}</button>`).join('')}</div>`;
+  const rows = LOOK_OPTIONS.filter((o) => o.group === g).map((o) => group(o.label, control(o))).join('');
+  const nxt = g === 'Details' ? next('history', 'History') : `<button class="om-next" data-a="om:lg|${GROUPS[GROUPS.indexOf(g) + 1]}"><span>Next</span> ${GROUPS[GROUPS.indexOf(g) + 1]} ${ARROW}</button>`;
   return `<div class="om-panel__head"><p class="om-panel__intro">How the neighbourhood will remember your face.</p><button class="om-btn om-btn--ghost om-btn--sm" data-a="om:shuffle">${DICE}<span>New face</span></button></div>
-    ${group('Complexion', swatches('skin', SKIN_LIST, SKIN_NAMES, 'Complexion'))}
-    ${group('Hair', swatches('hairColour', HAIR_LIST, HAIR_NAMES, 'Hair colour') + chips('style', r('style').opts))}
-    ${group('Facial hair', chips('beard', r('beard').opts))}
-    <div class="om-grid2">${group('Eyewear', chips('glasses', r('glasses').opts))}${group('Jaw', chips('jaw', r('jaw').opts))}</div>
-    <div class="om-row om-row--end">${next('history', 'History')}</div>`;
+    ${tabs}${rows}
+    <div class="om-row om-row--end">${nxt}</div>`;
 }
 function historyPanel(): string {
   const d = D();
