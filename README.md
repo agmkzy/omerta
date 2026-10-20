@@ -5,7 +5,7 @@ Single-player sandbox mafia RPG set in 1970 New York. A deterministic, seeded si
 Current version: **V85**.
 
 ## Requirements
-- Node.js 22.12 or newer (Vite's minimum) and npm.
+- Node.js 26 or newer and npm (`.nvmrc` pins 26: `nvm install` picks it up).
 
 ## Quick start
 ```

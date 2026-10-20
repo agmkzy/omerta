@@ -6,7 +6,7 @@ Live: Claude artifact https://claude.ai/artifact/YDyiAu7Aw8bZdwMjaBRVV3 (V85) an
 
 ## Setup
 `npm install && npm run build && npm run test:all`
-Node 22.12+. The build is Vite (`vite.config.ts`, `npm run dev` for a live-reload server); it replaced the V85 esbuild script `build-web.sh`.
+Node 26+ (`.nvmrc`). The build is Vite (`vite.config.ts`, `npm run dev` for a live-reload server); it replaced the V85 esbuild script `build-web.sh`.
 
 ## Layout
 - `src/` engine and game logic (`engine.ts` tick, `world.ts` generation, `core.ts` relationships, `actions.ts` NPC choices incl. retaliation, `jobs.ts`, `encounters.ts`, `career.ts`, `consequences.ts`, `crewlife.ts`, `situations.ts`, `ledger.ts`/`econ.ts` money).

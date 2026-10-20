@@ -57,15 +57,15 @@ This (or `npm run dev`) serves the game at http://localhost:5173 and reloads the
 
 | Tool | Version (lockfile) | Used for |
 | --- | --- | --- |
-| Node.js | 22.12 or newer ([.nvmrc](../.nvmrc)); Vite 8 needs `^20.19 \|\| >=22.12`, Vitest 5 `^22.12 \|\| ^24 \|\| >=26`. Verified on 25.8, where `npm ci` prints an `EBADENGINE` warning for Vitest (odd-numbered Node releases aren't in its range) but everything runs | Running `tsx`, `tsc`, `vite`, `vitest` |
-| npm | Ships with Node | Installing from `package-lock.json` |
+| Node.js | 26 ([.nvmrc](../.nvmrc), the newest line, LTS from late October 2026; `engines` in package.json says `>=26`, and `make check-node` refuses anything older). Vite 8 needs `^20.19 \|\| >=22.12`, Vitest 5 `^22.12 \|\| ^24 \|\| >=26` | Running `tsx`, `tsc`, `vite`, `vitest` |
+| npm | 11, shipped with Node 26 | Installing from `package-lock.json`. It skips dependency install scripts unless `allowScripts` in package.json approves them (see below) |
 | TypeScript | ^5.6 | `tsc --noEmit` |
 | tsx | ^4.19 | Running `.ts` directly (CLI, measurement scripts, playtest) |
 | Vite | ^8.3 | Bundling (Rolldown, Oxc minifier) and the dev server |
 | vite-plugin-singlefile | ^2.3 | Inlining the bundle into one HTML file |
 | Vitest | ^5.0 | The test runner ([vitest.config.ts](../vitest.config.ts)) |
 | @vitest/coverage-v8 | ^5.0 | Coverage for `npm run test:cov` |
-| @types/node | ^22 | Types for tests/CLI (`node:assert`, `node:fs`) |
+| @types/node | ^26 | Types for tests/CLI (`node:assert`, `node:fs`), matching the Node version |
 | make | Any POSIX make (macOS/Linux built-in) | Optional convenience wrapper |
 
 ## Setting up from scratch on a new machine
@@ -137,7 +137,7 @@ make test
 | Target | Does |
 | --- | --- |
 | `make` / `make all` | `install` (only if `package.json`/`package-lock.json` changed), then `typecheck`, then `build` |
-| `make check-node` | Fails with a clear message unless Node ≥ 22.12 (Vite's minimum) and npm are on the PATH |
+| `make check-node` | Fails with a clear message unless Node ≥ 26.0 (`.nvmrc`) and npm are on the PATH |
 | `make install` | `npm ci`. It uses `node_modules/.package-lock.json` as a stamp, so it is a no-op when nothing changed |
 | `make typecheck` | `npm run typecheck` |
 | `make build` | `npm run build`. It only rebuilds when a source `.ts` file, `web/index.html`, `web/main.ts` or `vite.config.ts` is newer than `dist/omerta.html` |
@@ -161,6 +161,7 @@ make test
 Design notes:
 
 - **`npm ci`, not `npm install`.** A fresh setup gets exactly the locked versions and never rewrites `package-lock.json`.
+- **Dependency install scripts are reviewed, not run blindly.** npm 11 blocks them unless `allowScripts` in package.json lists the package. Two dependencies have one, and neither needs it: `esbuild`'s `postinstall` only double-checks its native binary, which arrives as its own package (`@esbuild/darwin-arm64` and the like), and `fsevents` ships a prebuilt `fsevents.node`. Both are recorded as denied (`"esbuild": false`, `"fsevents": false`). If an update brings a new one, `npm ci` names it: read the script, then `npm install-scripts approve <pkg>` or `npm install-scripts deny <pkg>`.
 - **Real file targets** (`$(STAMP)`, `$(DIST)`) mean a second `make` does almost nothing. Only `typecheck` re-runs, because type errors can come from any file.
 - `check-node` is an order-only prerequisite of the install stamp, so it runs before the first install without forcing reinstalls.
 

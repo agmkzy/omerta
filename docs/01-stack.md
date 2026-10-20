@@ -8,7 +8,7 @@ This document covers what OMERTÀ is built with, why, what that costs, and where
 | --- | --- | --- |
 | Language | TypeScript 5.6, `strict: true`, typechecked only (`noEmit`) | [tsconfig.json](../tsconfig.json) |
 | Runtime (game) | Any modern browser. The whole game is **one self-contained HTML file** with an inline `<script type="module">` | [web/index.html](../web/index.html), `dist/omerta.html` |
-| Runtime (tools/tests) | Node.js 22 (see [.nvmrc](../.nvmrc)) running TypeScript directly through `tsx` | [package.json](../package.json) |
+| Runtime (tools/tests) | Node.js 26 (see [.nvmrc](../.nvmrc)); the tests run under Vitest, the CLI and tools through `tsx` | [package.json](../package.json) |
 | Bundler | Vite 8 (Rolldown, Oxc minifier) → one minified ES module (`target: es2020`), inlined into the page shell by `vite-plugin-singlefile`. `npm run dev` gives a live-reload dev server | [vite.config.ts](../vite.config.ts) |
 | UI | No framework. Views are functions returning HTML strings. `render()` assigns them to `#app.innerHTML`. One delegated click listener dispatches `data-a="action:value"` codes | [src/web.ts](../src/web.ts), [src/ui/](../src/ui) |
 | Styling | Hand-written CSS in the page shell, CSS custom properties, no preprocessor. It ships as authored, without minification | [web/index.html](../web/index.html) |
