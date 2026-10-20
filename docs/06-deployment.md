@@ -13,7 +13,7 @@ The Pages configuration was read from the GitHub API (`build_type: legacy`, `sou
 
 ## Are the dist files committed?
 
-**Yes.** Two copies of the build output are tracked: `dist/omerta.html` and `index.html`. They are byte-identical, about 1.08 MB each. The intermediate `dist/web.js` is git-ignored.
+**Yes.** Two copies of the build output are tracked: `dist/omerta.html` and `index.html`. They are byte-identical, about 1.08 MB each. The build writes no intermediate files.
 
 **Why (as the history suggests):**
 

@@ -5,11 +5,12 @@ Single-player sandbox mafia RPG set in 1970 New York. A deterministic, seeded si
 Current version: **V85**.
 
 ## Requirements
-- Node.js 22 (any recent LTS should work) and npm.
+- Node.js 22.12 or newer (Vite's minimum) and npm.
 
 ## Quick start
 ```
 make            # npm ci (if needed), typecheck, build dist/omerta.html
+make dev        # dev server with live reload, http://localhost:5173
 make help       # every target
 ```
 Without make: `npm ci && npm run typecheck && npm run build`. Setup from scratch on a new machine: [docs/03-build-and-setup.md](docs/03-build-and-setup.md).
@@ -21,9 +22,11 @@ npm install
 
 ## Build the playable game
 ```
-npm run build        # esbuild bundles src/web.ts + web/template.html -> dist/omerta.html
+npm run build        # Vite bundles src/web.ts into web/index.html -> dist/omerta.html
 ```
 Open `dist/omerta.html` in a browser. Saves go to the browser's storage.
+
+While working on the UI, `make dev` (or `npm run dev`) serves the game at http://localhost:5173 and reloads the page on every save.
 
 ## Type-check and test
 ```

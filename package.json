@@ -13,7 +13,9 @@
     "test:v74": "tsx src/tests/v74.test.ts fast && tsx src/tests/v74.test.ts compat",
     "typecheck": "tsc --noEmit",
     "bot": "tsx src/bot.ts",
-    "build": "ESBUILD=./node_modules/.bin/esbuild sh build-web.sh",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
     "test:all": "for t in storage v72 v73 v74 v75 v76 v77 v78 v79; do echo \"== $t\"; tsx src/tests/$t.test.ts fast || exit 1; done; tsx src/tests/oldsave.test.ts && tsx src/test.ts",
     "playtest": "tsx playtest/pt.ts"
   },
@@ -21,6 +23,7 @@
     "@types/node": "^22.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
-    "esbuild": "^0.28.2"
+    "vite": "^8.3.4",
+    "vite-plugin-singlefile": "^2.3.4"
   }
 }
