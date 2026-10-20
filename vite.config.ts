@@ -36,6 +36,20 @@ function singlePage(): Plugin {
   };
 }
 
+// vite preview (make preview) serves dist/, which has no index.html, so the URL it prints would be a 404.
+// Answer / with the page instead. This only affects the preview server, not the build.
+function previewAtRoot(): Plugin {
+  return {
+    name: 'omerta:preview-at-root',
+    configurePreviewServer(server) {
+      server.middlewares.use((req, _res, next) => {
+        if (req.url === '/' || req.url?.startsWith('/?')) req.url = `/${OUT}${req.url.slice(1)}`;
+        next();
+      });
+    },
+  };
+}
+
 export default defineConfig({
   root: 'web',
   build: {
@@ -46,7 +60,6 @@ export default defineConfig({
     cssMinify: false,
     modulePreload: { polyfill: false },
   },
-  plugins: [viteSingleFile({ outputFileName: OUT }), singlePage()],
-  // dist/ has no index.html, so `vite preview` (make preview) opens the page by name.
-  preview: { open: `/${OUT}` },
+  plugins: [viteSingleFile({ outputFileName: OUT }), singlePage(), previewAtRoot()],
+  preview: { open: true },
 });
