@@ -865,11 +865,12 @@ export function say(w: World, p: Character, t: Character, c: Convo, code: string
   }
   // V89 paths (subjects, matters, asks) keep the conversation's rules: something already said or done in this conversation gives
   // nothing more, and he never says the same line twice
-  if (/^(tk|mt|mv):/.test(code) && (c.used ?? []).includes(usedKey(c, code))) return { lines: [vsay(w, t, p, 'already')], minutes: 2, convo: c };
+  const already = () => { const l = vsay(w, t, p, 'already'); return (c.spoken ?? []).includes(l) ? 'He has nothing more to say on it.' : l; };
+  if (/^(tk|mt|mv):/.test(code) && (c.used ?? []).includes(usedKey(c, code))) { const l = already(); return { lines: [l], minutes: 2, convo: { ...c, spoken: [...(c.spoken ?? []), l].slice(-60) } }; }
   const fresh = (r: Said): Said => {
     const prev = new Set(c.spoken ?? []);
     const kept = r.lines.filter((l) => l.length <= 30 || !prev.has(l));
-    const lines = kept.length ? kept : [vsay(w, t, p, 'already')];
+    const lines = kept.length ? kept : [already()];
     return { ...r, lines, convo: r.convo ? { ...r.convo, spoken: [...(c.spoken ?? []), ...lines.filter((l) => l.length > 30)].slice(-60) } : r.convo };
   };
   if (code.startsWith('tk:')) { // V89: a subject on his mind (talk.ts), raised or followed up
@@ -953,7 +954,7 @@ export function say(w: World, p: Character, t: Character, c: Convo, code: string
   r.lines = r.lines.map((l) => l.replace(new RegExp(`^(?:${rx(t.name)}|${rx(t.name.split(' ')[0])}): (?=[“"])`), ''));
   // He does not repeat himself word for word: a line already said in this conversation is dropped, and if that leaves nothing he says so.
   { const prev = new Set(c.spoken ?? []); const kept = r.lines.filter((l) => l.startsWith('⟡') || l.length <= 30 || !prev.has(l));
-    if (kept.length !== r.lines.length) { r.lines = kept.some((l) => !l.startsWith('⟡')) ? kept : [vsay(w, t, p, 'already'), ...kept]; }
+    if (kept.length !== r.lines.length) { const alr = vsay(w, t, p, 'already'); r.lines = kept.some((l) => !l.startsWith('⟡')) ? kept : [prev.has(alr) ? 'He has nothing more to say on it.' : alr, ...kept]; }
     if (r.convo) r.convo.spoken = [...(c.spoken ?? []), ...r.lines.filter((l) => !l.startsWith('⟡') && l.length > 30)].slice(-60); }
   return r;
 }
