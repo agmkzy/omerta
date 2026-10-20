@@ -1,13 +1,17 @@
 // Pacing: quiet periods happen, serious matters are spaced out, and the player is not asked about matters above his
 // station. From the V75 suite.
 import assert from 'node:assert';
-import { describe, test as ok } from 'vitest';
+import { beforeAll, describe, test as ok } from 'vitest';
 import { advance } from '../../engine';
 import { createWorld } from '../../world';
 import { DAY } from '../../types';
 import { spawn } from '../../situ';
 import { situationWorld, pair } from './fixtures';
 import { P } from '../helpers';
+
+// The world the unit tests below start from takes a second or more to simulate: build it here, so a unit test's time
+// limit measures only its own work.
+beforeAll(() => { situationWorld(7, 20); });
 
 describe('pacing', () => {
   ok('10. quiet periods happen: most weeks the player hears of nothing serious', { tags: ['sim'] }, () => {

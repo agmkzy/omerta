@@ -1,13 +1,17 @@
 // Who knows what: information does not leak, claims and lies are recorded as claims, and word reaches the player only
 // from men who know it and trust him. From the V75 suite.
 import assert from 'node:assert';
-import { describe, test as ok } from 'vitest';
+import { beforeAll, describe, test as ok } from 'vitest';
 import { DAY } from '../../types';
 import { rel } from '../../core';
 import { spawn, tell, titleOf } from '../../situ';
 import { clubTalk, friendsTell, whisper, personTexture, visibleTo } from '../../sitmoves';
 import { situationWorld, pair, parts, skimCase, run } from './fixtures';
 import { P } from '../helpers';
+
+// The world the unit tests below start from takes a second or more to simulate: build it here, so a unit test's time
+// limit measures only its own work.
+beforeAll(() => { situationWorld(2, 20); });
 
 describe('who knows what', () => {
   ok('6. information does not leak: only those who were there or were told know; the truth is never a fact', { tags: ['scenario'] }, () => {

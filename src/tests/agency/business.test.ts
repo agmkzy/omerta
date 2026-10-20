@@ -1,12 +1,16 @@
 // NPCs buying businesses: a purchase is paid for, financed or refused, never of the player's place or a casino, and an
 // owner's investment goes through the record. From the V74 suite.
 import assert from 'node:assert';
-import { describe, test as ok } from 'vitest';
+import { beforeAll, describe, test as ok } from 'vitest';
 import { rel } from '../../core';
 import { ledgerCheck, stakesOf } from '../../econ';
 import { agencyIssues, agencyOf, begin, endGoal, moneyTotal, priceOf, stepGoal } from '../../goals';
 import { agencyWorld, drive, pair, aimed } from './fixtures';
 import { P } from '../helpers';
+
+// The world the unit tests below start from takes a second or more to simulate: build it here, so a unit test's time
+// limit measures only its own work.
+beforeAll(() => { agencyWorld(7, 20); });
 
 describe('buying a business', () => {
   ok('a purchase is paid for: cash moves buyer -> seller, ownership and history change, nothing is created', { tags: ['scenario'] }, () => {

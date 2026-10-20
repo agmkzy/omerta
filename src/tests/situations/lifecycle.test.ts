@@ -1,7 +1,7 @@
 // Situations: what a situation carries, how it persists, moves through stages, ends in different ways, is settled by
 // NPCs, and how the player's choice changes it. From the V75 suite.
 import assert from 'node:assert';
-import { describe, test as ok } from 'vitest';
+import { beforeAll, describe, test as ok } from 'vitest';
 import { DAYS, SEEDS } from '../modes';
 import { SCHEMA, advance, deserialize, serialize } from '../../engine';
 import { createWorld } from '../../world';
@@ -13,6 +13,10 @@ import { crewChoose } from '../../crewlife';
 import { isOpen, sitDay, sitIssues, spawn } from '../../situ';
 import { situationWorld, canon, trio, skimCase, run } from './fixtures';
 import { clone } from '../helpers';
+
+// The world the unit tests below start from takes a second or more to simulate: build it here, so a unit test's time
+// limit measures only its own work.
+beforeAll(() => { situationWorld(7, 20); });
 
 describe('situation lifecycle', () => {
   ok('a situation carries cause, parties, phase, history, knowledge and consequences', { tags: ['unit'] }, () => {

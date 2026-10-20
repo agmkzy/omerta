@@ -1,7 +1,7 @@
 // Organisations: every family carries a complete record, old saves migrate, membership changes stay consistent, the
 // treasury reconciles, relations persist, clubs follow, splinter groups form, and it is all deterministic. From the V76 suite.
 import assert from 'node:assert';
-import { describe, test as ok } from 'vitest';
+import { beforeAll, describe, test as ok } from 'vitest';
 import { DAYS, SEEDS } from '../modes';
 import { advance, deserialize, serialize } from '../../engine';
 import { createWorld } from '../../world';
@@ -16,6 +16,10 @@ import { present, sitAtClub } from '../../places';
 import { defect, foundOrg, hostility, interestsOf, leave, leaderOf, membersOf, noteDeal, noteGrievance, orgList, orgRecord, orgWeek, relWeek, treasuryCheck, treasuryMove, treasuryWeek, hierarchyOf } from '../../orgs';
 import { orgWorld, clean, other, C, rank } from './fixtures';
 import { P, clone } from '../helpers';
+
+// The world the unit tests below start from takes a second or more to simulate: build it here, so a unit test's time
+// limit measures only its own work.
+beforeAll(() => { orgWorld(3, 20, 5); });
 
 describe('organisations', () => {
   ok('1. the five-family world loads, and every organisation carries a complete record', { tags: ['unit'] }, () => {

@@ -1,12 +1,16 @@
 // Debtors' plans: asking for time, paying extra, choosing differently, and asking the player, who may refuse. From the
 // V74 suite.
 import assert from 'node:assert';
-import { describe, test as ok } from 'vitest';
+import { beforeAll, describe, test as ok } from 'vitest';
 import { createDebt, rel } from '../../core';
 import { agencyOf, agencyWeek, begin, goalChoose, moneyTotal, stepGoal } from '../../goals';
 import { choose } from '../../encounters';
 import { agencyWorld, npcs } from './fixtures';
 import { P } from '../helpers';
+
+// The world the unit tests below start from takes a second or more to simulate: build it here, so a unit test's time
+// limit measures only its own work.
+beforeAll(() => { agencyWorld(7, 20); });
 
 describe('debtors', { tags: ['scenario'] }, () => {
   ok('a debtor can ask for time: extension moves the due date', () => {

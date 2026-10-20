@@ -1,7 +1,7 @@
 // NPC goals: their shape, how they end, their bounds, and that a world full of plans conserves money, stays sound and
 // survives a save. From the V74 suite.
 import assert from 'node:assert';
-import { afterEach, describe, test as ok } from 'vitest';
+import { beforeAll, afterEach, describe, test as ok } from 'vitest';
 import { DAYS, SEEDS } from '../modes';
 import { SCHEMA, advance, deserialize, serialize } from '../../engine';
 import { createWorld } from '../../world';
@@ -14,6 +14,10 @@ import { agencyWorld, npcs, pair, aimed } from './fixtures';
 // Some checks switch on the per-step money audit; a failing one must not leave it on for the next.
 const AUDIT = AGENCY.audit;
 afterEach(() => { AGENCY.audit = AUDIT; });
+
+// The world the unit tests below start from takes a second or more to simulate: build it here, so a unit test's time
+// limit measures only its own work.
+beforeAll(() => { agencyWorld(7, 20); });
 
 describe('goals', () => {
   ok('a goal carries the specified structure', { tags: ['unit'] }, () => {

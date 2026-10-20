@@ -1,7 +1,7 @@
 // Sit-downs and settlements: a sit-down gives every participant a consistent result, a debt sit-down changes the real
 // debt, a partnership breakdown moves real money, and the player's own moves. From the V75 suite.
 import assert from 'node:assert';
-import { describe, test as ok } from 'vitest';
+import { beforeAll, describe, test as ok } from 'vitest';
 import { DAY } from '../../types';
 import { rel, createDebt } from '../../core';
 import { addStake, ledgerCheck } from '../../econ';
@@ -9,6 +9,10 @@ import { hold, isOpen, promotedOver, sitIssues, spawn } from '../../situ';
 import { doMove, negotiateDebt, movesFor, visibleTo } from '../../sitmoves';
 import { situationWorld, pair, parts, skimCase, run } from './fixtures';
 import { P } from '../helpers';
+
+// The world the unit tests below start from takes a second or more to simulate: build it here, so a unit test's time
+// limit measures only its own work.
+beforeAll(() => { situationWorld(5, 30); });
 
 describe('sit-downs and settlements', () => {
   ok('5. a sit-down gives every participant a consistent result; those who lose remember', { tags: ['scenario'] }, () => {

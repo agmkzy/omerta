@@ -1,7 +1,7 @@
 // Succession: who takes the chair when a boss dies, retires, goes inside or is removed, and that the chain of command
 // stays valid. From the V72 (hierarchy repair) and V76 (scored succession) suites.
 import assert from 'node:assert';
-import { describe, test as ok } from 'vitest';
+import { beforeAll, describe, test as ok } from 'vitest';
 import { SEEDS } from '../modes';
 import { advance } from '../../engine';
 import { DAY } from '../../types';
@@ -14,6 +14,10 @@ import { candidates, leave, leaderOf, membersOf, orgList, orgWeek } from '../../
 import { newWorld, P } from '../helpers';
 import { fam } from './fixtures';
 import { orgWorld, clean, other, rank } from '../organisations/fixtures';
+
+// The world the unit tests below start from takes a second or more to simulate: build it here, so a unit test's time
+// limit measures only its own work.
+beforeAll(() => { orgWorld(3, 20, 5); });
 
 describe('succession', () => {
   ok('fresh world has a valid hierarchy', { tags: ['unit'] }, () => assert.deepEqual(hierarchyIssues(newWorld(7)), []));
