@@ -11,9 +11,10 @@ web/index.html ── <script type="module" src="./main.ts"> ── import '../s
               │  vite build             (npm run build)
               │    Rolldown bundles everything reachable from src/web.ts into one ES module,
               │    minified by Oxc for es2020
-              │  vite-plugin-singlefile inlines it into the page as <script type="module">
-              │  guard (omerta:self-contained): fail unless the output is exactly one HTML file
-              │    with one inline script
+              │  omerta:single-page moves the entry <script> to the end of the page (after #app)
+              │  vite-plugin-singlefile inlines it there as <script type="module">
+              │  omerta:single-page then fails the build unless the output is one HTML file with
+              │    one inline script and <meta charset> in its first 1024 bytes
               ▼
        dist/omerta.html
               ├─► index.html            (manual copy, GitHub Pages)
@@ -25,7 +26,9 @@ web/index.html ── <script type="module" src="./main.ts"> ── import '../s
 1. **Root is `web/`.** [web/index.html](../web/index.html) is the page shell (title, meta tags, the Google Fonts link, all CSS, `<div id="app">`). The repository root is not used as Vite's root because its `index.html` is the GitHub Pages copy of the build.
 2. **Entry is [web/main.ts](../web/main.ts)**, a one-line `import '../src/web'`. Pointing the HTML straight at `../src/web.ts` builds, but the dev server can't serve it: the browser resolves the URL against `/` and asks for `/src/web.ts`, which is outside the root. A module import is resolved on the filesystem, so it works in both.
 3. **`vite-plugin-singlefile`** inlines the bundle into the HTML and escapes `</script>` and `<!--` inside it (as `\x3C…`). Its `outputFileName` option writes `dist/omerta.html` rather than `dist/index.html`. It also sets `base: './'` and turns off code splitting.
-4. **`omerta:self-contained`** is a small plugin in the config. `vite-plugin-singlefile` only warns about files it couldn't inline, so this plugin fails the build unless the output is exactly `omerta.html` with one inline `<script>` and no `src=`. It replaces the old `</script` guard in `build-web.sh`.
+4. **`omerta:single-page`** is a small plugin in the config. It does two jobs:
+   - **It moves the script to the end of the page.** Vite puts the entry script first, ahead of `<meta charset="utf-8">`. Once 1 MB of code is inlined there, the charset declaration is no longer in the first 1024 bytes, which is the only place browsers look for it. Unlike esbuild, Rolldown writes non-ASCII characters (`→`, `’`) as raw UTF-8, so when the server sends no charset (`file://`, a plain static server), the browser guesses, and it can guess windows-1252, which garbles the text. This happened in testing. GitHub Pages sends `charset=utf-8`, so it was never affected.
+   - **It checks the result.** `vite-plugin-singlefile` only warns about files it couldn't inline, so this plugin fails the build unless the output is exactly `omerta.html` with one inline `<script>`, no `src=`, and `<meta charset="utf-8">` in the first 1024 bytes. It replaces the old `</script` guard in `build-web.sh`.
 5. **`cssMinify: false`.** The hand-written CSS ships exactly as authored. Minifying it would save about 3 KB on a 1.07 MB page, but Lightning CSS also rewrites rules (it adds prefixes and merges declarations), so the page shell would no longer match `web/index.html`.
 6. **`target: 'es2020'`** keeps the language level the esbuild build used. **`modulePreload.polyfill: false`** stops a preload polyfill being inlined into a single-chunk page.
 
@@ -33,7 +36,7 @@ web/index.html ── <script type="module" src="./main.ts"> ── import '../s
 
 - **Fast.** `vite build` takes about 0.1 s.
 - **Deterministic.** Rebuilding an unchanged tree produces a byte-identical `dist/omerta.html`.
-- **The page shell is copied byte for byte.** Everything outside the inline script is identical to `web/index.html`. Vite places the script at the top of the file, before `<title>`. It's a module script, so it runs after the document has been parsed and `#app` already exists.
+- **The page shell is copied byte for byte.** Everything outside the inline script is identical to `web/index.html`, and the script sits at the end of the page, after `#app`, as it did in the esbuild build. It's a module script, so it runs once the document has been parsed.
 - **No doctype is added.** The shell has none, so the page still renders in quirks mode outside claude.ai, just as before (see [engine/08-ui-and-entry-points.md](engine/08-ui-and-entry-points.md#webindexhtml)).
 - **No type checking during the build.** Vite strips types without checking them. `npm run typecheck` is a separate step, and the Makefile's default target runs both.
 - **No source maps, no hashing, no code splitting.** These would contradict the single-file goal.

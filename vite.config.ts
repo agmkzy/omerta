@@ -7,11 +7,22 @@ import { viteSingleFile } from 'vite-plugin-singlefile';
 const OUT = 'omerta.html';
 
 // The page must stay one file with one inline script (the claude.ai artifact and file:// both depend on it).
-// vite-plugin-singlefile only warns about anything it could not inline, so fail the build instead.
-function selfContained(): Plugin {
+function singlePage(): Plugin {
   return {
-    name: 'omerta:self-contained',
+    name: 'omerta:single-page',
+    apply: 'build',
     enforce: 'post',
+    // Vite puts the entry script first, before <meta charset>. Inlined, that pushes the charset past the first 1024 bytes,
+    // where browsers look for it, so file:// and hosts that send no charset may decode the page as windows-1252.
+    // Move the script to the end of the page (after #app, as the old build did) before vite-plugin-singlefile inlines it.
+    transformIndexHtml: {
+      order: 'post',
+      handler(html) {
+        const tag = /<script type="module"[^>]*\ssrc="[^"]*"><\/script>\n?/.exec(html);
+        return tag ? html.replace(tag[0], '') + tag[0].trimEnd() + '\n' : html;
+      },
+    },
+    // vite-plugin-singlefile only warns about anything it could not inline, so fail the build instead.
     writeBundle(_opts, bundle) {
       const files = Object.keys(bundle);
       if (files.length !== 1 || files[0] !== OUT) throw new Error(`expected only ${OUT} in the build, got: ${files.join(', ')}`);
@@ -19,6 +30,8 @@ function selfContained(): Plugin {
       const scripts = html.match(/<script\b[^>]*>/g) ?? [];
       if (scripts.length !== 1 || /\bsrc=/.test(scripts[0])) throw new Error(`expected one inline <script> in ${OUT}, got: ${scripts.join(' ')}`);
       if (html.split('</script').length !== 2) throw new Error(`the bundle contains "</script", which would end the inline script early`);
+      const charset = /<meta charset="utf-8">/i.exec(html);
+      if (!charset || new TextEncoder().encode(html.slice(0, charset.index + charset[0].length)).length > 1024) throw new Error(`<meta charset="utf-8"> must be within the first 1024 bytes of ${OUT}`);
     },
   };
 }
@@ -33,7 +46,7 @@ export default defineConfig({
     cssMinify: false,
     modulePreload: { polyfill: false },
   },
-  plugins: [viteSingleFile({ outputFileName: OUT }), selfContained()],
+  plugins: [viteSingleFile({ outputFileName: OUT }), singlePage()],
   // dist/ has no index.html, so `vite preview` (make preview) opens the page by name.
   preview: { open: `/${OUT}` },
 });
