@@ -450,7 +450,9 @@ function flatRoot(w: World, p: Character, t: Character, c: Convo): DOpt[] {
   // LAYER 1: what is going on between you. Things that carry a story first; a quiet man has an empty list and that is fine.
   const rank = (x: Item) => (x.o.story === 'go' ? 0 : x.o.story ? 1 : x.o.code === 'b_envelope' ? 2 : 9);
   const urgent = [...contextual.map((o) => ({ o, cat: 'Favours and requests' })), ...items.filter((x) => rank(x) < 9).sort((a, b) => rank(a) - rank(b))];
-  const l1 = [...askRows.map((o) => ({ o, cat: 'Favours and requests' })), ...urgent].filter((x, i, arr) => arr.findIndex((y) => y.o.code === x.o.code) === i).slice(0, askRows.length ? Math.max(4, askRows.length) : 4);
+  // the envelope, when it is due, comes first: it is what you came for (V89: more now competes for these few places)
+  const env = items.filter((x) => x.o.code === 'b_envelope');
+  const l1 = [...env, ...askRows.map((o) => ({ o, cat: 'Favours and requests' })), ...urgent].filter((x, i, arr) => arr.findIndex((y) => y.o.code === x.o.code) === i).slice(0, (askRows.length ? Math.max(4, askRows.length) : 4) + env.length);
   const used = new Set(l1.map((x) => x.o.code));
   // LAYER 2: ordinary ways to talk, a few at a time, shaped by who he is to you
   const TALK = ['how', 'op', 'chat', 'work', 'earn', 'old_times', 'ask_want', 'pick_member'];

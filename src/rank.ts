@@ -9,6 +9,7 @@
 //   hierarchyIssues()  the same invariants, read-only, for audit() and tests
 // Eligibility has one door too: career.readiness(). For NPCs it is the family's rule of thumb; for the player it reads
 // the road in path.ts (see career.ts), so the screen, the dialogue and the actual promotion can never disagree.
+import { BASE_RATE } from './books';
 import { addFact, recordCareer } from './core';
 import { chooseLeader, logOrg } from './orgs';
 import type { Character, Id, Rank, World } from './types';
@@ -43,6 +44,8 @@ export function applyRank(w: World, c: Character, to: Rank, o: RankOpts = {}): b
   const up = rankIdx(to) > rankIdx(from);
   c.rank = to;
   c.wage = o.wage ?? (to === 'associate' ? 80 : WAGE[to] ?? c.wage);
+  // a civilian taken into the life starts on the usual share (he paid nobody before, so he was on nothing)
+  if (from === 'civilian' && to !== 'civilian' && c.kickRate < BASE_RATE[to]) c.kickRate = BASE_RATE[to];
   const label = (r: Rank) => (r === 'capo' ? 'captain' : r);
   if (o.career !== false) recordCareer(w, c, o.career ?? (rankIdx(from) < 0 || from === 'civilian' ? `Became ${to}` : up ? `Promoted from ${from} to ${to}` : `Put down from ${label(from)} to ${label(to)}`));
   o.place?.(c);
