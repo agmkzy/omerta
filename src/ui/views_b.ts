@@ -480,11 +480,13 @@ export function meetingView(v: Extract<typeof S.view, { t: 'meeting' }>): string
   const w = W();
   const m = v.m;
   const it = meetCurrent(m);
-  let out = `<div class="card"><h2>${esc(m.title)}</h2><p>${m.attendees.map((id) => who(w.chars[id])).join('<br>')}</p></div>`;
-  if (v.lines.length) out += `<div class="card"><h2>What happened</h2>${v.lines.map((l) => `<p>${lk(l)}</p>`).join('')}</div>`;
-  if (!it) return out + `<div class="card"><h2>Meeting over</h2>${m.summary.map((l) => `<p>${lk(l)}</p>`).join('') || '<p class="muted">That’s everything on the table.</p>'}</div><button class="btn primary" data-a="mdone:">Leave</button>`;
-  out += `<div class="card"><h2>${lk(it.title)}</h2>${it.text.map((l) => `<p class="say">${lk(l)}</p>`).join('')}</div>`;
-  out += `<div class="list">` + it.opts.map((o, i) => `<button class="opt" data-a="mopt:${i}"><b>${lk(o.label)}</b>${o.hint ? `<span class="because">${esc(o.hint)}</span>` : ''}</button>`).join('') + `<button class="opt" data-a="mdone:">Leave early</button></div>`;
+  // V88: a meeting is a scene. The room and the faces at the table, what is said, and then what you say.
+  const seat = (id: Id) => { const c = w.chars[id]; return c ? `<div class="g-seat">${avatar(c)}<span>${esc(c.name.split(' ')[0])}</span><small>${esc(c.rank)}</small></div>` : ''; };
+  let out = `<header class="g-meet"><h1 class="page">${esc(m.title)}</h1><div class="g-table" aria-label="At the table">${m.attendees.map(seat).join('')}</div></header>`;
+  if (v.lines.length) out += `<section class="g-just g-just--small">${v.lines.map((l) => `<p>${lk(l)}</p>`).join('')}</section>`;
+  if (!it) return out + `<h2 class="sect">The meeting is over</h2><div class="him">${m.summary.map((l) => `<p class="say">${lk(l)}</p>`).join('') || '<p class="nar">That’s everything on the table.</p>'}</div><button class="btn primary" data-a="mdone:">Leave</button>`;
+  out += `<h2 class="sect">${lk(it.title)}</h2><div class="him">${it.text.map((l) => `<p class="say">${lk(l)}</p>`).join('')}</div>`;
+  out += `<div class="list">` + it.opts.map((o, i) => `<button class="opt" data-a="mopt:${i}"><b>${lk(o.label)}</b>${o.hint ? `<span class="because">${esc(o.hint)}</span>` : ''}</button>`).join('') + `<button class="opt nav" data-a="mdone:"><b>Leave early</b></button></div>`;
   return out;
 }
 

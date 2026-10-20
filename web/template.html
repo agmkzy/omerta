@@ -2,7 +2,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&family=Public+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&family=Old+Standard+TT:ital,wght@0,400;0,700;1,400&family=UnifrakturCook:wght@700&family=Public+Sans:wght@400;500;600;700&display=swap">
 <style>
 /* ===================================================================== the game
    One dark identity from the V86 opening (--om-* tokens, defined below). The in-game palette is expressed in those terms;
@@ -246,21 +246,6 @@ input[type=text] { width: 100%; font: inherit; padding: 12px; border-radius: var
 .room .who b { font-weight: 500; } .room .who span { display: block; font-size: 13px; color: var(--muted); }
 details.fold > summary { list-style: none; cursor: pointer; } details.fold > summary::-webkit-details-marker { display: none; }
 
-/* the newspaper: the one printed thing in the game, on paper */
-.paper { background: #e7dec9; color: #1d1a14; border: 0; box-shadow: 0 18px 40px -20px #000; }
-.paper h2 { color: #6a5428; }
-.paper .mast { font-family: var(--display); font-weight: 600; font-size: 28px; letter-spacing: .06em; text-align: center; border-bottom: 3px double #1d1a14; padding-bottom: 6px; }
-.paper .dateline { font-size: 11px; text-align: center; letter-spacing: .16em; text-transform: uppercase; margin: 6px 0 12px; color: #4b4638; }
-.paper .lead { font-family: var(--display); font-weight: 600; font-size: 26px; line-height: 1.1; margin: 0 0 8px; color: #1d1a14; }
-.paper .pi { border-top: 1px solid #bdb398; padding: 8px 0; font-family: Georgia, serif; }
-.paper .pi b { display: block; font-size: 15px; color: #1d1a14; }
-.paper .pi span { display: block; font-size: 13px; color: #4b4638; margin-top: 2px; }
-.paper .alsoin { border-top: 3px double #1d1a14; margin-top: 8px; padding-top: 6px; font-family: Georgia, serif; }
-.paper .alsoin i { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: #4b4638; }
-.paper .alsoin p { font-size: 13px; margin: 3px 0; color: #2b2820; }
-.paper .small-note { color: #6b6450; }
-.paper a.nm { color: #6a1c25; border-bottom-color: rgba(106, 28, 37, .35); }
-
 /* conversation: his words in the book face, yours in the plain one, the room around you in italics */
 .opt { position: relative; }
 .opt.row { padding: 10px 14px; min-height: 44px; }
@@ -422,6 +407,19 @@ body.g-scene .tabs { display: none; }
 .g-person__t b { font: 500 18px/1.2 var(--display); }
 .g-person__t span { font-size: 12.5px; color: var(--muted); }
 .g-person__go { border-color: var(--brass); color: var(--brass-2); }
+.g-meet { margin-bottom: 6px; }
+.g-meet h1.page { margin-bottom: 14px; }
+.g-table { display: flex; gap: 14px; overflow-x: auto; padding: 4px 2px 10px; scrollbar-width: none; }
+.g-table::-webkit-scrollbar { display: none; }
+.g-seat { flex: none; width: 64px; display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center; }
+.g-seat .avatar.pt { width: 52px; height: 52px; box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px rgba(214, 185, 129, .25); }
+.g-seat span { font: 500 15px/1.1 var(--display); color: var(--ink); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-seat small { font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.g-just--small p, .g-just--small p:first-child { font-size: 17px; color: var(--ink-2); }
+.sunbtns .btn { flex: 0 1 auto; width: auto; min-height: 40px; padding: 8px 14px; font: 500 13.5px var(--body); letter-spacing: 0; text-transform: none; }
+.sunmore { margin-top: 2px; }
+.sunmore .sunbtns { margin-top: 2px; }
+.g-meet .g-just span { font: 400 17px/1.5 var(--display); color: var(--ink-2); }
 @media (min-width: 900px) {
   .g-figs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .g-sheet .avatar.pt { width: 120px; height: 120px; }
@@ -430,6 +428,32 @@ body.g-scene .tabs { display: none; }
   .g-places { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .g-just p:first-child { font-size: 23px; }
 }
+
+/* ===================================================================== the Herald (V88): a 1970 front page */
+.herald__issues { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 2px 0 12px; font-size: 12px; color: var(--muted); }
+.herald__issues .mini:disabled { opacity: .3; cursor: default; }
+.herald { --np-ink: #1c1914; --np-rule: #2b251c; position: relative; color: var(--np-ink); padding: 16px 15px 16px; border-radius: 1px;
+  background: linear-gradient(180deg, rgba(255, 251, 236, .45), rgba(130, 100, 50, .12)), url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35  0 0 0 0 .3  0 0 0 0 .22  0 0 0 .22 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"), #e7dfca;
+  box-shadow: 0 26px 50px -26px #000, 0 0 0 1px rgba(0, 0, 0, .5); font-family: "Old Standard TT", Georgia, "Times New Roman", serif; }
+.herald__mast { text-align: center; border-bottom: 3px double var(--np-rule); padding-bottom: 6px; }
+.herald__ears { display: flex; justify-content: space-between; align-items: flex-start; font: 700 8.5px/1.25 "Old Standard TT", Georgia, serif; letter-spacing: .12em; text-transform: uppercase; }
+.herald__ears span { border: 1px solid var(--np-rule); padding: 3px 6px; }
+.herald__name { font: 700 clamp(29px, 9.2vw, 60px)/1.05 "UnifrakturCook", "Old English Text MT", "Old Standard TT", Georgia, serif; margin: 4px 0 6px; color: var(--np-ink); }
+.herald__date { display: flex; justify-content: space-between; gap: 8px; border-top: 1px solid var(--np-rule); padding-top: 5px; font: 400 10px "Old Standard TT", Georgia, serif; letter-spacing: .14em; text-transform: uppercase; }
+.herald__lead { font: 700 clamp(25px, 7.2vw, 46px)/1.03 "Old Standard TT", Georgia, serif; text-transform: uppercase; text-align: center; margin: 14px 0 12px; padding-bottom: 13px; border-bottom: 1px solid var(--np-rule); color: var(--np-ink); }
+.herald__cols { column-gap: 24px; column-rule: 1px solid rgba(43, 37, 28, .45); }
+.herald__item { break-inside: avoid; padding: 0 0 10px; margin: 0 0 10px; border-bottom: 1px solid rgba(43, 37, 28, .28); }
+.herald__item h3 { font: 700 17px/1.16 "Old Standard TT", Georgia, serif; margin: 0 0 5px; color: var(--np-ink); }
+.herald__item.first h3 { font-size: 21px; }
+.herald__item p { font-size: 14px; line-height: 1.42; margin: 0; text-align: justify; hyphens: auto; -webkit-hyphens: auto; }
+.herald__item.first p::first-letter { float: left; font: 700 37px/.85 "Old Standard TT", Georgia, serif; margin: 4px 5px 0 0; }
+.herald__also { border-top: 3px double var(--np-rule); margin-top: 4px; padding-top: 9px; }
+.herald__also h4 { font: 700 10px "Old Standard TT", Georgia, serif; letter-spacing: .18em; text-transform: uppercase; margin: 0 0 6px; text-align: center; }
+.herald__also p { font-size: 13.5px; line-height: 1.4; margin: 5px 0; padding-left: 14px; position: relative; }
+.herald__also p::before { content: "\25AA"; position: absolute; left: 0; top: 0; }
+.herald__note, .herald__quiet { font: italic 12px/1.4 "Old Standard TT", Georgia, serif; color: #5b5244; margin: 12px 0 0; text-align: center; }
+.herald__quiet { font-size: 14px; color: var(--np-ink); }
+@media (min-width: 560px) { .herald { padding: 24px 30px 22px; } .herald__cols { columns: 2; } .herald__ears { font-size: 9.5px; } }
 
 /* ===================================================================== V86 design foundations
    The dark identity. Everything is namespaced .om / --om-* so screens move over one at a time;

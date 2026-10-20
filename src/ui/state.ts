@@ -71,6 +71,7 @@ export const S = {
   confirmNew: false, // a saved game exists and the player has been told a new one will replace it
   introPlayed: false, // the title's entrance plays once per visit, not on every tap
   seenBrief: 0,
+  paperAt: undefined as number | undefined, // which Herald edition is open (undefined: the latest)
   sundaySeen: 0,
   sundayHeard: 0,
   sundayLines: [] as string[],

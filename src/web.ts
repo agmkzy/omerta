@@ -364,6 +364,7 @@ function handle(a: string, v: string) {
     case 'tab': return tab(v as Tab);
     case 'back': return pop();
     case 'career': S.lifeSub = 'career'; return tab('life');
+    case 'paper': S.paperAt = Number(v); return;
     case 'tog': S.open[v] = !S.open[v]; return;
     case 'ent': return go({ t: 'person', id: v });
     case 'biz': return go({ t: 'biz', id: v });
@@ -447,7 +448,7 @@ function handle(a: string, v: string) {
     case 'ntag': { toggleTag(P(), args[0], Number(args[1])); save(); return; }
     case 'npin': { togglePin(P(), v); save(); return; }
     case 'restore': { const s = snapList().find((x) => x.key === v); const raw = s ? localStorage.getItem(s.key) : null; if (raw) { S.w = deserialize(raw); S.log = ['You go back to an earlier day.']; S.news = []; S.stack = []; S.view = { t: 'tab', name: 'today' }; save(); } return; }
-    case 'brief': return go({ t: 'brief' });
+    case 'brief': S.paperAt = undefined; return go({ t: 'brief' });
     case 'sunday': return go({ t: 'sunday' });
     case 'sbooks': {
       const c = w.chars[v];
