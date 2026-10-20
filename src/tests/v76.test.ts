@@ -149,9 +149,12 @@ function fast() {
     const w = fresh(3, 60); for (const f of orgList(w)) assert.equal(treasuryCheck(f), 0, f.name);
     assert.ok(orgList(w).every((f) => (f.treasury ?? 0) > 0), 'dues arrive');
     const f = other(w); const m = moneyTotal(w); treasuryWeek(w); assert.equal(moneyTotal(w), m, 'treasuryWeek only moves money');
-    const inmate = rank(w, f.id, 'soldier')[0]; inmate.jailedUntil = w.now + 20 * DAY; f.treasury = (f.treasury ?? 0) + 1000; f.tin = (f.tin ?? 0) + 1000;
-    const c0 = inmate.cash, t0 = f.treasury; treasuryWeek(w);
-    assert.ok(inmate.cash > c0 - 1 && f.treasury! < t0 + 400, 'support went from fund to man'); assert.equal(treasuryCheck(f), 0);
+    const inmate = rank(w, f.id, 'soldier')[0]; f.treasury = (f.treasury ?? 0) + 1000; f.tin = (f.tin ?? 0) + 1000;
+    // the same week with him free, for comparison: what the fund takes in dues depends on how the family's men are doing
+    const free = deserialize(serialize(w)); const ff = orgList(free).find((x) => x.id === f.id)!; treasuryWeek(free);
+    inmate.jailedUntil = w.now + 20 * DAY;
+    const c0 = inmate.cash; treasuryWeek(w);
+    assert.ok(inmate.cash > c0 - 1 && f.treasury! < ff.treasury!, 'support went from fund to man'); assert.equal(treasuryCheck(f), 0);
     const lead = leaderOf(w, f.id)!; lead.cash = 40000; const mm = moneyTotal(w); treasuryMove(w, f.id, lead, 5000, 'x'); treasuryMove(w, f.id, lead, -3000, 'y'); assert.equal(moneyTotal(w), mm); assert.equal(treasuryCheck(f), 0);
     for (let i = 0; i < 70; i++) treasuryMove(w, f.id, lead, 1, 'z'); assert.ok(f.tlog!.length <= 40, 'ledger bounded');
     clean(w, 'finance');
