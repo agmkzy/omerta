@@ -51,7 +51,7 @@ make dev
 
 This (or `npm run dev`) serves the game at http://localhost:5173 and reloads the page whenever a file under `src/` or `web/` changes. A reload resumes from the localStorage save, so you stay where you were. It's a full reload, not hot module replacement, because the UI keeps its state in the module-level `S` and isn't written for HMR. The dev server's origin differs from `file://`, GitHub Pages and the artifact, so it has its own saves.
 
-`make preview` builds if needed and serves `dist/omerta.html` over HTTP, which is useful for checking a production build. The browser opens at `/omerta.html`, because `dist/` has no `index.html`.
+`make preview` builds if needed, then serves `dist/omerta.html` over HTTP at http://localhost:4173 and opens it in the browser. Use it to check a production build. `dist/` has no `index.html`, so a small plugin in `vite.config.ts` (`omerta:preview-at-root`) answers `/` with the page. Without it, the address Vite prints would return a 404. `/omerta.html` also works.
 
 ## Tooling
 
@@ -166,7 +166,7 @@ Design notes:
 | `typecheck` | `tsc --noEmit` |
 | `dev` | `vite`: dev server with live reload (see [The dev server](#the-dev-server)) |
 | `build` | `vite build` → `dist/omerta.html` |
-| `preview` | `vite preview`: serves `dist/` and opens `/omerta.html` |
+| `preview` | `vite preview`: serves `dist/omerta.html` at http://localhost:4173 and opens it |
 | `test` | `tsx src/test.ts`: determinism, save round trip, multi-seed sanity |
 | `test:all` | `storage`, `v72` … `v79` (each `fast`), then `oldsave`, then `test.ts`. It stops at the first failing suite |
 | `test:v72` / `test:v73` / `test:v74` | Single version suites. v73/v74 include `compat` mode |
