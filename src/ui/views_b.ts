@@ -24,7 +24,8 @@ import { standingWord } from '../jobs';
 import { disputesList } from './views_c';
 import { avatar, back, banner, sink, meterRow, skillBars, skillLine, strip, traitTags } from './common';
 import { bl, chip, esc, fl, known, lk, P, pl, S, statusOf, W, who } from './links';
-import { favoursCard, treeView } from './views_a';
+import { careerView, favoursCard, treeView } from './views_a';
+import { toSide } from './layout';
 import { whereIs } from '../where';
 import { kinWord, stageWord, warmthWord, DATES, datingPool } from '../life';
 import { OPS, OP_GROUPS, canStart } from '../rackets';
@@ -498,7 +499,6 @@ export function guestsView(picked: Id[]): string {
 
 // ------------------------------------------------------------------ family & life
 
-import { queueView } from './family';
 function huntBanner(): string {
   const w = W(), p = P();
   const hs = Object.values(w.fam).filter((f) => f.hunt?.target === p.id);
@@ -526,11 +526,15 @@ const RANKS_SEE_FUND = ['soldier', 'capo', 'underboss', 'boss'];
 export function familyTab(): string {
   const w = W();
   const p = P();
-  let out = strip() + ((S.treeFam ?? p.familyId) === p.familyId ? huntBanner() + queueView() : '') + treeView(S.treeFam ?? p.familyId!);
-  out += orgCard(S.treeFam ?? p.familyId!);
-  out += `<h2 class="sect">Family business</h2><div class="list"><button class="opt" data-a="meet:family"><b>Call on the family</b><span class="because">Hear what’s being decided.</span></button></div>`;
+  const fid = S.treeFam ?? p.familyId!;
+  const mine = fid === p.familyId;
+  // V88: the organisation is the page. Your own place in line lives in Life > Career; the record and the city's shops go beside it.
+  let out = (mine ? huntBanner() : '') + treeView(fid);
+  if (mine) out += `<div class="list g-famact"><button class="opt" data-a="meet:family"><b>Call on the family</b><span class="because">Hear what’s being decided.</span></button><button class="opt" data-a="career:"><b>Your place in line</b><span class="because">Where you stand for the next rank, and what is holding you back.</span></button></div>`;
+  let side = orgCard(fid);
   const shops = Object.values(w.biz).filter((b) => b.open).sort((a, b) => Number(b.district === p.district) - Number(a.district === p.district) || a.district.localeCompare(b.district)).slice(0, S.open['shops'] ? 60 : 8);
-  out += `<h2 class="sect">Shops and places<small>${Object.keys(w.biz).length}</small></h2><div class="card"><ul class="rows">${shops.map((b) => `<li><span>${bl(b.id)}<small class="muted"> ${esc(b.district)}</small></span><span class="v">${b.protection ? esc(w.fam[b.protection.familyId].name) : 'unprotected'}</span></li>`).join('')}</ul>${S.open['shops'] ? '' : `<button class="btn" data-a="tog:shops">Show all</button>`}</div>`;
+  side += `<h2 class="sect">Shops and places<small>${Object.keys(w.biz).length}</small></h2><div class="card"><ul class="rows">${shops.map((b) => `<li><span>${bl(b.id)}<small class="muted"> ${esc(b.district)}</small></span><span class="v">${b.protection ? esc(w.fam[b.protection.familyId].name) : 'unprotected'}</span></li>`).join('')}</ul>${S.open['shops'] ? '' : `<button class="btn" data-a="tog:shops">Show all</button>`}</div>`;
+  toSide(side);
   return out;
 }
 
@@ -549,55 +553,53 @@ function statsCard(): string {
   const fOwed = (w.favours ?? []).filter((f) => f.from === p.id && !f.settled).length;
   const fOwe = (w.favours ?? []).filter((f) => f.to === p.id && !f.settled).length;
   const rep = p.rep;
-  const row = (k: string, val: string, cls = '') => `<li><span>${k}</span><span class="v ${cls}">${val}</span></li>`;
+  const fig = (k: string, val: string, cls = '') => `<div class="g-fig ${cls}"><b>${val}</b><span>${k}</span></div>`;
   const rows = [
-    row('Reputation', `${standingWord(p.standing)} <small class="muted">${Math.round(p.standing)}/100</small>`),
-    row('Heat', `${heatWord} <small class="muted">${Math.round(heat * 100)}%</small>`, heat > 0.4 ? 'warn' : ''),
-    row('Influence', `${influenceWord(influence(w, p))} <small class="muted">${Math.round(influence(w, p))}</small>`),
-    row('Rank', esc(p.rank)),
-    row('Cash', money(p.cash)),
-    row('Made last week', money(p.weekIncome)),
-    row('Passed up, all time', money(p.lifetimeKick)),
-    row('Men under you', String(men)),
-    row('Shops paying you', shops.length ? `${shops.length} &middot; ${money(fees)} a week` : 'none'),
-    behind.length ? row('Shops behind', `${behind.length} &middot; ${money(behind.reduce((a, b) => a + owedOf(b), 0))} owed`, 'warn') : '',
-    stakes ? row('Stakes in businesses', String(stakes)) : '',
-    row('Owed to you', owed ? money(owed) : 'nothing'),
-    row('You owe', owe ? money(owe) : 'nothing', owe ? 'warn' : ''),
-    row('Favours owed to you', String(fOwed)),
-    row('Favours you owe', String(fOwe), fOwe ? 'warn' : ''),
-    rep ? row('Word kept / broken', `${rep.kept} / ${rep.broken}`, rep.broken > rep.kept ? 'warn' : '') : '',
-    p.career ? row('Jobs done / failed', `${p.career.done} / ${p.career.failed}`) : '',
-    p.hurtUntil > w.now ? row('Health', 'hurt', 'warn') : '',
-    p.jailedUntil > w.now ? row('Status', 'locked up', 'warn') : '',
-  ].join('');
+    fig('Reputation', esc(standingWord(p.standing))),
+    fig('Influence', esc(influenceWord(influence(w, p)))),
+    fig('Made last week', money(p.weekIncome)),
+    fig('Men under you', String(men)),
+    fig('Shops paying', shops.length ? `${shops.length} · ${money(fees)}/wk` : 'none'),
+    behind.length ? fig('Shops behind', `${behind.length} · ${money(behind.reduce((a, b) => a + owedOf(b), 0))}`, 'warn') : '',
+    stakes ? fig('Stakes in businesses', String(stakes)) : '',
+    fig('Owed to you', owed ? money(owed) : 'nothing'),
+    fig('You owe', owe ? money(owe) : 'nothing', owe ? 'warn' : ''),
+    fig('Favours owed / owing', `${fOwed} / ${fOwe}`, fOwe ? 'warn' : ''),
+    rep ? fig('Word kept / broken', `${rep.kept} / ${rep.broken}`, rep.broken > rep.kept ? 'warn' : '') : '',
+    p.career ? fig('Jobs done / failed', `${p.career.done} / ${p.career.failed}`) : '',
+    fig('Passed up, all time', money(p.lifetimeKick)),
+  ].join('') + (p.hurtUntil > w.now ? `<p class="callout bad">You’re hurt.</p>` : '') + (p.jailedUntil > w.now ? `<p class="callout bad">You’re locked up.</p>` : '');
   const sc = specScores(w, p);
   const specRows = (Object.keys(SPEC_LABEL) as Spec[]).sort((a, b) => sc[b] - sc[a]).map((s) => `<li><span>${SPEC_LABEL[s]}</span><span class="v ${tierOf(sc[s]) >= 2 ? 'good' : ''}">${TIER_WORD[tierOf(sc[s])]}</span></li>${tierOf(sc[s]) >= 2 ? `<li class="muted"><small>${SPEC_PERK[s]}</small></li>` : ''}`).join('');
-  return `<div class="card"><h2>How you’re doing</h2><ul class="rows">${rows}</ul></div><div class="card"><h2>What you’re known as<small>from what you’ve done</small></h2><ul class="rows">${specRows}</ul></div>`;
+  return `<div class="g-figs">${rows}</div><div class="card"><h2>What you’re known as<small>from what you’ve done</small></h2><ul class="rows">${specRows}</ul></div>`;
 }
 
 export function lifeTab(): string {
   const w = W();
   const p = P();
   const sub = (id: typeof S.lifeSub, label: string) => `<button class="pill ${S.lifeSub === id ? 'on' : ''}" data-a="lsub:${id}">${label}</button>`;
-  let out = strip() + `<div class="pills">${sub('me', 'Me')}${sub('people', 'People')}${sub('intel', 'Intel')}${sub('money', 'Money')}${sub('love', 'Romance')}${sub('more', 'More')}</div>`;
+  let out = strip() + `<div class="pills">${sub('me', 'Me')}${sub('career', 'Career')}${sub('people', 'People')}${sub('intel', 'Intel')}${sub('money', 'Money')}${sub('love', 'Romance')}${sub('more', 'More')}</div>`;
   if (S.lifeSub === 'intel') out += disputesList();
-  if (S.lifeSub === 'me') {
-    out += `<div class="pers">${avatar(p)}<div><h1>${esc(p.name)}</h1><div class="sub">${esc(p.rank)} &middot; ${esc(famName(w, p))} &middot; ${esc(p.district)}</div></div></div>`;
+  if (S.lifeSub === 'career') out += careerView();
+  else if (S.lifeSub === 'me') {
+    // V88: a character sheet. Who he is and what he has; the people around him go beside it. His record lives in Career.
+    const bgx = p.bg ? bgLabel(p.bg) : undefined;
+    out += `<div class="pers g-sheet">${avatar(p)}<div><h1>${esc(p.name)}</h1><div class="sub">${esc(p.rank)} &middot; ${esc(famName(w, p))} &middot; ${esc(p.district)}</div>${bgx ? `<p class="g-sheet__bg"><b>${esc(bgx)}.</b>${bgOf(p.bg) ? ' ' + esc(bgOf(p.bg)!.blurb) : ''}</p>` : ''}</div></div>`;
     out += statsCard() + `<div class="tags">${traitTags(p)}</div><div class="card"><h2>What you’re good at</h2>${skillBars(p)}</div>`;
-    out += `<div class="card"><h2>Your standing</h2>${p.bg && bgLabel(p.bg) ? `<p class="muted"><b>${esc(bgLabel(p.bg)!)}.</b>${bgOf(p.bg) ? ' ' + esc(bgOf(p.bg)!.blurb) : ''}</p>` : ''}${careerLines(w, p).map((l) => `<p>${lk(l)}</p>`).join('')}</div>`;
-    out += `<div class="card"><h2>What they say about you<small>don’t take it personally</small></h2>${repLines(w, p).map((l) => `<p class="say">${esc(l)}</p>`).join('')}</div>`;
     out += p.job ? `<button class="btn" data-a="dayjob:">Your job: ${esc(p.job.kind)}</button>` : `<button class="btn" data-a="dayjob:">Find legitimate work</button>`;
+    let side = '';
+    side += `<div class="card"><h2>What they say about you<small>don’t take it personally</small></h2>${repLines(w, p).map((l) => `<p class="say">${esc(l)}</p>`).join('')}</div>`;
     const L = w.life;
     if (L) {
       const rows: string[] = [];
       const pr = L.partner;
       if (pr && pr.stage !== 'split') rows.push(`<li><button class="rowbtn" data-a="ent:${pr.id}" style="display:flex;justify-content:space-between;width:100%;text-align:left"><span>${esc(w.chars[pr.id].name)}</span><span class="v">${esc(stageWord[pr.stage])} &middot; ${warmthWord(pr.warmth)}</span></button></li>`);
       for (const k of L.kin) if (w.chars[k.id]?.alive) rows.push(`<li><button class="rowbtn" data-a="ent:${k.id}" style="display:flex;justify-content:space-between;width:100%;text-align:left"><span>${esc(w.chars[k.id].name)} <small class="muted">${esc(kinWord(k).replace('Your ', ''))}</small></span><span class="v ${k.sick ? 'warn' : ''}">${k.sick ? 'unwell' : warmthWord(k.warmth)}</span></button></li>`);
-      out += `<div class="card"><h2>The people at home</h2><ul class="rows">${rows.join('') || '<li class="muted">Nobody’s waiting for you.</li>'}</ul>${pr && pr.stage !== 'split' ? '' : '<p class="muted">Somebody will introduce you to someone, sooner or later, if you let them.</p>'}</div>`;
+      side += `<div class="card"><h2>The people at home</h2><ul class="rows">${rows.join('') || '<li class="muted">Nobody’s waiting for you.</li>'}</ul>${pr && pr.stage !== 'split' ? '' : '<p class="muted">Somebody will introduce you to someone, sooner or later, if you let them.</p>'}</div>`;
     }
     const patron = p.bossId ? w.chars[p.bossId] : undefined;
-    out += `<div class="card"><h2>Around you</h2><ul class="rows">${patron ? `<li><span>Answers to</span><span class="v">${pl(patron)}</span></li>` : ''}${p.sponsor ? `<li><span>Sponsor</span><span class="v">${pl(w.chars[p.sponsor])}</span></li>` : ''}${p.backer ? `<li><span>Backer</span><span class="v">${pl(w.chars[p.backer])}</span></li>` : ''}<li><span>Men</span><span class="v">${crewList().length}</span></li></ul></div>`;
+    side += `<div class="card"><h2>Around you</h2><ul class="rows">${patron ? `<li><span>Answers to</span><span class="v">${pl(patron)}</span></li>` : ''}${p.sponsor ? `<li><span>Sponsor</span><span class="v">${pl(w.chars[p.sponsor])}</span></li>` : ''}${p.backer ? `<li><span>Backer</span><span class="v">${pl(w.chars[p.backer])}</span></li>` : ''}<li><span>Men</span><span class="v">${crewList().length}</span></li></ul></div>`;
+    toSide(side);
   } else if (S.lifeSub === 'people') {
     const fam = S.worldFilter;
     const fil = (id: string, label: string) => `<button class="pill small ${fam === id ? 'on' : ''}" data-a="pf:${id}">${label}</button>`;

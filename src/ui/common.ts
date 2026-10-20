@@ -32,19 +32,8 @@ export function banner(id: string, icon: string, tone: 'g' | 'a' | 'b' | 'r', ti
 
 export const back = (label = 'Back') => `<button class="back" data-a="back:"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>${esc(label)}</button>`;
 
-export function strip(): string {
-  const w = W();
-  const p = P();
-  const heat = Math.min(1, p.heat);
-  const heatWord = heat < 0.15 ? 'Quiet' : heat < 0.4 ? 'Noticed' : heat < 0.7 ? 'Hot' : 'Burning';
-  const bits: string[] = [];
-  if (p.cars) bits.push(`${p.cars} car${p.cars > 1 ? 's' : ''}`);
-  if (p.goods) bits.push(`${money(p.goods)} in goods`);
-  return `<div class="strip"><div><div class="when">${esc(fmtTime(w.now))}</div><div class="cash">${money(p.cash)}</div></div>
-    <div class="meter"><span>Heat</span><div class="track"><i style="width:${Math.round(heat * 100)}%"></i></div><b class="${heat > 0.4 ? 'hurt' : 'good'}">${heatWord}</b></div></div>
-    <div class="whoami">${esc(p.name)} &middot; ${esc(p.familyId ? w.fam[p.familyId].name : 'independent')} &middot; ${esc(p.district)}${p.hurtUntil > w.now ? ' &middot; <b class="hurt">hurt</b>' : ''}${bits.length ? ' &middot; carrying ' + bits.join(', ') : ''}</div>
-    <div class="attrs"><span>Rank <b>${p.rank}</b></span><span>Reputation <b>${standingWord(p.standing)}</b></span><span>Influence <b>${influenceWord(influence(w, p))}</b></span></div>`;
-}
+// The status strip used to open every tab; since V88 it lives once, in the frame (ui/layout.ts).
+export const strip = (): string => '';
 
 export function skillBars(c: Character): string {
   return `<ul class="rows">${SKILLS.map((k) => `<li><span>${SKILL_LABEL[k]}</span><span class="v">${skillWord(c.skills[k])}</span></li>`).join('')}</ul>`;

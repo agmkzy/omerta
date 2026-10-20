@@ -7,7 +7,7 @@ import type { DayJobOpt } from '../orders';
 import type { Move, SchemeOpt } from '../jobs';
 
 export type Tab = 'today' | 'rackets' | 'crew' | 'family' | 'life' | 'stories';
-export type LifeSub = 'me' | 'people' | 'intel' | 'history' | 'money' | 'love' | 'more';
+export type LifeSub = 'me' | 'career' | 'people' | 'intel' | 'history' | 'money' | 'love' | 'more';
 
 export type View =
   | { t: 'tab'; name: Tab }

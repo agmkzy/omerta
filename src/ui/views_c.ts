@@ -10,6 +10,7 @@ import { DAY, Id, Op, World } from '../types';
 import { progress, bandOf } from '../ambition';
 import { WAYS, WAY_CATS, Way, wayById } from '../ways';
 import { back, strip, svg } from './common';
+import { toSide } from './layout';
 import { bl, esc, lk, P, pl, S, W } from './links';
 
 const crew = (w: World) => Object.values(w.chars).filter((c) => c.alive && c.bossId === w.playerId);
@@ -92,17 +93,19 @@ function statusOf(w: World, way: Way, b: ReturnType<typeof bucket>): Status {
 const cardOf = (way: Way, st: Status) =>
   `<button class="way ${st.tone}" data-a="way:${way.id}"><span class="ico ${way.tone}">${svg(way.icon)}</span><span class="wt"><b>${esc(way.name)}<i class="wtag ${st.tone === 'run' ? '' : st.tone === 'ok' ? 'ok' : 'off'}">${esc(st.badge)}</i></b><span class="wp">${esc(way.pitch)}</span><span class="wl">${esc(st.line)}</span></span><svg class="go" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>`;
 
+// The catalogue row: name and where it stands for you. The pitch and the details are one tap away (wayView).
+const rowOf = (way: Way, st: Status) =>
+  `<button class="way compact ${st.tone}" data-a="way:${way.id}"><span class="ico ${way.tone}">${svg(way.icon)}</span><span class="wt"><b>${esc(way.name)}</b><span class="wl">${esc(st.line)}</span></span><svg class="go" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>`;
+
 // ---------------------------------------------------------------- the page
 export function racketsView(): string {
   const w = W();
   const p = P();
   const b = bucket(w);
   const sts = new Map(WAYS.map((x) => [x.id, statusOf(w, x, b)] as const));
-  let out = strip();
+  let out = '';
   const gross = Object.entries(p.books.gross).filter(([, v]) => v > 0).sort((x, y) => y[1] - x[1]);
   const total = gross.reduce((a, [, v]) => a + v, 0);
-  out += `<div class="card"><h2>Earning this week<small>${money(Math.round(total))}</small></h2>${gross.length ? `<ul class="rows">${gross.map(([s, v]) => `<li><span>${esc(SOURCE_LABEL[s] ?? s)}</span><span class="v good">+${money(Math.round(v))}</span></li>`).join('')}</ul>` : '<p class="muted">Nothing yet. Pick a way to earn below.</p>'}</div>`;
-
   // what is running
   const live = WAYS.filter((x) => sts.get(x.id)!.tone === 'run');
   const jobsOut = w.jobs.filter((j) => j.status === 'active' && crew(w).some((c) => c.id === j.assignee));
@@ -111,17 +114,23 @@ export function racketsView(): string {
   out += live.map((x) => cardOf(x, sts.get(x.id)!)).join('');
   if (jobsOut.length) out += `<div class="card"><h2>Crew out on jobs<small>${jobsOut.length}</small></h2><div class="list">${jobsOut.map((j) => `<button class="opt" data-a="job:${j.id}"><b>${esc(j.title)}</b><span class="because">${esc(w.chars[j.assignee].name)}${j.orders ? ' · ' + (j.orders === 'hard' ? 'by any means' : 'quietly') : ''}</span></button>`).join('')}</div></div>`;
 
-  // the catalogue
-  out += `<h2 class="sect">Ways to earn<small>tap one for the details</small></h2>`;
+  // the catalogue: what you could start now, by kind; what is not open to you yet, folded away
+  const ready = WAYS.filter((x) => sts.get(x.id)!.tone === 'ok');
+  const locked = WAYS.filter((x) => sts.get(x.id)!.tone === 'lock');
+  out += `<h2 class="sect">Ways to earn<small>${ready.length} open to you</small></h2>`;
   for (const cat of WAY_CATS) {
-    const list = WAYS.filter((x) => x.cat === cat && sts.get(x.id)!.tone !== 'run');
-    if (!list.length) continue;
-    out += `<h3 class="sub">${esc(cat)}</h3>` + list.map((x) => cardOf(x, sts.get(x.id)!)).join('');
+    const list = ready.filter((x) => x.cat === cat);
+    if (list.length) out += `<h3 class="sub">${esc(cat)}</h3><div class="g-ways">${list.map((x) => rowOf(x, sts.get(x.id)!)).join('')}</div>`;
   }
-  // the one that isn't in anybody's books
+  if (locked.length) out += `<details class="fold g-locked"><summary class="more">Not open to you yet (${locked.length}) &rsaquo;</summary><div class="g-ways">${locked.map((x) => rowOf(x, sts.get(x.id)!)).join('')}</div></details>`;
+
+  // beside it: the week's money, and the money nobody else counts
+  { let out = '';
+  out += `<div class="card"><h2>Earning this week<small>${money(Math.round(total))}</small></h2>${gross.length ? `<ul class="rows">${gross.map(([s, v]) => `<li><span>${esc(SOURCE_LABEL[s] ?? s)}</span><span class="v good">+${money(Math.round(v))}</span></li>`).join('')}</ul>` : '<p class="muted">Nothing yet. Pick a way to earn below.</p>'}</div>`;
   { const side = p.books.side ?? 0, known = !!p.books.sideKnown;
     out += `<h2 class="sect">Hidden racket<small>${side ? money(Math.round(side)) + ' a week' : 'none yet'}</small></h2><div class="card"><p>${side ? `You have side deals paying about <b>${money(Math.round(side))}</b> a week straight into your pocket. None of it goes in your envelope. ${known ? '<b>Your boss knows about it now.</b>' : 'Nobody upstairs knows. Each week there’s a small chance somebody finds out.'}` : 'A deal outside the family’s books: $800 in, about $120 a week out. It never counts in your envelope, and if your boss finds it you will have to explain. You set one up from “Make a side arrangement” on your Today screen.'}</p></div>`; }
 
+    toSide(out); }
   return out;
 }
 
@@ -223,9 +232,11 @@ export function goalsView(): string {
   const done = all.filter((x) => x.done);
   const row = (x: (typeof all)[number]) => {
     const unit = x.a.key.startsWith('cash') || x.a.key === 'earner' || x.a.key.startsWith('rich') || x.a.key === 'loans2k' ? money : (n: number) => String(Math.round(n));
-    return `<div class="card goal ${x.a.head ? 'headgoal' : ''}"><h2>${esc(x.a.title)}${x.a.head ? '<small>the big one</small>' : ''}</h2><p>${esc(x.a.why)}</p><span class="bar"><i style="width:${Math.round(x.pct * 100)}%"></i></span><p class="muted">${unit(Math.min(x.have, x.need))} of ${unit(x.need)}</p><p class="muted"><b>How:</b> ${esc(x.a.how)}</p>${x.a.reward.cash || x.a.reward.standing ? `<p class="muted"><b>Reward:</b> ${[x.a.reward.cash ? money(x.a.reward.cash) : '', x.a.reward.standing ? 'standing +' + x.a.reward.standing : ''].filter(Boolean).join(', ')}</p>` : ''}</div>`;
+    // V88: a row you can read at a glance (title, progress); the why, the how and the reward open beneath it.
+    const reward = x.a.reward.cash || x.a.reward.standing ? `<p class="muted"><b>Reward:</b> ${[x.a.reward.cash ? money(x.a.reward.cash) : '', x.a.reward.standing ? 'standing +' + x.a.reward.standing : ''].filter(Boolean).join(', ')}</p>` : '';
+    return `<details class="g-goal ${x.a.head ? 'headgoal' : ''}"${x.a.head ? ' open' : ''}><summary><span class="g-goal__t">${esc(x.a.title)}${x.a.head ? ' <i class="tag amber">the big one</i>' : ''}</span><span class="g-goal__n">${unit(Math.min(x.have, x.need))} of ${unit(x.need)}</span><span class="bar"><i style="width:${Math.round(x.pct * 100)}%"></i></span></summary><div class="g-goal__body"><p>${esc(x.a.why)}</p><p class="muted"><b>How:</b> ${esc(x.a.how)}</p>${reward}</div></details>`;
   };
-  let out = back() + `<h2 class="sect">Milestones<small>${esc(p.rank)}</small></h2><p class="muted pad">What the family expects at your rank. They change as you rise, and meeting one pays a reward. Your own ambition is on the Today page.</p>`;
+  let out = back() + `<h2 class="sect">Milestones<small>${esc(p.rank)}</small></h2><p class="muted pad">What the family expects at your rank. They change as you rise, and meeting one pays a reward. Tap one to see what it takes.</p>`;
   out += now.filter((x) => x.a.head).map(row).join('') + now.filter((x) => !x.a.head).sort((a, b) => b.pct - a.pct).map(row).join('');
   if (done.length) out += `<h2 class="sect">Done<small>${done.length}</small></h2><div class="card"><ul class="rows">${done.map((x) => `<li><span>${esc(x.a.title)}</span><span class="v good">&#10003;</span></li>`).join('')}</ul></div>`;
   return out;

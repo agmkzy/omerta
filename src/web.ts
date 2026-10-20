@@ -46,6 +46,7 @@ import { treeView } from './ui/views_a';
 import { leaveCrew } from './rank';
 import { KEY, readSnaps, usageStatus, writeSave, type SaveStatus } from './storage';
 import { briefView } from './ui/brief';
+import { bottomTabs, rail, takeSide, topBar } from './ui/layout';
 import { startingLines } from './background';
 import { draftBg, draftDone, draftName, openingAct, openingView, typed } from './ui/opening';
 import { fullName } from './names';
@@ -227,21 +228,6 @@ function talkTo(id: string) {
 }
 
 // ------------------------------------------------------------------- views
-function tabs(): string {
-  const cur = S.view.t === 'tab' ? S.view.name : S.view.t === 'books' || S.view.t === 'meeting' || S.view.t === 'guests' || S.view.t === 'recruit' || S.view.t === 'orders' ? 'crew' : S.view.t === 'tree' ? 'family' : S.view.t === 'plan' ? 'rackets' : 'today';
-  const n = attentionCount();
-  const IC: Record<Tab, string> = {
-    today: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/>',
-    rackets: '<rect x="3" y="8" width="18" height="12" rx="2"/><path d="M9 8V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/>',
-    crew: '<circle cx="9" cy="8.5" r="3.2"/><path d="M3 20c0-3.6 2.7-6 6-6s6 2.4 6 6"/><circle cx="17" cy="9.5" r="2.4"/><path d="M16.5 14.2c2.8 0 4.5 2 4.5 5"/>',
-    family: '<rect x="9" y="3" width="6" height="4.5" rx="1"/><rect x="3" y="16.5" width="6" height="4.5" rx="1"/><rect x="15" y="16.5" width="6" height="4.5" rx="1"/><path d="M12 7.5v4.5M6 16.5V12h12v4.5"/>',
-    life: '<circle cx="12" cy="8" r="4"/><path d="M4.5 21c.6-4.4 3.6-7 7.5-7s6.9 2.6 7.5 7"/>',
-    stories: '<path d="M4 4.5h12.5a2 2 0 0 1 2 2V19a1.5 1.5 0 0 0 3 0V9h-3M4 4.5V18a2 2 0 0 0 2 2h14.5"/><path d="M8 9h7M8 12.5h7M8 16h4"/>',
-  };
-  const t = (id: Tab, label: string, badge = 0) => `<button class="${cur === id ? 'on' : ''}" data-a="tab:${id}"><svg class="ti" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[id]}</svg><span>${label}</span>${badge ? `<span class="badge">${badge}</span>` : ''}</button>`;
-  return `<nav class="tabs">${t('today', 'Today', n)}${t('rackets', 'Rackets')}${t('crew', 'Crew')}${t('family', 'Family')}${t('life', 'Life')}${t('stories', 'Stories', newStories(W()))}</nav>`;
-}
-
 function body(): string {
   const w = W();
   const v = S.view;
@@ -301,6 +287,10 @@ function saveBanner(): string {
 function render() {
   const app = document.getElementById('app')!;
   document.body.classList.toggle('om-open', !S.w);
+  document.body.classList.toggle('g-on', !!S.w);
+  // Scenes (a conversation, a meeting, an encounter, the card table) take the whole phone: the tabs step aside until you leave.
+  document.body.classList.toggle('g-scene', !!S.w && ['talk', 'meeting', 'enc', 'bj', 'sunday', 'approach', 'settle'].includes(S.view.t));
+  takeSide();
   if (!S.w) {
     app.innerHTML = openingView(S.notice, hasSave());
     S.notice = '';
@@ -317,7 +307,8 @@ function render() {
   }
   if (S.notice) { b = `<div class="callout info">${esc(S.notice)}</div>` + b; S.notice = ''; }
   b = saveBanner() + b;
-  app.innerHTML = `<div class="content">${b}</div>` + tabs();
+  const side = takeSide();
+  app.innerHTML = `<div class="g-shell${side ? '' : ' g-noside'}">${rail()}${topBar()}<main class="g-main">${b}</main>${side ? `<aside class="g-side" aria-label="More about where you stand">${side}</aside>` : ''}</div>${bottomTabs()}`;
 }
 
 // ------------------------------------------------------------------ events
@@ -349,7 +340,7 @@ function handle(a: string, v: string) {
     draftDone();
     const p = P();
     const bs = S.w.chars[p.bossId!];
-    S.log = [esc(`New York, March 1970. You’re ${p.name}, an associate of the ${famName(S.w, p)} family. You’re not made, and you’re nobody’s friend yet.`), ...startingLines(S.w, p).map(esc), esc(`${bs.name} is the man you answer to. Go and find him at his usual place, and let him see your face. Then make yourself useful.`), 'The Needs list says what wants doing. The Rackets tab says how to earn. Everything else is people.'];
+    S.log = [esc(`New York, March 1970. You’re ${p.name}, an associate of the ${famName(S.w, p)} family. You’re not made, and you’re nobody’s friend yet.`), ...startingLines(S.w, p).map(esc), esc(`${bs.name} is the man you answer to. Go and find him at his usual place, and let him see your face. Then make yourself useful.`), 'Needs you, on this page, says what wants doing. Rackets says how to earn. Everything else is people.'];
     S.news = [];
     S.stack = [];
     S.view = { t: 'tab', name: 'today' };
@@ -372,6 +363,7 @@ function handle(a: string, v: string) {
   switch (a) {
     case 'tab': return tab(v as Tab);
     case 'back': return pop();
+    case 'career': S.lifeSub = 'career'; return tab('life');
     case 'tog': S.open[v] = !S.open[v]; return;
     case 'ent': return go({ t: 'person', id: v });
     case 'biz': return go({ t: 'biz', id: v });
