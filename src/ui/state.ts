@@ -7,7 +7,8 @@ import type { DayJobOpt } from '../orders';
 import type { Move, SchemeOpt } from '../jobs';
 
 export type Tab = 'today' | 'rackets' | 'crew' | 'family' | 'life' | 'stories';
-export type LifeSub = 'me' | 'career' | 'people' | 'intel' | 'history' | 'money' | 'love' | 'more';
+// V89: four rooms (see ui/lifeview.ts). Older names still arrive from links and are mapped there (roomOf).
+export type LifeSub = 'you' | 'people' | 'business' | 'known';
 
 export type View =
   | { t: 'tab'; name: Tab }
@@ -62,7 +63,7 @@ export const S = {
   opts: [] as Action[],
   dopts: [] as DOpt[],
   planOpts: [] as OrderOpt[],
-  lifeSub: 'me' as LifeSub,
+  lifeSub: 'you' as LifeSub,
   worldFilter: 'all',
   look: { skin: 1, hairColour: 1, style: 0, beard: 0, glasses: 0, jaw: 1, seed: 'you1' } as import('./portrait').LookX,
   // The opening: the title screen, or the man being made. The draft lives until a game begins, so leaving and coming back keeps him.

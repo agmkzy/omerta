@@ -152,28 +152,6 @@ export function todayView(): string {
   return out;
 }
 
-// Life > Career: where you stand in the family and what you are after, in one place.
-export function careerView(): string {
-  const w = W();
-  const p = P();
-  let out = '';
-  if (p.familyId) out += queueView();
-  // where you stand
-  const st = standingTable(w, p);
-  if (st.rows.length) {
-    const steps = promoSteps(w, p);
-    if (steps) out += `<div class="card"><h2>Being considered</h2><ul class="rows">${steps.map((x) => `<li><span class="${x.state === 'wait' ? 'muted' : ''}">${x.state === 'done' ? '&#10003;' : x.state === 'now' ? '&#9679;' : '&#9675;'} ${esc(x.label)}</span><span class="v ${x.state === 'now' ? 'warn' : x.state === 'done' ? 'good' : ''}">${lk(x.note)}</span></li>`).join('')}</ul></div>`;
-    else if (pathInfo(w, p)) out += pathCard();
-    else out += `<div class="card"><h2>Your standing in the ${esc(famName(w, p))} family</h2><ul class="rows">${st.rows.map((r) => `<li><span>${esc(r.label)}</span><span class="v ${r.tone}">${esc(r.value)}</span></li>`).join('')}</ul><div class="callout ${st.verdict.startsWith('Held') ? '' : 'info'}">${esc(st.verdict)}</div></div>`;
-  }
-
-  out += ambitionCard();
-  { const pc = powersCard(); if (pc) out += `<details class="fold"><summary class="more">What your rank lets you do</summary>${pc}</details>`; }
-  { const cl = careerLines(w, p); if (cl.length) out += `<div class="card"><h2>Your record</h2>${cl.map((l) => `<p>${lk(l)}</p>`).join('')}</div>`; }
-  out += `<button class="more" data-a="goals:">Milestones &rsaquo;</button>`;
-  return out;
-}
-
 function clubHint(): string {
   const w = W(), cl = clubOf(w, P().familyId); if (!cl) return 'Cards, drinks, whispers.'; if (!clubOpen(w, cl)) return 'Shut right now.'; const n = clubPresent(w, cl).length; return n ? `${n} in. ${waiting(w, P(), cl, clubPresent(w, cl)).length ? 'Somebody wants a word.' : ''}`.trim() : 'Quiet right now.';
 }
