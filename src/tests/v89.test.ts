@@ -295,7 +295,9 @@ ok('the conversation screen carries a subject through its turns and back', () =>
 ok('what you already know opens a man up, and standing up for him is a promise and a matter', () => {
   const w = createWorld(3, 'Tony Marino'); advance(w, w.now + 10 * DAY);
   const p = P(w);
-  const s = openAsks(w).find((x) => x.ak === 'protect' && x.terms?.by !== p.id && x.terms?.of !== p.id)!;
+  // (a matter the player has not already heard of: with nothing to go on, the wary man says nothing)
+  const heardOf = (sid: string) => Object.keys(p.known).some((id) => w.facts[id]?.story === 'sit:' + sid);
+  const s = openAsks(w).find((x) => x.ak === 'protect' && x.terms?.by !== p.id && x.terms?.of !== p.id && !heardOf(x.id))!;
   const t = w.chars[s.terms!.of], a = w.chars[s.terms!.by];
   rel(t, p.id).trust = 0.2;
   let b = talkAbout(w, p, t, 'tk:pressed:' + s.id)!;
