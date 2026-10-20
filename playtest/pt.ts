@@ -19,7 +19,7 @@ import { clamp, rel as relOf } from '../src/core';
 import { prospects, recruitProspect } from '../src/orders';
 import { choose as mChoose, current as mCurrent, closeMeeting, openFamilyMeeting, openAccountsMeeting, openInduction, openSitdown, openCrewMeeting, Meeting } from '../src/meetings';
 
-const DIR = fileURLToPath(new URL('.', import.meta.url)).replace(/\/$/, ''); // this folder, wherever the project lives
+const DIR = process.env.PT_DIR || fileURLToPath(new URL('.', import.meta.url)).replace(/\/$/, ''); // this folder, unless PT_DIR says elsewhere (e.g. a replay)
 const SF = DIR + '/state.json', LOG = DIR + '/actions.log';
 const SEED = 3;
 const BG = process.env.PT_BG; // optional background for a new run (background.ts ids), e.g. PT_BG=connected
@@ -145,4 +145,6 @@ else if (cmd === 'who') {
   console.log(met.map((c) => `${c.name} (${c.rank}${c.familyId === p.familyId ? '' : ', ' + (c.familyId ? w.fam[c.familyId].name : 'civ')})`).join('; '));
 }
 save();
+// PT_TRACE=1: one machine-readable line after every command, for replay analysis (boss trust, standing, cash).
+if (process.env.PT_TRACE) { const p = P(), b = p.bossId ? w.chars[p.bossId] : undefined; console.log(`TRACE ${day()} trust=${(b?.rels[p.id]?.trust ?? 0).toFixed(3)} standing=${p.standing.toFixed(1)} cash=${p.cash}`); }
 process.exit(0);
