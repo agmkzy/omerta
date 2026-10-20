@@ -50,12 +50,12 @@ The suites used to take a mode argument (`process.argv[2]`). Those modes are now
 | [v87.test.ts](../src/tests/v87.test.ts) | Backgrounds and starting lives: each package is real state in the ordinary systems, applied once, and the world runs on from it for 35 days | 8 | eight seeds instead of four | 21 s |
 | [portrait.test.ts](../src/tests/portrait.test.ts) | Portraits (V88): deterministic, well-formed SVG for every rank × gender × option, old looks still render, the face survives a promotion, the creator's options, size and speed. Each numbered section is one check that evaluates all its conditions (2,097 in all) and lists every one that failed | 7 | — | <1 s |
 | [oldsave.test.ts](../src/tests/oldsave.test.ts) | Every `fixtures/*.save` loads, plays 3 days and round-trips byte-identically | 2 (one per fixture) | — | 1 s |
-| [determinism.test.ts](../src/tests/determinism.test.ts) | **Determinism** (seed 7, 120 days, built twice in separate processes, gives identical serialisation), save/load continuation, 8 seeds × 180 days with no NaN cash | 10 | — | 20 s† |
+| [determinism.test.ts](../src/tests/determinism.test.ts) | **Determinism** (seed 7, 120 days, built twice in separate processes, gives identical serialisation), save/load continuation, 8 seeds × 180 days with no NaN cash | 10 | — | 24 s† |
 
 \* Wall-clock per file during `npm run test:all` on an 18-core Apple-silicon Mac with Node 25, with all files running at once. A file runs a little faster on its own.
-† Measured on its own. The ten worlds are independent, so [determinism.job.ts](../src/tests/determinism.job.ts) builds each one in a child process of its own and they share the machine's cores (about 190 s of CPU in 20 s). Built one after another, they would take about three minutes and be the slowest file but one.
+† The ten worlds are independent, so [determinism.job.ts](../src/tests/determinism.job.ts) builds each one in a child process of its own and they share the machine's cores (on its own: about 190 s of CPU in 20 s). Built one after another, they would take about three minutes and be the slowest file but one.
 
-`npm run test:all` takes **3 min 18 s** (208 checks). Before the move to Vitest, the same checks without compat, v86 and v87 took 5 min 29 s on the same machine, run one suite after another. v75 is now the whole critical path. It's one file of serial checks, several of which simulate 200–400 days, so splitting it into two files would be the next speed-up.
+`npm run test:all` takes **3 min 13 s** (215 checks). Before the move to Vitest, the same checks without compat, v86, v87 and portrait took 5 min 29 s on the same machine, run one suite after another. v75 is now the whole critical path. It's one file of serial checks, several of which simulate 200–400 days, so splitting it into two files would be the next speed-up.
 
 ### Not tests: measurement and trace scripts
 
