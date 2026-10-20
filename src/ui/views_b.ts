@@ -17,7 +17,6 @@ import { PROBLEM_LABEL, aptitude, lateOf } from '../people';
 import { DAY, Id, Job, Kind } from '../types';
 import { arch, ARCH_WORD } from '../voice';
 import { rel } from '../core';
-import { readSnaps } from '../storage';
 import { influence, influenceWord } from '../books';
 import { SPEC_LABEL, SPEC_PERK, TIER_WORD, specScores, tierOf, Spec } from '../specs';
 import { standingWord } from '../jobs';

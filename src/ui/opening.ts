@@ -4,7 +4,7 @@ import { fmtTime } from '../core';
 import { BACKGROUNDS, bgLabel, bgOf } from '../background';
 import { cleanName, rollFirst, rollName, rollSurname } from '../names';
 import { SKILL_LABEL } from '../people';
-import { KEY } from '../storage';
+import { savedRaw } from '../savestore';
 import type { Character, Look, World } from '../types';
 import { esc, S } from './links';
 import { LOOK_OPTIONS, portrait, randomLook as rollLook, type LookOption, type LookX } from './portrait';
@@ -15,7 +15,7 @@ let cached: { raw: string; s: SaveSummary | null } | null = null;
 const RANK: Record<string, string> = { associate: 'Associate', soldier: 'Soldier', capo: 'Capo', underboss: 'Underboss', boss: 'Boss', civilian: 'Out of the life' };
 export function saveSummary(): SaveSummary | null {
   let raw: string | null = null;
-  try { raw = localStorage.getItem(KEY); } catch { return null; }
+  try { raw = savedRaw(); } catch { return null; }
   if (!raw) return null;
   if (cached?.raw === raw) return cached.s;
   let s: SaveSummary | null = null;
@@ -80,7 +80,7 @@ export function openingAct(v: string): void {
   }
 }
 function enter() { D(); S.intro = 'create'; }
-const hasRaw = () => { try { return !!localStorage.getItem(KEY); } catch { return false; } };
+const hasRaw = () => !!savedRaw();
 export const draftName = () => { const d = D(); return { first: d.first.trim(), last: d.last.trim() }; };
 export const draftBg = () => D().bg;
 export function draftDone() { S.draft = null; S.intro = 'title'; S.confirmNew = false; forgetSummary(); }
