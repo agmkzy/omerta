@@ -32,6 +32,8 @@ export interface AskKind {
   better?: (w: World, s: Situation) => number | undefined; // the asker's better offer (a lower amount), if there is room
   force?: (w: World, s: Situation, a: Character, t: Character) => string; // what force means here
   phrase: { ask: (w: World, s: Situation) => string; yes: string; no: string; counter: string; stall: string };
+  max?: number; // most open at once between NPCs, so no one kind fills the world's share of matters
+  ttl?: number; // days a matter of this kind is kept open before it fades (default 45): a loan offer or a warning does not hang for weeks
   cool?: number; // weeks before the same matter can be raised again once it has settled (default 6)
   onNo?: (w: World, s: Situation, a: Character, t: Character) => string | undefined; // what a refusal does in the world, if anything beyond the matter
   moves?: AskMove[]; // the moves that make sense in this kind of matter (default: all of them)
@@ -92,6 +94,7 @@ export function openAsk(w: World, ak: string, a: Character, t: Character, o: { b
   if (!K || a.id === t.id) return undefined;
   const existing = askBetween(w, ak, a.id, t.id, o.biz);
   if (existing) return existing;
+  if (K.max !== undefined && !a.isPlayer && !t.isPlayer && openAsks(w).filter((x) => x.ak === ak && x.terms?.by !== w.playerId).length >= K.max) return undefined;
   const key = `ask:${ak}:${a.id}:${t.id}:${o.biz ?? o.about ?? ''}`;
   const s = spawn(w, 'ask', key, a.id, {
     cause: o.why ?? `${a.name} wants something from ${t.name}`, sev: K.sev, phase: 'open', next: w.now + 2 * DAY,
@@ -301,7 +304,7 @@ function step(w: World, s: Situation) {
   const S = stance(w, s, t.id);
   // time works on everyone: anger and fear fade a little; a man left alone softens or hardens by nature
   S.anger = clamp(S.anger - 0.03); S.fear = clamp(S.fear - 0.03);
-  if (w.now - s.since > 45 * DAY) return closeSit(w, s, 'faded', [], 4);
+  if (w.now - s.since > (K.ttl ?? 45) * DAY && s.terms?.by !== w.playerId) return closeSit(w, s, 'faded', [], 4);
   if (a.isPlayer) {
     // the player is asked through a request, if the man asked is waiting on him; otherwise the matter simply waits for him
     s.next = w.now + 3 * DAY;
@@ -330,10 +333,11 @@ function npcMove(w: World, s: Situation, a: Character, t: Character, S: Stance):
     ['sweeten', last === 'counter' || last === 'no' ? (K.better?.(w, s) !== undefined ? 0.2 + T.caution * 0.2 - T.greed * 0.2 : -1) : -1],
     ['persuade', 0.15 + a.skills.charm * 0.35 + T.sociability * 0.15 - tried(A, 'persuade') * 0.2],
     ['pressure', 0.1 + T.violence * 0.35 + a.skills.nerve * 0.15 - tried(A, 'pressure') * 0.18],
-    ['force', K.force && last === 'no' && tried(S, 'no') >= 1 ? T.violence * 0.6 - T.caution * 0.4 - ((a.cooldown.restraint ?? 0) > w.now ? 1 : 0) : -1],
+    ['force', K.force && last === 'no' && tried(S, 'no') >= 1 ? T.violence * 0.6 - T.caution * 0.4 + (tried(S, 'no') >= 2 && !tried(A, 'force') ? 0.15 : 0) - ((a.cooldown.restraint ?? 0) > w.now ? 1 : 0) : -1],
     ['leverage', leverageOf(w, a, t) && tried(A, 'leverage') === 0 ? 0.3 + T.caution * 0.2 : -1],
     ['wait', last === 'stall' ? 0.3 + T.caution * 0.3 : 0.05 + T.caution * 0.15],
-    ['drop', 0.02 + T.caution * 0.2 + (rounds >= 7 ? 0.55 : rounds >= 5 ? 0.2 : 0) + (s.m?.help ? T.caution * 0.4 : 0) - T.ambition * 0.12 - T.greed * 0.1],
+    // a man told no again and again, or kept waiting for weeks, gives it up (or has already made his point by force)
+    ['drop', 0.02 + T.caution * 0.2 + (rounds >= 7 ? 0.55 : rounds >= 5 ? 0.2 : 0) + (s.m?.help ? T.caution * 0.4 : 0) + (tried(S, 'no') >= 5 ? 0.7 : tried(S, 'no') >= 3 ? 0.35 : 0) + (w.now - s.since > 14 * DAY ? 0.4 : 0) - T.ambition * 0.12 - T.greed * 0.1],
   ];
   // (a kind that names its moves is held to them: nobody pressures a man into a loan he is asking for)
   return u.filter(([m]) => !K.moves || K.moves.includes(m)).map(([m, v]) => [m, v + jitter(w, s, m)] as [AskMove, number]).sort((x, y) => y[1] - x[1])[0][0];
@@ -513,7 +517,7 @@ ASKS.protect = {
 };
 // ---------------------------------------------------------------- warning a man off
 ASKS.warn = {
-  id: 'warn', sev: 0.35, roles: ['warns', 'warned'],
+  id: 'warn', sev: 0.35, roles: ['warns', 'warned'], ttl: 12, max: 12,
   title: (w, s) => { const o = sits(w).find((x) => x.id === String(s.m?.about)); const ot = o ? askee(w, o) : undefined; return ot ? `Leave ${first(ot)} alone` : 'A warning'; },
   valid: (w, s) => { const o = sits(w).find((x) => x.id === String(s.m?.about)); return !!o && isOpen(o); },
   lean: (w, s, a, t) => {
@@ -640,7 +644,7 @@ ASKS.borrow = {
 };
 // ---------------------------------------------------------------- offering a man a loan
 ASKS.lend = {
-  id: 'lend', sev: 0.12, roles: ['lender', 'borrower'], cool: 2,
+  id: 'lend', sev: 0.12, roles: ['lender', 'borrower'], cool: 2, ttl: 7, max: 8,
   moves: ['take', 'ask', 'persuade', 'wait', 'drop'],
   title: (w, s) => { const t = askee(w, s); return t ? `A loan to ${first(t)}` : 'A loan'; },
   valid: (w, s) => { const a = asker(w, s); return !!a && a.cash >= (s.terms?.amt ?? 0) && !w.debts.some((d) => d.status === 'active' && d.debtor === s.terms?.of && d.creditor === s.terms?.by); },
