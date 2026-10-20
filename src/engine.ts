@@ -1,7 +1,8 @@
 import { mattersWeek } from './matters'; // V89: registers the matter kinds (and, through it, asks) with situ.ts
 import { pulseWeek } from './pulse';
 import { careerTick, promoTick } from './career';
-import { agencyWeek } from './goals';
+import { agencyDay, agencyWeek, goalAsks } from './goals';
+goalAsks(); // V89: the asks NPC plans make (join), registered once every module has loaded
 import { sitDay, sitWeek } from './situ';
 import { friendsTell } from './sitmoves';
 import { pathTick, turfWeek } from './path';
@@ -53,6 +54,7 @@ export function advance(w: World, until: number) {
     } else if (ev.kind === 'daily') {
       daily(w);
       sitDay(w);
+      agencyDay(w); // V89: NPC plans move on the day they fall due
       summonsTick(w);
       memoTick(w);
       pendingTick(w);

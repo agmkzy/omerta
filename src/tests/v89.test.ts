@@ -10,7 +10,8 @@ import { asksOf, askBetween, move, openAsk, openAsks, playerMove, playerMoves, r
 import { kinOf, closeKin, madeKin } from '../kin';
 import { addFact } from '../core';
 import { ORIGIN, startRivalry, topicsWith, matterAct } from '../matters';
-import { goalHooks, begin } from '../goals';
+import { goalHooks, begin, agencyOf, stepGoal, priceOf, endGoal } from '../goals';
+import { choose } from '../encounters';
 import { notesOf, subjectsOf, talkAbout } from '../talk';
 import { pass, salience, versionOf } from '../rumour';
 import { options, say, startConvo } from '../dialogue';
@@ -295,7 +296,8 @@ ok('the conversation screen carries a subject through its turns and back', () =>
 ok('what you already know opens a man up, and standing up for him is a promise and a matter', () => {
   const w = createWorld(3, 'Tony Marino'); advance(w, w.now + 10 * DAY);
   const p = P(w);
-  const s = openAsks(w).find((x) => x.ak === 'protect' && x.terms?.by !== p.id && x.terms?.of !== p.id)!;
+  // (one the player has heard nothing about yet: the point is what changes when he has)
+  const s = openAsks(w).find((x) => x.ak === 'protect' && x.terms?.by !== p.id && x.terms?.of !== p.id && !Object.values(w.facts).some((f) => f.story === 'sit:' + x.id && p.known[f.id]))!;
   const t = w.chars[s.terms!.of], a = w.chars[s.terms!.by];
   rel(t, p.id).trust = 0.2;
   let b = talkAbout(w, p, t, 'tk:pressed:' + s.id)!;
@@ -354,4 +356,116 @@ ok('a man passes on what matters to the listener; a stranger’s night at cards 
   const hurt = addFact(w, { kind: 'beating', actor: stranger.id, victim: b.id, text: `${stranger.name} beat up ${b.name}.`, district: b.district }, {});
   assert.ok(salience(w, b, hurt) > salience(w, a, hurt) || a.id === b.bossId, 'what happened to a man matters most to him');
 });
+// ---------------------------------------------------------------- NPC plans (goals.ts): they end, people hear, the player is asked
+ok('NPC plans end within weeks, in different ways, and how they ended is news the people around the man hear', () => {
+  const w = createWorld(3, 'Tony Marino');
+  advance(w, w.now + 70 * DAY);
+  const a = agencyOf(w);
+  const how = new Set(a.ended.map((e) => e.how)), kinds = new Set(a.ended.map((e) => e.kind));
+  assert.ok(how.has('done') && (how.has('failed') || how.has('dropped')), 'plans succeed, and plans fail or are given up: ' + [...how]);
+  assert.ok(kinds.size >= 3, 'across several kinds of plan: ' + [...kinds]);
+  assert.ok(a.ended.filter((e) => e.how !== 'done').length >= 5, 'not every plan comes off');
+  const told = Object.values(w.facts).filter((f) => f.story?.startsWith('goal:'));
+  assert.ok(told.length >= 5, 'endings are facts: ' + told.length);
+  for (const f of told) {
+    assert.ok(Object.values(w.chars).some((c) => c.id !== f.actor && c.known[f.id]), 'somebody besides the man himself knows: ' + f.text);
+    assert.ok(!/\d/.test(f.text), 'told in words, not figures: ' + f.text);
+  }
+  assert.ok(told.some((f) => !f.minor), 'and some of it is the kind of news that travels');
+  clean(w, 'seventy days of plans');
+});
+
+ok('a plan is given up when circumstances change: a long stretch inside ends it, and the man he answers to hears', () => {
+  const w = createWorld(4, 'Tony Marino');
+  const c = Object.values(w.chars).find((x) => x.alive && !x.isPlayer && x.rank === 'soldier' && x.bossId && w.chars[x.bossId]?.alive)!;
+  const g = begin(w, c, 'wealth', 'test', 0.6, { stage: 'build', need: 999999 });
+  c.jailedUntil = w.now + 90 * DAY;
+  stepGoal(w, g, c);
+  assert.equal(agencyOf(w).ended.find((x) => x.id === g.id)?.how, 'dropped');
+  const f = Object.values(w.facts).find((x) => x.story === 'goal:' + g.id);
+  assert.ok(f && w.chars[c.bossId!].known[f.id], 'the man he answers to hears of it');
+});
+
+// A man in the player's family who trusts him, short of the money for a place the owner will sell him.
+function shortBuyer(seed: number) {
+  const w = createWorld(seed, 'Tony Marino'), p = P(w);
+  advance(w, w.now + 3 * DAY);
+  const b = Object.values(w.biz).find((x) => x.open && x.kind !== 'casino' && w.chars[x.ownerId]?.alive && !w.chars[x.ownerId].isPlayer && w.chars[x.ownerId].rank === 'civilian')!;
+  const o = w.chars[b.ownerId];
+  const c = Object.values(w.chars).find((x) => x.alive && !x.isPlayer && x.familyId === p.familyId && x.rank === 'soldier' && x.id !== o.id && !ownerBiz(w, x.id))!;
+  rel(c, p.id).trust = 0.6; rel(c, p.id).grudge = 0; c.jailedUntil = 0; c.traits.ambition = 0.5; c.traits.violence = 0.2;
+  p.cash = 4000;
+  const price = priceOf(w, b);
+  c.cash = price - 800 + 150; // eight hundred short, keeping something back
+  const g = begin(w, c, 'business', 'test', 0.8, { stage: 'finance', target: b.id, owner: o.id, mode: 'buy', need: price, next: 'raise the difference' });
+  g.offer = price; g.deadline = w.now + 200 * DAY;
+  agencyOf(w).lastAsk = -1e9;
+  return { w, p, b, o, c, g };
+}
+const driveGoal = (w: World, g: ReturnType<typeof begin>, until: () => boolean, n = 20) => { for (let i = 0; i < n && !until() && agencyOf(w).goals.includes(g); i++) { w.now = Math.max(w.now, g.review); stepGoal(w, g, w.chars[g.who]); } };
+
+ok('a man who trusts the player comes to him for the money he is short; a yes is a real loan, and the plan goes through', () => {
+  const { w, p, b, c, g } = shortBuyer(3);
+  const asked = () => w.enc.find((e) => e.status === 'open' && e.kind === 'ask' && e.from === c.id);
+  driveGoal(w, g, () => !!asked());
+  const e = asked()!;
+  assert.ok(e, 'he asks the player');
+  assert.ok(e.lines.some((l) => l.includes(b.name)), 'and says what it is for: ' + e.lines.join(' / '));
+  const cash0 = p.cash;
+  choose(w, p, e, 'yes');
+  const d = w.debts.find((x) => x.creditor === p.id && x.debtor === c.id && x.status === 'active')!;
+  assert.ok(d, 'the yes is a debt he owes the player');
+  assert.ok(p.cash < cash0, 'and the money came out of the player’s pocket');
+  driveGoal(w, g, () => !agencyOf(w).goals.includes(g));
+  assert.equal(b.ownerId, c.id, 'with it he buys the place');
+  assert.equal(agencyOf(w).ended.find((x) => x.id === g.id)?.how, 'done');
+  // later: the loan is on the weekly round like any other debt
+  const bal = d.balance;
+  advance(w, w.now + 8 * DAY);
+  assert.ok(d.balance < bal || d.missed > 0 || d.status !== 'active', 'he pays it back on the weekly round (or misses, and it is counted)');
+  clean(w, 'after a loan to buy a place');
+});
+
+ok('if the player says no, the man remembers it, does not ask him again, and looks elsewhere', () => {
+  const { w, p, c, g } = shortBuyer(3);
+  const asked = () => w.enc.filter((e) => e.kind === 'ask' && e.from === c.id);
+  driveGoal(w, g, () => asked().some((e) => e.status === 'open'));
+  const e = asked().find((x) => x.status === 'open')!;
+  assert.ok(e, 'he asks the player');
+  const gr = rel(c, p.id).grudge;
+  choose(w, p, e, 'no');
+  assert.ok(rel(c, p.id).grudge > gr, 'he holds it against the player a little');
+  driveGoal(w, g, () => false, 8);
+  assert.ok(g.asked?.includes(p.id) || !agencyOf(w).goals.includes(g), 'the player is off his list for this plan');
+  assert.equal(asked().length, 1, 'he never puts it to the player twice');
+  assert.ok(!w.debts.some((d) => d.creditor === p.id && d.debtor === c.id), 'and no loan was made');
+  clean(w, 'after a refusal');
+});
+
+ok('an offer to join a crew is a negotiation through the asks engine: the young man weighs it, and yes makes him the recruiter’s man', () => {
+  const w = createWorld(5, 'Tony Marino');
+  const cap = Object.values(w.chars).find((x) => x.alive && !x.isPlayer && x.rank === 'capo')!;
+  const pro = Object.values(w.chars).find((x) => x.alive && x.prospect && x.rank === 'civilian' && !ownerBiz(w, x.id))!;
+  cap.cash = 5000; cap.jailedUntil = 0; cap.standing = 90; cap.traits.sociability = 1;
+  pro.traits.ambition = 1; pro.traits.caution = 0; pro.cash = 50;
+  const g = begin(w, cap, 'recruit', 'test', 0.6, { stage: 'approach', target: pro.id });
+  g.deadline = w.now + 200 * DAY;
+  driveGoal(w, g, () => !agencyOf(w).goals.includes(g), 30);
+  assert.ok((w.situations ?? []).some((x) => x.ak === 'join' && x.terms?.by === cap.id), 'the offer was an ask between them');
+  if (pro.rank === 'associate') { assert.equal(pro.bossId, cap.id); assert.equal(agencyOf(w).ended.find((x) => x.id === g.id)?.how, 'done'); }
+  else assert.ok(g.tries > 0 || !agencyOf(w).goals.includes(g), 'or he said no, and that counted');
+  clean(w, 'after a crew offer');
+});
+
+ok('a plan that ends takes its open ask with it: nothing is left waiting on a plan that no longer exists', () => {
+  const { w, c, g } = shortBuyer(3);
+  driveGoal(w, g, () => !!g.sit);
+  const sid = g.sit!;
+  assert.ok(sid, 'he has an ask out');
+  endGoal(w, g, 'dropped', 'test');
+  assert.equal((w.situations ?? []).find((x) => x.id === sid)!.stage, 'resolved');
+  assert.ok(!w.enc.some((e) => e.status === 'open' && e.kind === 'ask' && e.from === c.id), 'no question is left open for the player');
+  clean(w, 'after an ended plan');
+});
+
 console.log('all passed');

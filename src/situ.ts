@@ -12,7 +12,7 @@ import { begin as beginGoal, goalsOf, priceOf } from './goals';
 import { addEnc } from './encounters';
 import { Business, Character, DAY, Debt, Enc, Fact, FactKind, Id, Situation, SitKind, WEEK, World } from './types';
 
-export const SIT = { on: true, cap: { open: 30, asks: 45, climbs: 10, own: { ask: 45, climb: 10, rivalry: 14, arrest: 10, revenge: 12 } as Partial<Record<SitKind, number>>, closedOwn: 40, closed: 60, hist: 8, claims: 3, cons: 5 } };
+export const SIT = { on: true, cap: { open: 30, asks: 45, climbs: 10, plans: 40, own: { ask: 45, climb: 10, rivalry: 14, arrest: 10, revenge: 12 } as Partial<Record<SitKind, number>>, closedOwn: 40, closed: 60, hist: 8, claims: 3, cons: 5 } };
 const first = (c: Character) => c.name.split(' ')[0];
 const P = (w: World) => w.chars[w.playerId ?? ''];
 export const isOpen = (s: Situation) => s.stage !== 'resolved';
@@ -48,7 +48,11 @@ export function spawn(w: World, kind: SitKind, key: string, who: Id, o: Init): S
   const own = (k?: SitKind) => !!k && SIT.cap.own[k] !== undefined;
   // (whatever the player himself starts always has room: the ceilings are for the world's own business)
   const mine = o.parties.some((x) => x.id === w.playerId) && who === w.playerId;
-  if (own(kind) ? !mine && l.filter((x) => isOpen(x) && x.kind === kind).length >= SIT.cap.own[kind]! : !mirror && l.filter((x) => isOpen(x) && x.kind !== 'dispute' && x.kind !== 'crew' && !own(x.kind)).length >= SIT.cap.open) return undefined;
+  // (an ask made on an NPC's plan (goals.ts) has a ceiling of its own: plans are already bounded per man, and the world's other asks
+  // must not crowd them out, nor they the others)
+  const plan = kind === 'ask' && !!o.m?.goal;
+  if (plan) { if (l.filter((x) => isOpen(x) && x.kind === 'ask' && x.m?.goal).length >= SIT.cap.plans) return undefined; }
+  else if (own(kind) ? !mine && l.filter((x) => isOpen(x) && x.kind === kind && !x.m?.goal).length >= SIT.cap.own[kind]! : !mirror && l.filter((x) => isOpen(x) && x.kind !== 'dispute' && x.kind !== 'crew' && !own(x.kind)).length >= SIT.cap.open) return undefined;
   const major = o.sev >= 0.5 && !own(kind); // (the V89 kinds are paced by their own ceilings, not by the V75 pacing)
   if (major && !allowMajor(w, o.parties.some((p) => p.id === w.playerId))) return undefined;
   const s: Situation = { id: 's' + w.nextId++, kind, who, since: w.now, weeks: 0, stage: 'brewing', cause: o.cause, knows: false, told: false, parties: o.parties, phase: o.phase, sev: Math.round(o.sev * 100) / 100, next: o.next, key, hist: [], k: {}, claims: [], cons: [] };
@@ -933,9 +937,11 @@ export function sitIssues(w: World): string[] {
   }
   const nonMirror = l.filter((x) => isOpen(x) && x.kind !== 'dispute' && x.kind !== 'crew' && !(x.kind && SIT.cap.own[x.kind] !== undefined)).length;
   if (nonMirror > SIT.cap.open) out.push(`${nonMirror} open situations`);
-  const asks = l.filter((x) => isOpen(x) && x.kind === 'ask' && x.who !== w.playerId).length; // V89: asks have a ceiling of their own
+  const asks = l.filter((x) => isOpen(x) && x.kind === 'ask' && x.who !== w.playerId && !x.m?.goal).length; // V89: asks have a ceiling of their own
   if (asks > SIT.cap.asks) out.push(`${asks} open asks`);
-  for (const [k, cap] of Object.entries(SIT.cap.own)) { const n = l.filter((x) => isOpen(x) && x.kind === k && x.who !== w.playerId).length; if (n > cap!) out.push(`${n} open ${k}`); }
+  const plans = l.filter((x) => isOpen(x) && x.kind === 'ask' && x.m?.goal).length; // (and the asks NPC plans make, another)
+  if (plans > SIT.cap.plans) out.push(`${plans} open asks on plans`);
+  for (const [k, cap] of Object.entries(SIT.cap.own)) { const n = l.filter((x) => isOpen(x) && x.kind === k && x.who !== w.playerId && !(k === 'ask' && x.m?.goal)).length; if (n > cap!) out.push(`${n} open ${k}`); }
   // one dispute, one story: a quarrel cannot be open in one place and resolved in another
   for (const d of w.disputes ?? []) if ((d.status === 'open' || d.status === 'violated') && w.now - d.created > 10 * DAY && !l.some((s) => s.link?.dispute === d.id) && live(w, d.a) && live(w, d.b) && d.created + 3 * DAY < (w.sitpace?.sync ?? -1e9) && Math.max(d.created, ...d.history.map((h) => h.t)) < (w.sitpace?.sync ?? -1e9)) out.push(`dispute ${d.id}: open with no matching situation (${d.status}, created d${Math.floor(d.created / DAY)}, synced d${Math.floor((w.sitpace?.sync ?? 0) / DAY)}, now d${Math.floor(w.now / DAY)}, ${d.a === w.playerId || d.b === w.playerId ? 'player' : 'npcs'})`);
   return out;

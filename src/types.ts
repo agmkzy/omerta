@@ -696,6 +696,12 @@ export interface Goal {
   n?: number; // generic counter for the stage
   ask?: Id; // an open question to the player (an encounter id)
   paused?: number;
+  // V89: a plan works through people. (All optional: a goal from an older save has none of them and simply starts using them.)
+  sit?: Id; // an ask he has put to someone (asks.ts) and is waiting on
+  asked?: Id[]; // men who have already turned him down on this plan (he does not go back to them)
+  under?: Id; // the man he answered to when the plan began (a new superior is a new start)
+  was?: string; // his rank when the plan began (a step up changes what he wants)
+  since?: number; // when the current stage began, where the stage is a matter of waiting
 }
 export interface GoalEnd { id: Id; who: Id; kind: GoalKind; target?: Id; t: number; how: 'done' | 'failed' | 'dropped'; why: string }
 export interface Agency {
