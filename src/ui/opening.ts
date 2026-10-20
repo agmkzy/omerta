@@ -3,6 +3,7 @@
 import { fmtTime } from '../core';
 import { BACKGROUNDS, bgLabel, bgOf } from '../background';
 import { cleanName, rollFirst, rollName, rollSurname } from '../names';
+import { SKILL_LABEL } from '../people';
 import { KEY } from '../storage';
 import type { Character, Look, World } from '../types';
 import { esc, S } from './links';
@@ -119,7 +120,7 @@ function titleView(n: string): string {
       <div class="om-rule om-s2"></div>
       <div class="om-prologue">
         <p class="om-prologue__lead om-s3">Everybody answers to somebody.</p>
-        <p class="om-s4">You’re an associate of the Corrente family. Fifteen hundred dollars in your pocket, no crew, and a name that doesn’t mean much yet.</p>
+        <p class="om-s4">You’re an associate of the Corrente family. A little money, no crew, and a name that doesn’t mean much yet.</p>
         <p class="om-prologue__close om-s5">Nobody is going to hand you a story.</p>
       </div>
       ${notice(n)}
@@ -166,8 +167,15 @@ function lookPanel(): string {
 }
 function historyPanel(): string {
   const d = D();
-  return `<p class="om-panel__intro">Where you came from. It’s who you were, not what you’re owed.</p>
-    <div class="om-choices" role="radiogroup" aria-label="Background">${BACKGROUNDS.map((b) => `<button class="om-choice" ${radio(d.bg === b.id)} data-a="om:bg|${b.id}"><span class="om-choice__label">${esc(b.label)}</span><span class="om-choice__blurb">${esc(b.blurb)}</span></button>`).join('')}</div>`;
+  // The skills and the starting life come from the same record applyBackground uses, so what is shown is what you get.
+  const strengths = (b: (typeof BACKGROUNDS)[number]) => b.skills.map((k) => SKILL_LABEL[k]).join(' · ');
+  return `<p class="om-panel__intro">Where you came from. It decides what you walk in with, not where you end up.</p>
+    <div class="om-choices" role="radiogroup" aria-label="Background">${BACKGROUNDS.map((b) => `<button class="om-choice" ${radio(d.bg === b.id)} data-a="om:bg|${b.id}">
+      <span class="om-choice__top"><span class="om-choice__label">${esc(b.label)}</span><span class="om-choice__skills">${strengths(b)}</span></span>
+      <span class="om-choice__more"><span class="om-choice__blurb">${esc(b.blurb)}</span>
+        <span class="om-choice__life"><span class="om-choice__head">Strengths</span><span class="om-choice__item">${strengths(b)}</span>
+        <span class="om-choice__head">Starting life</span>${b.life.map((l) => `<span class="om-choice__item">${esc(l)}</span>`).join('')}</span></span>
+    </button>`).join('')}</div>`;
 }
 
 let lastSec = '';

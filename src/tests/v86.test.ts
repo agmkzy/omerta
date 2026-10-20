@@ -49,20 +49,9 @@ ok('no stranger is generated with the player’s full name or surname (his own m
   }
 });
 
-ok('a background is history only: it changes nothing about the world but the record', () => {
-  for (const b of BACKGROUNDS) {
-    const a = createWorld(42, 'Anthony Rossi'), c = createWorld(42, 'Anthony Rossi');
-    applyBackground(c, c.chars[c.playerId!], b.id);
-    const pa = a.chars[a.playerId!], pc = c.chars[c.playerId!];
-    assert.equal(pc.bg, b.id);
-    assert.equal(pc.cash, 1500);
-    delete pc.bg;
-    assert.equal(serialize(c), serialize(a), b.id + ' changed the world');
-    void pa;
-  }
-});
+// What a background now gives (skills, cash, assets, the brother) is covered by v87.test.ts.
 
-ok('the six V86 backgrounds exist, and earlier ones still have a name on old records', () => {
+ok('the six backgrounds exist, and earlier ones still have a name on old records', () => {
   assert.deepEqual(BACKGROUNDS.map((b) => b.label), ['Street Hustler', 'Connected Family', 'Small Businessman', 'Union Man', 'Bookmaker', 'Wheelman']);
   for (const id of ['boxer', 'convict', 'driver']) assert.ok(bgLabel(id));
   assert.equal(bgLabel(undefined), undefined);

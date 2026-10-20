@@ -9,12 +9,14 @@ import { arch, pick } from './voice';
 const PL = (w: World) => w.chars[w.playerId!];
 const first = (c: Character) => c.name.split(' ')[0];
 
-export function lifeInit(w: World, p: Character) {
-  const last = p.name.split(' ').slice(-1)[0];
+// `brother`, when given, is a man who already exists in the world (the connected family's soldier): he is the sibling,
+// and nobody else is invented to stand in for one.
+export function lifeInit(w: World, p: Character, brother?: Character) {
+  const last = p.name.split(' ').slice(1).join(' ') || p.name;
   const rng = w.rng;
   const mother = spawnCivilian(w, `${pick(['Rosa', 'Carmela', 'Theresa', 'Josephine', 'Antonia', 'Lucia'], p.id)} ${last}`, p.district, 80);
   mother.traits.sociability = 0.7;
-  const sib = spawnCivilian(w, `${rng.chance(0.5) ? pick(FEMALE, p.id + 'sib') : pick(['Frankie', 'Danny', 'Joey', 'Mikey'], p.id + 'sib')} ${last}`, p.district, 140);
+  const sib = brother ?? spawnCivilian(w, `${rng.chance(0.5) ? pick(FEMALE, p.id + 'sib') : pick(['Frankie', 'Danny', 'Joey', 'Mikey'], p.id + 'sib')} ${last}`, p.district, 140);
   const kin: Kin[] = [
     { id: mother.id, role: 'mother', warmth: 0.6, lastSeen: w.now - 5 * DAY },
     { id: sib.id, role: FEMALE.includes(sib.name.split(' ')[0]) ? 'sister' : 'brother', warmth: 0.5, lastSeen: w.now - 12 * DAY },
@@ -25,6 +27,11 @@ export function lifeInit(w: World, p: Character) {
     rel(c, p.id).affection = 0.8;
     rel(p, c.id).trust = 0.7;
     rel(p, c.id).affection = 0.8;
+  }
+  // A made brother loves you and is still waiting to see what you are. His trust is earned like anyone's.
+  if (brother) {
+    Object.assign(rel(brother, p.id), { trust: 0.45, affection: 0.75, respect: 0.25, lastMet: w.now - 12 * DAY });
+    Object.assign(rel(p, brother.id), { trust: 0.6, affection: 0.75, respect: 0.55, lastMet: w.now - 12 * DAY });
   }
   w.life = { kin, met: [], lastSunday: w.now };
 }
@@ -270,7 +277,8 @@ export function visitKin(w: World, p: Character, k: Kin): string[] {
   const c = w.chars[k.id];
   k.lastSeen = w.now;
   k.warmth = clamp(k.warmth + 0.06);
-  return [`You drop in on ${first(c)}. It’s nothing, an hour and a cup of coffee, and she acts as though you have crossed an ocean.`];
+  if (c.rank !== 'civilian') return [`You find ${first(c)} at his table and sit with him an hour. Family talk, nothing about work. That part stays outside.`];
+  return [`You drop in on ${first(c)}. It’s nothing, an hour and a cup of coffee, and ${isFemale(c) ? 'she acts' : 'he acts'} as though you have crossed an ocean.`];
 }
 
 // ------------------------------------------------------------ romance, on purpose

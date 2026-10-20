@@ -46,7 +46,7 @@ import { treeView } from './ui/views_a';
 import { leaveCrew } from './rank';
 import { KEY, readSnaps, usageStatus, writeSave, type SaveStatus } from './storage';
 import { briefView } from './ui/brief';
-import { applyBackground } from './background';
+import { startingLines } from './background';
 import { draftBg, draftDone, draftName, openingAct, openingView, typed } from './ui/opening';
 import { fullName } from './names';
 import { sundayView, sKey } from './ui/sunday';
@@ -344,13 +344,12 @@ function handle(a: string, v: string) {
     const n = draftName();
     if (!n.first || !n.last) { S.notice = 'He needs a first name and a surname before anyone will deal with him.'; openingAct('sec|name'); return; }
     const bg = draftBg();
-    S.w = createWorld(Math.floor(Math.random() * 1e6), fullName(n.first, n.last));
+    S.w = createWorld(Math.floor(Math.random() * 1e6), fullName(n.first, n.last), { bg });
     S.w.chars[S.w.playerId!].look = { ...S.look };
-    applyBackground(S.w, S.w.chars[S.w.playerId!], bg);
     draftDone();
     const p = P();
     const bs = S.w.chars[p.bossId!];
-    S.log = [esc(`New York, March 1970. You’re ${p.name}, an associate of the ${famName(S.w, p)} family. You’re not made, and you’re nobody’s friend yet.`), esc(`${bs.name} is the man you answer to. Go and find him at his usual place, and let him see your face. Then make yourself useful.`), 'The Needs list says what wants doing. The Rackets tab says how to earn. Everything else is people.'];
+    S.log = [esc(`New York, March 1970. You’re ${p.name}, an associate of the ${famName(S.w, p)} family. You’re not made, and you’re nobody’s friend yet.`), ...startingLines(S.w, p).map(esc), esc(`${bs.name} is the man you answer to. Go and find him at his usual place, and let him see your face. Then make yourself useful.`), 'The Needs list says what wants doing. The Rackets tab says how to earn. Everything else is people.'];
     S.news = [];
     S.stack = [];
     S.view = { t: 'tab', name: 'today' };

@@ -353,7 +353,7 @@ export interface Report {
   by: Id;
 }
 export interface DayJob {
-  kind: 'bartender' | 'driver' | 'doorman' | 'runner';
+  kind: 'bartender' | 'driver' | 'doorman' | 'runner' | 'porter'; // porter: union work at a civilian business, paid from its till
   biz?: Id;
   boss: Id;
   since: number;
