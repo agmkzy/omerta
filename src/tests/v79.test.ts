@@ -1,6 +1,7 @@
 // V79: the conversation crawler. Random walks through every menu, for many men at every level of trust, checking that nothing
-// breaks, nothing is a dead end, nothing is said twice for a reward, and nobody talks like a database. Usage: tsx src/tests/v79.test.ts fast
+// breaks, nothing is a dead end, nothing is said twice for a reward, and nobody talks like a database. DUMP=file writes every problem found.
 import assert from 'node:assert';
+import { describe, test as ok } from 'vitest';
 import { writeFileSync } from 'node:fs';
 import { advance, deserialize, serialize } from '../engine';
 import { createWorld } from '../world';
@@ -9,8 +10,6 @@ import { options, say, startConvo, arrive, isNavCode, Convo } from '../dialogue'
 import { whereIs } from '../where';
 import { Rng } from '../rng';
 
-let failed = 0;
-const ok = (name: string, f: () => void) => { try { f(); console.log('ok   ' + name); } catch (e) { failed++; console.log('FAIL ' + name + ': ' + (e as Error).message.split('\n').slice(0, 6).join(' ')); } };
 let base: string | undefined;
 const fresh = () => { if (!base) { const b = createWorld(3, 'Tony Marino'); advance(b, b.now + 60 * DAY); base = serialize(b); } return deserialize(base); };
 const P = (w: World) => w.chars[w.playerId!];
@@ -159,6 +158,4 @@ function fast() {
     assert.ok(!options(w, p, m, fresh2).find((o) => o.code === 'how')?.done, 'a new conversation starts clean');
   });
 }
-fast();
-console.log(failed ? `\n${failed} FAILED` : '\nall passed');
-process.exit(failed ? 1 : 0);
+describe('v79 fast', fast);

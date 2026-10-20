@@ -1,5 +1,6 @@
-// V78: conversation layers. Usage: tsx src/tests/v78.test.ts fast
+// V78: conversation layers.
 import assert from 'node:assert';
+import { describe, test as ok } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -13,8 +14,6 @@ import { recall } from '../memory';
 import { addFact } from '../core';
 import { whereIs } from '../where';
 
-let failed = 0;
-const ok = (name: string, f: () => void) => { try { f(); console.log('ok   ' + name); } catch (e) { failed++; console.log('FAIL ' + name + ': ' + (e as Error).message.split('\n').slice(0, 5).join(' ')); } };
 const here = dirname(fileURLToPath(import.meta.url));
 let base: string | undefined;
 const fresh = () => { if (!base) { const b = createWorld(3, 'Tony Marino'); advance(b, b.now + 60 * DAY); base = serialize(b); } return deserialize(base); };
@@ -313,6 +312,4 @@ function fast() {
     assert.equal(serialize(deserialize(s)), s);
   });
 }
-fast();
-console.log(failed ? `\n${failed} FAILED` : '\nall passed');
-process.exit(failed ? 1 : 0);
+describe('v78 fast', fast);

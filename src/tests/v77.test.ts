@@ -1,6 +1,7 @@
-// V77 suite: voices, memory and conversation. Usage: tsx src/tests/v77.test.ts fast
+// V77 suite: voices, memory and conversation.
 // Focused checks, no long simulation: the world is 60 days old, the rest is the writing layer.
 import assert from 'node:assert';
+import { describe, test as ok } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -15,10 +16,6 @@ import { options, say, startConvo } from '../dialogue';
 import { addFavour } from '../encounters';
 import { addFact, learn } from '../core';
 
-let failed = 0;
-const ok = (name: string, f: () => void) => {
-  try { f(); console.log('ok   ' + name); } catch (e) { failed++; console.log('FAIL ' + name + ': ' + (e as Error).message.split('\n').slice(0, 6).join(' ')); }
-};
 const here = dirname(fileURLToPath(import.meta.url));
 const P = (w: World) => w.chars[w.playerId!];
 let base: string | undefined;
@@ -218,6 +215,4 @@ function fast() {
   });
 }
 
-fast();
-console.log(failed ? `\n${failed} FAILED` : '\nall passed');
-process.exit(failed ? 1 : 0);
+describe('v77 fast', fast);

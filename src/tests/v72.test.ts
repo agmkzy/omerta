@@ -1,7 +1,9 @@
-// V72 regression suite. Usage: tsx src/tests/v72.test.ts fast | slow:<seed> | growth:<seed>
-// "fast" is a few seconds of targeted checks; the slow ones simulate 180 days.
+// V72 regression suite. The fast checks take a few seconds; SLOW=1 adds the 180-day stable, roundtrip and growth runs (see ./modes.ts).
 import assert from 'node:assert';
 import { readdirSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { describe, test as ok } from 'vitest';
+import { SEEDS, SLOW } from './modes';
 import { advance, deserialize, serialize, SCHEMA } from '../engine';
 import { createWorld } from '../world';
 import { DAY, World, Character } from '../types';
@@ -19,10 +21,6 @@ import { clubOf } from '../clubdata';
 import { prospects, recruitProspect } from '../orders';
 import { startScene, sceneNode, sceneAct, topicsFor } from '../club';
 
-let failed = 0;
-const ok = (name: string, f: () => void) => {
-  try { f(); console.log('ok   ' + name); } catch (e) { failed++; console.log('FAIL ' + name + ': ' + (e as Error).message.split('\n')[0]); }
-};
 const P = (w: World) => w.chars[w.playerId!];
 const fresh = (seed = 7) => createWorld(seed, 'Tony Marino');
 const fam = (w: World, fid: string) => members(w, fid);
@@ -150,8 +148,8 @@ function fast() {
 
   ok('rank has one door: no source line assigns .rank outside rank.ts/world.ts', () => {
     const bad: string[] = [];
-    const dir = process.cwd() + '/src/';
-    for (const f of readdirSync(dir).filter((x) => x.endsWith('.ts') && x !== 'rank.ts' && x !== 'world.ts' && x !== 'test.ts')) {
+    const dir = fileURLToPath(new URL('../', import.meta.url));
+    for (const f of readdirSync(dir).filter((x) => x.endsWith('.ts') && x !== 'rank.ts' && x !== 'world.ts')) {
       readFileSync(dir + f, 'utf8').split('\n').forEach((l, i) => { if (/\.rank = /.test(l)) bad.push(`${f}:${i + 1}`); });
     }
     assert.deepEqual(bad, []);
@@ -278,11 +276,10 @@ function growth(seed: number) {
   console.log(`seed ${seed}: ${rows.join(' ')} | avg ${per.toFixed(1)} KB/day | facts ${Object.keys(w.facts).length}`);
 }
 
-const arg = process.argv[2] ?? 'fast';
-const [kind, sd] = arg.split(':');
-if (kind === 'fast') fast();
-else if (kind === 'stable') ok('stable ' + sd, () => stable(+sd));
-else if (kind === 'roundtrip') ok('roundtrip ' + sd, () => roundtrip(+sd));
-else if (kind === 'growth') growth(+sd);
-setTimeout(() => { console.log(failed ? `${failed} FAILED` : 'all passed'); process.exit(failed ? 1 : 0); }, 50);
+describe('v72 fast', fast);
+describe.skipIf(!SLOW)('v72 slow', () => {
+  ok.each(SEEDS)('stable %i', stable);
+  ok.each(SEEDS)('roundtrip %i', roundtrip);
+  ok.each(SEEDS)('growth %i', growth);
+});
 void (null as unknown as Character);

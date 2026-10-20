@@ -1,7 +1,7 @@
 # Typecheck, build and run every regression suite on each push and pull request.
-# Free for public repositories on GitHub-hosted runners. Suites run as parallel jobs, so the
-# wall-clock time is roughly that of the slowest suite instead of the ~7.5 minute serial `test:all`.
-# See docs/05-testing.md.
+# Free for public repositories on GitHub-hosted runners. The suites (Vitest) run in parallel jobs, so the wall-clock time is
+# roughly that of the slowest suite, v75. Each job writes a blob report with its coverage; the last job merges them into one
+# report and checks the coverage thresholds in vitest.config.ts. See docs/05-testing.md.
 name: CI
 
 on:
@@ -53,18 +53,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: storage, run: 'npx tsx src/tests/storage.test.ts' }
-          - { name: v72 simulation and saves, run: 'npx tsx src/tests/v72.test.ts fast' }
-          - { name: v73 economy, run: 'npx tsx src/tests/v73.test.ts fast' }
-          - { name: v74 NPC agency, run: 'npx tsx src/tests/v74.test.ts fast' }
-          - { name: v75 situations, run: 'npx tsx src/tests/v75.test.ts fast' }
-          - { name: v76 organisations, run: 'npx tsx src/tests/v76.test.ts fast' }
-          - { name: v77 voices and memory, run: 'npx tsx src/tests/v77.test.ts fast' }
-          - { name: v78 conversation layers, run: 'npx tsx src/tests/v78.test.ts fast' }
-          - { name: v79 conversation crawler, run: 'npx tsx src/tests/v79.test.ts fast' }
-          - { name: old saves, run: 'npx tsx src/tests/oldsave.test.ts' }
-          - { name: determinism, run: 'npx tsx src/test.ts' }
-          - { name: schema migrations, run: 'make test-compat' }
+          # v75 and v74 are the slowest suites, so each gets a runner of its own. Every other suite runs in the third job,
+          # including any new src/tests/*.test.ts: Vitest finds the files, nothing here lists them.
+          - { name: v75 situations, id: v75, files: src/tests/v75.test.ts }
+          - { name: v74 NPC agency, id: v74, files: src/tests/v74.test.ts }
+          - { name: other suites, id: rest, files: --exclude src/tests/v74.test.ts --exclude src/tests/v75.test.ts }
+    env:
+      COMPAT: 1 # the schema-migration checks run in their suite's job
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -72,4 +67,32 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: ${{ matrix.run }}
+      # Coverage of a part is partial, so its thresholds are checked only on the merged report (job `report`).
+      - run: npx vitest run ${{ matrix.files }} --coverage --coverage.thresholds=false --reporter=default --reporter=blob --outputFile.blob=blob-reports/${{ matrix.id }}.json
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: blob-${{ matrix.id }}
+          path: blob-reports/
+          retention-days: 1
+
+  report:
+    name: All suites and coverage
+    needs: suite
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: blob-*
+          path: blob-reports
+          merge-multiple: true
+      # Fails if any suite failed, or if coverage of src/ fell below the thresholds.
+      - run: npx vitest run --merge-reports=blob-reports --coverage

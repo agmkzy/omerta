@@ -132,7 +132,7 @@ All of these work the same way: a build command of `npm ci && npm run build`, pu
 
 Until CI is in place:
 
-1. Run `make test-all`. Also run `make test-compat` if `types.ts` or `deserialize` changed.
+1. Run `make test-all`, which includes the synthetic schema migrations (`make test-compat`).
 2. If the save shape changed, check that a save from the previous build was added to `src/tests/fixtures/` (see [02-state-saves-and-compatibility.md](02-state-saves-and-compatibility.md#6-backwards-compatibility-will-a-new-version-wipe-progress)).
 3. Run `make pages`, which builds and copies to `index.html`. Commit `dist/omerta.html` and `index.html` together with the source change.
 4. Push `main`, then wait for the Pages build. Load the site, choose **Continue saved game** with an existing save, and confirm it loads.

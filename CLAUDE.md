@@ -28,11 +28,12 @@ A single-player sandbox mafia RPG in **1970 New York**. The pitch: a world that 
 ```
 npm install
 npm run typecheck
-npm run test:all          # or: npx tsx src/tests/<suite>.test.ts fast
+npm run test:all          # Vitest: every suite + schema migrations, in parallel
+npx vitest run v73 -t ledger   # one suite (file name filter), one check (name filter)
 npm run build             # -> dist/omerta.html
 npm run dev               # live-reload dev server, http://localhost:5173
 ```
-Before shipping any change: typecheck + v77–v79 at minimum, full `test:all` for anything touching sim, saves or economy. Deploy = publish `dist/omerta.html` (GitHub Pages `index.html` at https://agmkzy.github.io/omerta/; artifact https://claude.ai/artifact/YDyiAu7Aw8bZdwMjaBRVV3). Don’t poll with sleep loops; run long tests in the background.
+Tests are Vitest files (`src/tests/*.test.ts`, found by name; assertions are `node:assert`). Slow modes are opt-in via env: `COMPAT=1` (schema migrations, included in `test:all`), `SLOW=1` with `SEED`/`DAYS` (long simulations, `npm run test:slow`); see `src/tests/modes.ts` and `docs/05-testing.md`. Before shipping any change: typecheck + v77–v79 at minimum (`make test`), full `test:all` for anything touching sim, saves or economy. Deploy = publish `dist/omerta.html` (GitHub Pages `index.html` at https://agmkzy.github.io/omerta/; artifact https://claude.ai/artifact/YDyiAu7Aw8bZdwMjaBRVV3). Don’t poll with sleep loops; run long tests in the background.
 
 ## Playtesting
 `playtest/pt.ts` drives the real sim from the command line with persistent state (`playtest/state.json`, `actions.log`). The V85 playtest used seed 3, “Tony Marino”, 35 days, no manual state edits. Judge gameplay by tracing consequences (action → recorded state → later behaviour), not by passing tests.

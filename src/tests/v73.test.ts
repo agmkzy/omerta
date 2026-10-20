@@ -1,5 +1,8 @@
-// V73 regression suite: the economic foundation. Usage: tsx src/tests/v73.test.ts fast | stable:<seed> | roundtrip:<seed> | compat
+// V73 regression suite: the economic foundation. COMPAT=1 adds the schema-3 migration; SLOW=1 the 180-day stable and roundtrip runs (see ./modes.ts).
 import assert from 'node:assert';
+import { fileURLToPath } from 'node:url';
+import { describe, test as ok } from 'vitest';
+import { COMPAT, SEEDS, SLOW } from './modes';
 import { SCHEMA, advance, deserialize, serialize } from '../engine';
 import { createWorld } from '../world';
 import { DAY, WEEK, Business, Character, World } from '../types';
@@ -12,10 +15,6 @@ import {
 } from '../econ';
 import { readdirSync, readFileSync } from 'node:fs';
 
-let failed = 0;
-const ok = (name: string, f: () => void) => {
-  try { f(); console.log('ok   ' + name); } catch (e) { failed++; console.log('FAIL ' + name + ': ' + (e as Error).message.split('\n').slice(0, 6).join(' ')); }
-};
 const fresh = (seed = 7) => createWorld(seed, 'Tony Marino');
 const P = (w: World) => w.chars[w.playerId!];
 // A shop with an NPC collector who is not the player.
@@ -50,9 +49,9 @@ function fast() {
     assert.equal(w.txns!.at(-1)!.bal, b.cash); assert.equal(w.txns!.at(-1)!.d, 125);
   });
   ok('no source file changes a business\'s cash directly', () => {
-    const bad: string[] = [];
-    for (const f of readdirSync('src').filter((x) => x.endsWith('.ts') && x !== 'econ.ts')) {
-      readFileSync('src/' + f, 'utf8').split('\n').forEach((line, i) => { if (/\b(?:biz|shop|rb|sb|own|[a-z]*Biz)\.cash\s*[-+*]?=[^=]/.test(line) || /\bb\.cash\s*[-+*]?=[^=]/.test(line) && f !== 'disputes.ts') bad.push(`${f}:${i + 1}`); });
+    const bad: string[] = []; const src = fileURLToPath(new URL('../', import.meta.url));
+    for (const f of readdirSync(src).filter((x) => x.endsWith('.ts') && x !== 'econ.ts')) {
+      readFileSync(src + f, 'utf8').split('\n').forEach((line, i) => { if (/\b(?:biz|shop|rb|sb|own|[a-z]*Biz)\.cash\s*[-+*]?=[^=]/.test(line) || /\bb\.cash\s*[-+*]?=[^=]/.test(line) && f !== 'disputes.ts') bad.push(`${f}:${i + 1}`); });
     }
     assert.deepEqual(bad, []);
   });
@@ -368,11 +367,10 @@ function compat() {
   });
 }
 
-const arg = process.argv[2] ?? 'fast';
-const [kind, sd] = arg.split(':');
-if (kind === 'fast') fast();
-else if (kind === 'stable') ok('stable ' + sd, () => stable(+sd));
-else if (kind === 'roundtrip') ok('roundtrip ' + sd, () => roundtrip(+sd));
-else if (kind === 'compat') compat();
-setTimeout(() => { console.log(failed ? `${failed} FAILED` : 'all passed'); process.exit(failed ? 1 : 0); }, 50);
+describe('v73 fast', fast);
+describe.skipIf(!COMPAT)('v73 compat', compat);
+describe.skipIf(!SLOW)('v73 slow', () => {
+  ok.each(SEEDS)('stable %i', stable);
+  ok.each(SEEDS)('roundtrip %i', roundtrip);
+});
 void (null as unknown as Character);
