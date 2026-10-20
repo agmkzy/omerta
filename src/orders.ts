@@ -5,7 +5,7 @@
 import { applyRank } from './rank';
 import { addFact, clamp, learn, money, ownerBiz, recordCareer, rel, shortTime, travelTime, witnessesAt } from './core';
 import { aptitude, grow, lateOf, PROBLEM_LABEL } from './people';
-import { clearArrears, owedOf, takeFromBiz } from './econ';
+import { bizMove, clearArrears, owedOf, takeFromBiz } from './econ';
 import { arch, admit, excuse, pick } from './voice';
 import { activityOf, approaches, assign, mkJob, resolve } from './jobs';
 import { perform } from './actions';
@@ -421,7 +421,7 @@ export function recruitProspect(w: World, p: Character, c: Character): string[] 
 // ------------------------------------------------------------ day jobs
 
 export interface DayJobOpt {
-  kind: 'bartender' | 'driver' | 'doorman' | 'runner';
+  kind: 'bartender' | 'driver' | 'doorman' | 'runner' | 'porter';
   label: string;
   hint: string;
   biz?: Id;
@@ -449,7 +449,7 @@ export function takeDayJob(w: World, p: Character, o: DayJobOpt) {
 export const quitDayJob = (p: Character) => {
   delete p.job;
 };
-const PAY = { bartender: 90, doorman: 100, driver: 120, runner: 70 };
+const PAY = { bartender: 90, doorman: 100, driver: 120, runner: 70, porter: 75 };
 export function workShift(w: World, p: Character): { minutes: number; lines: string[] } {
   const j = p.job;
   if (!j) return { minutes: 0, lines: ['You have no job to go to.'] };
@@ -459,7 +459,20 @@ export function workShift(w: World, p: Character): { minutes: number; lines: str
     delete p.job;
     return { minutes: 0, lines: ['The man you worked for is gone. So is the job.'] };
   }
+  // A place that has shut can't employ anyone.
+  const place = j.biz ? w.biz[j.biz] : undefined;
+  if (place && !place.open) {
+    delete p.job;
+    return { minutes: 0, lines: [`${place.name} has closed its doors. There’s no work there any more.`] };
+  }
   let pay = PAY[j.kind] + (j.kind === 'driver' && boss.rank === 'boss' ? 30 : 0);
+  // Union scale comes out of the employer's own till, so a bad week at the place is a short week for you.
+  if (j.kind === 'porter' && place) {
+    const can = Math.max(0, Math.min(pay, place.cash));
+    if (can > 0) bizMove(w, place, -can, 'expense', p.id);
+    if (can < pay) lines.push(can > 0 ? `${boss.name} is short this week. He pays you ${money(can)} and swears the rest is coming.` : `${boss.name} opens an empty till and shrugs. Nothing for you this week.`);
+    pay = can;
+  }
   p.cash += pay;
   p.books.gross.odd = (p.books.gross.odd ?? 0) + pay;
   p.weekIncome += pay;
@@ -472,7 +485,7 @@ export function workShift(w: World, p: Character): { minutes: number; lines: str
   r.lastMet = w.now;
   if (j.biz) p.district = w.biz[j.biz].district;
   else p.district = boss.district;
-  lines.push(`A long shift ${j.kind === 'driver' ? `driving ${boss.name}` : `for ${boss.name}`}. You earn ${money(pay)}.`);
+  lines.push(j.kind === 'porter' ? `Four hours on the loading floor at ${place?.name ?? 'the market'} before the city wakes up.${pay ? ` You earn ${money(pay)}.` : ''}` : `A long shift ${j.kind === 'driver' ? `driving ${boss.name}` : `for ${boss.name}`}. You earn ${money(pay)}.`);
   // what you pick up
   if (w.rng.chance(0.45)) {
     const f = Object.values(w.facts)
@@ -480,7 +493,7 @@ export function workShift(w: World, p: Character): { minutes: number; lines: str
       .sort((a, b) => b.t - a.t)[0];
     if (f) {
       learn(w, p.id, f, boss.id, boss.known[f.id].knowsActor);
-      lines.push(j.kind === 'driver' ? `In the back seat they forget you’re there. You hear: "${f.text}"` : `Between orders you catch it: "${f.text}"`);
+      lines.push(j.kind === 'porter' ? `Over the crates, ${boss.name} talks. You hear: "${f.text}"` : j.kind === 'driver' ? `In the back seat they forget you’re there. You hear: "${f.text}"` : `Between orders you catch it: "${f.text}"`);
     } else lines.push('Nothing worth hearing tonight.');
   }
   if (j.noticed >= 0.6 && !p.backer && ['soldier', 'capo', 'underboss', 'boss'].includes(boss.rank) && (j.shifts % 4 === 0)) {
@@ -488,7 +501,7 @@ export function workShift(w: World, p: Character): { minutes: number; lines: str
     lines.push(`${boss.name} pulls you aside. "I’ve been watching you work. If anyone asks, I have a good word for you."`);
     p.standing = clamp(p.standing + 3, 0, 100);
   }
-  return { minutes: 360, lines };
+  return { minutes: j.kind === 'porter' ? 240 : 360, lines };
 }
 
 // ------------------------------------------------- errands from above

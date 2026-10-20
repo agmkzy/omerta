@@ -31,8 +31,7 @@ import type { World } from './types';
 import { relevance } from './reports';
 import { ignoreDispute, investigate, callSitdown, playerActed, touchDispute } from './disputes';
 import { whereIs } from './where';
-import { back as backBtn, avatar } from './ui/common';
-import { SKIN_LIST, HAIR_LIST } from './ui/portrait';
+import { back as backBtn } from './ui/common';
 import { esc, lk, P, S, W } from './ui/links';
 import type { Tab, View } from './ui/state';
 import { storiesTab, newStories } from './ui/stories';
@@ -47,7 +46,9 @@ import { treeView } from './ui/views_a';
 import { leaveCrew } from './rank';
 import { KEY, readSnaps, usageStatus, writeSave, type SaveStatus } from './storage';
 import { briefView } from './ui/brief';
-import { applyBackground, BACKGROUNDS } from './background';
+import { startingLines } from './background';
+import { draftBg, draftDone, draftName, openingAct, openingView, typed } from './ui/opening';
+import { fullName } from './names';
 import { sundayView, sKey } from './ui/sunday';
 import { racketsView, wayView } from './ui/views_c';
 
@@ -241,33 +242,6 @@ function tabs(): string {
   return `<nav class="tabs">${t('today', 'Today', n)}${t('rackets', 'Rackets')}${t('crew', 'Crew')}${t('family', 'Family')}${t('life', 'Life')}${t('stories', 'Stories', newStories(W()))}</nav>`;
 }
 
-const previewChar = () => ({ id: 'preview', name: S.startName, rank: 'associate', familyId: null, traits: { greed: 0.5, violence: 0.45, ambition: 0.7, caution: 0.5, sociability: 0.6, vice: 0.3, courage: 0.7 }, hurtUntil: 0, look: S.look }) as unknown as import('./types').Character;
-const LOOK_ROWS: { key: keyof import('./types').Look; label: string; opts: string[] }[] = [
-  { key: 'style', label: 'Hair', opts: ['Slicked', 'Long', 'Receding', 'Bald'] },
-  { key: 'beard', label: 'Facial hair', opts: ['Clean', 'Moustache', 'Stubble', 'Goatee', 'Sideburns', 'Mutton chops'] },
-  { key: 'glasses', label: 'Eyewear', opts: ['None', 'Spectacles', 'Dark glasses'] },
-  { key: 'jaw', label: 'Jaw', opts: ['Square', 'Even', 'Lean'] },
-];
-const startView = () => `<main class="start">
-    <h1>OMERTÀ</h1>
-    <p class="lede">New York, March 1970. You are an associate in the Corrente family with $1,500 and nobody under you. You’ll have to find your own men. Nobody is going to hand you a story.</p>
-    <p class="muted">Time only moves when you act. Everyone else keeps living while it does.</p>
-    <div class="chooser">
-      <div class="pv">${avatar(previewChar())}</div>
-      <div class="cg">
-        <div class="cl">Complexion</div><div class="sw">${SKIN_LIST.map((c, i) => `<button class="swatch ${S.look.skin === i ? 'on' : ''}" style="background:${c}" data-a="look:skin|${i}" aria-label="complexion ${i + 1}"></button>`).join('')}</div>
-        <div class="cl">Hair colour</div><div class="sw">${HAIR_LIST.map((c, i) => `<button class="swatch ${S.look.hairColour === i ? 'on' : ''}" style="background:${c}" data-a="look:hairColour|${i}" aria-label="hair colour ${i + 1}"></button>`).join('')}</div>
-        ${LOOK_ROWS.map((r) => `<div class="cl">${r.label}</div><div class="chips">${r.opts.map((o, i) => `<button class="pill small ${S.look[r.key] === i ? 'on' : ''}" data-a="look:${r.key}|${i}">${o}</button>`).join('')}</div>`).join('')}
-        <button class="btn" data-a="look:shuffle|0">Shuffle a new face</button>
-      </div>
-    </div>
-    <div class="cl" style="margin-top:12px">Where you came from</div><div class="chips">${BACKGROUNDS.map((b) => `<button class="pill small ${S.bg === b.id ? 'on' : ''}" data-a="bg:${b.id}">${b.label}</button>`).join('')}</div><p class="muted">${esc(BACKGROUNDS.find((b) => b.id === S.bg)?.blurb ?? '')}</p>
-    <label for="name" class="muted">Your name</label>
-    <input id="name" type="text" value="${esc(S.startName)}" autocomplete="off" autocapitalize="words" maxlength="30" />
-    <button class="btn primary" data-a="new:">New game</button>
-    ${hasSave() ? `<button class="btn" data-a="continue:">Continue saved game</button>` : ''}
-  </main>`;
-
 function body(): string {
   const w = W();
   const v = S.view;
@@ -326,8 +300,9 @@ function saveBanner(): string {
 
 function render() {
   const app = document.getElementById('app')!;
+  document.body.classList.toggle('om-open', !S.w);
   if (!S.w) {
-    app.innerHTML = (S.notice ? `<div class="callout bad">${esc(S.notice)}</div>` : '') + startView();
+    app.innerHTML = openingView(S.notice, hasSave());
     S.notice = '';
     return;
   }
@@ -357,15 +332,7 @@ function startMeeting(m: ReturnType<typeof openCrewMeeting>, fail: View = { t: '
 function handle(a: string, v: string) {
   const w = S.w;
   const args = v.split('|');
-  if (a === 'bg') { const nm = (document.getElementById('name') as HTMLInputElement | null)?.value; if (nm != null) S.startName = nm; S.bg = v; return; }
-  if (a === 'look') {
-    const nm = (document.getElementById('name') as HTMLInputElement | null)?.value;
-    if (nm != null) S.startName = nm;
-    const [k, val] = args;
-    if (k === 'shuffle') S.look = { skin: Math.floor(Math.random() * 6), hairColour: Math.floor(Math.random() * 6), style: Math.floor(Math.random() * 4), beard: Math.floor(Math.random() * 6), glasses: Math.random() < 0.7 ? 0 : 1 + Math.floor(Math.random() * 2), jaw: Math.floor(Math.random() * 3), seed: 'you' + Math.floor(Math.random() * 1e6) };
-    else (S.look as Record<string, number | string>)[k] = Number(val);
-    return;
-  }
+  if (a === 'om') return openingAct(v);
   if (a !== 'reset') S.confirmReset = false;
   if (w && w.goals && w.playerId) {
     const g = w.goals.done;
@@ -374,13 +341,15 @@ function handle(a: string, v: string) {
     if (['job', 'approach', 'delegate', 'sendorder'].includes(S.view.t) && !['back', 'tab', 'ent', 'biz', 'fact', 'tog'].includes(a)) g['g:job'] = w.now;
   }
   if (a === 'new') {
-    const name = (document.getElementById('name') as HTMLInputElement | null)?.value.trim() || 'Tony Marino';
-    S.w = createWorld(Math.floor(Math.random() * 1e6), name);
+    const n = draftName();
+    if (!n.first || !n.last) { S.notice = 'He needs a first name and a surname before anyone will deal with him.'; openingAct('sec|name'); return; }
+    const bg = draftBg();
+    S.w = createWorld(Math.floor(Math.random() * 1e6), fullName(n.first, n.last), { bg });
     S.w.chars[S.w.playerId!].look = { ...S.look };
-    applyBackground(S.w, S.w.chars[S.w.playerId!], S.bg);
+    draftDone();
     const p = P();
     const bs = S.w.chars[p.bossId!];
-    S.log = [esc(`New York, March 1970. You’re ${p.name}, an associate of the ${famName(S.w, p)} family. You’re not made, and you’re nobody’s friend yet.`), esc(`${bs.name} is the man you answer to. Go and find him at his usual place, and let him see your face. Then make yourself useful.`), 'The Needs list says what wants doing. The Rackets tab says how to earn. Everything else is people.'];
+    S.log = [esc(`New York, March 1970. You’re ${p.name}, an associate of the ${famName(S.w, p)} family. You’re not made, and you’re nobody’s friend yet.`), ...startingLines(S.w, p).map(esc), esc(`${bs.name} is the man you answer to. Go and find him at his usual place, and let him see your face. Then make yourself useful.`), 'The Needs list says what wants doing. The Rackets tab says how to earn. Everything else is people.'];
     S.news = [];
     S.stack = [];
     S.view = { t: 'tab', name: 'today' };
@@ -836,6 +805,9 @@ function handle(a: string, v: string) {
         }
         S.w = null;
         S.confirmReset = false;
+        S.intro = 'title';
+        S.confirmNew = false;
+        S.introPlayed = false;
       } else S.confirmReset = true;
       return;
   }
@@ -862,8 +834,19 @@ document.addEventListener('click', (e) => {
     S.stack = [];
   }
   render();
-  const inPlace = ['tog', 'gpick', 'lsub', 'pf', 'stance', 'tree', 'opdist', 'oprun', 'hjpick'].includes(raw.slice(0, i));
+  const inPlace = ['tog', 'gpick', 'lsub', 'pf', 'stance', 'tree', 'opdist', 'oprun', 'hjpick'].includes(raw.slice(0, i)) || /^om:(both|first|last|bg|shuffle|look|keep|new)/.test(raw);
   window.scrollTo(0, inPlace ? before : 0);
+  // On the opening screens a keyboard user keeps their place: the control they pressed has focus again after the redraw.
+  if (!S.w && e.detail === 0) (document.querySelector(`[data-a="${CSS.escape(raw)}"]`) as HTMLElement | null)?.focus();
+});
+
+document.addEventListener('input', (e) => {
+  const el = e.target as HTMLInputElement;
+  if (el?.id === 'om-first' || el?.id === 'om-last') typed(el);
+});
+document.addEventListener('keydown', (e) => {
+  const el = e.target as HTMLElement;
+  if (e.key === 'Enter' && (el?.id === 'om-first' || el?.id === 'om-last')) (el as HTMLInputElement).blur();
 });
 
 document.addEventListener('change', (e) => {

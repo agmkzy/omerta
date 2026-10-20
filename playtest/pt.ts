@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 // Unassisted play-test harness. Seed 3, "Tony Marino". The only things that change the world are the ones a player can do:
 // wait, talk (say), answer a request (enc), take or decline an offered job. Nothing here edits trust, cash, relationships or goals.
 // State between commands lives in playtest/state.json; every command is appended to playtest/actions.log so the run can be replayed.
@@ -18,12 +19,13 @@ import { clamp, rel as relOf } from '../src/core';
 import { prospects, recruitProspect } from '../src/orders';
 import { choose as mChoose, current as mCurrent, closeMeeting, openFamilyMeeting, openAccountsMeeting, openInduction, openSitdown, openCrewMeeting, Meeting } from '../src/meetings';
 
-const DIR = '/home/claude/omerta/playtest';
+const DIR = fileURLToPath(new URL('.', import.meta.url)).replace(/\/$/, ''); // this folder, wherever the project lives
 const SF = DIR + '/state.json', LOG = DIR + '/actions.log';
 const SEED = 3;
+const BG = process.env.PT_BG; // optional background for a new run (background.ts ids), e.g. PT_BG=connected
 let w: World; let convo: Convo | null = null; let lastWait = 0; let meet: Meeting | null = null;
 function load() {
-  if (!existsSync(SF)) { w = createWorld(SEED, 'Tony Marino'); convo = null; save(); appendFileSync(LOG, `# seed ${SEED} name "Tony Marino" start day 0\n`); return; }
+  if (!existsSync(SF)) { w = createWorld(SEED, 'Tony Marino', { bg: BG }); convo = null; save(); appendFileSync(LOG, `# seed ${SEED} name "Tony Marino"${BG ? ` background ${BG}` : ''} start day 0\n`); return; }
   const o = JSON.parse(readFileSync(SF, 'utf8')); w = deserialize(o.world); convo = o.convo; lastWait = o.lastWait ?? 0; meet = o.meet ?? null;
 }
 function save() { writeFileSync(SF, JSON.stringify({ world: serialize(w), convo, lastWait, meet })); }

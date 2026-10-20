@@ -7,6 +7,7 @@ import { addFact, createDebt, link, money, schedule } from './core';
 import { DISTRICTS } from './core';
 import { Rng } from './rng';
 import { lifeInit } from './life';
+import { applyBackground } from './background';
 import { Business, Character, DAY, Family, HOUR, Id, Rank, Traits, WEEK, World } from './types';
 
 const FIRST = [
@@ -140,7 +141,8 @@ export function spawnCivilian(w: World, name: string, district: string, cash = 1
   return c;
 }
 
-export function createWorld(seed: number, playerName = 'Tony Marino', opts: { orgs?: OrgDef[] } = {}): World {
+// `bg` is the player's background (background.ts). It shapes the start of a new game once, here, and never again.
+export function createWorld(seed: number, playerName = 'Tony Marino', opts: { orgs?: OrgDef[]; bg?: string } = {}): World {
   const ORGS = opts.orgs ?? STANDARD_ORGS;
   const rng = new Rng(seed);
   const w: World = {
@@ -212,6 +214,19 @@ export function createWorld(seed: number, playerName = 'Tony Marino', opts: { or
   members[corrente].push(player);
   // You start with nobody under you. Taking men on is the first thing you have to do.
 
+  // A man from a connected family has an older brother already made in the Corrente family: a soldier in another captain's
+  // crew, made here like every other soldier so that the rest of the world (protection, loans, clubs, ambitions) counts him.
+  let brother: Character | undefined;
+  if (opts.bg === 'connected') {
+    const capo = rng.pick(famCapos[corrente].filter((c) => c.id !== mentor.id));
+    const mine = playerName.trim().split(/\s+/)[0].toLowerCase();
+    const surname = playerName.trim().split(/\s+/).slice(1).join(' ') || playerName.trim();
+    const given = rng.pick(['Sal', 'Carmine', 'Vinnie', 'Frankie', 'Sonny', 'Richie', 'Paulie', 'Gino', 'Nicky', 'Dom'].filter((n) => n.toLowerCase() !== mine));
+    brother = mk(w, used, { rank: 'soldier', familyId: corrente, bossId: capo.id, district: capo.district, cash: cash(600, 1800), name: `${given} ${surname}` });
+    link(capo, brother, 0.55);
+    members[corrente].push(brother);
+  }
+
   // --- civilians and their businesses
   const kinds = [...BIZ_KINDS];
   for (let i = 0; i < 40; i++) {
@@ -278,10 +293,11 @@ export function createWorld(seed: number, playerName = 'Tony Marino', opts: { or
   schedule(w, 6 * DAY + 20 * HOUR, 'weekly');
   schedule(w, 1 * DAY + 9 * HOUR, 'daily');
   for (const c of Object.values(w.chars)) if (!c.isPlayer) schedule(w, w.now + rng.int(0, 180), 'think', c.id);
-  lifeInit(w, player);
+  lifeInit(w, player, brother);
   ambitionInit(w);
   void WEEK;
   ensureShape(w);
+  if (opts.bg) applyBackground(w, player, opts.bg);
   return w;
 }
 
