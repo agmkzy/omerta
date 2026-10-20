@@ -221,7 +221,7 @@ function ruleOn(w: World, s: Situation, up: Character, x: Character, y: Characte
   return closeSit(w, s, 'ruled on', [`${first(up)} ruled for ${first(win)}`, `${first(lose)} has to swallow it`], 10);
 }
 MATTERS.rivalry = {
-  title: (w, s) => { const [a, b] = rivals(w, s); return a && b ? `${first(a)} and ${first(b)}: bad blood` : 'Bad blood'; },
+  title: (w, s) => { const [a, b] = rivals(w, s); if (!a || !b) return 'Bad blood'; const [x, y] = b.isPlayer ? [b, a] : [a, b]; return `${x.isPlayer ? 'You' : first(x)} and ${first(y)}: bad blood`; },
   step: rivalryStep,
   stage: (w, s, p) => { const r = rivals(w, s), me = r.some((x) => x.id === p.id); return num(s, 'blows') ? 'It has come to blows' : me ? (num(s, 'heat') > 0.5 ? 'He is gunning for you' : 'There is bad blood between you') : num(s, 'heat') > 0.5 ? 'Getting worse' : 'Simmering'; },
   opts: (w, s, p, t) => {
@@ -357,7 +357,7 @@ function clear(w: World, s: Situation, c: Character, boss: Character) {
   return closeSit(w, s, 'kept quiet', [`${first(c)} kept quiet`], 10);
 }
 MATTERS.arrest = {
-  title: (w, s) => { const c = w.chars[role(s, 'held') ?? '']; return c ? `${first(c)}'s arrest` : 'An arrest'; },
+  title: (w, s) => { const c = w.chars[role(s, 'held') ?? '']; return c ? (c.isPlayer ? 'Your arrest' : `${first(c)}'s arrest`) : 'An arrest'; },
   step: arrestStep,
   stage: (w, s, p) => { const c = w.chars[role(s, 'held') ?? '']; return s.phase === 'held' ? (c?.isPlayer ? 'You are inside' : 'He is still inside') : c?.isPlayer ? 'They want to know what you said' : 'People are wondering what he said'; },
   opts: (w, s, p, t) => {

@@ -54,8 +54,9 @@ function exchange(q: string | undefined, ls: string[], now: boolean, t: Characte
     if (m) return `<p class="cv-say">${lk(m[2])}</p>`;
     return /^[“"]/.test(l) ? `<p class="cv-say">${lk(l)}</p>` : `<p class="cv-nar">${lk(l)}</p>`;
   }).join('');
-  const speaks = said.some((l) => /[“"]/.test(l));
-  return `<div class="cv-ex${now ? ' cv-now' : ''}">${q ? `<p class="cv-you">${esc(q)}</p>` : ''}${said.length ? `<div class="cv-him">${speaks ? `<span class="cv-who">${esc(first(t))}</span>` : ''}${lines}${fx.length ? `<p class="cv-fx">${esc(fx.join(' '))}</p>` : ''}</div>` : ''}</div>`;
+  // his name goes just above the first thing he actually says, not above the narration that leads up to it
+  const withWho = lines.replace('<p class="cv-say">', `<span class="cv-who">${esc(first(t))}</span><p class="cv-say">`);
+  return `<div class="cv-ex${now ? ' cv-now' : ''}">${q ? `<p class="cv-you">${esc(q)}</p>` : ''}${said.length ? `<div class="cv-him">${withWho}${fx.length ? `<p class="cv-fx">${esc(fx.join(' '))}</p>` : ''}</div>` : ''}</div>`;
 }
 
 // ------------------------------------------------------------------ what is open between you
@@ -79,7 +80,7 @@ function openBetween(w: World, p: Character, t: Character): Open[] {
     if (d.creditor === p.id && d.debtor === t.id) out.push({ key: d.id, title: `He owes you ${money(d.balance)}`, stage: d.missed ? `${d.missed} payment${d.missed > 1 ? 's' : ''} missed` : 'Paying on time', body: [`${money(d.weeklyPayment)} a week.`] });
     if (d.debtor === p.id && d.creditor === t.id) out.push({ key: d.id, title: `You owe him ${money(d.balance)}`, stage: d.missed ? `You have missed ${d.missed}` : 'You are paying', body: [`${money(d.weeklyPayment)} a week. He will want it on time.`] });
   }
-  for (const m of t.memos) if (m.other === p.id && !m.done && (m.kind === 'promise' || m.kind === 'agreement')) out.push({ key: m.id, title: m.kind === 'promise' ? 'Your word to him' : 'Agreed between you', stage: m.due ? (m.due > w.now ? `due ${shortTime(m.due)}` : 'overdue') : 'standing', body: [m.text] });
+  for (const m of t.memos) if (m.other === p.id && !m.done && (m.kind === 'promise' || m.kind === 'agreement')) out.push({ key: m.id, title: m.kind === 'promise' ? 'Your word to him' : 'Agreed between you', stage: m.due ? (m.due > w.now ? `due ${ago(m.due, w.now).replace('ago', 'from now').replace('today', 'today').replace('yesterday', 'tomorrow')}` : 'overdue') : m.text.length > 46 ? m.text.slice(0, 44).replace(/\s+\S*$/, '') + '…' : m.text, body: [m.text] });
   for (const f of w.favours) if (!f.settled && ((f.from === p.id && f.to === t.id) || (f.from === t.id && f.to === p.id))) out.push({ key: f.id, title: f.from === p.id ? 'He owes you a favour' : 'You owe him a favour', stage: f.size >= 2 ? 'a big one' : 'a small one', body: [f.from === p.id ? `For ${f.what}.` : `He ${f.what}.`] });
   return out.slice(0, 6);
 }

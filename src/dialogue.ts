@@ -655,7 +655,9 @@ export function optionsRaw(w: World, p: Character, t: Character, c: Convo): DOpt
         break;
       }
       if (k?.knowsActor && f.actor && f.actor !== p.id && !(pk?.knowsActor)) add('who', inv ? 'Ask who it was' : 'Ask who he’s heard it was');
-      if (f.victim === t.id && f.amount) add('how_much', 'What did it cost you?');
+      // V89: when it is between the two of you (you did it to him, or he to you), the bystander's questions make no sense
+      const mineToHim = f.actor === p.id && f.victim === t.id, hisToMe = f.actor === t.id && f.victim === p.id;
+      if (f.victim === t.id && f.amount && !mineToHim) add('how_much', 'What did it cost you?');
       if (inv && SCENE.has(f.kind)) add('witness', 'Who else was there?');
       if (!inv) add('source', 'Where did you hear it?');
       // What the player can ask depends on what has just been said and on who is saying it.
@@ -678,9 +680,10 @@ export function optionsRaw(w: World, p: Character, t: Character, c: Convo): DOpt
       const actor = f.actor ? w.chars[f.actor] : undefined;
       if (actor?.alive && actor.id !== p.id && pk?.knowsActor && actor.id !== t.id && actor.familyId !== t.familyId && f.victim === t.id) add('speak', `Offer to speak with ${actor.familyId ? 'the ' + famName(w, actor) + ' family' : actor.name}`, 'You’re promising to act.');
       if (actor?.alive && actor.id !== p.id && pk?.knowsActor && actor.id !== t.id && f.victim === t.id) add('sitdown', 'Suggest arranging a sit-down', `With ${actor.name}.`);
-      add('view', inv && f.victim === t.id ? 'What are you going to do about it?' : 'What do you make of it?');
+      add('view', mineToHim ? 'Where does that leave us?' : hisToMe ? 'Are we square now?' : inv && f.victim === t.id ? 'What are you going to do about it?' : 'What do you make of it?');
+      if (mineToHim && asked.includes('own')) add('n:amends', 'Offer to make it right', 'It will cost you something. He will remember that you came.');
       if (connected(w, t, p, f)) add('tell_more', 'Is there more to it?');
-      add('involve', f.kind === 'ruling' && !f.actor ? 'Does this touch us?' : f.actor === t.id ? 'Will it get you trouble?' : f.actor && f.victim ? 'Will anyone do something about it?' : 'Does anyone know what’s behind it?');
+      if (!mineToHim && !hisToMe) add('involve', f.kind === 'ruling' && !f.actor ? 'Does this touch us?' : f.actor === t.id ? 'Will it get you trouble?' : f.actor && f.victim ? 'Will anyone do something about it?' : 'Does anyone know what’s behind it?');
       add('pick_incident', 'Ask about something else he’s heard');
       // Three directions to begin with: learn more, how he sees it, and what can be done. Everything else sits one step down.
       const LEARN = ['who', 'how_much', 'witness', 'source', 'tell_more', 'involve', 'pick_incident', 'p_how', 'p_claim', 'p_owner', 'why'];
@@ -693,7 +696,7 @@ export function optionsRaw(w: World, p: Character, t: Character, c: Convo): DOpt
       const spec = all.filter((x) => SPEC.includes(x.code));
       const learn = all.filter((x) => LEARN.includes(x.code.split(':')[0]) && !whoKnows.includes(x) && !spec.includes(x));
       const act = all.filter((x) => ACT.includes(x.code.split(':')[0]) && !(mine && ['own', 'lie'].includes(x.code)));
-      const urgent = all.filter((x) => mine && ['own', 'lie'].includes(x.code));
+      const urgent = all.filter((x) => (mine && ['own', 'lie'].includes(x.code)) || x.code === 'n:amends');
       const view = all.filter((x) => x.code === 'view');
       if (c.ctx.sub === 'learn' && learn.length) { o.push(...learn); add('sub:back', 'Go back'); break; }
       if (c.ctx.sub === 'act' && act.length) { o.push(...act); add('sub:back', 'Go back'); break; }

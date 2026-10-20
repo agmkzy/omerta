@@ -5,6 +5,7 @@
 // player has seen or been told (p.known), the records he is himself a party to, and the words the matters give for where they stand.
 import { asker, askee, playerMoves, read as mRead, titleOf as mTitle } from '../asks';
 import { factText, fmtTime, money } from '../core';
+import { versionOf, youText } from '../rumour';
 import { dangerLevel, LADDER_WORDS } from '../danger';
 import { matterKind, matterOpts, matterStage, matterTitle, ORIGIN } from '../matters';
 import { PROBLEM_LABEL } from '../people';
@@ -64,7 +65,7 @@ const known = (w: World, p: Character, f: (x: Fact) => boolean) =>
   Object.keys(p.known).map((id) => w.facts[id]).filter((x) => x && f(x)).sort((a, b) => b.t - a.t);
 const entry = (p: Character, f: Fact): Entry => {
   const k = p.known[f.id];
-  return { t: f.t, text: k ? factText(f, k.knowsActor) : f.text, learned: k?.t, k, mine: f.actor === p.id };
+  return { t: f.t, text: k ? versionOf(W(), p, f) : youText(p, f.text), learned: k?.t, k, mine: f.actor === p.id };
 };
 // Does the player know of this matter at all? He has seen or been told something of it, it is his own doing, he has been asked
 // about it, or (for the older kinds, which only ever put a man in a matter by telling him) he is in it. Being the man somebody

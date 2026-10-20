@@ -75,13 +75,19 @@ export function pass(w: World, from: Character, to: Character, f: Fact, knowsIn:
   return knows;
 }
 
+// The player's own name, as the player reads it: "you".
+export function youText(viewer: Character, s: string): string {
+  if (!viewer.isPlayer) return s;
+  const out = s.split(viewer.name + "'s").join('your').split(viewer.name + '’s').join('your').split(viewer.name).join('you');
+  return out.replace(/\byou was\b/g, 'you were').replace(/\byou has\b/g, 'you have').replace(/\byou is\b/g, 'you are').replace(/\byou walks\b/g, 'you walk').replace(/(^|[.!?]\s+)(you|your)\b/g, (m, a, b) => a + b[0].toUpperCase() + b.slice(1));
+}
 // The player's version of an event: what he was told, as he was told it.
 export function versionOf(w: World, viewer: Character, f: Fact): string {
   const k = claim(viewer, f.id);
   let s = factText(f, !!k?.knowsActor);
   if (k?.big && f.amount) s = s.split(money(f.amount)).join(money(Math.round(f.amount * 1.6 / 50) * 50));
   if (k && !k.knowsActor && k.blame && w.chars[k.blame]) s = s.replace(/\.$/, '') + `. ${k.how === 't' ? 'He says' : 'People say'} it was ${w.chars[k.blame].name}.`;
-  return s;
+  return youText(viewer, s);
 }
 // Where he had it from, in words.
 export function sourceOf(w: World, viewer: Character, f: Fact): string {
