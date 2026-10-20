@@ -13,7 +13,7 @@ Node 22.12+. The build is Vite (`vite.config.ts`, `npm run dev` for a live-reloa
 - Dialogue: `dialogue.ts` (options, nodes, used-option memory, `say()`), `flows.ts` (standing, promotion, sit-downs, threats, crew, recruitment, rivals), `voice.ts`/`voicesheet.ts` (archetype voices).
 - UI: `src/web.ts` (entry), `src/ui/*` views, `web/index.html` (page shell/CSS, Vite's entry).
 - `src/storage.ts` saves; `serialize/deserialize` in the world code (SCHEMA 7).
-- `src/tests/` regression suites: storage, v72–v79 (v77–v79 = conversation overhaul crawler/info-leak/memory tests).
+- `src/tests/` regression tests, by game system (`saves/`, `economy/`, `dialogue/` …; the conversation-overhaul crawler, info-leak and memory tests are in `dialogue/`). See `docs/05-testing.md`.
 - `playtest/pt.ts` command-line harness for unassisted play (`state.json`, `actions.log`; seed 3, "Tony Marino", reached day 35). `npx tsx playtest/pt.ts status|talk <name>|do <code>|wait <n>|leave|…`
 - `docs/` the owner's binding specs: conversation overhaul spec, final regression/playtest brief.
 - Earlier reports and the original README are in `docs/`.
@@ -25,7 +25,7 @@ Node 22.12+. The build is Vite (`vite.config.ts`, `npm run dev` for a live-reloa
 ## Known issues / next work (from the final report)
 Bugs: haggling with no reason accepts too easily (`tipReply`, encounters.ts ~787); loan text grammar ("It’s the car is finished…"); completed promises still listed in memos; generic capo reply to a beating; flat weekly-envelope prompt; presumptuous recall line.
 Integration: ignored promises penalised less than failed ones; routine jobs saturate relationships too fast (Louie trust ~0.99 by day 35); NPC goals store (`w.goals`) rarely visibly drives behaviour; rivals never approached the player in 35 days; no promotion occurred.
-Open: save-size failure around day ~60 (undiscussed); old-save check now exists (`oldsave.test.ts`); stale preview artifact XCtjtUGmhoQwMCzM9pvSQE can be deleted.
+Open: save-size failure around day ~60 (undiscussed); old-save check now exists (`src/tests/saves/oldsave.test.ts`); stale preview artifact XCtjtUGmhoQwMCzM9pvSQE can be deleted.
 
 ## Working style the owner expects
 Autonomous execution, honest reporting (don't call tests passing "compelling gameplay"), don't add systems quietly, never poll with sleep loops.

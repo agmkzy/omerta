@@ -7,21 +7,21 @@ These are the rules the codebase already follows, collected from [CLAUDE.md](../
 1. **Nothing happens without a reason, and nothing significant happens without consequences.** Every significant event is a `Fact` with an optional `cause` link to the fact that led to it. The UI can follow that chain ("follow this ›").
 2. **Integration means a downstream system reads it.** Changing a state variable is not a feature. Some other system has to read it and behave differently. When you add a field, name the reader in the pull request.
 3. **Same rules for the player and the NPCs.** `generate()` produces the options. NPCs pick the best-scoring one and the player picks from a menu. Avoid player-only shortcuts in the simulation.
-4. **Knowledge is a mechanic.** A character knows a fact only if it is in their `known` map, through `learn()` or `addFact(…, { witnesses, broadcast })`. Dialogue, jobs and boss behaviour must check knowledge before acting on a fact. For example, a boss only offers a "deal with X" job once he knows who wronged you. Victims may guess wrong (`knowsActor: false`). Checked by `v78`/`v79` (information-leak checks) and `v75` test 6.
+4. **Knowledge is a mechanic.** A character knows a fact only if it is in their `known` map, through `learn()` or `addFact(…, { witnesses, broadcast })`. Dialogue, jobs and boss behaviour must check knowledge before acting on a fact. For example, a boss only offers a "deal with X" job once he knows who wronged you. Victims may guess wrong (`knowsActor: false`). Checked by the dialogue tests (information-leak checks) and `situations/information.test.ts`.
 5. **Don't add systems or change balance unless asked.** Report integration gaps instead of hiding them (CLAUDE.md).
-6. **Player-facing text never shows the machinery:** no internal numbers, no database words, no ids, no unfilled placeholders. NPCs speak in their archetype's voice (`voice.ts`/`voicesheet.ts`). Lines are not repeated within a conversation (`Convo.spoken`). Used options grey out and give no further benefit until a new conversation. Enforced by `v77`, `v78` and `v79` (the crawler).
+6. **Player-facing text never shows the machinery:** no internal numbers, no database words, no ids, no unfilled placeholders. NPCs speak in their archetype's voice (`voice.ts`/`voicesheet.ts`). Lines are not repeated within a conversation (`Convo.spoken`). Used options grey out and give no further benefit until a new conversation. Enforced by the dialogue tests, including the crawler.
 
 ## 2. Engineering rules
 
 ### Determinism
-- All randomness comes from `w.rng` (`next`, `range`, `int`, `chance`, `pick`). **Never** use `Math.random`, `Date.now`, `new Date()` or `performance.now()` in simulation code. The only allowed uses are at the edges: choosing a new game's seed and shuffling the character creator in `web.ts`, the CLI's default seed, and timing output in `stress.ts`. Enforced by `test.ts` (two runs of seed 7 must serialise identically) and `v76` `det`.
+- All randomness comes from `w.rng` (`next`, `range`, `int`, `chance`, `pick`). **Never** use `Math.random`, `Date.now`, `new Date()` or `performance.now()` in simulation code. The only allowed uses are at the edges: choosing a new game's seed and shuffling the character creator in `web.ts`, the CLI's default seed, and timing output in `stress.ts`. Enforced by `test.ts` (two runs of seed 7 must serialise identically) and the other `determinism` tests.
 - Iteration order is part of determinism. `Object.values(w.chars)` follows insertion order, which is deterministic. Don't introduce `Set` or `Map` iteration over data whose insertion order depends on anything non-deterministic. Sort explicitly when order carries meaning.
 - Don't call `w.rng` from UI rendering code. A view that rolls dice changes the world's future just because a screen was opened.
 
 ### State
 - **The `World` is plain JSON-compatible data.** No classes (apart from `Rng`), no functions, no `Map`/`Set`/`Date`, and no cyclic references. Refer to other entities by `Id`, never by object reference.
 - **New fields are optional** and get defaults where they are read or in `ensureShape`/`ensure*`. A field whose meaning changes for old data needs a `SCHEMA` bump and a migration step. Full rules are in [02-state-saves-and-compatibility.md](02-state-saves-and-compatibility.md#6-backwards-compatibility-will-a-new-version-wipe-progress).
-- **Every growing collection needs a bound.** Use rings (`hist`, `tlog`, `ended`, `snaps`, `career.log`, `talk`), weekly sweeps (`retain.ts`) or explicit caps. Save size is the scaling limit ([01-stack.md](01-stack.md#where-the-hurdles-will-be-as-the-project-grows)). `v72` `growth:<seed>` measures it.
+- **Every growing collection needs a bound.** Use rings (`hist`, `tlog`, `ended`, `snaps`, `career.log`, `talk`), weekly sweeps (`retain.ts`) or explicit caps. Save size is the scaling limit ([01-stack.md](01-stack.md#where-the-hurdles-will-be-as-the-project-grows)). The `growth` long run in `saves/save-load.test.ts` measures it (`SLOW=1 npx vitest run saves -t growth`).
 - Don't keep game state in module-level variables. If you need a cache, key it by the `World` object (`WeakMap<World, …>`) and make sure its answer is a pure function of the current world. A cache whose contents depend on *when* it was first filled (time-keyed, or filled by whichever caller asks first) makes a reloaded game diverge from an uninterrupted one. Exported tuning objects (`AGENCY`, `SIT`) are constants that only tests change.
 
 ### Single doors
@@ -29,18 +29,18 @@ Some state may only change through one function, so that the record can never di
 
 | State | The only door | Enforced by |
 | --- | --- | --- |
-| `Character.rank` | `applyRank` in [rank.ts](../src/rank.ts) (boss powers such as `setRank` in `path.ts` call it; the generator in `world.ts` is exempt) | `v72` "rank has one door" scans every source file for `.rank =` |
+| `Character.rank` | `applyRank` in [rank.ts](../src/rank.ts) (boss powers such as `setRank` in `path.ts` call it; the generator in `world.ts` is exempt) | `architecture.test.ts` "rank has one door" scans every source file for `.rank =` |
 | `Business.cash` (typed `readonly`) | `bizMove()` in [econ.ts](../src/econ.ts), which records a `Txn` | The `readonly` type, plus `economyIssues()` in `audit()` |
-| The record of money moving inside the player's circle | `post()` in [ledger.ts](../src/ledger.ts). It is a *record*: character `cash` is still changed by the caller, so every cash change in the circle must be paired with a `post()` | `ledgerCheck()` (v73) |
+| The record of money moving inside the player's circle | `post()` in [ledger.ts](../src/ledger.ts). It is a *record*: character `cash` is still changed by the caller, so every cash change in the circle must be paired with a `post()` | `ledgerCheck()` (`economy/ledger.test.ts`) |
 | Family treasury | The treasury helpers in [orgs.ts](../src/orgs.ts) (`tin`/`tout` totals prove the balance) | `orgIssues()` in `audit()` |
 | History | `addFact()` in [core.ts](../src/core.ts) | Convention |
-| Knowledge | `learn()` / `addFact` options in [core.ts](../src/core.ts) | v75 and v78 leak checks |
+| Knowledge | `learn()` / `addFact` options in [core.ts](../src/core.ts) | `situations/information` and dialogue leak checks |
 | Scheduling | `schedule()` in [core.ts](../src/core.ts) (keeps the queue sorted, assigns `seq`) | Convention |
 
 If you need to change one of these, add a function next to the door. Don't assign the field directly.
 
 ### No hardcoded world content
-- Don't name family ids (`fam_corrente` …) or assume the number of families in engine code. `v76` scans every source file except `world.ts` for both.
+- Don't name family ids (`fam_corrente` …) or assume the number of families in engine code. `architecture.test.ts` scans every source file except `world.ts` for both.
 
 ### Modules
 - **One system per module**, named after the game concept (`debts`, `disputes`, `rackets`). The public surface is what's `export`ed. Keep helpers unexported.
@@ -61,10 +61,10 @@ Match the surrounding code. The existing style is deliberate and consistent:
 
 ## 3. Tests
 
-- Add checks to the suite for the version you're working on, or start a new `vNN.test.ts`. Follow the existing pattern: Vitest's `test` imported as `ok`, fast checks in a few seconds, and slower runs behind `SLOW`/`COMPAT` (see [05-testing.md](05-testing.md#writing-a-test)).
+- Add checks to the file of the system whose rule they prove (`src/tests/<system>/<topic>.test.ts`), give each one kind (a tag), and put long runs behind `slow`. See [05-testing.md](05-testing.md#where-a-new-test-goes).
 - Any change to simulation, economy or saves must keep `audit(w)` and `ledgerCheck(w)` empty after a run. Most suites assert this.
-- Gameplay is judged by tracing consequences (action → recorded state → later behaviour), not by green tests. Use `playtest/pt.ts` and the `*_measure.ts` / `*_trace.ts` scripts.
-- Minimum before shipping: `make test` (typecheck plus v77–v79). Anything touching the simulation, saves or economy needs `make test-all`. Schema changes also need a new fixture (`make test-all` already runs the synthetic migrations).
+- Gameplay is judged by tracing consequences (action → recorded state → later behaviour), not by green tests. Use `playtest/pt.ts` and the `src/tests/tools/` scripts (`*_measure.ts`, `*_trace.ts`).
+- Minimum before shipping: `make test` (typecheck plus the dialogue tests). Anything touching the simulation, saves or economy needs `make test-all`. Schema changes also need a new fixture (`make test-all` already runs the synthetic migrations).
 
 ## 4. Pull request checklist
 

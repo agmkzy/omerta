@@ -49,7 +49,7 @@ ok('no stranger is generated with the player’s full name or surname (his own m
   }
 });
 
-// What a background now gives (skills, cash, assets, the brother) is covered by v87.test.ts.
+// What a background now gives (skills, cash, assets, the brother) is covered by backgrounds.test.ts.
 
 ok('the six backgrounds exist, and earlier ones still have a name on old records', { tags: ['unit'] }, () => {
   assert.deepEqual(BACKGROUNDS.map((b) => b.label), ['Street Hustler', 'Connected Family', 'Small Businessman', 'Union Man', 'Bookmaker', 'Wheelman']);

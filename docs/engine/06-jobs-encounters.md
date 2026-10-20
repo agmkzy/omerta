@@ -209,7 +209,7 @@ Encounters generated here (`GENERATORS`, [encounters.ts:394](../../src/encounter
 
 **Depends on / used by.**
 - Imports: `jobs` (`newOffer` for the "score" tip), `people` (`lateOf`, `PROBLEM_LABEL`), `econ` (`bizMove`, `clearArrears`, `evidence`, `giveTime`, `owedOf`, `takeFromBiz`), `disputes` (`sitdownChoose`, `callSitdown`), `reports` (`investChoose`), `core`, `voice` (`arch`, `pick`), and at the bottom of the file `danger` (`threatChoose`), `career` (`promoChoose`), `crewlife` (`crewChoose`), `life` (`lifeChoose`), `politics` (`politicsChoose`). Unused: `helpMan`, `hash`, local `wk`.
-- Imported by: `addEnc` from `danger`, `crewlife`, `path`, `career`, `reports`, `life`, `situations`, `rackets`, `goals`, `politics`, `disputes`, `powers2`, `pulse`, `situ`; `addFavour` from `crewlife`, `dialogue`, `flows`, `career`, `meetings`, `gigs`, `situations`, `club`, `politics`, `powers2`, `pulse`; `choose` from `web.ts`, `dialogue`, `club`, `stress.ts`, `playtest/pt.ts`, `tests/v74`; `encounterTick` and `eventTick` from `engine`; `forceEncounter` from `places`; `makeLoan` from `situations`; `owedTo` from `ambition` and `ui/views_a`; `owing` and `favourWord` from `ui/views_a`.
+- Imported by: `addEnc` from `danger`, `crewlife`, `path`, `career`, `reports`, `life`, `situations`, `rackets`, `goals`, `politics`, `disputes`, `powers2`, `pulse`, `situ`; `addFavour` from `crewlife`, `dialogue`, `flows`, `career`, `meetings`, `gigs`, `situations`, `club`, `politics`, `powers2`, `pulse`; `choose` from `web.ts`, `dialogue`, `club`, `stress.ts`, `playtest/pt.ts`, `tests/agency/`; `encounterTick` and `eventTick` from `engine`; `forceEncounter` from `places`; `makeLoan` from `situations`; `owedTo` from `ambition` and `ui/views_a`; `owing` and `favourWord` from `ui/views_a`.
 - Circular imports: encounters ↔ danger, career, crewlife, life, politics, disputes, reports (each imports `addEnc` or `addFavour`, and encounters imports its `*Choose`).
 
 **Invariants & rules.**
@@ -261,7 +261,7 @@ Encounters generated here (`GENERATORS`, [encounters.ts:394](../../src/encounter
 
 **Tick hooks.** None. Read by `ui/views_c.ts` (the Ways page) only.
 
-**Depends on / used by.** Imports `OPS` from `rackets.ts`. Used by `ui/views_c.ts` and `tests/v72.test.ts`. The test checks that every op has a non-empty sheet, the counts match and ids are unique.
+**Depends on / used by.** Imports `OPS` from `rackets.ts`. Used by `ui/views_c.ts` and `tests/economy/rackets.test.ts`. The test checks that every op has a non-empty sheet, the counts match and ids are unique.
 
 **Invariants & rules.** Every `OPS` key must have an `OP_SHEETS` entry (enforced by the type checker). Way ids must be unique (enforced by the test).
 

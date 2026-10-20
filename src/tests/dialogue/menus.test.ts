@@ -41,7 +41,7 @@ describe('menus', () => {
     const ms = men(w);
     for (const m of ms) (p.intro ??= {})[m.id] = w.now;
     let n = 0;
-    for (const m of ms) for (const node of ['personal', 'business', 'family', 'disputes', 'orders', 'memos', 'amends', 'shop', 'crew', 'debt', 'myboss', 'rival', 'pick_member', 'pick_concern']) { // root was restructured in V78; v78.test.ts proves nothing was lost
+    for (const m of ms) for (const node of ['personal', 'business', 'family', 'disputes', 'orders', 'memos', 'amends', 'shop', 'crew', 'debt', 'myboss', 'rival', 'pick_member', 'pick_concern']) { // root was restructured in V78; "nothing that was reachable in V76 has been removed" above proves nothing was lost
       const c = startConvo(m.id); c.node = node;
       const got = options(w, p, m, c).map((o) => `${o.code}|${o.hint ?? ''}`);
       // The world differs slightly from the V76 snapshot (V78 tells you one thing at a time), so who is listed can differ; what each kind of
