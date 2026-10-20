@@ -1,0 +1,879 @@
+import { doMove } from './sitmoves';
+// Mobile web front end. Same engine as the CLI, different skin.
+import { generate, perform } from './actions';
+import { crewOf } from './crewlife';
+import { clubOf } from './clubdata';
+import { closeScene, sceneAct, startScene, topicsFor } from './club';
+import { addFact, clamp, factText, famName, fmtTime, money, rel } from './core';
+import { advance, deserialize, serialize } from './engine';
+import { pruneJobs, approaches, assign, declineJob, dropJob, performMove, resolve, startScheme, takeJob, askAroundJob, haggleJob, investigateJob, pressJob, questionJob } from './jobs';
+import { recommend, recruit, reward } from './career';
+import { chairAct, raise, setRank, usePower } from './path';
+import { manageView, commView } from './ui/pathview';
+import { bjLobby, bjTable, bjDeal, bjAct } from './ui/blackjack';
+import { buyLife, courtBoss, propose, setBoss, setConsigliere, setHeir } from './powers2';
+import { auditMember, checkBooks, envelopeSum, handOver, rule, setStance } from './books';
+import { post } from './ledger';
+import { statement } from './ledger';
+import { say, startConvo, introduced, arrive, isNavCode } from './dialogue';
+import { closeMeeting, choose as meetChoose, current as meetCurrent, openAccountsMeeting, openCrewMeeting, openFamilyMeeting, openGathering, openInduction, openSitdown } from './meetings';
+import { giveOrder, questionReport, recruitProspect, takeDayJob, quitDayJob, workShift } from './orders';
+import { helpMan } from './people';
+import { drinkAt, shave, sitAtClub } from './places';
+import { toggleTag, togglePin } from './notebook';
+import { seePartner, visitKin, askOut, askSteady, askMarry, wedding, tryForBaby, breakOff, datePlan, datingPool } from './life';
+import { askPermission } from './politics';
+import { settleDo } from './revenge';
+import { closeOp, countOp, hijack, opRule, startOp } from './rackets';
+import { Kind } from './types';
+import { createWorld } from './world';
+import type { World } from './types';
+import { relevance } from './reports';
+import { ignoreDispute, investigate, callSitdown, playerActed, touchDispute } from './disputes';
+import { whereIs } from './where';
+import { back as backBtn, avatar } from './ui/common';
+import { SKIN_LIST, HAIR_LIST } from './ui/portrait';
+import { esc, lk, P, S, W } from './ui/links';
+import type { Tab, View } from './ui/state';
+import { storiesTab, newStories } from './ui/stories';
+import { goalsView, disputeView, storyView, storyExists } from './ui/views_c';
+import { encView, factView, bizView, attentionCount, personView, todayView } from './ui/views_a';
+import { choose as encChoose } from './encounters';
+import {
+  approachView, booksView, crewList, crewView, dayjobView, delegateView, familyTab, grudgesView, settleView, guestsView, helpView, jobView, lifeTab, meetingView,
+  menuView, placesView, opStartView, opView, hijackView, ordersView, peopleView, placeView, planView, recruitView, reportView, sendView, talkView, waitChoices, waitView,
+} from './ui/views_b';
+import { treeView } from './ui/views_a';
+import { leaveCrew } from './rank';
+import { KEY, readSnaps, usageStatus, writeSave, type SaveStatus } from './storage';
+import { briefView } from './ui/brief';
+import { applyBackground, BACKGROUNDS } from './background';
+import { sundayView, sKey } from './ui/sunday';
+import { racketsView, wayView } from './ui/views_c';
+
+
+// ------------------------------------------------------------------ storage
+// Three older saves are kept, a few game-days apart, so one bad day is never the end of a run.
+export function snapList(): { day: number; key: string; label: string }[] {
+  try { return readSnaps(localStorage); } catch { return []; }
+}
+// Saving is never silent: every outcome lands in S.save, and render() shows it whenever it is bad.
+function save(): boolean {
+  if (!S.w) return false;
+  let st: SaveStatus;
+  try {
+    st = writeSave(localStorage, serialize(S.w), Math.floor(S.w.now / 1440), fmtTime(S.w.now));
+  } catch (e) {
+    st = { ok: false, available: false, bytes: 0, used: 0, snapshots: 0, error: e instanceof Error ? e.message : 'storage is blocked' };
+  }
+  if (st.ok) S.saveGood = fmtTime(S.w.now);
+  S.save = st;
+  return st.ok;
+}
+function downloadSave() {
+  if (!S.w) return;
+  const name = `omerta-day-${Math.floor(S.w.now / 1440)}.json`;
+  const data = serialize(S.w);
+  const say = (m: string) => { S.notice = m; render(); };
+  // Inside claude.ai a page cannot download directly; it asks the viewer through the downloads capability.
+  const cl = (window as unknown as { claude?: { use(n: string): Promise<{ save(r: { filename: string; data: string }): Promise<unknown> } | null> } }).claude;
+  if (cl) {
+    cl.use('downloads').then((d) => {
+      if (!d) return say('Backup files can’t be saved from this view.');
+      return d.save({ filename: name, data }).then(() => say('Backup saved.'), (e: { code?: string }) => say(e?.code === 'declined' ? 'Backup cancelled.' : 'Could not save a backup file here.'));
+    }, () => say('Could not save a backup file here.'));
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+const hasSave = () => {
+  try {
+    return !!localStorage.getItem(KEY);
+  } catch {
+    return false;
+  }
+};
+function load(): World | null {
+  try {
+    const s = localStorage.getItem(KEY);
+    if (s) {
+      try { return deserialize(s); } catch (e) { console.error(e); }
+      // The main save would not open: fall back to the newest snapshot that does, and say so.
+      for (const sn of snapList()) {
+        const raw = localStorage.getItem(sn.key);
+        if (!raw) continue;
+        try { const w = deserialize(raw); S.notice = `Your latest save could not be opened, so this is the snapshot from ${sn.label}. The damaged save will be replaced by your next save.`; return w; } catch { /* try the next */ }
+      }
+      S.notice = 'Your saved game could not be opened and no readable snapshot was found. It has not been deleted.';
+    }
+    return null;
+  } catch {
+    S.notice = 'Saved games are not available in this browser.';
+    return null;
+  }
+}
+
+// -------------------------------------------------------------------- news
+const sourceOf = (k: { from: string }) => (k.from === 'witness' ? 'you saw it' : k.from === 'self' ? 'you did it' : k.from === 'public' ? 'word on the street' : `heard from ${W().chars[k.from]?.name ?? 'someone'}`);
+function storyLink(fid: string): string {
+  const w = W();
+  const f = w.facts[fid];
+  let key = f.story;
+  if (!key) { let c: typeof f | undefined = f; for (let i = 0; c && i < 6 && !key; i++) { const d = (w.disputes ?? []).find((x) => x.fact === c!.id); if (d) key = d.id; c = c.cause ? w.facts[c.cause] : undefined; } }
+  return key && storyExists(w, key) ? ` <a class="nm story" href="#" data-a="story:${key}">follow this &rsaquo;</a>` : '';
+}
+function collectNews(since: number): string[] {
+  const w = W();
+  const p0 = P();
+  const fresh = Object.entries(p0.known).filter(([id, k]) => k.t > since && w.facts[id]);
+  // Everything is judged by one rule: does it touch me, a man close to me, something I own, or something I can act on?
+  const scored = fresh.map(([id, k]) => ({ id, k, f: w.facts[id], r: relevance(w, p0, w.facts[id]) }));
+  S.routine = scored.filter((x) => x.r.level === 0).length;
+  const seen = new Set<string>();
+  const picked = scored
+    .filter((x) => x.r.level > 0 && (x.f.kind === 'report' || !x.f.minor))
+    .sort((a, b) => b.r.level - a.r.level || b.k.t - a.k.t)
+    .filter((x) => { const key = `${x.f.kind}|${x.f.actor ?? ''}|${x.f.victim ?? ''}|${x.f.business ?? ''}`; if (seen.has(key)) { S.routine++; return false; } seen.add(key); return true; })
+    .slice(0, 5);
+  return picked.map(({ id, k, f, r }) => {
+    const body = lk(f.kind === 'report' ? f.text : factText(f, k.knowsActor));
+    const tag = `<span class="why${r.level === 2 ? ' crit' : ''}">${esc(r.why.replace(/^./, (m) => m.toUpperCase()))}</span>`;
+    const src = f.kind === 'report' ? '' : ` <span class="src">${esc(sourceOf(k))} &middot; <a class="nm" href="#" data-a="fact:${id}">details</a></span>`;
+    return `${r.level === 2 ? `<b class="crit">${body}</b>` : `<span>${body}</span>`}${f.kind === 'report' ? '' : storyLink(id)}${src}${tag}`;
+  });
+}
+
+// -------------------------------------------------------------- navigation
+const same = (a: View, b: View) => a.t === b.t && JSON.stringify(a, (k, v) => (k === 'm' || k === 'convo' ? undefined : v)) === JSON.stringify(b, (k, v) => (k === 'm' || k === 'convo' ? undefined : v));
+function go(v: View) {
+  if (!same(S.view, v)) S.stack.push(S.view);
+  if (S.stack.length > 30) S.stack.shift();
+  S.view = v;
+}
+function tab(name: Tab) {
+  S.stack = [];
+  S.view = { t: 'tab', name };
+}
+function pop() {
+  const prev = S.stack.pop();
+  S.view = prev ?? { t: 'tab', name: 'today' };
+  // do not return into a dead conversation or meeting
+  while (S.stack.length && (S.view.t === 'talk' || S.view.t === 'meeting' || S.view.t === 'approach' || S.view.t === 'sendorder')) S.view = S.stack.pop()!;
+}
+
+function pass(minutes: number, lines: string[], next: View = { t: 'tab', name: 'today' }, from?: number) {
+  const w = W();
+  const t0 = from ?? w.now;
+  const p0 = P();
+  const snap = { cash: p0.cash, heat: p0.heat, standing: p0.standing, known: Object.keys(p0.known).length, rank: p0.rank };
+  advance(w, w.now + minutes);
+  pruneJobs(w);
+  S.log = lines.map((l) => lk(l));
+  const p = P();
+  if (p.alive && p.jailedUntil > w.now) {
+    S.log.push(lk(`You were picked up. You’re inside until ${fmtTime(p.jailedUntil)}.`));
+    advance(w, p.jailedUntil);
+  }
+  S.news = collectNews(t0);
+  S.chips = [];
+  const pn = P();
+  const dc = Math.round(pn.cash - snap.cash);
+  if (dc) S.chips.push({ t: `${dc > 0 ? '+' : '−'}${money(Math.abs(dc))}`, tone: dc > 0 ? 'good' : 'bad' });
+  const dh = pn.heat - snap.heat;
+  if (Math.abs(dh) >= 0.04) S.chips.push({ t: `Heat ${dh > 0 ? 'up' : 'down'}`, tone: dh > 0 ? 'bad' : 'good' });
+  const ds = Math.round(pn.standing - snap.standing);
+  if (ds) S.chips.push({ t: `Standing ${ds > 0 ? '+' : '−'}${Math.abs(ds)}`, tone: ds > 0 ? 'good' : 'bad' });
+  const dk = Object.keys(pn.known).length - snap.known;
+  if (dk > 0) S.chips.push({ t: `${dk} new thing${dk > 1 ? 's' : ''} learned`, tone: '' });
+  if (pn.rank !== snap.rank) S.chips.push({ t: `Now ${pn.rank}`, tone: 'good' });
+  S.stack = [];
+  S.view = next;
+  save();
+}
+
+function doAction(a: import('./types').Action) {
+  const prevMet = (a.target ? W().chars[a.target]?.rels[P().id]?.lastMet : undefined) ?? -1e9;
+  if (a.kind === 'socialise') a.quiet = true;
+  const r = perform(W(), a);
+  if (a.kind === 'socialise' && a.target && W().chars[a.target]?.alive) { const x = W().chars[a.target]; const aa = arrive(W(), P(), x, r, whereIs(W(), P(), x), prevMet); return pass(r.minutes, [], { t: 'talk', convo: aa.convo, lines: aa.lines }); }
+  pass(r.minutes, r.lines);
+}
+
+const job = (id: string) => W().jobs.find((j) => j.id === id);
+
+function talkTo(id: string) {
+  const w = W();
+  const p = P();
+  const x = w.chars[id];
+  const wh = x ? whereIs(w, p, x) : undefined;
+  if (wh?.kind === 'jail') return pass(5, [`${x.name} is locked up. Nothing to do but wait.`]);
+  const known = introduced(w, p, x);
+  const act = known ? generate(w, p, 'socialise').find((a) => a.target === id) : undefined;
+  if (!known) return pass(wh?.mins ?? 15, [], { t: 'talk', convo: startConvo(id), lines: [wh ? `You find ${x.name}: ${wh.line.replace(/^He’s /, 'he is ')}` : '', `You’ve never met ${x.name}. He has no reason to know who you are.`].filter(Boolean) });
+  if (act) {
+    const prevMet = x.rels[p.id]?.lastMet ?? -1e9;
+    act.quiet = true;
+    const r = perform(w, act);
+    const a = arrive(w, p, x, r, wh!, prevMet);
+    return pass(r.minutes, [], { t: 'talk', convo: a.convo, lines: a.lines });
+  }
+  pass(wh?.mins ?? 15, [], { t: 'talk', convo: startConvo(id), lines: wh ? [wh.line] : [] });
+}
+
+// ------------------------------------------------------------------- views
+function tabs(): string {
+  const cur = S.view.t === 'tab' ? S.view.name : S.view.t === 'books' || S.view.t === 'meeting' || S.view.t === 'guests' || S.view.t === 'recruit' || S.view.t === 'orders' ? 'crew' : S.view.t === 'tree' ? 'family' : S.view.t === 'plan' ? 'rackets' : 'today';
+  const n = attentionCount();
+  const IC: Record<Tab, string> = {
+    today: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/>',
+    rackets: '<rect x="3" y="8" width="18" height="12" rx="2"/><path d="M9 8V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/>',
+    crew: '<circle cx="9" cy="8.5" r="3.2"/><path d="M3 20c0-3.6 2.7-6 6-6s6 2.4 6 6"/><circle cx="17" cy="9.5" r="2.4"/><path d="M16.5 14.2c2.8 0 4.5 2 4.5 5"/>',
+    family: '<rect x="9" y="3" width="6" height="4.5" rx="1"/><rect x="3" y="16.5" width="6" height="4.5" rx="1"/><rect x="15" y="16.5" width="6" height="4.5" rx="1"/><path d="M12 7.5v4.5M6 16.5V12h12v4.5"/>',
+    life: '<circle cx="12" cy="8" r="4"/><path d="M4.5 21c.6-4.4 3.6-7 7.5-7s6.9 2.6 7.5 7"/>',
+    stories: '<path d="M4 4.5h12.5a2 2 0 0 1 2 2V19a1.5 1.5 0 0 0 3 0V9h-3M4 4.5V18a2 2 0 0 0 2 2h14.5"/><path d="M8 9h7M8 12.5h7M8 16h4"/>',
+  };
+  const t = (id: Tab, label: string, badge = 0) => `<button class="${cur === id ? 'on' : ''}" data-a="tab:${id}"><svg class="ti" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[id]}</svg><span>${label}</span>${badge ? `<span class="badge">${badge}</span>` : ''}</button>`;
+  return `<nav class="tabs">${t('today', 'Today', n)}${t('rackets', 'Rackets')}${t('crew', 'Crew')}${t('family', 'Family')}${t('life', 'Life')}${t('stories', 'Stories', newStories(W()))}</nav>`;
+}
+
+const previewChar = () => ({ id: 'preview', name: S.startName, rank: 'associate', familyId: null, traits: { greed: 0.5, violence: 0.45, ambition: 0.7, caution: 0.5, sociability: 0.6, vice: 0.3, courage: 0.7 }, hurtUntil: 0, look: S.look }) as unknown as import('./types').Character;
+const LOOK_ROWS: { key: keyof import('./types').Look; label: string; opts: string[] }[] = [
+  { key: 'style', label: 'Hair', opts: ['Slicked', 'Long', 'Receding', 'Bald'] },
+  { key: 'beard', label: 'Facial hair', opts: ['Clean', 'Moustache', 'Stubble', 'Goatee', 'Sideburns', 'Mutton chops'] },
+  { key: 'glasses', label: 'Eyewear', opts: ['None', 'Spectacles', 'Dark glasses'] },
+  { key: 'jaw', label: 'Jaw', opts: ['Square', 'Even', 'Lean'] },
+];
+const startView = () => `<main class="start">
+    <h1>OMERTÀ</h1>
+    <p class="lede">New York, March 1970. You are an associate in the Corrente family with $1,500 and nobody under you. You’ll have to find your own men. Nobody is going to hand you a story.</p>
+    <p class="muted">Time only moves when you act. Everyone else keeps living while it does.</p>
+    <div class="chooser">
+      <div class="pv">${avatar(previewChar())}</div>
+      <div class="cg">
+        <div class="cl">Complexion</div><div class="sw">${SKIN_LIST.map((c, i) => `<button class="swatch ${S.look.skin === i ? 'on' : ''}" style="background:${c}" data-a="look:skin|${i}" aria-label="complexion ${i + 1}"></button>`).join('')}</div>
+        <div class="cl">Hair colour</div><div class="sw">${HAIR_LIST.map((c, i) => `<button class="swatch ${S.look.hairColour === i ? 'on' : ''}" style="background:${c}" data-a="look:hairColour|${i}" aria-label="hair colour ${i + 1}"></button>`).join('')}</div>
+        ${LOOK_ROWS.map((r) => `<div class="cl">${r.label}</div><div class="chips">${r.opts.map((o, i) => `<button class="pill small ${S.look[r.key] === i ? 'on' : ''}" data-a="look:${r.key}|${i}">${o}</button>`).join('')}</div>`).join('')}
+        <button class="btn" data-a="look:shuffle|0">Shuffle a new face</button>
+      </div>
+    </div>
+    <div class="cl" style="margin-top:12px">Where you came from</div><div class="chips">${BACKGROUNDS.map((b) => `<button class="pill small ${S.bg === b.id ? 'on' : ''}" data-a="bg:${b.id}">${b.label}</button>`).join('')}</div><p class="muted">${esc(BACKGROUNDS.find((b) => b.id === S.bg)?.blurb ?? '')}</p>
+    <label for="name" class="muted">Your name</label>
+    <input id="name" type="text" value="${esc(S.startName)}" autocomplete="off" autocapitalize="words" maxlength="30" />
+    <button class="btn primary" data-a="new:">New game</button>
+    ${hasSave() ? `<button class="btn" data-a="continue:">Continue saved game</button>` : ''}
+  </main>`;
+
+function body(): string {
+  const w = W();
+  const v = S.view;
+  const j = (id: string) => job(id);
+  switch (v.t) {
+    case 'tab':
+      return v.name === 'today' ? todayView() : v.name === 'rackets' ? racketsView() : v.name === 'crew' ? crewView() : v.name === 'family' ? familyTab() : v.name === 'stories' ? storiesTab() : lifeTab();
+    case 'person': return personView(v.id);
+    case 'brief': return briefView();
+    case 'sunday': return sundayView();
+    case 'biz': return bizView(v.id);
+    case 'fact': return factView(v.id);
+    case 'tree': return backBtn() + treeView(v.fam);
+    case 'manage': return backBtn() + manageView();
+    case 'comm': return backBtn() + commView();
+    case 'bj': return v.id ? bjTable(v.id) : bjLobby();
+    case 'menu': return menuView(v.kind);
+    case 'wait': return waitView();
+    case 'job': return j(v.id) ? jobView(j(v.id)!) : todayView();
+    case 'approach': return j(v.id) ? approachView(j(v.id)!) : todayView();
+    case 'delegate': return j(v.id) ? delegateView(j(v.id)!) : todayView();
+    case 'sendorder': return j(v.id) ? sendView(j(v.id)!, w.chars[v.who]) : todayView();
+    case 'plan': return planView(v.idx, v.who);
+    case 'orders': return ordersView(v.who);
+    case 'recruit': return recruitView();
+    case 'dayjob': return dayjobView();
+    case 'books': return booksView(v.id, v.lines);
+    case 'meeting': return meetingView(v);
+    case 'guests': return guestsView(v.picked);
+    case 'talk': return talkView(v);
+    case 'people': return peopleView();
+    case 'report': return j(v.id) ? reportView(j(v.id)!, v.lines) : todayView();
+    case 'grudges': return grudgesView();
+    case 'goals': return goalsView();
+    case 'dispute': return disputeView(v.id, v.lines);
+    case 'story': return storyView(v.id);
+    case 'way': return wayView(v.id, v.lines);
+    case 'settle': return settleView(v.id, v.lines, v.kill);
+    case 'place': return placeView(v.id);
+    case 'places': return placesView();
+    case 'help': return helpView(v.who, v.lines);
+    case 'enc': return encView(v.id, v.lines);
+    case 'opstart': return opStartView(v.kind);
+    case 'op': return opView(v.id, v.lines, v.found);
+    case 'hijack': return hijackView(v.picked);
+  }
+}
+
+function saveBanner(): string {
+  const st = S.save;
+  if (!st) return '';
+  if (!st.ok) return `<div class="callout bad"><b>Your progress is not being saved.</b> ${esc(st.error ?? 'Storage is not available.')}. ${S.saveGood ? `The last good save is from ${esc(S.saveGood)}.` : 'Nothing has been saved yet this session.'} <button class="pill small" data-a="dlsave:">Download a backup</button></div>`;
+  if (st.warn) return `<div class="callout info">${esc(st.warn)} <button class="pill small" data-a="dlsave:">Download a backup</button></div>`;
+  return '';
+}
+
+function render() {
+  const app = document.getElementById('app')!;
+  if (!S.w) {
+    app.innerHTML = (S.notice ? `<div class="callout bad">${esc(S.notice)}</div>` : '') + startView();
+    S.notice = '';
+    return;
+  }
+  let b: string;
+  try {
+    b = body();
+  } catch (e) {
+    console.error(e);
+    S.view = { t: 'tab', name: 'today' };
+    S.stack = [];
+    b = todayView();
+  }
+  if (S.notice) { b = `<div class="callout info">${esc(S.notice)}</div>` + b; S.notice = ''; }
+  b = saveBanner() + b;
+  app.innerHTML = `<div class="content">${b}</div>` + tabs();
+}
+
+// ------------------------------------------------------------------ events
+function startMeeting(m: ReturnType<typeof openCrewMeeting>, fail: View = { t: 'tab', name: 'crew' }) {
+  if (typeof m === 'string') {
+    S.notice = m;
+    S.view = fail;
+    S.stack = [];
+  } else go({ t: 'meeting', m, lines: [] });
+}
+
+function handle(a: string, v: string) {
+  const w = S.w;
+  const args = v.split('|');
+  if (a === 'bg') { const nm = (document.getElementById('name') as HTMLInputElement | null)?.value; if (nm != null) S.startName = nm; S.bg = v; return; }
+  if (a === 'look') {
+    const nm = (document.getElementById('name') as HTMLInputElement | null)?.value;
+    if (nm != null) S.startName = nm;
+    const [k, val] = args;
+    if (k === 'shuffle') S.look = { skin: Math.floor(Math.random() * 6), hairColour: Math.floor(Math.random() * 6), style: Math.floor(Math.random() * 4), beard: Math.floor(Math.random() * 6), glasses: Math.random() < 0.7 ? 0 : 1 + Math.floor(Math.random() * 2), jaw: Math.floor(Math.random() * 3), seed: 'you' + Math.floor(Math.random() * 1e6) };
+    else (S.look as Record<string, number | string>)[k] = Number(val);
+    return;
+  }
+  if (a !== 'reset') S.confirmReset = false;
+  if (w && w.goals && w.playerId) {
+    const g = w.goals.done;
+    if (a === 'talk') { g['g:talk'] = w.now; if (v === w.chars[w.playerId].bossId) g['g:boss'] = w.now; else g['g:friend'] = w.now; }
+    if (a === 'waitgo') g['g:wait'] = w.now;
+    if (['job', 'approach', 'delegate', 'sendorder'].includes(S.view.t) && !['back', 'tab', 'ent', 'biz', 'fact', 'tog'].includes(a)) g['g:job'] = w.now;
+  }
+  if (a === 'new') {
+    const name = (document.getElementById('name') as HTMLInputElement | null)?.value.trim() || 'Tony Marino';
+    S.w = createWorld(Math.floor(Math.random() * 1e6), name);
+    S.w.chars[S.w.playerId!].look = { ...S.look };
+    applyBackground(S.w, S.w.chars[S.w.playerId!], S.bg);
+    const p = P();
+    const bs = S.w.chars[p.bossId!];
+    S.log = [esc(`New York, March 1970. You’re ${p.name}, an associate of the ${famName(S.w, p)} family. You’re not made, and you’re nobody’s friend yet.`), esc(`${bs.name} is the man you answer to. Go and find him at his usual place, and let him see your face. Then make yourself useful.`), 'The Needs list says what wants doing. The Rackets tab says how to earn. Everything else is people.'];
+    S.news = [];
+    S.stack = [];
+    S.view = { t: 'tab', name: 'today' };
+    save();
+    return;
+  }
+  if (a === 'continue') {
+    const s = load();
+    if (s) {
+      S.w = s;
+      try { S.save = usageStatus(localStorage); } catch { /* ignore */ }
+      S.log = ['Welcome back.'];
+      S.news = [];
+      S.stack = [];
+      S.view = { t: 'tab', name: 'today' };
+    }
+    return;
+  }
+  if (!w) return;
+  switch (a) {
+    case 'tab': return tab(v as Tab);
+    case 'back': return pop();
+    case 'tog': S.open[v] = !S.open[v]; return;
+    case 'ent': return go({ t: 'person', id: v });
+    case 'biz': return go({ t: 'biz', id: v });
+    case 'fact': return go({ t: 'fact', id: v });
+    case 'tree': S.treeFam = v || undefined; if (S.view.t === 'tab' && S.view.name === 'family') return; return go({ t: 'tree', fam: v || P().familyId! });
+    case 'lsub': S.lifeSub = v as typeof S.lifeSub; if (v === 'love' && W().life) { datingPool(W(), P()); save(); } return;
+    case 'pf': S.worldFilter = v; return;
+    case 'place': return go({ t: 'place', id: v });
+    case 'places': return go({ t: 'places' });
+    case 'cscene': {
+      const p = P(), cl = clubOf(w, p.familyId); const c = w.chars[v];
+      if (!cl || !c || w.scene) return;
+      const t = topicsFor(w, p, cl, c).filter((q) => q.by === 'him').sort((a, b) => b.prio - a.prio)[0];
+      startScene(w, p, v, t ? t.key : 'chat');
+      if (t?.key === 'enc') w.scene!.data.enc = w.enc.find((e) => e.status === 'open' && e.from === c.id)?.id ?? '';
+      save(); return;
+    }
+    case 'cact': { sceneAct(w, P(), v); save(); return; }
+    case 'cend': { const mins = closeScene(w); return pass(mins, [], v === 'stay' ? { t: 'place', id: 'club' } : { t: 'tab', name: 'today' }); }
+    case 'club': {
+      const r = v === 'sit' ? sitAtClub(w, P()) : v === 'shave' ? shave(w, P()) : drinkAt(w, P());
+      return pass(r.minutes, r.lines);
+    }
+    case 'people': return go({ t: 'people' });
+    case 'grudges': return go({ t: 'grudges' });
+    case 'goals': return go({ t: 'goals' });
+    case 'dispute': return go({ t: 'dispute', id: v, lines: [] });
+    case 'rival': return W().chars[v]?.alive ? go({ t: 'settle', id: v, lines: [] }) : undefined;
+    case 'story': return /^d\d+$/.test(v) ? go({ t: 'dispute', id: v, lines: [] }) : go({ t: 'story', id: v });
+    case 'dv': {
+      const [code, did] = v.split('|');
+      const d = (w.disputes ?? []).find((x) => x.id === did);
+      if (!d) return;
+      const pp = P();
+      const opp = d.a === pp.id || w.chars[d.a]?.bossId === pp.id ? w.chars[d.b] : w.chars[d.a];
+      if (code === 'talk') return talkTo(opp.id);
+      if (code === 'settle') return go({ t: 'settle', id: opp.id, lines: [] });
+      if (code === 'ignore') { ignoreDispute(d, w); return pass(5, ['You let it ride. The other side will notice.'], { t: 'dispute', id: did, lines: [] }); }
+      if (code === 'look') { const r = investigate(w, pp, d); return pass(r.minutes, [], { t: 'dispute', id: did, lines: r.lines }); }
+      if (code === 'sit') { const ls = callSitdown(w, pp, d); return pass(30, ls, { t: 'dispute', id: did, lines: [] }); }
+      return;
+    }
+    case 'recruit': return go({ t: 'recruit' });
+    case 'dayjob': return go({ t: 'dayjob' });
+    case 'orders': return go({ t: 'orders', who: v });
+    case 'wait': return go({ t: 'wait' });
+    case 'guideoff': if (w.goals) w.goals.done['g:off'] = w.now; save(); return;
+    case 'waitgo': {
+      const o = waitChoices(true)[Number(v)];
+      if (!o) return;
+      if (!o.event) return doAction({ kind: 'wait', actor: w.playerId!, hours: o.mins / 60, label: 'wait', score: 0 });
+      const t0 = w.now;
+      const before = attentionCount();
+      let stopped = false;
+      for (let i = 0; i < 48; i++) {
+        advance(w, w.now + 30);
+        pruneJobs(w);
+        if (!P().alive || P().jailedUntil > w.now || attentionCount() > before) { stopped = true; break; }
+      }
+      return pass(0, [stopped ? 'Something has come up.' : 'A long day. Nothing stirs.'], undefined, t0);
+    }
+    case 'cat': {
+      const kind = v as Kind;
+      S.opts = generate(w, P(), kind).sort((x, y) => y.score - x.score).slice(0, 12);
+      if (kind === 'work' && S.opts.length) return doAction(S.opts[0]);
+      return go({ t: 'menu', kind });
+    }
+    case 'opt': return doAction(S.opts[Number(v)]);
+    case 'talk': return talkTo(v);
+    case 'settle': return W().chars[v]?.alive ? go({ t: 'settle', id: v, lines: [] }) : undefined;
+    case 'sv': {
+      const [code, id] = v.split('|');
+      const x = w.chars[id];
+      if (code === 'back') return go({ t: 'settle', id, lines: [] });
+      if (code === 'whack') return go({ t: 'settle', id, lines: [], kill: true });
+      const r = settleDo(w, P(), x, code);
+      if (r.done) playerActed(w, P(), x, code);
+      if (!r.done) return go({ t: 'settle', id, lines: r.lines });
+      return pass(r.minutes, r.lines, { t: 'tab', name: 'today' });
+    }
+    case 'ntag': { toggleTag(P(), args[0], Number(args[1])); save(); return; }
+    case 'npin': { togglePin(P(), v); save(); return; }
+    case 'restore': { const s = snapList().find((x) => x.key === v); const raw = s ? localStorage.getItem(s.key) : null; if (raw) { S.w = deserialize(raw); S.log = ['You go back to an earlier day.']; S.news = []; S.stack = []; S.view = { t: 'tab', name: 'today' }; save(); } return; }
+    case 'brief': return go({ t: 'brief' });
+    case 'sunday': return go({ t: 'sunday' });
+    case 'sbooks': {
+      const c = w.chars[v];
+      if (c) { S.sundayBooks[sKey(v)] = checkBooks(w, P(), c); }
+      save(); return;
+    }
+    case 'srule': {
+      // Answer one man across the table. Nothing here moves you to another page.
+      const c = w.chars[args[0]], p = P(), code = args[1];
+      if (!c || !c.alive || S.sundayRes[sKey(c.id)]) return;
+      const s = statement(w, c);
+      const r = rel(c, p.id), first = c.name.split(' ')[0];
+      let lines: string[] = [];
+      if (code === 'accept') {
+        r.trust = clamp(r.trust + (s.light ? 0 : 0.02)); r.respect = clamp(r.respect + (s.light ? -0.02 : 0.01));
+        lines = [s.light ? `You take it without a word. ${money(s.short)} stays on ${first}’s tab.` : `You take the envelope and nod. ${first} relaxes.`];
+      } else if (code === 'keep') {
+        const back = Math.round(s.handed / 2 / 5) * 5;
+        if (back <= 0 || p.cash < back) { S.log = ['You can’t afford the gesture right now.']; return; }
+        p.cash -= back; c.cash += back; r.trust = clamp(r.trust + 0.08); r.affection = clamp(r.affection + 0.05);
+        post(w, { from: p.id, to: c.id, amt: back, flow: 'gift', note: 'let him keep half' });
+        lines = [`You slide ${money(back)} back across the table to ${first}. "For your mother, or something." He doesn’t forget it.`];
+      } else if (code === 'praise') {
+        r.trust = clamp(r.trust + 0.04); r.respect = clamp(r.respect + 0.02);
+        lines = [`You tell ${first} he’s the kind of man this family needs. He walks out a little taller.`];
+      } else if (code === 'shout') {
+        r.trust = clamp(r.trust - 0.1); r.respect = clamp(r.respect - 0.05); r.grudge = clamp(r.grudge + 0.06);
+        for (const m of crewOf(w, p)) if (m.id !== c.id) { const q = rel(m, p.id); q.respect = clamp(q.respect + (c.books.missed > 1 ? 0.02 : -0.01)); }
+        lines = [`You raise your voice until the room goes quiet. ${first} stares at the table. The others pretend not to listen. He’ll pay next week, and he’ll remember how you made him.`];
+        if (s.short > 0) c.books.arrears += Math.round(s.short);
+      } else if (code === 'cut') {
+        r.grudge = clamp(r.grudge + 0.3); r.trust = clamp(r.trust - 0.3);
+        leaveCrew(w, c);
+        lines = [`"We’re done, ${first}." He puts his hat on and doesn’t say anything. He’s no longer one of yours, and he knows how your crew runs.`];
+      } else {
+        if (code === 'demand' && (p.books.flags[c.id]?.amt ?? 0) <= 0) (p.books.flags[c.id] ??= { amt: 0, n: 0, last: 0 }).amt = Math.max(s.short, 1);
+        const res = rule(w, p, c, code);
+        lines = res.lines;
+      }
+      addFact(w, { kind: 'favour', actor: p.id, victim: c.id, story: 'man:' + c.id, minor: true, text: `${p.name} sat down with ${c.name} on Sunday and went over what he handed up.`, district: c.district }, { witnesses: [p.id] });
+      S.sundayRes[sKey(c.id)] = lines; save(); return;
+    }
+    case 'saccall': {
+      const p = P();
+      for (const c of crewOf(w, p)) {
+        const s = statement(w, c);
+        if (s.light || c.books.missed > 1 || S.sundayRes[sKey(c.id)]) continue;
+        const r = rel(c, p.id); r.trust = clamp(r.trust + 0.02);
+        S.sundayRes[sKey(c.id)] = [`You take ${c.name.split(' ')[0]}’s envelope and nod. ${c.name.split(' ')[0]} relaxes.`];
+      }
+      save(); return;
+    }
+    case 'shand': {
+      const p = P(), boss = p.bossId ? w.chars[p.bossId] : undefined;
+      if (!boss) return;
+      const e = envelopeSum(w, p);
+      const amt = v === 'half' ? Math.round(e.due / 2 / 5) * 5 : e.due;
+      S.sundayMine = handOver(w, p, boss, amt);
+      save(); return;
+    }
+    case 'date': return pass(240, seePartner(w, P()));
+    case 'dateplan': return pass(v === 'walk' ? 90 : 240, datePlan(w, P(), v), { t: 'tab', name: 'life' });
+    case 'askout': { const r = askOut(w, P(), w.chars[v]); return pass(r.minutes, r.lines, { t: 'tab', name: 'life' }); }
+    case 'steady': { const r = askSteady(w, P()); return pass(60, r.lines, { t: 'tab', name: 'life' }); }
+    case 'marryask': { const r = askMarry(w, P()); return pass(90, r.lines, { t: 'tab', name: 'life' }); }
+    case 'wed': return pass(480, wedding(w, P()), { t: 'tab', name: 'life' });
+    case 'baby': return pass(120, tryForBaby(w, P()), { t: 'tab', name: 'life' });
+    case 'breakoff': return pass(60, breakOff(w, P()), { t: 'tab', name: 'life' });
+    case 'visit': {
+      const k = w.life?.kin.find((x) => x.id === v);
+      return k ? pass(90, visitKin(w, P(), k)) : undefined;
+    }
+    case 'perm': {
+      const lines = askPermission(w, P(), w.chars[v]);
+      return pass(60, lines, { t: 'grudges' });
+    }
+    case 'shift': {
+      const r = workShift(w, P());
+      return pass(r.minutes, r.lines);
+    }
+    case 'takejob': takeDayJob(w, P(), S.jobOpts[Number(v)]); save(); return;
+    case 'quitjob': quitDayJob(P()); save(); return;
+    case 'hire': {
+      const lines = recruitProspect(w, P(), w.chars[v]);
+      return pass(30, lines, { t: 'tab', name: 'crew' });
+    }
+    case 'enc': return go({ t: 'enc', id: v, lines: [] });
+    case 'way': return go({ t: 'way', id: v, lines: [] });
+    case 'opstart': S.opDist = ''; S.opRunner = 'me'; return go({ t: 'opstart', kind: v });
+    case 'opdist': S.opDist = v; return;
+    case 'oprun': S.opRunner = v; return;
+    case 'opgo': {
+      const lines = startOp(w, P(), v as never, S.opDist, S.opRunner === 'me' ? null : S.opRunner);
+      return pass(30, lines, { t: 'tab', name: 'rackets' });
+    }
+    case 'op': return go({ t: 'op', id: v, lines: [] });
+    case 'opcount': {
+      const op = w.ops.find((o) => o.id === v)!;
+      const r = countOp(w, P(), op);
+      advance(w, w.now + 60);
+      S.view = { t: 'op', id: v, lines: r.lines, found: r.found };
+      save();
+      return;
+    }
+    case 'oprule': {
+      const op = w.ops.find((o) => o.id === args[0])!;
+      const lines = opRule(w, P(), op, args[1], Number(args[2]));
+      S.view = { t: 'op', id: args[0], lines };
+      save();
+      return;
+    }
+    case 'opclose': {
+      const lines = closeOp(w, w.ops.find((o) => o.id === v)!);
+      return pass(10, lines, { t: 'tab', name: 'rackets' });
+    }
+    case 'hijack': return go({ t: 'hijack', picked: [] });
+    case 'hjpick': {
+      if (S.view.t === 'hijack') {
+        const i = S.view.picked.indexOf(v);
+        if (i >= 0) S.view.picked.splice(i, 1);
+        else if (S.view.picked.length < 3) S.view.picked.push(v);
+      }
+      return;
+    }
+    case 'hjgo': return S.view.t === 'hijack' ? pass(60, hijack(w, P(), S.view.picked), { t: 'tab', name: 'rackets' }) : undefined;
+    case 'echoose': {
+      const e = w.enc.find((x) => x.id === args[0])!;
+      const r = encChoose(w, P(), e, args[1]);
+      if (e.status === 'open') {
+        advance(w, w.now + r.minutes);
+        S.view = { t: 'enc', id: e.id, lines: r.lines };
+        save();
+        return;
+      }
+      return pass(r.minutes, r.lines, { t: 'tab', name: 'today' });
+    }
+    case 'mv': {
+      const r = doMove(w, P(), args[0], args[1], args[2] || undefined);
+      return pass(r.minutes, r.lines, { t: 'story', id: 'sit:' + args[0] });
+    }
+    case 'help': return go({ t: 'help', who: v, lines: [] });
+    case 'helpdo': {
+      const lines = helpMan(w, P(), w.chars[args[0]], args[1] as 'cash' | 'duties' | 'leave');
+      S.view = { t: 'help', who: args[0], lines };
+      save();
+      return;
+    }
+    case 'plan': {
+      const [i, who] = args;
+      if (who) return go({ t: 'plan', idx: Number(i), who });
+      if (S.view.t === 'tab' && Number.isNaN(Number(i))) return;
+      return go({ t: 'plan', idx: Number(i) });
+    }
+    case 'doplan': {
+      const o = S.planOpts[Number(args[0])];
+      if (!o) return;
+      if (args[1] === 'me') {
+        const j = o.make(w.playerId!);
+        j.status = 'active';
+        j.assignee = w.playerId!;
+        S.stack = [];
+        S.view = { t: 'approach', id: j.id };
+        S.stack.push({ t: 'tab', name: 'rackets' });
+        return;
+      }
+      const m = w.chars[args[1]];
+      const j = giveOrder(w, P(), m, o, args[2] as 'quiet' | 'hard');
+      if (typeof j === 'string') { S.log = [j]; return; }
+      return pass(15, [`${m.name} is on it: ${o.label}. He’ll report back.`], { t: 'tab', name: 'rackets' });
+    }
+    case 'shake': {
+      const b = w.biz[v];
+      const list = require_plan();
+      const i = list.findIndex((o) => o.label.startsWith('Shake') && o.label.includes(w.chars[b.ownerId].name));
+      if (i >= 0) {
+        const j = list[i].make(w.playerId!);
+        j.status = 'active';
+        S.view = { t: 'approach', id: j.id };
+      }
+      return;
+    }
+    case 'scheme': {
+      const o = S.schemeMoves[Number(v)];
+      if (o?.move) {
+        const r = performMove(w, o.move);
+        return pass(r.minutes, r.lines);
+      }
+      return;
+    }
+    case 'say': {
+      if (S.view.t !== 'talk') return;
+      const t = w.chars[S.view.convo.id];
+      const tv = S.view, picked = S.dopts[Number(v)];
+      const history = [...(tv.history ?? []), ...(tv.lines.length ? [{ q: tv.q, lines: tv.lines }] : [])].slice(-12);
+      const res = say(w, P(), t, tv.convo, picked.code);
+      if (res.meeting && typeof res.meeting !== 'string') {
+        advance(w, w.now + res.minutes);
+        S.view = { t: 'meeting', m: res.meeting, lines: res.lines };
+        save();
+        return;
+      }
+      const lines = typeof res.meeting === 'string' ? [...res.lines, res.meeting] : res.lines;
+      const keep = isNavCode(picked.code) && !res.lines.length && !!res.convo;
+      return pass(res.minutes, res.convo ? [] : lines, res.convo ? (keep ? { t: 'talk', convo: res.convo, lines: tv.lines, q: tv.q, history: tv.history } : { t: 'talk', convo: res.convo, lines, q: isNavCode(picked.code) ? undefined : picked.label, history }) : { t: 'tab', name: 'today' });
+    }
+    case 'cmove': {
+      const r = performMove(w, S.moves[Number(v)]);
+      return pass(r.minutes, r.lines, { t: 'tab', name: 'crew' });
+    }
+    case 'meet':
+      if (v === 'dinner') return go({ t: 'guests', picked: [] });
+      if (v === 'family') return startMeeting(openFamilyMeeting(w, P()), { t: 'tab', name: 'family' });
+    {
+      // If the men are asleep, send word and wait until the afternoon rather than just refusing.
+      let m = openCrewMeeting(w, P());
+      if (typeof m === 'string' && /asleep/.test(m)) {
+        const t0 = w.now; const day = Math.floor(w.now / 1440) * 1440; let at = day + 14 * 60; if (at <= w.now) at += 1440;
+        advance(w, at); pruneJobs(w);
+        const m2 = openCrewMeeting(w, P());
+        if (typeof m2 !== 'string') { S.log = [`You send word round and wait until the afternoon.`]; m = m2; } else m = m2;
+        void t0;
+      }
+      return startMeeting(m);
+    }
+    case 'gpick': {
+      if (S.view.t === 'guests') {
+        const i = S.view.picked.indexOf(v);
+        if (i >= 0) S.view.picked.splice(i, 1);
+        else if (S.view.picked.length < 4) S.view.picked.push(v);
+      }
+      return;
+    }
+    case 'ghost': return S.view.t === 'guests' ? startMeeting(openGathering(w, P(), S.view.picked)) : undefined;
+    case 'attend': {
+      const j = job(v)!;
+      const p = P();
+      const m = j.meeting === 'induction' ? openInduction(w, p, j) : j.meeting === 'accounts' ? openAccountsMeeting(w, p, j) : j.meeting === 'family' ? openFamilyMeeting(w, p, j) : j.meeting === 'sitdown' ? (w.grievances.find((g) => g.id === j.extra?.g) ? openSitdown(w, p, w.grievances.find((g) => g.id === j.extra?.g)!) : 'It has sorted itself out.') : openCrewMeeting(w, p);
+      if (typeof m !== 'string' && j.meeting === 'sitdown') j.status = 'done';
+      return startMeeting(m, { t: 'tab', name: 'today' });
+    }
+    case 'excuse': declineJob(w, job(v)!); save(); S.stack = []; S.view = { t: 'tab', name: 'today' }; return;
+    case 'mopt': {
+      if (S.view.t === 'meeting') {
+        const it = meetCurrent(S.view.m);
+        if (it) S.view.lines = meetChoose(w, P(), S.view.m, it.opts[Number(v)].code);
+      }
+      return;
+    }
+    case 'mdone': {
+      if (S.view.t === 'meeting') {
+        const r = closeMeeting(w, P(), S.view.m);
+        return pass(r.minutes, [...S.view.lines, ...r.lines]);
+      }
+      return;
+    }
+    case 'books': return go({ t: 'books', id: v, lines: [] });
+    case 'stance': setStance(P(), v as 'honest' | 'shave' | 'stall'); save(); return;
+    case 'audit': {
+      const r = auditMember(w, P(), w.chars[v]);
+      addFact(w, { kind: 'favour', actor: P().id, victim: v, story: 'man:' + v, minor: true, text: `${P().name} went through ${w.chars[v].name}’s books.`, district: w.chars[v].district }, { witnesses: [P().id] });
+      return pass(r.minutes, [], { t: 'books', id: v, lines: r.lines });
+    }
+    case 'rule': {
+      const r = rule(w, P(), w.chars[args[0]], args[1]);
+      addFact(w, { kind: 'favour', actor: P().id, victim: args[0], story: 'man:' + args[0], minor: true, text: `${P().name} dealt with ${w.chars[args[0]].name}’s books and told him where he stands.`, district: w.chars[args[0]].district }, { witnesses: [P().id] });
+      return pass(r.minutes, [], { t: 'books', id: args[0], lines: r.lines });
+    }
+    case 'reward': {
+      const lines = reward(w, P(), w.chars[args[0]], args[1]);
+      return pass(20, [], { t: 'books', id: args[0], lines });
+    }
+    case 'manage': return go({ t: 'manage' });
+    case 'comm': return go({ t: 'comm' });
+    case 'bj': return go({ t: 'bj' });
+    case 'bjt': return go({ t: 'bj', id: v });
+    case 'bjbet': { const lines = bjDeal(args[0], Number(args[1])); return pass(10, lines, { t: 'bj', id: args[0] }); }
+    case 'bjact': { const lines = bjAct(v as 'hit' | 'stand' | 'double'); return pass(5, lines, { t: 'bj', id: w.bj?.biz }); }
+    case 'buy': return pass(10, buyLife(w, P(), v), { t: 'tab', name: 'today' });
+    case 'court': return pass(60, courtBoss(w, P(), v), { t: 'comm' });
+    case 'propose': return pass(90, propose(w, P(), args[0], args[1] || undefined), { t: 'comm' });
+    case 'consig': return pass(5, setConsigliere(w, P(), w.chars[v]), { t: 'manage' });
+    case 'heir': return pass(5, setHeir(w, P(), w.chars[v]), { t: 'manage' });
+    case 'setboss': return pass(5, setBoss(w, P(), w.chars[args[0]], w.chars[args[1]]), { t: 'manage' });
+    case 'setrank': { const lines = setRank(w, P(), w.chars[args[0]], args[1] as import('./types').Rank); return pass(5, lines, { t: 'manage' }); }
+    case 'power': return pass(40, usePower(w, P(), v), { t: 'tab', name: 'today' });
+    case 'chair': return pass(40, chairAct(w, P(), v), { t: 'tab', name: 'today' });
+    case 'raise': {
+      const lines = raise(w, P(), w.chars[args[0]], args[1] as import('./types').Rank);
+      return pass(30, lines, { t: 'tab', name: 'today' });
+    }
+    case 'rec':
+    case 'recr': {
+      const lines = (a === 'rec' ? recommend : recruit)(w, P(), w.chars[v]);
+      return pass(30, lines, { t: 'tab', name: 'crew' });
+    }
+    case 'jx': {
+      const j = job(args[0])!;
+      const fn = { press: pressJob, ask: questionJob, inv: investigateJob, around: askAroundJob, haggle: haggleJob }[args[1]]!;
+      const r = fn(w, j);
+      return pass(r.minutes, [], { t: 'job', id: j.id });
+    }
+    case 'job': return go({ t: 'job', id: v });
+    case 'report': return go({ t: 'report', id: v, lines: [] });
+    case 'qrep': {
+      const j = job(v)!;
+      const lines = questionReport(w, j);
+      S.view = { t: 'report', id: v, lines };
+      save();
+      return;
+    }
+    case 'ack': {
+      const j = job(v);
+      if (j) j.acked = true;
+      save();
+      S.stack = [];
+      S.view = { t: 'tab', name: 'today' };
+      return;
+    }
+    case 'mine': {
+      const j = job(v)!;
+      if (j.status === 'offered') takeJob(w, j);
+      return go({ t: 'approach', id: v });
+    }
+    case 'go': {
+      const r = resolve(w, job(args[0])!, args[1]);
+      return pass(r.minutes, r.lines);
+    }
+    case 'deleg': return go({ t: 'delegate', id: v });
+    case 'who': return go({ t: 'sendorder', id: args[0], who: args[1] });
+    case 'send': {
+      const err = assign(w, job(args[0])!, args[1], args[2] as 'quiet' | 'hard');
+      if (err) { S.log = [err]; S.view = { t: 'delegate', id: args[0] }; return; }
+      return pass(15, [`${w.chars[args[1]].name} is on it. He’ll report back.`]);
+    }
+    case 'pass': declineJob(w, job(v)!); save(); S.stack = []; S.view = { t: 'tab', name: 'today' }; return;
+    case 'drop': dropJob(w, job(v)!); save(); S.stack = []; S.view = { t: 'tab', name: 'today' }; return;
+    case 'amb': { const p = P(); p.ambition = { kind: v, since: w.now, rank0: p.rank }; save(); return; }
+    case 'save': { const ok = save(); S.log = [ok ? 'Saved.' : 'Could not save: ' + (S.save?.error ?? 'unknown problem') + '. Your last good save is untouched.']; tab('today'); return; }
+    case 'dlsave': downloadSave(); return;
+    case 'ulsave': document.getElementById('ulfile')?.click(); return;
+    case 'reset':
+      if (v === 'go' || S.confirmReset) {
+        try {
+          localStorage.removeItem(KEY);
+        } catch {
+          /* nothing to clear */
+        }
+        S.w = null;
+        S.confirmReset = false;
+      } else S.confirmReset = true;
+      return;
+  }
+}
+
+import { orderMenu } from './orders';
+function require_plan() {
+  return orderMenu(W(), P());
+}
+
+document.addEventListener('click', (e) => {
+  const el = (e.target as HTMLElement).closest('[data-a]') as HTMLElement | null;
+  if (!el) return;
+  e.preventDefault();
+  const raw = el.dataset.a!;
+  const i = raw.indexOf(':');
+  const before = window.scrollY;
+  try {
+    handle(raw.slice(0, i), raw.slice(i + 1));
+  } catch (err) {
+    console.error(err);
+    S.log = ['Something went wrong with that. Nothing was lost.'];
+    S.view = { t: 'tab', name: 'today' };
+    S.stack = [];
+  }
+  render();
+  const inPlace = ['tog', 'gpick', 'lsub', 'pf', 'stance', 'tree', 'opdist', 'oprun', 'hjpick'].includes(raw.slice(0, i));
+  window.scrollTo(0, inPlace ? before : 0);
+});
+
+document.addEventListener('change', (e) => {
+  const el = e.target as HTMLInputElement;
+  if (el?.id !== 'ulfile' || !el.files?.[0]) return;
+  el.files[0].text().then((raw) => {
+    try { S.w = deserialize(raw); S.stack = []; S.view = { t: 'tab', name: 'today' }; S.log = ['Save file loaded.']; save(); } catch { S.notice = 'That file is not a readable OMERTÀ save.'; }
+    render();
+  });
+});
+
+render();
+void KEY;

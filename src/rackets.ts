@@ -1,0 +1,219 @@
+import { hasPerk } from './specs';
+// Ongoing operations. Each one has a runner, a weekly take, and a way to go wrong. Money from these comes through the books
+// like everything else, so what your superiors can see is a choice with consequences.
+import { aptitude, grow } from './people';
+import { addFact, clamp, earn, handleDeath, money, newId, rel } from './core';
+import { addEnc } from './encounters';
+import { Character, DAY, Id, Op, OpKind, World } from './types';
+import { arch, pick } from './voice';
+
+export interface OpDef {
+  label: string;
+  group: string;
+  cost: number;
+  base: number;
+  risk: number;
+  heat: number;
+  rank: 'associate' | 'soldier';
+  districts?: string[];
+  blurb: string;
+  skill: string;
+}
+export const OPS: Record<Exclude<OpKind, 'hijack'>, OpDef> = {
+  numbers: { label: 'Numbers bank', group: 'Betting', cost: 600, base: 340, risk: 0.05, heat: 0.03, rank: 'associate', skill: 'numbers', blurb: 'Runners take nickel and dime bets in bars and barbershops. You pay the hits. Steady money, steady attention.' },
+  bookie: { label: 'Bookmaking', group: 'Betting', cost: 400, base: 260, risk: 0.04, heat: 0.025, rank: 'associate', skill: 'numbers', blurb: 'Sports and the horses. Wonderful until a favourite comes in.' },
+  vending: { label: 'Jukeboxes and vending', group: 'Street trades', cost: 800, base: 190, risk: 0.015, heat: 0.01, rank: 'associate', skill: 'lean', blurb: 'Machines in every bar in the district, and every owner agrees they’re yours.' },
+  dock: { label: 'Pier loading racket', group: 'Waterfront and unions', cost: 0, base: 620, risk: 0.05, heat: 0.04, rank: 'soldier', districts: ['Red Hook', 'Staten Island'], skill: 'collect', blurb: 'Every crate that moves pays a toll. The foremen know who to give it to.' },
+  union: { label: 'Union local', group: 'Waterfront and unions', cost: 1500, base: 520, risk: 0.03, heat: 0.03, rank: 'soldier', districts: ["Hell's Kitchen", 'The Bronx', 'Astoria'], skill: 'lean', blurb: 'Dues, a pension fund and jobs for sale. Quiet and very profitable. The first month is a bribe.' },
+  shylock: { label: 'Street loans', group: 'Street trades', cost: 1200, base: 300, risk: 0.04, heat: 0.015, rank: 'associate', skill: 'collect', blurb: 'Cash lent at a weekly rate to people the banks won’t see. It pays well until someone can’t. Then it pays in other ways.' },
+  cigarettes: { label: 'Bootleg cigarettes', group: 'Street trades', cost: 900, base: 230, risk: 0.03, heat: 0.02, rank: 'associate', skill: 'handle', blurb: 'Untaxed cartons from the south, sold from the back of every corner store. The state taxes are the profit.' },
+  nightclub: { label: 'A nightclub stake', group: 'Fronts', cost: 4000, base: 330, risk: 0.02, heat: 0.01, rank: 'associate', skill: 'charm', blurb: 'Your name behind the bar of a place everyone wants to be seen. The cash register does the laundering.' },
+  carting: { label: 'Private carting', group: 'Waterfront and unions', cost: 1800, base: 440, risk: 0.025, heat: 0.02, rank: 'soldier', districts: ['Bensonhurst', 'The Bronx', 'Staten Island'], skill: 'lean', blurb: 'Every restaurant and shop pays for its rubbish to go, and nobody else is allowed to take it. Dull, steady, vicious if you cross it.' },
+  construction: { label: 'Construction kickbacks', group: 'Waterfront and unions', cost: 2500, base: 560, risk: 0.035, heat: 0.03, rank: 'soldier', districts: ["Hell's Kitchen", 'Astoria', 'Little Italy'], skill: 'fix', blurb: 'Concrete, cranes and building inspectors. Every contractor pays to keep the site moving.' },
+  trucking: { label: 'Trucking and cargo', group: 'Waterfront and unions', cost: 2200, base: 480, risk: 0.05, heat: 0.035, rank: 'soldier', districts: ['Red Hook', 'Staten Island', 'The Bronx'], skill: 'handle', blurb: 'Control the drivers and you control what gets delivered, what gets lost, and who is told about it.' },
+  front: { label: 'A front business', group: 'Fronts', cost: 3000, base: 150, risk: 0.01, heat: -0.04, rank: 'associate', skill: 'numbers', blurb: 'A laundromat or a restaurant on paper. Clean money and a reason to be seen.' },
+};
+export const OP_GROUPS = ['Betting', 'Street trades', 'Waterfront and unions', 'Fronts'] as const;
+
+const PL = (w: World) => w.chars[w.playerId!];
+
+export function canStart(w: World, p: Character, kind: Exclude<OpKind, 'hijack'>, district: string): string | null {
+  const d = OPS[kind];
+  if (p.rank === 'associate' && d.rank === 'soldier') return 'That’s made men\'s business. You are not made.';
+  if (d.districts && !d.districts.includes(district)) return `It only works in ${d.districts.join(' or ')}.`;
+  if (p.cash < d.cost) return `You need ${money(d.cost)}.`;
+  if (w.ops.some((o) => o.owner === p.id && o.kind === kind && o.district === district && o.state !== 'closed')) return 'You already run one there.';
+  if (d.rank === 'soldier') {
+    const fam = p.familyId ? w.fam[p.familyId] : undefined;
+    const capo = p.bossId ? w.chars[p.bossId] : undefined;
+    if (!fam?.districts.includes(district)) return 'That’s not your family\'s ground. You would need leave to work it.';
+    if (capo && (capo.rels[p.id]?.trust ?? 0) < 0.35) return `${capo.name} doesn’t trust you with it yet.`;
+  }
+  return null;
+}
+
+export function startOp(w: World, p: Character, kind: Exclude<OpKind, 'hijack'>, district: string, runner: Id | null): string[] {
+  const d = OPS[kind];
+  const err = canStart(w, p, kind, district);
+  if (err) return [err];
+  p.cash -= d.cost;
+  const op: Op = { id: newId(w, 'op'), kind, owner: p.id, runner, district, since: w.now, state: 'running', last: 0, total: 0, skimmed: 0, weeks: 0 };
+  w.ops.push(op);
+  const r = runner ? w.chars[runner] : undefined;
+  if (kind === 'dock' || kind === 'union') {
+    const capo = p.bossId ? w.chars[p.bossId] : undefined;
+    if (capo) rel(capo, p.id).respect = clamp(rel(capo, p.id).respect + 0.03);
+  }
+  return [`${d.label} in ${district}. ${r ? `${r.name} will run it.` : 'You’ll run it yourself.'} ${d.cost ? `It costs you ${money(d.cost)}.` : ''} The first money comes in a week.`];
+}
+
+export function hijack(w: World, p: Character, crew: Id[]): string[] {
+  const men = crew.map((id) => w.chars[id]).filter((c) => c?.alive && c.jailedUntil <= w.now);
+  if (men.length < 2) return ['You need at least two men you can trust.'];
+  const cargo = pick(['a truck of cigarettes off the Jersey Turnpike', 'a trailer of fur coats out of the garment district', 'a load of television sets bound for a department store', 'a shipment of liquor leaving a bonded warehouse'], p.id + w.now);
+  const op: Op = { id: newId(w, 'op'), kind: 'hijack', owner: p.id, runner: men[0].id, district: p.district, since: w.now, state: 'out', last: 0, total: 0, skimmed: 0, crew: men.map((m) => m.id), due: w.now + 2 * DAY, note: cargo, weeks: 0 };
+  w.ops.push(op);
+  return [`You put ${men.map((m) => m.name).join(', ')} on ${cargo}. You’ll hear in a couple of days. Nobody says the word hijack out loud.`];
+}
+
+export function closeOp(w: World, op: Op): string[] {
+  op.state = 'closed';
+  return [`${OPS[op.kind as Exclude<OpKind, 'hijack'>]?.label ?? 'The job'} is shut down. People will notice the gap.`];
+}
+
+export function countOp(w: World, p: Character, op: Op): { lines: string[]; found: number } {
+  const r = op.runner ? w.chars[op.runner] : undefined;
+  const found = Math.round(op.skimmed);
+  const lines: string[] = [];
+  if (!r) return { lines: ['You count it yourself. It’s all there. It’s yours, after all.'], found: 0 };
+  if (found > 30) {
+    lines.push(`You go through ${r.name}'s count, line by line. It doesn’t add up. About ${money(found)} has gone somewhere, over the weeks.`);
+  } else lines.push(`You go through ${r.name}'s count. It adds up. He’s either honest or very careful.`);
+  op.skimmed = 0;
+  rel(r, p.id).lastMet = w.now;
+  return { lines, found };
+}
+export function opRule(w: World, p: Character, op: Op, code: string, found: number): string[] {
+  const r = op.runner ? w.chars[op.runner] : undefined;
+  if (!r) return [];
+  const rr = rel(r, p.id);
+  if (code === 'repay') {
+    const amt = Math.min(r.cash, found);
+    r.cash -= amt;
+    p.cash += amt;
+    rr.trust = clamp(rr.trust - 0.08);
+    return [`${r.name} hands over ${money(amt)} without looking at you. Whatever he felt about you, he feels it a little differently now.`];
+  }
+  if (code === 'fire') {
+    op.runner = null;
+    rr.grudge = clamp(rr.grudge + 0.1);
+    rr.trust = clamp(rr.trust - 0.15);
+    return [`You take the operation away from ${r.name}. He takes it the way men take a public embarrassment.`];
+  }
+  rr.trust = clamp(rr.trust - 0.02);
+  return [`You tell ${r.name} you know, and that it stops. He nods once.`];
+}
+
+// ------------------------------------------------------------------ ticking
+
+export function opsDaily(w: World) {
+  for (const op of w.ops) {
+    if (op.state === 'out' && op.due !== undefined && op.due <= w.now) resolveHijack(w, op);
+    if (op.state === 'raided' && op.until !== undefined && op.until <= w.now) op.state = 'running';
+  }
+}
+
+function resolveHijack(w: World, op: Op) {
+  const p = w.chars[op.owner];
+  const men = (op.crew ?? []).map((id) => w.chars[id]).filter((c) => c?.alive);
+  const strength = men.length ? men.reduce((a, c) => a + aptitude(c, 'hijack'), 0) / men.length : 0.3;
+  const roll = w.rng.next();
+  const ok = clamp(0.3 + strength * 0.55, 0.2, 0.85);
+  op.state = 'done';
+  const where = op.district;
+  if (roll < ok) {
+    const gross = Math.round(w.rng.int(1800, 3800) * (0.8 + strength * 0.4));
+    const cut = Math.round(gross * 0.12);
+    for (const m of men) { m.cash += cut; grow(m, 'hijack'); }
+    const net = gross - cut * men.length;
+    earn(p, net, 'hijack');
+    p.heat = clamp(p.heat + 0.2, 0, 1.5);
+    op.total = net;
+    addFact(w, { kind: 'report', actor: men[0]?.id, minor: true, text: `The ${op.note ?? 'job'} went clean. ${money(net)} after the men's share.`, district: where }, { witnesses: [p.id] });
+    if (w.rng.chance(0.3)) addFact(w, { kind: 'theft', actor: p.id, hiddenActor: true, text: `${p.name} had a truck taken off the road.`, textHidden: `A truck was taken off the road in ${where}.`, district: where }, {});
+  } else if (roll < ok + (1 - ok) * 0.55) {
+    const gross = Math.round(gross0(w) * 0.2);
+    earn(p, gross, 'hijack');
+    op.total = gross;
+    addFact(w, { kind: 'report', actor: men[0]?.id, minor: true, text: `The ${op.note ?? 'job'} was a dud. The truck was mostly empty. ${money(gross)} was all there was to take.`, district: where }, { witnesses: [p.id] });
+  } else {
+    const caught = men.filter(() => w.rng.chance(0.5));
+    for (const m of caught) { m.jailedUntil = w.now + w.rng.int(10, 30) * DAY; m.heat = clamp(m.heat + 0.5, 0, 1.5); }
+    p.heat = clamp(p.heat + 0.25, 0, 1.5);
+    addFact(w, { kind: 'arrest', actor: caught[0]?.id ?? men[0]?.id, text: `${caught.map((c) => c.name).join(' and ') || 'Two men'} picked up after a hijacking went wrong near ${where}.`, district: where }, { witnesses: [p.id], broadcast: caught.map((c) => c.id) });
+  }
+}
+const gross0 = (w: World) => w.rng.int(1800, 3800);
+
+export function opsWeek(w: World) {
+  const p = PL(w);
+  if (!p) return;
+  for (const op of w.ops) {
+    if (op.state === 'closed' || op.kind === 'hijack' || op.state === 'done') continue;
+    const d = OPS[op.kind as Exclude<OpKind, 'hijack'>];
+    const owner = w.chars[op.owner];
+    const runner = op.runner ? w.chars[op.runner] : undefined;
+    if (!owner?.alive) { op.state = 'closed'; continue; }
+    if (runner && (!runner.alive)) { op.runner = null; }
+    op.weeks++;
+    if (op.state === 'raided') { op.last = 0; continue; }
+    const doer = runner && runner.alive ? runner : owner;
+    if (runner && runner.jailedUntil > w.now) { op.last = Math.round(op.last * 0.3); continue; }
+    const ap = aptitude(doer, d.skill);
+    let take = d.base * (0.55 + ap * 0.9) * w.rng.range(0.8, 1.25);
+    if (owner.isPlayer && hasPerk(w, owner, 'earner')) take *= 1.12;
+    if (op.kind === 'bookie' && w.rng.chance(0.18)) take = -w.rng.int(150, 500); // the favourite came in
+    if (op.kind === 'front') take = d.base * w.rng.range(0.8, 1.2);
+    const fam = owner.familyId ? w.fam[owner.familyId] : undefined;
+    const hot = Object.values(fam?.tension ?? {}).reduce((a, b) => Math.max(a, b), 0);
+    if (!fam?.districts.includes(op.district)) take *= 0.7;
+    // police
+    if (d.risk > 0 && w.rng.chance(d.risk + owner.heat * 0.06)) {
+      op.state = 'raided';
+      op.until = w.now + w.rng.int(2, 4) * DAY * 7;
+      const fine = w.rng.int(150, 450);
+      owner.cash = Math.max(0, owner.cash - fine);
+      if (runner && w.rng.chance(0.6)) { runner.jailedUntil = w.now + w.rng.int(7, 21) * DAY; runner.heat = clamp(runner.heat + 0.4, 0, 1.5); }
+      addFact(w, { kind: 'raid', actor: doer.id, text: `Police raided the ${d.label.toLowerCase()} in ${op.district}${runner?.jailedUntil && runner.jailedUntil > w.now ? ` and took ${runner.name}` : ''}. It costs ${money(fine)} to get moving again.`, district: op.district }, { witnesses: owner.isPlayer ? [owner.id] : [], broadcast: [doer.id] });
+      op.last = 0;
+      continue;
+    }
+    // squeeze from a rival
+    if (owner.isPlayer && hot >= 3 && w.rng.chance(0.07) && !w.enc.some((e) => e.status === 'open' && e.kind === 'squeeze')) {
+      const rf = Object.entries(fam!.tension).sort((a, b) => b[1] - a[1])[0];
+      const rb = rf ? w.chars[w.fam[rf[0]].bossId] : undefined;
+      const rc = Object.values(w.chars).find((c) => c.alive && c.familyId === rf?.[0] && c.rank === 'capo');
+      if (rc && rb) addEnc(w, { kind: 'squeeze', from: rc.id, title: `${rc.name} wants a piece`, lines: [`${rc.name} of the ${w.fam[rc.familyId!].name} family sends a man to say it nicely.`, `"We hear you have a ${d.label.toLowerCase()} in ${op.district}. That’s a neighbourhood we have an interest in. A weekly gesture would keep everyone friendly."`], opts: [{ code: 'pay', label: 'Pay a $300 gesture, and keep your hands clean', hint: 'It will come again.' }, { code: 'boss', label: 'Say you’ll take it to your boss' }, { code: 'refuse', label: 'Tell him no', hint: 'They won’t take it quietly.' }], data: { op: op.id }, days: 4 });
+    }
+    // the runner
+    let skim = 0;
+    if (runner && take > 0 && runner.alive) {
+      const tempted = (runner.problem && runner.problem.sev > 0.35) || ['schemer', 'bitter'].includes(arch(runner));
+      const loyal = rel(runner, owner.id).trust;
+      if (tempted && w.rng.chance(0.35 - loyal * 0.2)) {
+        skim = Math.round(take * w.rng.range(0.08, 0.3));
+        op.skimmed += skim;
+        runner.cash += skim;
+      }
+      grow(runner, d.skill, 0.01);
+    }
+    const net = Math.round(take - skim);
+    op.last = net;
+    op.total += net;
+    if (net > 0) earn(owner, net, op.kind);
+    else owner.cash += net;
+    owner.heat = clamp(owner.heat + d.heat, 0, 1.5);
+    if (owner.isPlayer && Math.abs(net) >= 1) addFact(w, { kind: 'report', actor: doer.id, minor: true, text: net < 0 ? `A bad week on the ${d.label.toLowerCase()} in ${op.district}: a favourite came in, and ${money(-net)} had to be paid out.` : `The ${d.label.toLowerCase()} in ${op.district} brought in ${money(net)}.`, district: op.district }, { witnesses: [owner.id] });
+  }
+  void handleDeath;
+}

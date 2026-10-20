@@ -1,0 +1,144 @@
+OMERTÀ: Final Regression, Publication & Emergent Gameplay Validation
+
+Your assessment of the limitations is reasonable. I don’t expect you to guarantee emergent storytelling or manufacture consequences that the simulation doesn’t currently support.
+
+I do expect a rigorous, transparent assessment of how well the existing systems work together during ordinary gameplay.
+
+Proceed with the following work autonomously. Don’t stop for approval between stages unless you encounter a genuinely consequential architectural decision.
+
+Phase 1: Finish, Validate and Publish
+
+Complete the outstanding regression tests, including v77–v79, against the latest code.
+
+Fix any genuine regressions introduced by the conversation overhaul.
+
+Then build and publish the updated game to the existing link.
+
+Preserve:
+
+* Existing saves and migration compatibility.
+* All V72–V76 simulation mechanics.
+* The authoritative economic ledger and persistent world state.
+* Existing NPC autonomy, relationships and information restrictions.
+* Every existing character portrait, completely unchanged.
+
+Do not delay publication indefinitely for speculative improvements. Once the build passes the required checks, publish it.
+
+Phase 2: Unassisted Multi-Week Gameplay Test
+
+After publication, conduct a genuine gameplay test spanning at least 28 in-game days, using the actual simulation and ordinary player actions.
+
+Do not manually manipulate trust, respect, cash, relationships, grudges, NPC goals or other simulation variables to create favourable outcomes.
+
+You may select player actions, hold conversations, negotiate, make promises, interact with businesses and advance time through the normal game systems.
+
+Use a reproducible starting state and record the seed, save and action sequence.
+
+Interact with several characters across different ranks, personalities and relationships. Where naturally available, explore:
+
+* Loans, repayments and financial obligations.
+* Promises and their fulfilment or expiration.
+* Grievances, threats and resentment.
+* Recruitment, sponsorship and career progression.
+* NPC requests, disputes and autonomous activity.
+* Rival organisations and competing interests.
+
+Don’t force every category to appear. If something never becomes available naturally, record that fact.
+
+Avoid scripting an artificially dramatic sequence. Make plausible player decisions and allow the simulation to respond.
+
+Phase 3: Trace Consequences Through the Simulation
+
+For each significant player decision, identify:
+
+1. Immediate outcome: What happened during the interaction?
+2. Recorded state: What changed in the underlying game?
+3. Subsequent behaviour: Did that change influence later dialogue, opportunities, autonomous NPC decisions or economic activity?
+4. Long-term outcome: Did anything meaningful develop over the following days or weeks?
+
+Crucially, distinguish between:
+
+A. Confirmed integration: A recorded consequence demonstrably affects another system.
+
+B. Potential integration: The code contains a plausible connection, but the test did not trigger it.
+
+C. Missing integration: A consequence is recorded but no relevant downstream system appears to use it.
+
+D. Legitimate inactivity: The system can react, but the character reasonably takes no action under the circumstances.
+
+E. Defect: The game behaves inconsistently with its own rules.
+
+Do not automatically classify an uneventful outcome as a failure. A character holding a grudge without immediately retaliating may be entirely believable.
+
+However, distinguish believable restraint from a grudge variable that is never consulted by autonomous behaviour.
+
+Use code inspection where necessary to establish the difference.
+
+Phase 4: Evaluate Conversations as Gameplay
+
+Review the actual conversations produced during the test.
+
+Assess whether:
+
+* Different personalities have recognisably different voices.
+* Rank meaningfully changes authority, expectations and available choices.
+* Dialogue follows logically from the previous exchange.
+* NPCs only disclose information they plausibly know and would share.
+* Negotiations reflect actual financial circumstances, motivations and relationships.
+* Counteroffers have understandable reasons.
+* Repeated conversations respect persistent memory.
+* Decisions carry meaningful risks, obligations or consequences.
+* The player can understand what they’re agreeing to without seeing internal simulation data.
+
+Pay particular attention to negotiations that resolve too easily, generic refusals and characters accepting offers without a convincing reason.
+
+Fix clear defects in existing dialogue or negotiation logic. Don’t introduce major new systems merely to improve the test results.
+
+Phase 5: Report the Findings Without Embellishment
+
+Provide a concise but substantive report containing:
+
+1. Publication status
+Build result, regression status and confirmation of the published version.
+
+2. Gameplay chronology
+A day-by-day or event-by-event account of what actually happened during the multi-week test.
+
+Include uneventful periods, failed attempts, rejected requests and dead ends.
+
+3. Consequence tracing
+Several examples showing the complete chain from player action to recorded state to subsequent behaviour, where such behaviour genuinely occurred.
+
+4. Integration gaps
+Identify consequences that currently exist only as relationship scores, facts or memos without demonstrable effects elsewhere.
+
+5. Dialogue assessment
+Include representative real transcripts showing both successful interactions and weaknesses.
+
+6. Prioritised recommendations
+Separate:
+
+* Bugs requiring correction.
+* Existing systems that need better integration.
+* Gameplay limitations that would require genuinely new mechanics.
+* Behaviour that is already working as intended.
+
+Important Boundaries
+
+Do not claim that a feature is integrated simply because its state variable changes.
+
+Do not claim that emergent storytelling has been demonstrated simply because several unrelated events occurred during the same test.
+
+Do not quietly add new gameplay systems to manufacture the desired results.
+
+Do not alter test state to demonstrate an outcome and then present it as naturally occurring.
+
+Do not confuse a passing automated test suite with a compelling gameplay experience.
+
+Equally, do not treat every quiet period or unresolved conflict as a defect. The objective is a believable autonomous world, not constant artificial drama.
+
+The ultimate question is whether ordinary player decisions create lasting, interconnected consequences in a world whose characters have their own interests and agency.
+
+I want to understand what OMERTÀ already achieves, where its existing systems fail to connect, and what would make the greatest difference to the actual experience of playing it.
+
+Complete the work, publish the stable version, and give me the evidence.

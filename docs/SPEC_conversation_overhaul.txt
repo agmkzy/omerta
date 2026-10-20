@@ -1,0 +1,627 @@
+OMERTÀ: Comprehensive NPC Interaction & Conversation Overhaul
+
+Objective
+
+I want a widespread, systemic overhaul of every NPC interaction and conversation function in OMERTÀ.
+
+The objective is to transform the current interaction system from a collection of dialogue menus, information queries and isolated actions into a coherent, immersive, reactive social gameplay system.
+
+This is not simply a dialogue-writing exercise.
+
+I want you to reconsider the architecture, interaction flow, presentation, information disclosure, character behaviour, consequences and relationships across the entire game.
+
+The ultimate goal is to make talking to people one of the most compelling parts of OMERTÀ.
+
+The player should feel they’re dealing with independent people who have personalities, ambitions, loyalties, fears, grudges, responsibilities and their own understanding of the criminal world.
+
+The underlying simulation is already sophisticated. The interaction system needs to expose that sophistication through believable human behaviour.
+
+Do not settle for rewriting dialogue while leaving the underlying experience fundamentally unchanged.
+
+⸻
+
+1. Overhaul Every Interaction Function
+
+Audit and redesign the complete NPC interaction system, including:
+
+* Initial encounters and greetings
+* Casual conversation
+* Personal relationships
+* Friendship and familiarity
+* Business discussions
+* Earnings, tribute and kickbacks
+* Loans and debts
+* Protection arrangements
+* Business acquisitions and ownership
+* Crew management
+* Recruitment
+* Orders and assignments
+* Favours and obligations
+* Promises and commitments
+* Grievances and disputes
+* Sit-downs and negotiations
+* Threats and intimidation
+* Apologies and making amends
+* Family politics
+* Relationships with superiors
+* Relationships with subordinates
+* Relationships with rival organisations
+* Rumours and intelligence gathering
+* Promotions and advancement
+* Initiation and becoming made
+* Leadership and succession
+* Any other NPC-facing functionality currently implemented
+
+Do not limit the overhaul to incidents or the conversation screen.
+
+Every interaction should be reviewed for its purpose, naturalness, contextual relevance and connection to the underlying simulation.
+
+Preserve the actual capabilities of the existing systems. The overhaul must improve how they are experienced, not silently remove them.
+
+2. Introduce a Natural Conversation Lifecycle
+
+Every interaction should follow a believable conversational progression.
+
+Stage A: Encounter
+
+The player approaches someone.
+
+The NPC reacts according to their relationship, personality, current circumstances, location and recent history.
+
+An old friend might greet the player warmly.
+
+A superior might acknowledge them briefly.
+
+An enemy might be suspicious.
+
+Someone occupied with urgent business might have little patience.
+
+The encounter should establish a situation, not immediately reveal everything the character knows.
+
+Stage B: Opening Conversation
+
+The player begins with natural conversational choices.
+
+Examples might include:
+
+* How’ve you been?
+* How’s business?
+* What’s been happening?
+* Got a minute?
+* I wanted to ask you something.
+
+These are examples, not mandatory universal options.
+
+The actual choices should depend on who the player is speaking to and why.
+
+Do not force artificial pleasantries when the situation warrants getting straight to business.
+
+Stage C: Discovery
+
+Information emerges through what the player asks and what the NPC chooses to reveal.
+
+If I ask what’s been happening, the NPC might mention a recent disagreement, a business opportunity, a rumour or something personal.
+
+They might also have nothing interesting to say.
+
+They should not automatically disclose every relevant fact.
+
+Their willingness to speak should depend on their knowledge, trust, temperament, rank, loyalties, personal involvement and the sensitivity of the information.
+
+Stage D: Development
+
+Once a subject is introduced, the conversation develops naturally.
+
+The next options must follow from the actual response.
+
+For example:
+
+NPC: “That hardware shop’s paying me now.”
+
+Player: “Wasn’t somebody else collecting there?”
+
+NPC: “Not anymore.”
+
+Player: “What happened to him?”
+
+NPC: “We had a conversation. He understood.”
+
+This is the kind of continuity I want.
+
+Each answer creates the next logical question.
+
+Do not simply return to a generic list of questions after every response.
+
+Stage E: Resolution
+
+The conversation may conclude with:
+
+* Nothing beyond a social exchange
+* Improved or damaged relations
+* New information
+* A lead worth pursuing
+* An agreement
+* A promise
+* A favour
+* A debt
+* A warning
+* A threat
+* An assignment
+* A dispute
+* A negotiation
+* A change in someone’s intentions
+* A meaningful refusal
+
+Not every conversation needs a reward or dramatic outcome.
+
+Ordinary conversation should remain possible.
+
+However, meaningful conversations must have the potential to influence the world.
+
+3. Make Dialogue Truly Contextual
+
+The dialogue system must consider the complete relevant context.
+
+At minimum:
+
+* NPC personality and temperament
+* Trust, warmth, respect and resentment
+* Rank and organisational position
+* Relative power between the characters
+* Current location
+* Recent events
+* Personal involvement
+* Relationships with third parties
+* Organisational loyalties
+* Financial interests
+* Existing promises and obligations
+* Active disputes
+* What the NPC knows
+* What the player knows
+* What has already been discussed
+* Whether the NPC has a reason to lie or withhold information
+
+The same question should produce meaningfully different responses depending on these factors.
+
+A trusted friend should not speak like a hostile capo.
+
+A boss should not negotiate with an associate as though they have equal authority.
+
+A man personally responsible for an incident should not respond identically to someone who heard about it second-hand.
+
+Avoid treating personalities as cosmetic dialogue variations. They should affect behaviour, disclosure, negotiation and consequences.
+
+4. Implement Persistent Conversational Memory
+
+NPCs must remember meaningful interactions.
+
+This includes:
+
+* Information they’ve already disclosed
+* Promises made
+* Promises broken
+* Favours performed
+* Requests refused
+* Threats issued
+* Accusations made
+* Previous negotiations
+* Important personal conversations
+* Past conflicts
+* Attempts to deceive or pressure them
+
+A character should not repeatedly reveal the same information as though it were new.
+
+If I promised to help someone and failed, that history should influence future encounters.
+
+If I repeatedly ask a suspicious character about something sensitive, they may become guarded or irritated.
+
+Distinguish between temporary conversation state and persistent social memory.
+
+Not every line needs permanent storage. Persist what matters, using bounded and save-compatible records.
+
+5. Eliminate Repetition and Exploitation
+
+An option already used in the current conversation should not repeatedly produce the same reward.
+
+Implement the following:
+
+* Remember used options within the current encounter.
+* Disable or remove exhausted choices where appropriate.
+* Prevent repeated selections from generating additional trust, warmth, respect, standing, money or other benefits.
+* Avoid rewarding the same casual conversation repeatedly throughout the day.
+* Preserve meaningful opportunities to revisit subjects when circumstances actually change.
+* Allow a new conversation to begin naturally without pretending the previous conversation never happened.
+
+Do not rely solely on greyed-out buttons.
+
+Where possible, the dialogue itself should acknowledge that a subject has already been discussed.
+
+For example:
+
+“We already talked about that.”
+
+Or:
+
+“Nothing’s changed since you asked me yesterday.”
+
+These responses should fit the character and situation.
+
+6. Redesign Dialogue Options Around Intent
+
+The player should not routinely face ten or fifteen questions.
+
+Use a smaller number of meaningful choices that represent distinct intentions.
+
+For example:
+
+* Learn more
+* Challenge what was said
+* Offer help
+* Ask for something
+* Change the subject
+
+These are conceptual categories, not universal labels.
+
+The actual wording must be natural and contextual.
+
+More specific options should appear as the conversation develops.
+
+The player should have substantial agency without being presented with every possible action simultaneously.
+
+Reduce visible complexity without reducing underlying optionality.
+
+Actions should become available because the situation makes them relevant.
+
+Do not bury urgent or meaningful decisions behind unnecessary layers of menus.
+
+7. Make Information Disclosure Credible
+
+The player must discover the world through believable sources.
+
+Maintain strict distinctions between:
+
+* What objectively happened
+* What an NPC personally witnessed
+* What an NPC heard
+* What an NPC believes
+* What an NPC suspects
+* What an NPC deliberately conceals
+* What the player actually knows
+
+NPCs should never reveal information simply because the simulation contains it.
+
+A character can be mistaken.
+
+A rumour can be incomplete.
+
+Someone can refuse to answer.
+
+Someone can deliberately misrepresent their involvement when their motives justify it.
+
+However, do not invent contradictory facts without recording the belief, deception or uncertainty appropriately.
+
+The simulation must remain authoritative.
+
+8. Remove Database Language From Gameplay
+
+Eliminate interface wording that exposes internal records instead of presenting believable dialogue.
+
+Examples of unacceptable conversational language include:
+
+* “The matter”
+* “Which incident?”
+* “Something from Day 1 10:02”
+* “He knows this first-hand”
+* Generic descriptions of records
+* Repeated references to internal event categories
+
+Do not display a complete incident summary before the NPC has actually disclosed it.
+
+The player should experience conversations, not browse a database of known facts.
+
+Technical metadata can remain available in development and testing tools.
+
+Where information needs to be reviewed later, present it naturally through a journal, remembered conversation or relevant character history.
+
+9. Give Every Character a Distinct Voice
+
+Improve dialogue generation across the entire interaction system.
+
+Characters should vary in:
+
+* Directness
+* Vocabulary
+* Humour
+* Patience
+* Confidence
+* Aggression
+* Caution
+* Willingness to gossip
+* Deference to authority
+* Familiarity with the player
+
+Dialogue must remain believable for New York’s criminal underworld in 1973.
+
+Avoid exaggerated gangster stereotypes, repetitive catchphrases and theatrical dialogue.
+
+Characters should use first-person language naturally.
+
+A man should not ordinarily refer to himself by his full name.
+
+Avoid mechanically repeating the NPC’s name at the start of every paragraph.
+
+The goal is convincing characterisation, not simply more colourful text.
+
+10. Make Social Relationships Mechanically Meaningful
+
+Relationships should affect what players can accomplish.
+
+Trust should influence disclosure and willingness to cooperate.
+
+Respect should influence whether requests are taken seriously.
+
+Warmth should influence personal familiarity and generosity.
+
+Fear, resentment and rivalry should influence reactions where those states exist in the simulation.
+
+Relationships should develop through meaningful shared experiences, not repetitive conversation farming.
+
+A player who helps someone through a serious dispute should earn a different kind of loyalty from someone who simply makes pleasant conversation.
+
+Characters should also remember negative behaviour.
+
+Do not introduce arbitrary relationship rewards without a defensible causal basis.
+
+11. Integrate Conversations With Autonomous NPC Behaviour
+
+This is essential.
+
+The game already contains autonomous organisations, relationships, disputes, business interests, financial obligations and NPC ambitions.
+
+Conversations must be a meaningful interface to those systems.
+
+An NPC might:
+
+* Ask the player for help
+* Seek protection
+* Request money
+* Complain about another character
+* Reveal dissatisfaction with a superior
+* Offer a business opportunity
+* Warn about a rival
+* Seek a promotion
+* Refuse an order
+* Ask for a favour
+* Attempt to manipulate the player
+* Conceal a financial problem
+* Propose an arrangement
+
+These situations must originate from actual world state.
+
+Do not manufacture artificial quests solely to populate dialogue.
+
+The NPC should continue pursuing their interests even if the player does nothing.
+
+A promise, agreement, threat or intervention should feed back into the real simulation.
+
+12. Make Rank and Power Matter
+
+The experience of conversation must change substantially as the player advances.
+
+An associate should not interact with a boss in the same way a capo does.
+
+A soldier should have different responsibilities and opportunities from a crew leader.
+
+A capo should be able to discuss organisational matters, issue instructions and handle disputes appropriate to their authority.
+
+A boss should be able to negotiate with other leaders, manage subordinates and deal with political consequences.
+
+The available dialogue, information, requests and responses should evolve with rank.
+
+Make advancement feel like entering a different social and political world, not simply unlocking another title.
+
+13. Improve Negotiations and Difficult Conversations
+
+High-stakes interactions should feel meaningfully different from casual conversation.
+
+This includes:
+
+* Debt negotiations
+* Protection arrangements
+* Business deals
+* Sit-downs
+* Threats
+* Requests for promotion
+* Disputes between crews
+* Inter-family disagreements
+* Broken promises
+* Challenges to authority
+
+Characters should have objectives, acceptable outcomes, leverage and reasons to resist.
+
+The player should be able to negotiate through meaningful choices.
+
+NPCs should respond according to their interests rather than following predetermined dialogue sequences.
+
+Consequences must update the authoritative economic, organisational and social records.
+
+Avoid creating duplicate disputes, promises or obligations.
+
+14. Overhaul the Conversation Interface
+
+The current mobile presentation also needs improvement.
+
+There is excessive empty space above character portraits.
+
+Conversations can still resemble lists of buttons rather than exchanges between people.
+
+Redesign the interface so that:
+
+* The NPC and current exchange are immediately visible.
+* The screen makes efficient use of mobile space.
+* Dialogue is the visual focus.
+* Available responses are clearly distinguished from previous dialogue.
+* The conversation progresses without unnecessary scrolling.
+* Previous exchanges can be reviewed when useful.
+* Important decisions are visually distinct from ordinary questions.
+* Options change naturally as the discussion progresses.
+* Leaving, returning and changing subjects are intuitive.
+
+Avoid clutter, excessive nested menus and repetitive panels.
+
+The interface should feel like an interactive narrative RPG, not a management dashboard.
+
+Preserve all existing character portraits exactly as they are.
+
+Do not redraw, regenerate, replace or restyle them.
+
+15. Preserve the Existing Simulation
+
+This overhaul must build upon V72–V76, not replace them.
+
+Preserve:
+
+* Existing saves and migration compatibility
+* Economic records and authoritative transactions
+* NPC autonomy
+* Criminal organisations
+* Leadership and succession
+* Business ownership and protection
+* Debts and obligations
+* Disputes and grievances
+* Sit-down outcomes
+* Promises and consequences
+* Character relationships
+* Knowledge restrictions
+* Rank progression
+* Existing meaningful player actions
+
+Do not introduce a runtime AI dependency.
+
+The game must remain a fully functional standalone browser application.
+
+You may refactor the conversation architecture where necessary, but do not destabilise the underlying simulation.
+
+16. Comprehensive Automated Testing
+
+Build an automated interaction crawler capable of exploring the redesigned conversation system.
+
+Test across:
+
+* Different NPC personalities
+* Different trust levels
+* Different ranks
+* Different relationships
+* Different organisations
+* Ordinary and high-stakes encounters
+* Characters with and without relevant information
+* Active and resolved disputes
+* Existing promises and debts
+* Multiple encounters with the same NPC
+* Save and reload cycles
+
+Check for:
+
+* Crashes
+* Dead ends
+* Broken navigation
+* Empty dialogue
+* Repeated dialogue
+* Repeated rewards
+* Inappropriate questions
+* Contradictory responses
+* Information leaks
+* Characters referring to themselves unnaturally
+* Inaccessible gameplay actions
+* Duplicate economic or dispute records
+* Promises that do not persist
+* Actions that fail to affect the simulation
+* Incorrect rank permissions
+* Broken save compatibility
+
+Do not rely exclusively on technical assertions.
+
+Include semantic checks for conversational continuity and contextual appropriateness.
+
+The crawler should help identify problems, but real gameplay review remains essential.
+
+Use efficient, targeted testing. Do not waste time on endless large-scale simulations when smaller reproducible tests will establish correctness.
+
+17. Demonstrate the Actual Experience
+
+Before declaring this complete, demonstrate full conversations from real game states.
+
+I want to see at least:
+
+1. An ordinary friendly conversation with no significant events.
+2. A guarded conversation where an NPC initially refuses to disclose information.
+3. A conversation where the player gradually uncovers a meaningful incident.
+4. A business negotiation with competing interests.
+5. A conversation involving an existing promise or grievance.
+6. An interaction with a superior where rank and trust matter.
+7. An interaction with a subordinate where the player exercises authority.
+8. A conversation where an earlier interaction meaningfully changes the outcome.
+
+Show complete exchanges, not isolated dialogue snippets.
+
+For each, explain which existing simulation records were used and what, if anything, changed.
+
+I want evidence that the player is interacting with a living world, not selecting from a collection of prewritten questions.
+
+18. Completion Criteria
+
+This overhaul is complete only when:
+
+* Conversations begin naturally.
+* Information is disclosed progressively and credibly.
+* Dialogue responds to conversational history.
+* Characters have distinct personalities.
+* Questions follow logically from preceding answers.
+* Important interactions have meaningful consequences.
+* Relationships influence behaviour.
+* Rank influences authority and access.
+* NPCs remember significant interactions.
+* Repeated conversations cannot be exploited.
+* The interface is comfortable and immersive on mobile.
+* Existing gameplay functionality remains accessible.
+* Autonomous world systems remain authoritative.
+* Automated tests pass.
+* Real transcripts demonstrate believable conversations.
+
+Implementation Approach
+
+First, audit the existing interaction architecture and identify the common causes of the problems.
+
+Then implement a coherent system-wide solution rather than applying isolated patches to individual dialogue branches.
+
+Use shared conversational principles and reusable mechanisms wherever appropriate.
+
+Do not create an enormous collection of special-case scripts that become impossible to maintain.
+
+You have authority to refactor the interaction system substantially where necessary.
+
+However, preserve the existing simulation, game functionality, save compatibility and all character portraits.
+
+Work through implementation, testing and refinement systematically.
+
+Do not stop at a design document or a prototype.
+
+Implement the overhaul across the actual playable game.
+
+At completion, provide:
+
+* A concise explanation of the architectural changes.
+* A summary of the interaction functions updated.
+* Real transcripts demonstrating the new behaviour.
+* Regression and crawler results.
+* Any remaining limitations or known issues.
+
+Then publish the updated playable version for review.
+
+Final Principle
+
+OMERTÀ should not feel like a game where I click on people to retrieve information and select transactions.
+
+It should feel like a world where I build relationships, navigate loyalties, discover opportunities, negotiate power and make decisions through interactions with people who have their own lives and interests.
+
+The simulation creates the world. The conversations should make that world feel alive.

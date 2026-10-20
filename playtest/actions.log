@@ -1,0 +1,262 @@
+# seed 3 name "Tony Marino" start day 0
+Day 0 08:00 > status
+Day 0 08:00 > who
+Day 0 08:00 > talk Louie Costa
+Day 0 09:37 > do b_stand
+Day 0 09:57 > do chat
+Day 0 10:07 > do more:all
+Day 0 10:07 > do more:Ask him for something
+Day 0 10:07 > do b_need
+Day 0 10:22 > leave
+Day 0 10:22 > status
+Day 0 10:22 > take j234
+Day 0 10:22 > job j234
+Day 0 10:22 > take j234 yes
+Day 0 10:22 > job j234 go
+Day 0 12:52 > status
+Day 0 12:52 > wait 3
+Day 1 09:52 > enc e315
+Day 1 09:52 > job j314
+Day 1 09:52 > enc e315 haggle
+Day 1 10:12 > take j314 no
+Day 1 10:12 > status
+Day 1 10:12 > job j317
+Day 1 10:12 > take j317 no
+Day 1 10:12 > wait 3
+Day 2 09:12 > job j360
+Day 2 09:12 > take j360 yes
+Day 2 09:12 > job j360 go
+Day 2 11:17 > job j361
+Day 2 11:17 > take j361 yes
+Day 2 11:17 > job j361 ride
+Day 2 13:26 > status
+Day 2 13:26 > who
+Day 2 13:26 > talk Mickey Galante
+Day 2 14:01 > do chat
+Day 2 14:06 > do pick_member
+Day 2 14:11 > do about:c4
+Day 2 14:31 > leave
+Day 2 14:31 > wait 4
+Day 3 09:31 > take j380 yes
+Day 3 09:31 > job j380 go
+Day 3 12:01 > wait 4
+Day 4 09:01 > take j395 no
+Day 4 09:01 > wait 5
+Day 5 09:01 > enc e414 mid
+Day 5 13:01 > status
+Day 5 13:01 > who
+Day 5 13:01 > wait 5
+Day 6 20:01 > talk Artie Silvestri
+Day 6 22:01 > do chat
+Day 6 22:06 > do op
+Day 6 22:31 > do how
+Day 6 22:51 > man Artie Silvestri
+Day 6 22:51 > do work
+Day 6 23:16 > leave
+Day 6 23:16 > status
+Day 6 23:16 > wait 6
+Day 7 09:16 > job j509
+Day 7 09:16 > take j509 yes
+Day 7 09:16 > job j509 go
+Day 7 11:16 > status
+Day 7 11:16 > wait 3
+Day 8 09:16 > take j567 yes
+Day 8 09:16 > job j567 go
+Day 8 11:21 > job j568 ride
+Day 8 11:26 > status
+Day 8 11:26 > take j568 yes
+Day 8 11:26 > job j568 ride
+Day 8 13:52 > wait 4
+Day 9 09:52 > enc e597
+Day 9 09:52 > man Mario Testa
+Day 9 09:52 > man Nicky
+Day 9 09:52 > enc e597 do
+Day 9 10:52 > status
+Day 9 10:52 > man Mario Testa
+Day 9 10:52 > talk Mario Testa
+Day 9 13:08 > do rk_back
+Day 9 13:23 > leave
+Day 9 13:23 > talk Mario Testa
+Day 9 15:54 > do rk_back
+Day 9 16:09 > do fl:back_call
+Day 9 16:24 > status
+Day 9 16:24 > do chat
+Day 9 16:39 > do sit_ask
+Day 9 16:39 > do source
+Day 9 16:49 > leave
+Day 9 16:49 > take j595 no
+Day 9 16:49 > take j596 no
+Day 9 16:49 > wait 5
+Day 10 09:49 > job j625
+Day 10 09:49 > take j625 yes
+Day 10 09:49 > job j625 bribe
+Day 10 12:05 > status
+Day 10 12:05 > talk Gino Fontana
+Day 10 14:16 > man Gino Fontana
+Day 10 14:16 > do op
+Day 10 14:41 > do more:all
+Day 10 14:41 > do more:Ask him for something
+Day 10 14:41 > leave
+Day 10 14:41 > wait 4
+Day 11 09:41 > job j651
+Day 11 09:41 > take j651 yes
+Day 11 09:41 > job j651 straight
+Day 11 11:53 > take j650 no
+Day 11 11:53 > wait 5
+Day 12 09:53 > prospects
+Day 12 09:53 > talk Johnny Palumbo
+Day 12 10:28 > do ask_around
+Day 12 10:58 > do intro
+Day 12 11:13 > do how
+Day 12 11:33 > do more:all
+Day 12 11:33 > do more:Do something for him
+Day 12 11:33 > do f_help
+Day 12 11:38 > do more:all
+Day 12 11:38 > do more:Do something for him
+Day 12 11:38 > do help_loan
+Day 12 11:53 > status
+Day 12 11:53 > do more:all
+Day 12 11:53 > do more:Do something for him
+Day 12 11:53 > do recruit_offer
+Day 12 12:13 > do fl:rc_std
+Day 12 12:43 > status
+Day 12 12:43 > man Johnny Palumbo
+Day 12 12:43 > leave
+Day 12 12:43 > take j677 no
+Day 12 12:43 > take j678 no
+Day 12 12:43 > wait 4
+Day 13 09:43 > take j709 yes
+Day 13 09:43 > job j709 go
+Day 13 12:13 > wait 6
+Day 13 20:13 > talk Louie Costa
+Day 13 22:23 > man Louie Costa
+Day 13 22:23 > do b_envelope
+Day 13 22:48 > do earn
+Day 13 23:13 > leave
+Day 13 23:13 > enc e730
+Day 13 23:13 > enc e734
+Day 13 23:13 > man Mario Testa
+Day 13 23:13 > enc e730 ask
+Day 13 23:28 > status
+Day 13 23:28 > enc e730 lend
+Day 13 23:48 > status
+Day 13 23:48 > enc e734 tax
+Day 14 00:13 > status
+Day 14 00:13 > job j768
+Day 14 00:13 > take j768 yes
+Day 14 00:13 > job j768 go
+Day 14 04:48 > wait 5
+Day 14 09:48 > enc e780 go
+Day 14 13:48 > take j778 yes
+Day 14 13:48 > job j778 ride
+Day 14 16:22 > wait 4
+Day 15 09:22 > job j837
+Day 15 09:22 > enc e839
+Day 15 09:22 > man Sonny Cassano
+Day 15 09:22 > enc e839 do
+Day 15 10:22 > take j837 yes
+Day 15 10:22 > job j837 warn
+Day 15 11:32 > status
+Day 15 11:32 > man Sonny Cassano
+Day 15 11:32 > man Louie Costa
+Day 15 11:32 > talk Louie Costa
+Day 15 13:14 > do pick_incident
+Day 15 13:19 > do b_stand
+Day 15 13:19 > do inc:f815
+Day 15 13:44 > do 1
+Day 15 13:44 > sunday
+Day 15 13:44 > leave
+Day 15 13:44 > take j838 no
+Day 15 13:44 > wait 5
+Day 16 09:44 > take j873 no
+Day 16 09:44 > wait 4
+Day 18 09:44 > take j914 no
+Day 18 09:44 > wait 3
+Day 19 09:44 > take j931 yes
+Day 19 09:44 > job j931 go
+Day 19 12:14 > enc e934 mid
+Day 19 16:14 > wait 2
+Day 20 09:14 > take j949 yes
+Day 20 09:14 > job j949 ride
+Day 20 10:48 > wait 2
+Day 20 20:48 > sunday
+Day 20 20:48 > talk Louie Costa
+Day 20 22:43 > do b_envelope
+Day 20 23:08 > leave
+Day 20 23:08 > enc e972
+Day 20 23:08 > man Johnny Palumbo
+Day 20 23:08 > enc e971
+Day 20 23:08 > man Angelo Rizzo
+Day 20 23:08 > enc e971 ask
+Day 20 23:23 > enc e972 wait
+Day 20 23:48 > enc e971 half
+Day 21 00:08 > status
+Day 21 00:08 > wait 3
+Day 23 09:08 > take j1081 no
+Day 23 09:08 > talk Dom Mancini
+Day 23 09:18 > man Dom Mancini
+Day 23 09:18 > do intro_via:c8
+Day 23 09:33 > do inc:f1069
+Day 23 09:58 > do 0
+Day 23 09:58 > do view
+Day 23 10:06 > do sub:act
+Day 23 10:14 > do sitdown
+Day 23 10:29 > do speak
+Day 23 10:44 > status
+Day 23 10:44 > man Dom Mancini
+Day 23 10:44 > man Sonny Cassano
+Day 23 10:44 > status
+Day 23 10:44 > job j1088
+Day 23 10:44 > job j1088 squeeze
+Day 23 11:54 > status
+Day 23 11:54 > man Sonny Cassano
+Day 23 11:54 > man Dom Mancini
+Day 23 11:54 > leave
+Day 23 11:54 > wait 3
+Day 24 09:54 > take j1114 no
+Day 24 09:54 > take j1115 no
+Day 24 09:54 > talk Johnny Palumbo
+Day 24 12:30 > do how
+Day 24 12:50 > man Johnny Palumbo
+Day 24 12:50 > leave
+Day 24 12:50 > wait 3
+Day 26 09:50 > man Sonny Cassano
+Day 26 09:50 > talk Louie Costa
+Day 26 12:20 > do pick_incident
+Day 26 12:25 > do inc:f1148
+Day 26 12:50 > do view
+Day 26 12:58 > do sub:learn
+Day 26 12:58 > do involve
+Day 26 13:06 > leave
+Day 26 13:06 > take j1171 no
+Day 26 13:06 > wait 2
+Day 27 09:06 > job j1183
+Day 27 09:06 > take j1183 no
+Day 27 09:06 > wait 2
+Day 27 20:06 > talk Louie Costa
+Day 27 22:25 > do b_envelope
+Day 27 22:25 > leave
+Day 27 22:25 > talk Mario Testa
+Day 28 01:01 > do earn
+Day 28 01:01 > do d_remind
+Day 28 01:16 > do work
+Day 28 01:41 > leave
+Day 28 01:41 > man Mario Testa
+Day 28 01:41 > wait 3
+Day 28 09:41 > wait 3
+Day 29 09:41 > enc e1282
+Day 29 09:41 > enc e1282 ask
+Day 29 09:51 > man Angelo Rizzo
+Day 29 09:51 > enc e1282 do
+Day 29 10:11 > status
+Day 29 10:11 > wait 3
+Day 30 09:11 > wait 3
+Day 31 09:11 > wait 4
+Day 34 20:11 > man Louie Costa
+Day 34 20:11 > talk Louie Costa
+Day 34 23:16 > do b_envelope
+Day 34 23:16 > leave
+Day 34 23:16 > talk Dom Mancini
+Day 35 01:44 > man Dom Mancini
+Day 35 01:44 > status
+Day 35 01:44 > who

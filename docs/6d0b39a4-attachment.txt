@@ -1,0 +1,95 @@
+I don’t think the conversation system is finished yet.
+
+You’ve made progress with contextual questions and follow-ups, but I think you’ve improved the structure of an interrogation rather than created a genuinely natural conversation.
+
+I want you to reconsider the experience from the player’s perspective.
+
+The fundamental principle is that a conversation should unfold naturally, rather than expose the underlying simulation as a series of selectable records.
+
+Here’s what I mean:
+
+1. Information must emerge through conversation.
+
+When I approach someone, I shouldn’t immediately see a box telling me exactly what incident occurred, who was involved and what happened.
+
+I should first encounter the person.
+
+We exchange greetings. I might ask how they’re doing, how business is, or what’s been happening.
+
+Their response may introduce something interesting. Only then should I be able to ask questions about it.
+
+The player should discover information, not be shown the answer before asking.
+
+2. Conversations need continuity.
+
+Every response should acknowledge the question that preceded it and shape what comes next.
+
+If someone says they weren’t there, I might ask who was.
+
+If they reveal they were personally involved, I might ask why they did it.
+
+If they’re evasive, I might press them, change my approach or leave it alone.
+
+Don’t simply generate another generic menu of questions after every response.
+
+3. Characters need to behave like people.
+
+They should have distinct personalities, motives and conversational habits.
+
+Someone who trusts me might speak freely. Someone wary might be guarded. Someone involved in an incident might conceal their involvement or deliberately mislead me.
+
+Rank, relationships, personality, knowledge and the sensitivity of the subject should influence what someone says.
+
+And characters should speak naturally. Tony Testa should not refer to himself as “Tony Testa” in ordinary dialogue.
+
+4. Remove simulation language from conversations.
+
+I don’t want to see:
+
+* “The matter”
+* “Which incident?”
+* “Something from Day 1 10:02”
+* “He knows this first-hand”
+* Any other database-like descriptions masquerading as dialogue.
+
+Those details can remain internally for the simulation, but the player should experience them as believable interactions.
+
+If someone knows about multiple incidents, have them introduce those subjects naturally. Don’t present a list of timestamped records.
+
+5. Follow-up questions must be specific to what’s actually been said.
+
+If someone tells me they’re collecting $50 a week from a hardware shop, I should be able to ask how they got the arrangement, whether anyone else has a claim, or how the owner took it.
+
+I shouldn’t be offered generic questions that don’t make sense in context.
+
+Equally, if someone refuses to discuss something, the game shouldn’t behave as though they’ve already disclosed it.
+
+6. Conversations should develop towards meaningful possibilities.
+
+A conversation might reveal a rumour, strengthen a relationship, uncover a lie, create an opportunity, expose a problem, or lead to a favour or dispute.
+
+Not every conversation needs a dramatic outcome, but the player should feel that talking to people is a meaningful way of navigating the criminal world.
+
+Preserve the existing autonomous simulation, information restrictions and consequences. I want dialogue to provide a natural interface to those systems, not replace them with scripted quests.
+
+7. Fix the mobile presentation.
+
+There is an enormous amount of empty space above the character portraits in the conversation screens. Fix the layout so the conversation starts near the top and uses the screen properly.
+
+The standard I want you to aim for:
+
+Imagine I’m sitting across from another character at a social club in 1973.
+
+I ask how he’s doing. He answers. I ask what’s been happening. He mentions something. I show interest. He tells me more, or perhaps refuses. I respond accordingly.
+
+That exchange should feel coherent from beginning to end.
+
+I don’t want a dialogue tree that feels like a database query system with mafia-flavoured text attached.
+
+I want the experience of having a conversation with another person who exists independently in the world.
+
+Before implementing another broad overhaul, build and demonstrate one complete example conversation from greeting through discovery, follow-up and conclusion. Show how the dialogue changes depending on whether the character trusts me, is personally involved, or only knows a rumour.
+
+Get that interaction right before applying the design across the game.
+
+Do not alter the existing character portraits.
