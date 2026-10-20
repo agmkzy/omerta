@@ -8,7 +8,7 @@
 // loan, a favour owed, a promise you will be held to, an introduction, an offer for his shop, a rival made by a careless word.
 // He remembers how it went, and the next time you raise it he picks up where you left off.
 import { openAsk, openAsks, stance } from './asks';
-import { addFact, clamp, createDebt, learn, link, money, ownerBiz, regard, rel } from './core';
+import { addFact, clamp, createDebt, learn, link, money, ownerBiz, regard, peek, rel } from './core';
 import { addFavour } from './encounters';
 import { agencyOf } from './goals';
 import { mkJob } from './jobs';
@@ -48,7 +48,7 @@ const said = (w: World, t: Character, key: string, code: string) => remember(w, 
 const lastSaid = (t: Character, key: string) => mem(t, 'tkc:' + key)?.sig;
 const done = (key: string): Choice => ({ code: `tk:${key}:end`, label: 'Leave it there' });
 const ch = (key: string, code: string, label: string, hint?: string, big?: boolean): Choice => ({ code: `tk:${key}:${code}`, label, hint, big });
-const trust = (x: X) => rel(x.t, x.p.id).trust;
+const trust = (x: X) => peek(x.t, x.p.id).trust;
 const warm = (x: X, amt: number, kind: string) => regard(x.w, x.t, x.p, 'affection', amt, kind);
 // What he has told you, in plain words, kept with what you know about him (shown beside the conversation). Only ever what he said
 // or showed you, never what the world knows about him privately. Bounded: the latest few.
@@ -95,7 +95,7 @@ function trouble(x: X): Subject | undefined {
     reply: (x, code) => {
       if (code === 'press') {
         const ok = p.skills.charm * 0.5 + trust(x) * 0.6 + (arch(t) === 'earnest' || arch(t) === 'frightened' ? 0.15 : 0) - (arch(t) === 'proud' || arch(t) === 'cold' ? 0.2 : 0) > 0.42;
-        if (!ok) { rel(t, p.id).respect = clamp(rel(t, p.id).respect - 0.02); return { lines: [q(t, by(t, { proud: 'I said it’s nothing. Leave it.', hothead: 'You deaf? Drop it.', _: 'Another time, maybe.' }))], choices: [] }; }
+        if (!ok) { rel(t, p.id).respect = clamp(peek(t, p.id).respect - 0.02); return { lines: [q(t, by(t, { proud: 'I said it’s nothing. Leave it.', hothead: 'You deaf? Drop it.', _: 'Another time, maybe.' }))], choices: [] }; }
         return reveal(x);
       }
       const amt = T.need?.(x) ?? 0;
@@ -116,8 +116,8 @@ function trouble(x: X): Subject | undefined {
       if (code === 'straighten') {
         said(w, t, key, 'straighten');
         const takes = arch(t) === 'earnest' || arch(t) === 'frightened' || t.traits.caution > 0.6;
-        if (takes) { pr.sev = clamp(pr.sev - 0.1); rel(t, p.id).respect = clamp(rel(t, p.id).respect + 0.03); return { lines: [q(t, 'You’re right. I know you’re right.')], choices: [] }; }
-        rel(t, p.id).grudge = clamp(rel(t, p.id).grudge + 0.04);
+        if (takes) { pr.sev = clamp(pr.sev - 0.1); rel(t, p.id).respect = clamp(peek(t, p.id).respect + 0.03); return { lines: [q(t, 'You’re right. I know you’re right.')], choices: [] }; }
+        rel(t, p.id).grudge = clamp(peek(t, p.id).grudge + 0.04);
         return { lines: [q(t, by(t, { proud: 'I didn’t ask for a sermon.', hothead: 'Who are you to tell me?', _: 'Easy for you to say.' }))], choices: [] };
       }
       if (code === 'listen') { said(w, t, key, 'listen'); warm(x, 0.05, 'listened'); return { lines: [`You let him talk. He talks for a long time, and seems lighter for it.`], choices: [], minutes: 40 }; }
@@ -153,7 +153,7 @@ function shop(x: X): Subject | undefined {
   const col = b.protection ? live(w, b.protection.collectorId) : undefined;
   const fee = b.protection && b.protection.collectorId !== t.id ? b.protection.fee : 0;
   const heavy = fee > 0 && fee > feePosition(b).cap;
-  const sore = col ? rel(t, col.id).grudge > 0.15 || heavy : false;
+  const sore = col ? peek(t, col.id).grudge > 0.15 || heavy : false;
   const rival = Object.values(w.biz).find((o) => o.open && o.id !== b.id && o.kind === b.kind && o.district === b.district && (o.acct?.at(-1)?.revenue ?? o.income) > (b.acct?.at(-1)?.revenue ?? b.income));
   const sig = `${b.distress}:${Math.sign(Math.round(trend / 50))}:${fee}:${b.damaged > 0}`;
   return {
@@ -191,7 +191,7 @@ function shop(x: X): Subject | undefined {
         const o = w.chars[rival.ownerId];
         const j = mkJob(w, { kind: 'handle', title: `Speak to ${o.name} for ${t.name}`, brief: `${t.name} says ${o.name} at ${rival.name} is taking his trade. You said you would have a word.`, giver: t.id, via: 'tip', assignee: p.id, target: o.id, pay: 0, status: 'active', days: 14 });
         t.memos.push({ id: 'm' + w.nextId++, t: w.now, other: p.id, kind: 'promise', text: `You said you would have a word with ${o.name} at ${rival.name}.`, ref: j.id, due: w.now + 10 * DAY });
-        rel(t, o.id).grudge = clamp(rel(t, o.id).grudge + 0.05); said(w, t, key, 'word'); warm(x, 0.04, 'promised');
+        rel(t, o.id).grudge = clamp(peek(t, o.id).grudge + 0.05); said(w, t, key, 'word'); warm(x, 0.04, 'promised');
         return { lines: [q(t, 'You’d do that? I’d owe you.'), 'You have given your word. It is on your list.'], choices: [] };
       }
       if (code === 'col' && b.protection) {
@@ -331,7 +331,7 @@ function wants(x: X): Subject | undefined {
       said(w, t, key, code);
       if (code === 'forward') { t.backer = p.id; warm(x, 0.08, 'sponsor'); regard(w, t, p, 'trust', 0.06, 'sponsor'); return { lines: [q(t, 'From you, that means something. I won’t make you sorry.'), 'Your name is behind his now.'], choices: [] }; }
       if (code === 'word' && boss) {
-        rel(boss, t.id).trust = clamp(rel(boss, t.id).trust + 0.02 + p.standing / 2000);
+        rel(boss, t.id).trust = clamp(peek(boss, t.id).trust + 0.02 + p.standing / 2000);
         addFavour(w, p.id, t.id, 1, `you spoke up for him to ${boss.name}`);
         addFact(w, { kind: 'favour', actor: p.id, victim: t.id, minor: true, text: `${p.name} spoke up for ${t.name} to ${boss.name}.`, district: p.district }, { witnesses: [t.id, boss.id] });
         warm(x, 0.05, 'spoke-up');
@@ -351,8 +351,8 @@ function wants(x: X): Subject | undefined {
         return { lines: [`You give him ${money(amt)}. He looks at it a long time before he puts it away.`, q(t, 'You’ll see it back. With interest.')], choices: [] };
       }
       if (code === 'doubt') {
-        if (arch(t) === 'hothead' || arch(t) === 'proud') { rel(t, p.id).grudge = clamp(rel(t, p.id).grudge + 0.08); return { lines: [q(t, 'Funny. I was going to say the same about you.')], choices: [] }; }
-        rel(t, p.id).respect = clamp(rel(t, p.id).respect + 0.02); return { lines: [q(t, 'Maybe. Maybe not yet.')], choices: [] };
+        if (arch(t) === 'hothead' || arch(t) === 'proud') { rel(t, p.id).grudge = clamp(peek(t, p.id).grudge + 0.08); return { lines: [q(t, 'Funny. I was going to say the same about you.')], choices: [] }; }
+        rel(t, p.id).respect = clamp(peek(t, p.id).respect + 0.02); return { lines: [q(t, 'Maybe. Maybe not yet.')], choices: [] };
       }
       return { lines: [], choices: [] };
     },
@@ -377,7 +377,7 @@ function opinion(x: X): Subject | undefined {
       note(p, t, hate ? `Can’t stand ${o.name}.${wrong ? ' Says he has reason.' : ''}` : `Thinks highly of ${o.name}.`);
       if (!hate) {
         const cs: Choice[] = [];
-        if (!p.intro?.[o.id] && rel(p, o.id).trust < 0.3) cs.push(ch(key, 'intro', `Ask him to introduce you to ${first(o)}`, 'A friend of a friend starts better than a stranger.'));
+        if (!p.intro?.[o.id] && peek(p, o.id).trust < 0.3) cs.push(ch(key, 'intro', `Ask him to introduce you to ${first(o)}`, 'A friend of a friend starts better than a stranger.'));
         cs.push(done(key));
         return { lines: [q(t, by(t, { jovial: `${first(o)}? Salt of the earth. I’d trust him with my sister.`, cold: `${first(o)} does what he says. There aren’t many.`, _: `${first(o)} is a good man. One of the few.` }))], choices: cs };
       }
@@ -391,7 +391,7 @@ function opinion(x: X): Subject | undefined {
       said(w, t, key, code);
       if (code === 'intro') {
         if (trust(x) < 0.4) return { lines: [q(t, 'I don’t make introductions lightly.')], choices: [] };
-        (p.intro ??= {})[o.id] = w.now; link(p, o, 0.3); rel(o, p.id).trust = Math.max(rel(o, p.id).trust, 0.25 + rel(o, t.id).trust * 0.15);
+        (p.intro ??= {})[o.id] = w.now; link(p, o, 0.3); rel(o, p.id).trust = Math.max(peek(o, p.id).trust, 0.25 + peek(o, t.id).trust * 0.15);
         addFact(w, { kind: 'favour', actor: t.id, victim: p.id, minor: true, text: `${t.name} introduced ${p.name} to ${o.name}.`, district: t.district }, { witnesses: [p.id, o.id] });
         return { lines: [q(t, `I’ll tell ${first(o)} you’re all right. After that it’s up to you.`), `You can go and see ${first(o)} as a friend of ${first(t)}’s.`], choices: [] };
       }
@@ -399,14 +399,14 @@ function opinion(x: X): Subject | undefined {
         warm(x, 0.05, 'shared-enemy');
         // a careless word travels
         if (w.rng.chance(0.2 + t.traits.sociability * 0.3)) {
-          rel(o, p.id).grudge = clamp(rel(o, p.id).grudge + 0.1);
+          rel(o, p.id).grudge = clamp(peek(o, p.id).grudge + 0.1);
           addFact(w, { kind: 'rumour', actor: p.id, victim: o.id, minor: true, text: `${p.name} and ${t.name} were running ${o.name} down.`, district: t.district }, { witnesses: [o.id] });
         }
         return { lines: [q(t, 'I knew you had sense.')], choices: [] };
       }
       if (code === 'defend') {
-        if (arch(t) === 'hothead' || arch(t) === 'bitter' || arch(t) === 'proud') { rel(t, p.id).grudge = clamp(rel(t, p.id).grudge + 0.05); rel(t, p.id).respect = clamp(rel(t, p.id).respect + 0.01); return { lines: [q(t, 'Then you don’t know him like I do.')], choices: [] }; }
-        rel(t, p.id).respect = clamp(rel(t, p.id).respect + 0.03); rel(t, o.id).grudge = clamp(rel(t, o.id).grudge - 0.04);
+        if (arch(t) === 'hothead' || arch(t) === 'bitter' || arch(t) === 'proud') { rel(t, p.id).grudge = clamp(peek(t, p.id).grudge + 0.05); rel(t, p.id).respect = clamp(peek(t, p.id).respect + 0.01); return { lines: [q(t, 'Then you don’t know him like I do.')], choices: [] }; }
+        rel(t, p.id).respect = clamp(peek(t, p.id).respect + 0.03); rel(t, o.id).grudge = clamp(peek(t, o.id).grudge - 0.04);
         return { lines: [q(t, 'Maybe. Maybe I’ve been hard on him.')], choices: [] };
       }
       if (code === 'more') {
@@ -443,7 +443,7 @@ function family(x: X): Subject | undefined {
         return { lines: [q(t, venge ? `My ${k.role}. They put him in the hospital. I know who did it, and I’m not going to sit here.` : `They hurt my ${k.role}. He says leave it. I don’t know if I can.`)], choices: cs };
       }
       const cs: Choice[] = [];
-      if (!p.intro?.[kin.id] && rel(p, kin.id).trust < 0.3 && trust(x) >= 0.4) cs.push(ch(key, 'meet', `Ask to meet ${first(kin)}`, 'Family vouches for family.'));
+      if (!p.intro?.[kin.id] && peek(p, kin.id).trust < 0.3 && trust(x) >= 0.4) cs.push(ch(key, 'meet', `Ask to meet ${first(kin)}`, 'Family vouches for family.'));
       cs.push(done(key));
       return { lines: [q(t, `${first(kin)}? My ${k.role}. He ${what}.`), by(t, { jovial: 'He tells you a story about the two of them and a stolen ice cream truck. You suspect it has grown over the years.', bitter: 'They don’t seem to speak much.', _: 'He says it with some pride.' })], choices: cs };
     },
@@ -477,8 +477,8 @@ function hisBoss(x: X): Subject | undefined {
       said(w, t, key, code);
       if (code === 'same') { warm(x, 0.04, 'grumble'); regard(w, t, p, 'trust', 0.05, 'grumble'); if (t.want?.kind === 'independent') (p.insight ??= {})[t.id] = [...new Set([...(p.insight[t.id] ?? []), 'leaving'])]; return { lines: [q(t, 'I thought you might.')], choices: [] }; }
       if (code === 'loyal') {
-        rel(t, p.id).trust = clamp(rel(t, p.id).trust - 0.04);
-        if (w.rng.chance(0.25 + t.traits.sociability * 0.2)) rel(b, p.id).respect = clamp(rel(b, p.id).respect + 0.02); // it may get back to him, in a good way
+        rel(t, p.id).trust = clamp(peek(t, p.id).trust - 0.04);
+        if (w.rng.chance(0.25 + t.traits.sociability * 0.2)) rel(b, p.id).respect = clamp(peek(b, p.id).respect + 0.02); // it may get back to him, in a good way
         return { lines: [q(t, 'Sure. Sure he does.')], choices: [] };
       }
       return { lines: [], choices: [] };
@@ -502,9 +502,9 @@ function tellOn(x: X): Subject | undefined {
     reply: (x, code) => {
       if (code !== 'tell') return { lines: [], choices: [] };
       (t.talk ??= {})['told:' + c.id] = { d: day(w), sig: 'x', n: 1 };
-      rel(t, c.id).trust = clamp(rel(t, c.id).trust - 0.15); regard(w, t, p, 'trust', 0.05, 'told-on');
+      rel(t, c.id).trust = clamp(peek(t, c.id).trust - 0.15); regard(w, t, p, 'trust', 0.05, 'told-on');
       const f = addFact(w, { kind: 'rumour', actor: p.id, victim: c.id, minor: true, text: `${p.name} told ${t.name} that ${c.name} is looking for a way out.`, district: t.district }, { witnesses: [t.id] });
-      if (w.rng.chance(0.3)) { c.known[f.id] = { t: w.now, from: t.id, knowsActor: true }; rel(c, p.id).grudge = clamp(rel(c, p.id).grudge + 0.3); }
+      if (w.rng.chance(0.3)) { c.known[f.id] = { t: w.now, from: t.id, knowsActor: true }; rel(c, p.id).grudge = clamp(peek(c, p.id).grudge + 0.3); }
       return { lines: [q(t, `Is he. Thank you for telling me.`), `${first(t)} doesn’t say what he’ll do. He doesn’t have to.`], choices: [] };
     },
   };

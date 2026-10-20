@@ -34,6 +34,10 @@ export function newId(w: World, prefix: string): Id {
   return prefix + w.nextId++;
 }
 
+// V89: reading how a man stands with another without creating a record for two men who have never met (rel() creates one,
+// which is right when something is about to change, and fills the save when it is only a question)
+const NOREL: Readonly<Rel> = Object.freeze({ trust: 0.1, respect: 0.3, affection: 0.1, grudge: 0, lastMet: -1e9 });
+export const peek = (c: Character, id: Id): Readonly<Rel> => c.rels[id] ?? NOREL;
 export function rel(c: Character, id: Id): Rel {
   return (c.rels[id] ??= { trust: 0.1, respect: 0.3, affection: 0.1, grudge: 0, lastMet: -1e9 });
 }

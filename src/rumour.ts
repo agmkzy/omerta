@@ -5,7 +5,7 @@
 //
 // And a man passes on what matters to the man he is talking to: what touched him, his family, his crew, his street, before what
 // some stranger lost at cards.
-import { clamp, factText, learn, money, rel } from './core';
+import { clamp, factText, learn, money, peek, rel } from './core';
 import { closeKin, kinTie } from './kin';
 import { tierOf } from './retain';
 import type { Character, Fact, Id, Knowledge, World } from './types';
@@ -26,7 +26,7 @@ export function salience(w: World, to: Character, f: Fact): number {
     if (kinTie(w, to, c)) return 0.8;
     if (c.id === to.bossId || c.bossId === to.id) return 0.7;
     if (to.bossId && c.bossId === to.bossId) return 0.5;
-    if (rel(to, c.id).affection >= 0.5 || rel(to, c.id).grudge >= 0.3) return 0.45;
+    if (peek(to, c.id).affection >= 0.5 || peek(to, c.id).grudge >= 0.3) return 0.45;
     if (to.familyId && c.familyId === to.familyId) return 0.25;
     return 0;
   };
@@ -48,8 +48,8 @@ export function pass(w: World, from: Character, to: Character, f: Fact, knowsIn:
   const actor = f.actor ? w.chars[f.actor] : undefined;
   if (WHODUNIT.has(f.kind) && actor && knows && actor.id !== from.id) {
     // a man does not hand his own people to the street
-    const own = closeKin(w, from, actor) || actor.id === from.bossId || from.bossId === actor.id || rel(from, actor.id).affection >= 0.6;
-    if (own && !to.isPlayer || own && rel(from, to.id).trust < 0.7) { knows = false; blame = undefined; }
+    const own = closeKin(w, from, actor) || actor.id === from.bossId || from.bossId === actor.id || peek(from, actor.id).affection >= 0.6;
+    if (own && !to.isPlayer || own && peek(from, to.id).trust < 0.7) { knows = false; blame = undefined; }
   }
   if (WHODUNIT.has(f.kind) && !knows && !blame && f.victim !== from.id) {
     // he didn't see it, but he knows who he'd like it to have been

@@ -5,7 +5,7 @@
 // family, his friends, whoever protects him, another family, the police). Those people may make asks of their own. Superiors hear
 // about what their men are doing and have views. The player and the NPCs use exactly the same moves; NPCs choose theirs from who
 // they are. Each kind of ask only says what is being asked, what it is worth to the man asked, and what yes does in the real world.
-import { addFact, clamp, createDebt, famName, money, notifyProtector, ownerBiz, payDebt, regard, rel, repute, witnessesAt } from './core';
+import { addFact, clamp, createDebt, famName, money, notifyProtector, ownerBiz, payDebt, regard, peek, rel, repute, witnessesAt } from './core';
 import { loanPosition } from './negotiate';
 import { say as vsay } from './voicesheet';
 import { bizMove, giveTime, setCollector } from './econ';
@@ -166,7 +166,7 @@ export function move(w: World, s: Situation, mv: AskMove): Outcome {
     }
     case 'senior': {
       const boss = a.bossId ? live(w, a.bossId) : undefined;
-      if (!boss || rel(boss, a.id).trust < 0.45) return { lines: [`Nobody above ${a.isPlayer ? 'you' : first(a)} would put his name to this.`] };
+      if (!boss || peek(boss, a.id).trust < 0.45) return { lines: [`Nobody above ${a.isPlayer ? 'you' : first(a)} would put his name to this.`] };
       S.fear = clamp(S.fear + 0.12 + Math.max(0, rk(boss) - rk(t)) * 0.06); S.resolve = clamp(S.resolve - 0.1);
       if (a.isPlayer) regard(w, boss, a, 'trust', -0.03, 'lean-on-me');
       know(w, s, boss.id, 2, 'was asked to weigh in');
@@ -218,7 +218,7 @@ function answer(w: World, s: Situation, a: Character, t: Character, K: AskKind, 
     return { answer: 'stall', lines };
   }
   S.last = 'no'; s.phase = 'refused'; s.next = w.now + 2 * DAY;
-  if (!tried(S, 'refusedRec')) { bumpTried(S, 'refusedRec'); rel(t, a.id).grudge = clamp(rel(t, a.id).grudge + 0.05); }
+  if (!tried(S, 'refusedRec')) { bumpTried(S, 'refusedRec'); rel(t, a.id).grudge = clamp(peek(t, a.id).grudge + 0.05); }
   lines.push(a.isPlayer && K.voice?.no ? K.voice.no(w, s, a, t) : K.phrase.no);
   { const x = K.onNo?.(w, s, a, t); if (x) lines.push(x); }
   // A man who is frightened or angry enough, or asked once too often, goes to someone.
@@ -235,9 +235,9 @@ function finish(w: World, s: Situation, a: Character, t: Character, K: AskKind, 
   lines.push(K.yes(w, s, a, t));
   S.last = 'yes'; S.coerced = coerced;
   // how he feels about it afterwards is part of the bargain: a frightened yes is resented, a willing one is not
-  if (coerced) rel(t, a.id).grudge = clamp(rel(t, a.id).grudge + 0.12);
+  if (coerced) rel(t, a.id).grudge = clamp(peek(t, a.id).grudge + 0.12);
   else if (a.isPlayer) regard(w, t, a, 'trust', 0.03, 'deal');
-  else rel(t, a.id).trust = clamp(rel(t, a.id).trust + 0.03);
+  else rel(t, a.id).trust = clamp(peek(t, a.id).trust + 0.03);
   closeSit(w, s, coerced ? 'gave in' : 'agreed', [coerced ? `${first(t)} agreed because he was afraid` : `${first(t)} agreed`], K.cool ?? 6);
   return { answer: 'yes', lines, closed: true };
 }
@@ -363,7 +363,7 @@ export function answerAsk(w: World, p: Character, e: Enc, code: string): { lines
   if (code === 'yes') { const o = finish(w, s, a, p, K, S, [], false); return { lines: o.lines, minutes: 20 }; }
   if (code === 'counter') { const amt = Math.round((s.terms?.amt ?? 0) * 0.6 / 5) * 5; S.last = 'counter'; s.m = { ...(s.m ?? {}), offer: amt }; tell(w, s, `${p.name} offered ${a.name} ${money(amt)} instead.`, { actor: p.id, victim: a.id, minor: true }); s.next = w.now + DAY; return { lines: [`You offer ${money(amt)}. ${first(a)} says he will think about it.`], minutes: 20 }; }
   if (code === 'stall') { S.last = 'stall'; bumpTried(S, 'stalled'); s.next = w.now + 3 * DAY; return { lines: [`You tell ${first(a)} you need a few days. He gives you them, and no more.`], minutes: 15 }; }
-  S.last = 'no'; bumpTried(S, 'no'); rel(a, p.id).grudge = clamp(rel(a, p.id).grudge + 0.06);
+  S.last = 'no'; bumpTried(S, 'no'); rel(a, p.id).grudge = clamp(peek(a, p.id).grudge + 0.06);
   tell(w, s, `${p.name} turned ${a.name} down.`, { actor: p.id, victim: a.id, minor: true });
   { const x = K.onNo?.(w, s, a, p); if (x) { closeSit(w, s, 'refused', [`${first(p)} said no`], K.cool ?? 6); return { lines: [`You tell ${first(a)} no.`, x], minutes: 15 }; } }
   s.next = w.now + 2 * DAY;
@@ -387,7 +387,7 @@ function superiors(w: World, s: Situation, a: Character) {
       opts: [{ code: 'explain', label: 'Explain yourself', hint: 'Tell him how it is. He may or may not like it.' }, { code: 'sorry', label: 'Say it won’t happen again', hint: 'Swallow it. He’ll want you to mean it.' }], data: { sit: s.id } });
     void e;
   } else {
-    rel(boss, a.id).trust = clamp(rel(boss, a.id).trust - (messy ? 0.06 : 0.02));
+    rel(boss, a.id).trust = clamp(peek(boss, a.id).trust - (messy ? 0.06 : 0.02));
     if (messy && boss.traits.caution > 0.5) { tell(w, s, `${boss.name} told ${a.name} to leave it alone.`, { actor: boss.id, victim: a.id, minor: true }); closeSit(w, s, 'called off', [`${first(boss)} called it off`], 6); }
   }
 }
@@ -403,7 +403,7 @@ export function answerWord(w: World, p: Character, e: Enc, code: string): { line
     return { lines: [`${first(boss)} looks at you a long moment. "Good. Then it’s finished." You let the matter go.`], minutes: 30 };
   }
   // explaining is a gamble on how he sees you and how well you argue
-  const ok = rel(boss, p.id).trust * 0.6 + p.skills.charm * 0.4 + boss.traits.ambition * 0.2 - boss.traits.caution * 0.3 > 0.35;
+  const ok = peek(boss, p.id).trust * 0.6 + p.skills.charm * 0.4 + boss.traits.ambition * 0.2 - boss.traits.caution * 0.3 > 0.35;
   if (ok) { regard(w, boss, p, 'respect', 0.03, 'explained'); return { lines: [`You lay it out. ${first(boss)} hears you to the end. "All right. But finish it quietly."`], minutes: 30 }; }
   regard(w, boss, p, 'trust', -0.04, 'explained'); repute(w, p, -1, 'explained');
   return { lines: [`You lay it out. ${first(boss)} doesn’t like the sound of it. "I didn’t ask for a story. Fix it."`], minutes: 30 };
@@ -428,7 +428,7 @@ export function playerMoves(w: World, p: Character, s: Situation): PlayerMove[] 
   add('pressure', 'Lean on him', 'Fear works. So does resentment, later.');
   if (K.force) add('force', 'Make an example', 'Loud, and it will be talked about.');
   const boss = p.bossId ? w.chars[p.bossId] : undefined;
-  add('senior', boss ? `Let him know ${first(boss)} is behind you` : 'Bring in someone senior', 'It costs you with your boss.', !boss || rel(boss, p.id).trust < 0.45 ? 'Nobody above you would put his name to this.' : undefined);
+  add('senior', boss ? `Let him know ${first(boss)} is behind you` : 'Bring in someone senior', 'It costs you with your boss.', !boss || peek(boss, p.id).trust < 0.45 ? 'Nobody above you would put his name to this.' : undefined);
   add('drop', 'Let it go', 'Walk away. People notice.');
   return out;
 }
@@ -521,7 +521,7 @@ ASKS.warn = {
   yes: (w, s, a, t) => {
     const o = sits(w).find((x) => x.id === String(s.m?.about));
     if (o && isOpen(o)) { tell(w, o, `${t.name} backed off after ${a.name} had a word.`, { actor: t.id, victim: a.id, minor: true }); closeSit(w, o, 'warned off', [`${first(a)} made ${first(t)} back off`], 8); }
-    if (t.isPlayer) regard(w, a, t, 'respect', 0.02, 'backoff'); else rel(a, t.id).respect = clamp(rel(a, t.id).respect + 0.02);
+    if (t.isPlayer) regard(w, a, t, 'respect', 0.02, 'backoff'); else rel(a, t.id).respect = clamp(peek(a, t.id).respect + 0.02);
     return `${t.isPlayer ? 'You back' : `${first(t)} backs`} off.`;
   },
   force: (w, s, a, t) => {
@@ -587,8 +587,8 @@ ASKS.help = {
   },
   onNo: (w, s, a, t) => {
     // a man who pays for protection and doesn't get it remembers, and stops being sure what he is paying for
-    rel(a, t.id).grudge = clamp(rel(a, t.id).grudge + 0.15);
-    rel(a, t.id).trust = clamp(rel(a, t.id).trust - 0.15);
+    rel(a, t.id).grudge = clamp(peek(a, t.id).grudge + 0.15);
+    rel(a, t.id).trust = clamp(peek(a, t.id).trust - 0.15);
     const o = sits(w).find((x) => x.id === String(s.m?.about));
     if (o && isOpen(o)) { const S = stance(w, o, a.id); S.resolve = clamp(S.resolve - 0.2); S.fear = clamp(S.fear + 0.1); }
     const b = o?.biz ? w.biz[o.biz] : undefined;

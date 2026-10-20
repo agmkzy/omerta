@@ -12,7 +12,7 @@ import { begin as beginGoal, goalsOf, priceOf } from './goals';
 import { addEnc } from './encounters';
 import { Business, Character, DAY, Debt, Enc, Fact, FactKind, Id, Situation, SitKind, WEEK, World } from './types';
 
-export const SIT = { on: true, cap: { open: 30, asks: 70, climbs: 10, own: { ask: 70, climb: 10, rivalry: 14, arrest: 10, revenge: 12 } as Partial<Record<SitKind, number>>, closedOwn: 40, closed: 60, hist: 8, claims: 3, cons: 5 } };
+export const SIT = { on: true, cap: { open: 30, asks: 45, climbs: 10, own: { ask: 45, climb: 10, rivalry: 14, arrest: 10, revenge: 12 } as Partial<Record<SitKind, number>>, closedOwn: 40, closed: 60, hist: 8, claims: 3, cons: 5 } };
 const first = (c: Character) => c.name.split(' ')[0];
 const P = (w: World) => w.chars[w.playerId ?? ''];
 export const isOpen = (s: Situation) => s.stage !== 'resolved';
@@ -65,7 +65,7 @@ export function spawn(w: World, kind: SitKind, key: string, who: Id, o: Init): S
   // (asks are many and short; they are pruned among themselves, so they never push older situations out of the record)
   const drop = new Set<Id>();
   const ownK = (x: Situation) => !!x.kind && SIT.cap.own[x.kind] !== undefined;
-  for (const [pool, cap] of [[l.filter((x) => !isOpen(x) && x.kind === 'ask'), SIT.cap.closedOwn], [l.filter((x) => !isOpen(x) && ownK(x) && x.kind !== 'ask'), SIT.cap.closedOwn], [l.filter((x) => !isOpen(x) && !ownK(x)), SIT.cap.closed]] as [Situation[], number][])
+  for (const [pool, cap] of [[l.filter((x) => !isOpen(x) && x.kind === 'ask'), 15], [l.filter((x) => !isOpen(x) && ownK(x) && x.kind !== 'ask'), SIT.cap.closedOwn], [l.filter((x) => !isOpen(x) && !ownK(x)), SIT.cap.closed]] as [Situation[], number][])
     if (pool.length > cap) for (const x of pool.slice(0, pool.length - cap)) drop.add(x.id);
   if (drop.size) w.situations = l.filter((x) => !drop.has(x.id));
   return s;
@@ -97,6 +97,8 @@ export function closeSit(w: World, s: Situation, out: string, cons: string[] = [
   s.cons = [...(s.cons ?? []), ...cons].slice(-SIT.cap.cons);
   delete s.ask; delete s.next;
   if (s.key) (w.sitcool ??= {})[s.key] = w.now + coolWeeks * WEEK;
+  // a settled matter between other men keeps its story, not its private workings (the save stays small)
+  if (s.kind === 'ask' && !(s.parties ?? []).some((x) => x.id === w.playerId)) { delete s.st; delete s.k; delete s.claims; }
   // V89: a matter opened inside a larger one (an ask for permission inside a revenge, say) reports back to it, and the larger one
   // moves on at its next step with the answer in hand
   const par = s.m?.parent ? sits(w).find((x) => x.id === s.m!.parent) : undefined;
@@ -895,6 +897,8 @@ export function sitWeek(w: World) {
   sp.weekVis = 0;
   for (const s of sits(w)) if (isOpen(s)) s.weeks++;
   syncLinks(w);
+  // cooling-off periods that have run out are forgotten
+  if (w.sitcool) for (const [k, t] of Object.entries(w.sitcool)) if (t <= w.now) delete w.sitcool[k];
   leak(w);
   crewWord(w);
   tributeScan(w);
