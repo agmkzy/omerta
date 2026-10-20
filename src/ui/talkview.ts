@@ -10,6 +10,7 @@ import { PROBLEM_LABEL } from '../people';
 import { isOpen } from '../situ';
 import { isParty, knownFacts, visibleTo } from '../sitmoves';
 import { notesOf } from '../talk';
+import { sourceOf, versionOf } from '../rumour';
 import type { Character, Situation, World } from '../types';
 import { avatar, back } from './common';
 import { toSide } from './layout';
@@ -69,7 +70,7 @@ function openBetween(w: World, p: Character, t: Character): Open[] {
     const body = [
       s.terms?.amt ? `On the table: ${money(s.terms.amt)}${s.ak === 'protect' ? ' a week' : ''}${s.terms.first && s.terms.first !== s.terms.amt ? ` (it started at ${money(s.terms.first)})` : ''}.` : '',
       mine ? `He is ${askRead(w, s, t.id)}.` : '',
-      ...knownFacts(w, p, s).slice(0, 3).reverse().map((f) => `${shortTime(f.t)}: ${f.text}`),
+      ...knownFacts(w, p, s).slice(0, 3).reverse().map((f) => `${ago(w.now, f.t).replace(/^./, (m) => m.toUpperCase())}: ${versionOf(w, p, f)}`),
     ].filter(Boolean);
     out.push({ title: askTitle(w, s), stage, body, key: s.id });
   }
@@ -106,7 +107,7 @@ function aboutHim(w: World, p: Character, t: Character): string {
   const person = (c: Character, how: string) => { const r = c.rels[p.id]; return `<details class="cv-d"><summary>${esc(c.name)} <span>${esc(how)}</span></summary><p>${c.rank === 'civilian' ? 'Not in the life.' : `${esc(c.rank)}, ${c.familyId ? esc(w.fam[c.familyId].name) : 'no family'}.`} ${!r ? 'He doesn’t know you.' : r.trust >= 0.5 ? 'He thinks well of you.' : r.grudge >= 0.3 ? 'He has no love for you.' : 'He knows your face.'}</p><button class="mini" data-a="talk:${c.id}">Go and see him</button></details>`; };
   // what is going on around him, as far as you know it: the stories he is in that you have heard of
   const near = (w.situations ?? []).filter((s: Situation) => isOpen(s) && isParty(s, t.id) && s.kind !== 'ask' && visibleTo(w, p, s)).slice(0, 4);
-  const story = (s: Situation) => { const f = knownFacts(w, p, s)[0]; return `<details class="cv-d"><summary>${esc(matterTitle(w, s) ?? s.cause)} <span>${esc(matterStage(w, s, p) ?? '')}</span></summary>${f ? `<p>${esc(f.text)}</p>` : ''}<button class="mini" data-a="story:sit:${s.id}">Open the story</button></details>`; };
+  const story = (s: Situation) => { const f = knownFacts(w, p, s)[0]; return `<details class="cv-d"><summary>${esc(matterTitle(w, s) ?? s.cause)} <span>${esc(matterStage(w, s, p) ?? '')}</span></summary>${f ? `<p>${esc(versionOf(w, p, f))} <span class="cv-src">${esc(sourceOf(w, p, f))}</span></p>` : ''}<button class="mini" data-a="story:sit:${s.id}">Open the story</button></details>`; };
   const shared = Object.keys(p.known).map((id) => w.facts[id]).filter((f) => f && !f.minor && ((f.actor === p.id && f.victim === t.id) || (f.actor === t.id && f.victim === p.id))).sort((a, b2) => b2.t - a.t).slice(0, 3);
   const met = p.intro?.[t.id];
   const sec = (h: string, body: string) => (body ? `<h3 class="cv-h">${h}</h3>${body}` : '');
@@ -114,7 +115,7 @@ function aboutHim(w: World, p: Character, t: Character): string {
     + sec('What you know', known.map((x) => `<p>${x}</p>`).join('') + ties.map((c) => person(c, `his ${kinOf(w, t).find((k) => k.id === c.id)?.role ?? 'family'}`)).join(''))
     + sec('What he has told you', said.map((x) => `<p class="cv-told">${esc(x)}</p>`).join(''))
     + sec('Going on around him', near.map(story).join(''))
-    + sec('Your history', (met ? `<p>You first met ${ago(w.now, met)}.</p>` : '') + shared.map((f) => `<p>${esc(f.text)}</p>`).join(''));
+    + sec('Your history', (met ? `<p>You first met ${ago(w.now, met)}.</p>` : '') + shared.map((f) => `<p>${esc(versionOf(w, p, f))}</p>`).join(''));
 }
 
 // ------------------------------------------------------------------ the screen

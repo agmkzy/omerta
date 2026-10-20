@@ -449,7 +449,8 @@ function revengeStep(w: World, s: Situation) {
           claim(w, s, av.id, `${w.chars[guess].name} did it`, guess === root?.actor);
         } else return at(w, s, 'looking', 4);
       }
-      const t = live(w, s.m?.target as string)!;
+      const t = live(w, s.m?.target as string);
+      if (!t) { delete s.m!.target; return closeSit(w, s, 'beyond reach', [`the man ${first(av)} wanted is beyond his reach`], 8); }
       addParty(s, t.id, 'target');
       tell(w, s, `${av.name} has let it be known he wants ${t.name} for what happened to ${wronged ? first(wronged) : 'his family'}.`, { actor: av.id, victim: t.id, witnesses: witnessesAt(w, av.district, [av.id], 3), minor: true });
       // the player's own family comes to him first

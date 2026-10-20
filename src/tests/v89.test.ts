@@ -12,6 +12,7 @@ import { addFact } from '../core';
 import { ORIGIN, startRivalry, topicsWith, matterAct } from '../matters';
 import { goalHooks, begin } from '../goals';
 import { notesOf, subjectsOf, talkAbout } from '../talk';
+import { pass, salience, versionOf } from '../rumour';
 import { options, say, startConvo } from '../dialogue';
 import { ownerBiz } from '../core';
 import { hierarchyIssues } from '../rank';
@@ -321,5 +322,36 @@ ok('what you know of a man is what he has shown you: nothing is noted that he di
   talkAbout(w, p, m, 'tk:trouble');
   assert.equal(notesOf(p, m).length, 0, 'a guarded man who says nothing gives you nothing to write down');
   assert.ok(!m.problem.revealed, 'and his trouble stays his');
+});
+
+ok('news is told the teller’s way: he protects his own, puts his enemy’s name to what he didn’t see, and the listener believes it', () => {
+  const w = createWorld(3, 'Tony Marino'), p = P(w);
+  const men = Object.values(w.chars).filter((c) => c.alive && !c.isPlayer && c.rank !== 'civilian');
+  const [teller, actor, victim, enemy, listener] = men;
+  // a beating whose doer the teller doesn't know, and a man he hates
+  const f = addFact(w, { kind: 'beating', actor: actor.id, victim: victim.id, hiddenActor: true, text: `${actor.name} beat up ${victim.name}.`, textHidden: `${victim.name} was beaten.`, district: victim.district }, {});
+  teller.known[f.id] = { t: w.now, from: 'public', knowsActor: false };
+  rel(teller, enemy.id).grudge = 0.9; teller.traits.greed = 0.9; teller.traits.sociability = 0.3; // bitter
+  let blamed = 0;
+  for (let i = 0; i < 30; i++) { delete listener.known[f.id]; delete (teller.known[f.id] as { blame?: string }).blame; pass(w, teller, listener, f, false); if ((listener.known[f.id] as { blame?: string }).blame === enemy.id) blamed++; }
+  assert.ok(blamed > 3 && blamed < 30, 'sometimes he names the man he hates: ' + blamed);
+  // the player hears the claim, attributed, not the truth
+  delete p.known[f.id]; (teller.known[f.id] as { blame?: string }).blame = enemy.id;
+  pass(w, teller, p, f, false);
+  assert.ok(versionOf(w, p, f).includes(enemy.name) && !versionOf(w, p, f).includes(actor.name), 'the player hears the claim, not the truth: ' + versionOf(w, p, f));
+  // a man protects his own: told by a brother of the doer, the name stays out of it
+  const g = addFact(w, { kind: 'beating', actor: actor.id, victim: victim.id, text: `${actor.name} beat up ${victim.name}.`, district: victim.district }, {});
+  rel(teller, actor.id).affection = 0.9; teller.known[g.id] = { t: w.now, from: 'witness', knowsActor: true };
+  assert.equal(pass(w, teller, listener, g, true), false, 'he will not hand his friend to the street');
+});
+
+ok('a man passes on what matters to the listener; a stranger’s night at cards is nobody’s business', () => {
+  const w = createWorld(3, 'Tony Marino');
+  const [a, b] = Object.values(w.chars).filter((c) => c.alive && !c.isPlayer && c.rank !== 'civilian' && c.familyId).slice(0, 2);
+  const stranger = Object.values(w.chars).find((c) => c.alive && !c.isPlayer && c.familyId && c.familyId !== b.familyId)!;
+  const loss = addFact(w, { kind: 'gambling_loss', actor: stranger.id, amount: 300, text: `${stranger.name} dropped $300.`, district: stranger.district }, {});
+  assert.ok(salience(w, b, loss) < 0, 'a stranger’s small loss is not passed on');
+  const hurt = addFact(w, { kind: 'beating', actor: stranger.id, victim: b.id, text: `${stranger.name} beat up ${b.name}.`, district: b.district }, {});
+  assert.ok(salience(w, b, hurt) > salience(w, a, hurt) || a.id === b.bossId, 'what happened to a man matters most to him');
 });
 console.log('all passed');

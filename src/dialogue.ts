@@ -824,7 +824,7 @@ export function optionsRaw(w: World, p: Character, t: Character, c: Convo): DOpt
       break;
     }
     case 'memos': {
-      for (const m of t.memos.filter((q) => q.other === p.id && !q.done)) add('memo:' + m.id, m.text, m.due ? `due ${shortTime(m.due)}` : undefined);
+      for (const m of t.memos.filter((q) => q.other === p.id && !q.done)) add('memo:' + m.id, m.text, m.due ? dueWords(w.now, m.due) : undefined);
       for (const m of t.memos.filter((q) => q.other === p.id && !q.done && q.kind === 'question' && q.ref && p.known[q.ref]?.knowsActor)) add('answer:' + m.id, `Tell him what you found out`, clip(w.facts[m.ref!].text, 60));
       back();
       break;
@@ -845,6 +845,8 @@ function storyKeyFor(w: World, p: Character, t: Character, node: string): string
   if (node === 'amends' || node === 'disputes') return (rel(t, p.id).grudge >= 0.3 || rel(p, t.id).grudge >= 0.3) ? 'threat:' + t.id : undefined;
   return undefined;
 }
+// when a promise falls due, in words
+const dueWords = (now: number, due: number) => { const d = Math.floor(due / 1440) - Math.floor(now / 1440); return d < 0 ? 'overdue' : d === 0 ? 'due today' : d === 1 ? 'due tomorrow' : d < 7 ? `due in ${d} days` : 'due next week or after'; };
 export function say(w: World, p: Character, t: Character, c: Convo, code: string): Said {
   const node = c.node;
   // Something already said or done in this conversation cannot be said again for another reward: it changes nothing until you come back.
@@ -861,25 +863,34 @@ export function say(w: World, p: Character, t: Character, c: Convo, code: string
       return { lines: lt.lines, minutes: 2, convo: { ...c, named: lt.named, used: [...(c.used ?? []), usedKey(c, code)] } };
     }
   }
+  // V89 paths (subjects, matters, asks) keep the conversation's rules: something already said or done in this conversation gives
+  // nothing more, and he never says the same line twice
+  if (/^(tk|mt|mv):/.test(code) && (c.used ?? []).includes(usedKey(c, code))) return { lines: [vsay(w, t, p, 'already')], minutes: 2, convo: c };
+  const fresh = (r: Said): Said => {
+    const prev = new Set(c.spoken ?? []);
+    const kept = r.lines.filter((l) => l.length <= 30 || !prev.has(l));
+    const lines = kept.length ? kept : [vsay(w, t, p, 'already')];
+    return { ...r, lines, convo: r.convo ? { ...r.convo, spoken: [...(c.spoken ?? []), ...lines.filter((l) => l.length > 30)].slice(-60) } : r.convo };
+  };
   if (code.startsWith('tk:')) { // V89: a subject on his mind (talk.ts), raised or followed up
     const b = talkAbout(w, p, t, code);
     if (b) {
       const used = [...(c.used ?? []), usedKey(c, code.split(':').slice(0, code.startsWith('tk:op:') || code.startsWith('tk:kin:') || code.startsWith('tk:tell:') ? 3 : 2).join(':')), usedKey(c, code)];
       const lines = b.lines.map((l) => speechFor(w, p, t, l));
-      if (b.go?.node === 'subject' && b.go.subject) return { lines, minutes: b.minutes ?? 15, convo: { ...c, node: 'subject', ctx: { ...c.ctx, subject: b.go.subject }, used } };
-      if (b.choices.length) return { lines, minutes: b.minutes ?? 15, convo: { ...c, node: 'follow', ctx: { ...c.ctx, follow: b.choices.map((x) => ({ code: x.code, label: x.label, hint: x.hint, big: x.big })) }, used } };
-      return { lines: lines.length ? lines : ['You leave it there.'], minutes: b.minutes ?? 10, convo: { ...c, node: 'root', used } };
+      if (b.go?.node === 'subject' && b.go.subject) return fresh({ lines, minutes: b.minutes ?? 15, convo: { ...c, node: 'subject', ctx: { ...c.ctx, subject: b.go.subject }, used } });
+      if (b.choices.length) return fresh({ lines, minutes: b.minutes ?? 15, convo: { ...c, node: 'follow', ctx: { ...c.ctx, follow: b.choices.map((x) => ({ code: x.code, label: x.label, hint: x.hint, big: x.big })) }, used } });
+      return fresh({ lines: lines.length ? lines : ['You leave it there.'], minutes: b.minutes ?? 10, convo: { ...c, node: 'root', used } });
     }
   }
   if (code.startsWith('mt:')) { // V89: a matter he is in or knows of (matters.ts), raised in his own terms
     const [, sid, mc] = code.split(':');
     const r = matterAct(w, p, sid, mc, t.id);
-    return { lines: r.lines.map((l) => speechFor(w, p, t, l)), minutes: r.minutes, convo: { ...c, node: 'root', used: [...(c.used ?? []), usedKey(c, code)] } };
+    return fresh({ lines: r.lines.map((l) => speechFor(w, p, t, l)), minutes: r.minutes, convo: { ...c, node: 'root', used: [...(c.used ?? []), usedKey(c, code)] } });
   }
   if (code.startsWith('mv:')) {
     const [, sid, mv] = code.split(':');
     const r = playerMove(w, p, sid, mv as AskMove);
-    return { lines: r.lines.map((l) => speechFor(w, p, t, l)), minutes: r.minutes, convo: { ...c, node: 'root' } };
+    return fresh({ lines: r.lines.map((l) => speechFor(w, p, t, l)), minutes: r.minutes, convo: { ...c, node: 'root', used: [...(c.used ?? []), usedKey(c, code)] } });
   }
   const opt = options(w, p, t, c).find((o) => o.code === code);
   const snap = () => { const q = rel(t, p.id), m = rel(p, t.id); return { tr: q.trust, af: q.affection, rs: q.respect, gr: q.grudge, cash: p.cash, st: p.standing, ht: p.heat, tc: t.cash }; };
@@ -1975,7 +1986,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
         if (!rng.chance(0.4)) return stay('root', 10);
       }
       const sup = RKN(t.rank) > RKN(p.rank) || t.id === p.bossId;
-      const heard = share(w, t, p, lines, { partial: tier !== 'open', avoidActor: sup ? t.id : undefined, say: (f, k) => told(w, t, f, k), exclude: (f) => (tier === 'general' && (f.victim === t.id || f.actor === t.id)) || (tier === 'partial' && f.victim === t.id && HUMILIATING.has(f.kind)) });
+      const heard = share(w, t, p, lines, { partial: tier !== 'open', avoidActor: sup ? t.id : undefined, say: (f, k) => { const base = told(w, t, f, k); const mine = p.known[f.id]; const b = !k && mine?.blame ? w.chars[mine.blame] : undefined; return b ? `${base.replace(/[.!]?$/, '.')} If you ask me, it was ${b.name}.` : base; }, exclude: (f) => (tier === 'general' && (f.victim === t.id || f.actor === t.id)) || (tier === 'partial' && f.victim === t.id && HUMILIATING.has(f.kind)) });
       if (!heard.length) { if (tier !== 'general') lines.push(vsay(w, t, p, 'chat_none')); return stay('root', 10); }
       return { lines, minutes: 15, convo: { id: c.id, node: 'incident', ctx: { fact: heard[0].id, asked: [] } } };
     }

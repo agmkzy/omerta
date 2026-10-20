@@ -1,6 +1,7 @@
 import { menace } from './danger';
 import { noteGrievance } from './orgs';
 import { sanctioned } from './politics';
+import { pass, salience, versionOf } from './rumour';
 import { askBetween, collectAsk, move as askMove, openAsk, shopInPlay } from './asks';
 import {
   addFact, clamp, createDebt, factText, famName, handleDeath, learn, money, notifyProtector,
@@ -166,20 +167,22 @@ export function share(w: World, from: Character, to: Character, lines: string[],
   const cands = Object.entries(from.known)
     .map(([id, k]) => ({ f: w.facts[id], k }))
     .filter(({ f }) => f && !f.minor && !to.known[f.id] && !(f.actor === from.id && SENSITIVE.has(f.kind)) && (!PRIVATE.has(f.kind) || r.trust > 0.5) && !(opt?.avoidActor && f.actor === opt.avoidActor) && !opt?.exclude?.(f) && (to.isPlayer || (gossipFresh(w, f) && (f.heard ?? 0) < gossipCap(f))))
-    .sort((a, b) => (to.isPlayer ? Number(own(b.f)) - Number(own(a.f)) : 0) || Number(tierOf(a.f.kind) === 'routine') - Number(tierOf(b.f.kind) === 'routine') || b.f.t - a.f.t)
+    // V89: an NPC passes on what matters to the man he is talking to (rumour.ts salience); a stranger's bad night at cards is dropped
+    .filter(({ f }) => to.isPlayer || salience(w, to, f) >= 0)
+    .sort((a, b) => (to.isPlayer ? Number(own(b.f)) - Number(own(a.f)) : salience(w, to, b.f) - salience(w, to, a.f)) || Number(tierOf(a.f.kind) === 'routine') - Number(tierOf(b.f.kind) === 'routine') || b.f.t - a.f.t)
     .slice(0, to.isPlayer ? 1 : 2); // you are told one thing at a time; the rest comes up if you ask
   const told: Fact[] = [];
   let spoken = 0;
   for (const { f, k } of cands) {
     if (!to.isPlayer) f.heard = (f.heard ?? 0) + 1; // the cap limits how far news travels between NPCs, not what you can be told
-    const knows = opt?.partial ? false : k.knowsActor; // holding back the name: he tells you something happened, not who
-    learn(w, to.id, f, from.id, knows);
+    // holding back the name: he tells you something happened, not who; and he tells it his way (rumour.ts)
+    const knows = pass(w, from, to, f, opt?.partial ? false : k.knowsActor);
     if (to.isPlayer) {
       // The same event can be on record twice (a night at the club, and the money lost there): you learn both, he tells it once.
       const again = f.amount && told.some((g) => g.actor === f.actor && g.amount === f.amount);
       told.push(f);
       if (again) continue;
-      lines.push(`${spoken++ ? vsay(w, from, to, 'lead2') : vsay(w, from, to, 'lead')} “${opt?.say ? opt.say(f, knows) : factText(f, knows)}”`);
+      lines.push(`${spoken++ ? vsay(w, from, to, 'lead2') : vsay(w, from, to, 'lead')} “${opt?.say ? opt.say(f, knows) : versionOf(w, to, f)}”`);
     }
   }
   return told;

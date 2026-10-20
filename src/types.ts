@@ -41,6 +41,11 @@ export interface Knowledge {
   t: number;
   from: string; // 'witness' | 'self' | 'public' | a character id (who told them)
   knowsActor: boolean; // some events (arson, robbery) hide who did it
+  // V89 (rumour.ts), all optional: how he came by it (saw / told by a witness / heard), whom he believes did it when he doesn't
+  // know, and whether he heard it bigger than it was
+  how?: 's' | 't' | 'h';
+  blame?: Id;
+  big?: 1;
 }
 
 // How a man's week with his superior really went. Several of these look the same from outside (he is short), which is the point.

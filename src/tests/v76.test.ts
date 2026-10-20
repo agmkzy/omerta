@@ -100,7 +100,7 @@ function fast() {
     const ub = rank(w, f.id, 'underboss')[0], cap = rank(w, f.id, 'capo')[0];
     ub.cash = 90000; ub.lifetimeKick = 90000;
     for (const v of membersOf(w, f.id)) { if (v.id === ub.id || v.id === cap.id || v.isPlayer) continue; rel(v, ub.id).trust = 0.05; rel(v, ub.id).grudge = 0.7; rel(v, cap.id).trust = 0.95; rel(v, cap.id).respect = 0.8; }
-    cap.standing = 80; cap.bossId = ub.id;
+    cap.standing = 80; cap.bossId = ub.id; ub.standing = 35; // (resented: his name has suffered for it, whatever the world did before)
     const cs = candidates(w, f.id, boss.id, { cause: 'death' });
     assert.equal(cs[0].c.id, cap.id, 'captain ranks first: ' + cs.slice(0, 3).map((x) => `${x.c.rank}:${x.score.toFixed(2)}`));
     handleDeath(w, boss.id);
@@ -151,7 +151,8 @@ function fast() {
     const f = other(w); const m = moneyTotal(w); treasuryWeek(w); assert.equal(moneyTotal(w), m, 'treasuryWeek only moves money');
     const inmate = rank(w, f.id, 'soldier')[0]; inmate.jailedUntil = w.now + 20 * DAY; f.treasury = (f.treasury ?? 0) + 1000; f.tin = (f.tin ?? 0) + 1000;
     const c0 = inmate.cash, t0 = f.treasury; treasuryWeek(w);
-    assert.ok(inmate.cash > c0 - 1 && f.treasury! < t0 + 400, 'support went from fund to man'); assert.equal(treasuryCheck(f), 0);
+    // (the fund also takes in the week's dues, so its balance alone proves nothing: the support itself is on its ledger)
+    assert.ok(inmate.cash > c0 && (f.tlog ?? []).some((e) => e.who === inmate.id && e.d < 0), 'support went from fund to man'); void t0; assert.equal(treasuryCheck(f), 0);
     const lead = leaderOf(w, f.id)!; lead.cash = 40000; const mm = moneyTotal(w); treasuryMove(w, f.id, lead, 5000, 'x'); treasuryMove(w, f.id, lead, -3000, 'y'); assert.equal(moneyTotal(w), mm); assert.equal(treasuryCheck(f), 0);
     for (let i = 0; i < 70; i++) treasuryMove(w, f.id, lead, 1, 'z'); assert.ok(f.tlog!.length <= 40, 'ledger bounded');
     clean(w, 'finance');
