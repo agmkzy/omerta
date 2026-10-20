@@ -24,7 +24,7 @@ import { standingWord } from '../jobs';
 import { disputesList } from './views_c';
 import { avatar, back, banner, sink, meterRow, skillBars, skillLine, strip, traitTags } from './common';
 import { bl, chip, esc, fl, known, lk, P, pl, S, statusOf, W, who } from './links';
-import { careerView, favoursCard, treeView } from './views_a';
+import { treeView } from './views_a';
 import { toSide } from './layout';
 import { whereIs } from '../where';
 import { kinWord, stageWord, warmthWord, DATES, datingPool } from '../life';
@@ -513,107 +513,8 @@ export function familyTab(): string {
   return out;
 }
 
-const snapList = (): { day: number; key: string; label: string }[] => { try { return readSnaps(localStorage); } catch { return []; } };
-function statsCard(): string {
-  const w = W(), p = P();
-  const heat = Math.min(1, p.heat);
-  const heatWord = heat < 0.15 ? 'Quiet' : heat < 0.4 ? 'Noticed' : heat < 0.7 ? 'Hot' : 'Burning';
-  const men = crewList().length;
-  const shops = Object.values(w.biz).filter((b) => b.protection?.collectorId === p.id);
-  const fees = shops.reduce((a, b) => a + (b.protection?.fee ?? 0), 0);
-  const stakes = stakesOf(w, p.id).length;
-  const behind = shops.filter((b) => owedOf(b) > 0);
-  const owed = (w.debts ?? []).filter((d) => d.creditor === p.id && d.status === 'active').reduce((a, d) => a + d.balance, 0);
-  const owe = (w.debts ?? []).filter((d) => d.debtor === p.id && d.status === 'active').reduce((a, d) => a + d.balance, 0);
-  const fOwed = (w.favours ?? []).filter((f) => f.from === p.id && !f.settled).length;
-  const fOwe = (w.favours ?? []).filter((f) => f.to === p.id && !f.settled).length;
-  const rep = p.rep;
-  const fig = (k: string, val: string, cls = '') => `<div class="g-fig ${cls}"><b>${val}</b><span>${k}</span></div>`;
-  const rows = [
-    fig('Reputation', esc(standingWord(p.standing))),
-    fig('Influence', esc(influenceWord(influence(w, p)))),
-    fig('Made last week', money(p.weekIncome)),
-    fig('Men under you', String(men)),
-    fig('Shops paying', shops.length ? `${shops.length} · ${money(fees)}/wk` : 'none'),
-    behind.length ? fig('Shops behind', `${behind.length} · ${money(behind.reduce((a, b) => a + owedOf(b), 0))}`, 'warn') : '',
-    stakes ? fig('Stakes in businesses', String(stakes)) : '',
-    fig('Owed to you', owed ? money(owed) : 'nothing'),
-    fig('You owe', owe ? money(owe) : 'nothing', owe ? 'warn' : ''),
-    fig('Favours owed / owing', `${fOwed} / ${fOwe}`, fOwe ? 'warn' : ''),
-    rep ? fig('Word kept / broken', `${rep.kept} / ${rep.broken}`, rep.broken > rep.kept ? 'warn' : '') : '',
-    p.career ? fig('Jobs done / failed', `${p.career.done} / ${p.career.failed}`) : '',
-    fig('Passed up, all time', money(p.lifetimeKick)),
-  ].join('') + (p.hurtUntil > w.now ? `<p class="callout bad">You’re hurt.</p>` : '') + (p.jailedUntil > w.now ? `<p class="callout bad">You’re locked up.</p>` : '');
-  const sc = specScores(w, p);
-  const specRows = (Object.keys(SPEC_LABEL) as Spec[]).sort((a, b) => sc[b] - sc[a]).map((s) => `<li><span>${SPEC_LABEL[s]}</span><span class="v ${tierOf(sc[s]) >= 2 ? 'good' : ''}">${TIER_WORD[tierOf(sc[s])]}</span></li>${tierOf(sc[s]) >= 2 ? `<li class="muted"><small>${SPEC_PERK[s]}</small></li>` : ''}`).join('');
-  return `<div class="g-figs">${rows}</div><div class="card"><h2>What you’re known as<small>from what you’ve done</small></h2><ul class="rows">${specRows}</ul></div>`;
-}
-
-export function lifeTab(): string {
-  const w = W();
-  const p = P();
-  const sub = (id: typeof S.lifeSub, label: string) => `<button class="pill ${S.lifeSub === id ? 'on' : ''}" data-a="lsub:${id}">${label}</button>`;
-  let out = strip() + `<div class="pills">${sub('me', 'Me')}${sub('career', 'Career')}${sub('people', 'People')}${sub('intel', 'Intel')}${sub('money', 'Money')}${sub('love', 'Romance')}${sub('more', 'More')}</div>`;
-  if (S.lifeSub === 'intel') out += disputesList();
-  if (S.lifeSub === 'career') out += careerView();
-  else if (S.lifeSub === 'me') {
-    // V88: a character sheet. Who he is and what he has; the people around him go beside it. His record lives in Career.
-    const bgx = p.bg ? bgLabel(p.bg) : undefined;
-    out += `<div class="pers g-sheet">${avatar(p)}<div><h1>${esc(p.name)}</h1><div class="sub">${esc(p.rank)} &middot; ${esc(famName(w, p))} &middot; ${esc(p.district)}</div>${bgx ? `<p class="g-sheet__bg"><b>${esc(bgx)}.</b>${bgOf(p.bg) ? ' ' + esc(bgOf(p.bg)!.blurb) : ''}</p>` : ''}</div></div>`;
-    out += statsCard() + `<div class="tags">${traitTags(p)}</div><div class="card"><h2>What you’re good at</h2>${skillBars(p)}</div>`;
-    out += p.job ? `<button class="btn" data-a="dayjob:">Your job: ${esc(p.job.kind)}</button>` : `<button class="btn" data-a="dayjob:">Find legitimate work</button>`;
-    let side = '';
-    side += `<div class="card"><h2>What they say about you<small>don’t take it personally</small></h2>${repLines(w, p).map((l) => `<p class="say">${esc(l)}</p>`).join('')}</div>`;
-    const L = w.life;
-    if (L) {
-      const rows: string[] = [];
-      const pr = L.partner;
-      if (pr && pr.stage !== 'split') rows.push(`<li><button class="rowbtn" data-a="ent:${pr.id}" style="display:flex;justify-content:space-between;width:100%;text-align:left"><span>${esc(w.chars[pr.id].name)}</span><span class="v">${esc(stageWord[pr.stage])} &middot; ${warmthWord(pr.warmth)}</span></button></li>`);
-      for (const k of L.kin) if (w.chars[k.id]?.alive) rows.push(`<li><button class="rowbtn" data-a="ent:${k.id}" style="display:flex;justify-content:space-between;width:100%;text-align:left"><span>${esc(w.chars[k.id].name)} <small class="muted">${esc(kinWord(k).replace('Your ', ''))}</small></span><span class="v ${k.sick ? 'warn' : ''}">${k.sick ? 'unwell' : warmthWord(k.warmth)}</span></button></li>`);
-      side += `<div class="card"><h2>The people at home</h2><ul class="rows">${rows.join('') || '<li class="muted">Nobody’s waiting for you.</li>'}</ul>${pr && pr.stage !== 'split' ? '' : '<p class="muted">Somebody will introduce you to someone, sooner or later, if you let them.</p>'}</div>`;
-    }
-    const patron = p.bossId ? w.chars[p.bossId] : undefined;
-    side += `<div class="card"><h2>Around you</h2><ul class="rows">${patron ? `<li><span>Answers to</span><span class="v">${pl(patron)}</span></li>` : ''}${p.sponsor ? `<li><span>Sponsor</span><span class="v">${pl(w.chars[p.sponsor])}</span></li>` : ''}${p.backer ? `<li><span>Backer</span><span class="v">${pl(w.chars[p.backer])}</span></li>` : ''}<li><span>Men</span><span class="v">${crewList().length}</span></li></ul></div>`;
-    toSide(side);
-  } else if (S.lifeSub === 'people') {
-    const fam = S.worldFilter;
-    const fil = (id: string, label: string) => `<button class="pill small ${fam === id ? 'on' : ''}" data-a="pf:${id}">${label}</button>`;
-    out += `<div class="pills">${fil('all', 'All')}${Object.values(w.fam).map((f) => fil(f.id, esc(f.name))).join('')}${fil('pin', '&#9733; Pinned')}${fil('none', 'Civilians')}</div>`;
-    const rows = Object.entries(p.rels).map(([id, r]) => [w.chars[id], r] as const).filter(([x]) => x && x.alive && (fam === 'all' || (fam === 'pin' ? !!p.notes?.[x.id]?.pin : fam === 'none' ? !x.familyId : x.familyId === fam))).sort((a, b) => Number(!!p.notes?.[b[0].id]?.pin) - Number(!!p.notes?.[a[0].id]?.pin) || b[1].trust - a[1].trust).slice(0, 40);
-    out += `<div class="card"><ul class="rows">${rows.map(([x, r]) => `<li><span>${p.notes?.[x.id]?.pin ? '&#9733; ' : ''}${pl(x)} <small class="muted">${esc(x.rank)}${p.notes?.[x.id]?.tags.length ? ' &middot; ' + esc(p.notes[x.id].tags.join(', ')) : ''}</small></span><span class="v ${r.grudge >= 0.3 ? 'warn' : ''}">${r.grudge >= 0.3 ? grudgeWord(r.grudge) : r.trust > 0.6 ? 'close' : r.trust > 0.35 ? 'friendly' : 'known'}</span></li>`).join('') || '<li class="muted">Nobody you know fits.</li>'}</ul></div>`;
-  } else if (S.lifeSub === 'intel') {
-    const items = Object.entries(p.known).filter(([id]) => w.facts[id] && !w.facts[id].minor).sort((a, b) => w.facts[b[0]].t - w.facts[a[0]].t).slice(0, 25);
-    out += items.length ? `<div class="card">${items.map(([id, k]) => `<div class="note"><a class="nm" href="#" data-a="fact:${id}" style="text-decoration:none">${lk(factText(w.facts[id], k.knowsActor))}</a><div class="src">${esc(shortTime(w.facts[id].t))}</div></div>`).join('')}</div>` : `<p class="muted pad">You know nothing. Go and be seen.</p>`;
-  } else if (S.lifeSub === 'love') {
-    out += loveView();
-  } else if (S.lifeSub === 'money') {
-    out += booksOwn() + lendingCard();
-  } else {
-    out += `<div class="list"><button class="opt" data-a="save:">Save now</button><button class="opt ${S.confirmReset ? 'danger' : ''}" data-a="reset:">${S.confirmReset ? 'Tap again to erase this game and start over' : 'Start a new game'}</button></div><div class="list"><button class="opt" data-a="dlsave:"><b>Download a backup file</b><span class="because">A copy you can keep outside the browser.</span></button><button class="opt" data-a="ulsave:"><b>Load a backup file</b><span class="because">Replaces the game you are playing.</span></button></div><input type="file" id="ulfile" accept=".json,application/json" hidden><p class="muted pad">${S.save ? (S.save.ok ? `Saved (${fmtTime(W().now)}). This game takes ${(S.save.bytes / 1e6).toFixed(2)} MB; with ${S.save.snapshots} earlier-day snapshot${S.save.snapshots === 1 ? '' : 's'} it is ${(S.save.used / 1e6).toFixed(2)} MB of roughly 5 MB available in this browser.` : 'NOT saved: ' + esc(S.save.error ?? '')) : 'The game saves itself after every action, in this browser only.'}</p>${(() => { const l = snapList(); return l.length ? `<h2 class="sect">Earlier days<small>if you need to undo</small></h2><div class="list">${l.map((x) => `<button class="opt" data-a="restore:${x.key}"><b>${esc(x.label)}</b><span class="because">Go back to this day. Everything since is lost.</span></button>`).join('')}</div>` : ''; })()}`;
-  }
-  return out;
-}
-
-function booksOwn(): string {
-  const w = W();
-  const p = P();
-  const b = p.books;
-  const boss = p.bossId ? w.chars[p.bossId] : undefined;
-  const st = b.stance ?? 'honest';
-  const pill = (id: string, label: string) => `<button class="pill small ${st === id ? 'on' : ''}" data-a="stance:${id}">${label}</button>`;
-  let out = '';
-  if (boss) {
-    out += `<div class="card"><h2>What you owe ${pl(boss)}</h2><p>You pass up <b>${Math.round(effectiveRate(w, p) * 100)}%</b> of what you declare each Sunday.${b.arrears > 0 ? ` You are behind by <b class="hurt">${money(b.arrears)}</b>.` : ''}</p>`;
-    out += `<p class="muted">How honest are you with him?</p><div class="pills">${pill('honest', 'Straight')}${pill('shave', 'Shave 30%')}${pill('stall', 'Stall')}</div>`;
-    out += `<p class="muted">${st === 'honest' ? 'You declare everything. It builds your name.' : st === 'shave' ? 'You under-report. He may notice, and if he does, you’ll hear about it.' : 'You pay nothing this week. He’ll notice.'}</p></div>`;
-  }
-  const hist = b.history.slice(-6).reverse();
-  if (hist.length) out += `<div class="card"><h2>Recent weeks</h2><ul class="rows">${hist.map((h) => `<li><span>Week ${h.week + 1}</span><span class="v">earned ${money(h.gross)}, paid ${money(h.paid)} of ${money(h.due)}${h.received ? `, got ${money(h.received)}` : ''}</span></li>`).join('')}</ul></div>`;
-  out += favoursCard();
-  const mine = w.debts.filter((d) => d.status === 'active' && (d.creditor === p.id || d.debtor === p.id));
-  out += `<div class="card"><h2>Debts</h2>` + (mine.length ? `<ul class="rows">${mine.map((d) => `<li><span>${d.creditor === p.id ? pl(w.chars[d.debtor]) + ' owes you' : 'You owe ' + pl(w.chars[d.creditor])}</span><span class="v">${money(d.balance)}</span></li>`).join('')}</ul>` : '<p class="muted">No open debts.</p>') + `</div>`;
-  return out;
-}
+// V89: the Life tab lives in lifeview.ts
+export { lifeTab } from './lifeview';
 
 void ownerBiz; void fl; void known; void standingTable;
 
@@ -707,47 +608,5 @@ function crewOverview(w: World, p: Character, crew: Character[]): string {
     return `<tr><td><a href="#" class="nm" data-a="ent:${c.id}" style="text-decoration:none">${esc(c.name.split(' ')[0])}</a><small>${c.nick ? '“' + esc(c.nick) + '” · ' : ''}${act ? esc(act.why) : 'free'}</small></td><td>${h.length ? money(h.at(-1)!.declared) : '–'}</td><td>${h.length ? money(avg(h.map((x) => x.declared))) : '–'}</td><td>${h.length ? money(h.at(-1)!.paid) : '–'}</td><td>${reliab(c)}</td><td>${c.career && c.career.done + c.career.failed > 0 ? `${c.career.done}/${c.career.done + c.career.failed}` : '–'}</td><td title="${esc(line)}">${opsN}</td></tr>`;
   }).join('');
   out += `<h2 class="sect">Side by side<small>declared figures</small></h2><div class="card tbl"><table class="crewt"><thead><tr><th>Man</th><th>Week</th><th>4-wk avg</th><th>Kick-up</th><th>Pays</th><th>Jobs</th><th>Lines</th></tr></thead><tbody>${rows}</tbody></table><p class="muted" style="margin:8px 0 0;font-size:12.5px">These are the numbers they hand you. Tap a name for the full picture.</p></div>`;
-  return out;
-}
-
-function lendingCard(): string {
-  const w = W();
-  const p = P();
-  const rows = Object.values(w.biz)
-    .filter((b) => b.open && b.kind !== 'casino')
-    .map((b) => ({ b, o: w.chars[b.ownerId] }))
-    .filter(({ o }) => o?.alive && o.rank === 'civilian' && !w.debts.some((d) => d.status === 'active' && d.debtor === o.id))
-    .sort((a, c) => Number(c.b.district === p.district) - Number(a.b.district === p.district) || c.b.distress - a.b.distress)
-    .slice(0, 8);
-  return `<h2 class="sect">Who could use a loan<small>owners with no debts</small></h2><div class="card"><ul class="rows">${rows.map(({ b, o }) => `<li><button class="rowbtn" data-a="talk:${o.id}" style="display:flex;justify-content:space-between;width:100%;text-align:left"><span>${esc(o.name)} <small class="muted">${esc(b.name)}, ${esc(b.district)}</small></span><span class="v ${b.distress > 0.4 ? 'warn' : ''}">${b.distress > 0.6 ? 'struggling' : b.distress > 0.25 ? 'tight' : 'steady'}</span></button></li>`).join('') || '<li class="muted">Everyone around has a lender already.</li>'}</ul><p class="small-note">Tap a name and offer him money. Struggling men take it more readily, and pay back less easily.</p></div>`;
-}
-
-function loveView(): string {
-  const w = W();
-  const p = P();
-  const L = w.life;
-  if (!L) return '<p class="muted pad">Nothing here yet.</p>';
-  const pr = L.partner && L.partner.stage !== 'split' ? L.partner : undefined;
-  let out = '';
-  if (!pr) {
-    const pool = datingPool(w, p);
-    out += `<h2 class="sect">Meet someone<small>this week</small></h2><p class="muted pad">Ask a girl out and you spend a little money. The better your name and your manner, the better your odds. A no stays a no for a while.</p><div class="list">`;
-    out += pool.list.filter((x) => w.chars[x.id]?.alive).map((x) => { const g = w.chars[x.id]; return `<button class="opt" data-a="askout:${g.id}"><b>${esc(g.name)}</b><span class="because">${esc(x.job)}, ${esc(g.district)}. You see her ${esc(x.where)}. Ask her out ($20).</span></button>`; }).join('');
-    out += `</div>`;
-    if (L.ex && w.chars[L.ex]) out += `<p class="muted pad">${esc(w.chars[L.ex].name)} is the one you let go.</p>`;
-    return out;
-  }
-  const g = w.chars[pr.id];
-  const kids = L.kin.filter((k) => (k.role === 'son' || k.role === 'daughter') && w.chars[k.id]?.alive);
-  out += `<div class="card"><div class="pers" style="margin:0">${avatar(g)}<div><h1>${pl(g)}</h1><div class="sub">${esc(stageWord[pr.stage])} &middot; ${esc(warmthWord(pr.warmth))} &middot; ${pr.dates} evening${pr.dates === 1 ? '' : 's'} together</div></div></div>${meterRow('How she feels', warmthWord(pr.warmth), pr.warmth)}${pr.due ? `<p class="muted">She is expecting. ${Math.max(1, Math.ceil((pr.due - w.now) / DAY / 30))} month${Math.ceil((pr.due - w.now) / DAY / 30) > 1 ? 's' : ''} to go.</p>` : ''}</div>`;
-  out += `<h2 class="sect">Time together</h2><div class="list">` + DATES.map((d) => `<button class="opt" data-a="dateplan:${d.code}"><b>${esc(d.label)} <small class="muted">$${d.cost}</small></b><span class="because">${esc(d.hint)}</span></button>`).join('') + `</div>`;
-  out += `<h2 class="sect">Where this goes</h2><div class="list">`;
-  if (pr.stage === 'seeing') out += `<button class="opt" data-a="steady:"><b>Ask her to be your girl</b><span class="because">${pr.dates >= 3 && pr.warmth >= 0.5 ? 'She might say yes.' : 'Too early. A few more evenings first.'}</span></button>`;
-  if (pr.stage === 'steady') out += `<button class="opt" data-a="marryask:"><b>Ask her to marry you ($400 ring)</b><span class="because">${pr.dates >= 8 && pr.warmth >= 0.7 ? 'You are both ready.' : 'She isn’t there yet. More time, more evenings.'}</span></button>`;
-  if (pr.stage === 'engaged') out += `<button class="opt" data-a="wed:"><b>Hold the wedding ($1,500)</b><span class="because">The whole family will come. They will bring envelopes.</span></button>`;
-  if (pr.stage === 'married') out += `<button class="opt" data-a="baby:"><b>${pr.due ? 'She is expecting' : 'Talk about having a baby'}</b><span class="because">${pr.due ? 'Nothing to do but be there.' : 'A child changes what is at stake.'}</span></button>`;
-  if (pr.stage !== 'married') out += `<button class="opt danger" data-a="breakoff:"><b>End it</b><span class="because">It is kinder done properly.</span></button>`;
-  out += `</div>`;
-  if (kids.length) out += `<h2 class="sect">Your children</h2><div class="card"><ul class="rows">${kids.map((k) => `<li><button class="rowbtn" data-a="ent:${k.id}" style="display:flex;justify-content:space-between;width:100%;text-align:left"><span>${esc(w.chars[k.id].name)}</span><span class="v">${esc(kinWord(k).replace('Your ', ''))}</span></button></li>`).join('')}</ul></div>`;
   return out;
 }

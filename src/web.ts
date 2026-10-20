@@ -50,6 +50,7 @@ import { leaveCrew } from './rank';
 import { KEY, readSnaps, usageStatus, writeSave, type SaveStatus } from './storage';
 import { briefView } from './ui/brief';
 import { bottomTabs, rail, takeSide, topBar } from './ui/layout';
+import { roomOf } from './ui/lifeview';
 import { startingLines } from './background';
 import { draftBg, draftDone, draftName, openingAct, openingView, typed } from './ui/opening';
 import { fullName } from './names';
@@ -366,14 +367,14 @@ function handle(a: string, v: string) {
   switch (a) {
     case 'tab': return tab(v as Tab);
     case 'back': return pop();
-    case 'career': S.lifeSub = 'career'; return tab('life');
+    case 'career': S.lifeSub = 'you'; return tab('life');
     case 'paper': S.paperAt = Number(v); return;
     case 'tog': S.open[v] = !S.open[v]; return;
     case 'ent': return go({ t: 'person', id: v });
     case 'biz': return go({ t: 'biz', id: v });
     case 'fact': return go({ t: 'fact', id: v });
     case 'tree': S.treeFam = v || undefined; if (S.view.t === 'tab' && S.view.name === 'family') return; return go({ t: 'tree', fam: v || P().familyId! });
-    case 'lsub': S.lifeSub = v as typeof S.lifeSub; if (v === 'love' && W().life) { datingPool(W(), P()); save(); } return;
+    case 'lsub': S.lifeSub = roomOf(v); if (S.lifeSub === 'people' && W().life) { datingPool(W(), P()); save(); } return;
     case 'pf': S.worldFilter = v; return;
     case 'place': return go({ t: 'place', id: v });
     case 'places': return go({ t: 'places' });

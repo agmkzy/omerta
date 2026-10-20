@@ -10,9 +10,10 @@ export function pathCard(): string {
   const i = pathInfo(w, p);
   if (!i) return '';
   const done = i.goals.filter((g) => g.done).length;
-  let out = `<div class="card"><h2>The road to ${i.to === 'soldier' ? 'being made' : i.to}<small>${done} of ${i.goals.length}</small></h2><ul class="rows q">`;
+  let out = `<div class="card"><h2>The road to ${i.to === 'soldier' ? 'being made' : i.to}<small>${done} of ${i.goals.length} done</small></h2><ul class="rows q lf-road">`;
+  // V89: one line per thing asked of you, in words; what it takes shows only while it is still to do.
   for (const g of i.goals) {
-    out += `<li><span class="qb"><span>${g.done ? '&#10003; ' : ''}<b>${esc(g.label)}</b></span><small class="muted">${esc(g.note)}</small>${g.done ? '' : `<small class="muted">${esc(g.tip)}</small>`}<span class="qbar"><i style="width:${Math.round(g.frac * 100)}%"></i></span></span></li>`;
+    out += `<li class="${g.done ? 'done' : ''}"><span class="lf-tick" aria-hidden="true">${g.done ? '&#10003;' : '&#9675;'}</span><span class="qb"><b>${esc(g.label)}</b><small class="muted">${esc(g.note)}</small>${g.done ? '' : `<small class="lf-tip">${esc(g.tip)}</small>`}</span></li>`;
   }
   out += `</ul>`;
   const co = chairOptions(w, p);

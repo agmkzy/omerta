@@ -25,16 +25,19 @@ export function queueView(): string {
   const rows = queueOf(w, fid, rk);
   const open = Math.max(0, capOf(w, fid, to) - seats(w, fid, to));
   const mine = rows.findIndex((x) => x.c.id === p.id);
-  let out = `<h2 class="sect">Next in line for ${to === 'soldier' ? 'soldier' : 'capo'}<small>${open ? open + ' seat' + (open > 1 ? 's' : '') + ' open' : 'no seat open'}</small></h2>`;
-  out += `<p class="muted pad">The family weighs what a man has earned, how the boss trusts him, his name and who will vouch for him. ${mine === 0 ? 'Right now that’s you.' : mine > 0 ? `${mine} ahead of you.` : ''}</p>`;
-  out += `<div class="card"><ul class="rows q">` + rows.map((x, i) => ({ ...x, i })).filter((x) => x.i < 3 || Math.abs(x.i - mine) <= 1).map(({ c, r, i }, k, arr) => {
+  // V89: the line in words. Who is ahead of you and how near each man is; the numbers the family weighs stay behind the curtain.
+  // What still stands between you and the seat is said once, in the road above this (pathview.ts), not repeated here.
+  const near = (x: QRow) => (eligible(x.r) ? 'ready now' : x.r.score >= 0.75 ? 'close' : x.r.score >= 0.45 ? 'getting there' : 'a long way off');
+  let out = `<h2 class="lf-h">Next in line for ${to === 'soldier' ? 'soldier' : 'captain'}<small>${open ? (open > 1 ? open + ' seats open' : 'a seat is open') : 'no seat open'}</small></h2>`;
+  out += `<p class="lf-note">The family weighs what a man has earned, how far the boss trusts him, his name, and who will vouch for him. ${mine === 0 ? 'Right now, that’s you.' : mine === 1 ? 'One man is ahead of you.' : mine > 1 ? `${mine} men are ahead of you.` : ''}</p>`;
+  out += `<ul class="rows q lf-line">` + rows.map((x, i) => ({ ...x, i })).filter((x) => x.i < 3 || Math.abs(x.i - mine) <= 1).map((x, k, arr) => {
+    const { c, r, i } = x;
     const you = c.id === p.id;
     const boss = c.bossId ? w.chars[c.bossId] : undefined;
-    const pct = Math.round(r.score * 100);
-    const gap = k > 0 && i - arr[k - 1].i > 1 ? `<li class="muted" style="justify-content:center">&hellip; ${i - arr[k - 1].i - 1} more &hellip;</li>` : '';
-    return `${gap}<li class="${you ? 'you' : ''}"><span class="qn">${i + 1}</span><span class="qb"><span>${you ? '<b>You</b>' : pl(c)}${i === 0 ? ' <span class="tag green">next</span>' : ''}</span><small class="muted">${boss ? 'under ' + esc(boss.name.split(' ')[0]) + ' &middot; ' : ''}earned ${Math.round(r.earn * 100)}% &middot; ${r.sponsor ? 'has a sponsor' : 'no sponsor'}</small><span class="qbar"><i style="width:${pct}%"></i></span></span>${you ? '' : `<button class="mini" data-a="rival:${c.id}">Deal with him</button>`}</li>`;
-  }).join('') + `</ul></div>`;
-  if (mine >= 0) { const bl = rows[mine].r.blockers; if (bl.length) out += `<div class="callout"><b>What’s holding you back:</b> ${esc(bl.join('; '))}.</div>`; }
+    const gap = k > 0 && i - arr[k - 1].i > 1 ? `<li class="muted lf-gap">&hellip; ${i - arr[k - 1].i - 1} more &hellip;</li>` : '';
+    const who = [boss && !you ? 'under ' + esc(boss.name.split(' ')[0]) : '', r.sponsor ? `someone speaks for ${you ? 'you' : 'him'}` : `nobody speaks for ${you ? 'you' : 'him'}`].filter(Boolean).join(' &middot; ');
+    return `${gap}<li class="${you ? 'you' : ''}"><span class="qn">${i + 1}</span><span class="qb"><span>${you ? '<b>You</b>' : pl(c)} <span class="lf-near ${eligible(r) ? 'good' : ''}">${near(x)}</span></span><small class="muted">${who}</small></span>${you ? '' : `<button class="mini" data-a="rival:${c.id}">Deal with him</button>`}</li>`;
+  }).join('') + `</ul>`;
   void famName;
   return out;
 }

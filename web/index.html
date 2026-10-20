@@ -810,6 +810,94 @@ body.om-open #app { max-width: none; padding: 0; }
 }
 @media (max-width: 899px) { .g-side:has(> .st-side:only-child) { display: none; } }
 @media (max-width: 559px) { .st-h { flex-direction: column; align-items: flex-start; gap: 4px; } .st-h small { text-align: left; } }
+/* ===================================================================== V89: the Life tab (src/ui/lifeview.ts)
+   Four rooms under a quiet row of words; headings in the display face; rows, not boxes; empty rooms speak a line instead of zeroes. */
+.lf-nav { display: flex; gap: 22px; margin: 4px 0 18px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.lf-nav::-webkit-scrollbar { display: none; }
+.lf-nav button { all: unset; box-sizing: border-box; cursor: pointer; flex: none; padding: 12px 0 11px; min-height: 44px; font: 600 11.5px/1.2 var(--body); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; transition: color .15s, border-color .15s; }
+.lf-nav button:hover { color: var(--ink); }
+.lf-nav button.on { color: var(--ink); border-bottom-color: var(--brass); }
+.lf-nav button:focus-visible { outline: 2px solid var(--brass-2); outline-offset: 2px; }
+@media (max-width: 400px) { .lf-nav { gap: 16px; } .lf-nav button { letter-spacing: .1em; font-size: 11px; } }
+
+.lf-h { font: 500 22px/1.2 var(--display); color: var(--ink); margin: 30px 0 8px; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.lf-h small { font: 600 10.5px var(--body); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.lf-quiet { font: italic 400 16.5px/1.5 var(--display); color: var(--ink-2); margin: 6px 0 10px; }
+.lf-note { font-size: 13.5px; color: var(--muted); margin: 6px 0 10px; }
+
+/* you */
+.lf-me { display: flex; gap: 18px; align-items: flex-start; margin: 4px 0 6px; }
+.lf-me .avatar.pt { width: 92px; height: 92px; }
+.lf-me h1 { font: 500 34px/1.05 var(--display); margin: 0; }
+.lf-me .sub { font-size: 13.5px; color: var(--muted); margin-top: 6px; }
+.lf-me .tags { margin: 10px 0 0; }
+.lf-bg { font: italic 400 16px/1.45 var(--display); color: var(--ink-2); margin: 10px 0 0; }
+.lf-bg b { font-style: normal; font-weight: 600; color: var(--brass-2); }
+.card.lf-road, .card:has(> .lf-road) { margin-top: 22px; }
+.rows.lf-road li { justify-content: flex-start; gap: 12px; }
+.rows.lf-road li.done { color: var(--muted); }
+.rows.lf-road li.done b { font-weight: 500; color: var(--ink-2); }
+.lf-tick { flex: none; width: 16px; color: var(--muted); line-height: 1.4; }
+.rows.lf-road li.done .lf-tick { color: var(--green); }
+.lf-tip { display: block; margin-top: 3px; font-size: 12.5px; color: var(--dim); font-style: italic; }
+.rows.lf-line li { align-items: center; }
+.rows.lf-line li.you { padding: 10px 8px; }
+.lf-near { font: italic 400 15px/1.2 var(--display); color: var(--muted); white-space: nowrap; margin-left: 6px; }
+.lf-near::before { content: '— '; }
+.lf-near.good { color: var(--green); }
+.lf-gap { justify-content: center !important; font-size: 12.5px; }
+.lf-perk { display: block; font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.lf-fold { border-top: 1px solid var(--line); margin: 18px 0 0; }
+.lf-fold + .lf-fold { margin-top: 0; }
+.lf-fold > summary { cursor: pointer; list-style: none; padding: 13px 0; min-height: 44px; box-sizing: border-box; font: 500 18px/1.2 var(--display); color: var(--ink); display: flex; justify-content: space-between; align-items: center; }
+.lf-fold > summary::-webkit-details-marker { display: none; }
+.lf-fold > summary::after { content: '›'; color: var(--muted); font-family: var(--body); transition: transform .2s; }
+.lf-fold[open] > summary::after { transform: rotate(90deg); }
+.lf-fold > .card { margin-top: 0; }
+.lf-links { display: flex; flex-wrap: wrap; gap: 0 26px; border-top: 1px solid var(--line); margin-top: 0; }
+.lf-links .more { width: auto; }
+.lf-saves { margin: 34px 0 8px; border-top: 1px solid var(--line); }
+.lf-saves__t { all: unset; box-sizing: border-box; cursor: pointer; display: flex; justify-content: space-between; width: 100%; padding: 13px 0; min-height: 44px; font: 600 11px/1.4 var(--body); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
+.lf-saves__t:hover { color: var(--ink-2); }
+.lf-saves__t:focus-visible { outline: 2px solid var(--brass-2); outline-offset: 2px; }
+
+/* the context column */
+.lf-side .lf-h { font-size: 19px; margin: 26px 0 6px; }
+.g-side > .lf-side:first-child .lf-h { margin-top: 0; }
+.lf-side .rows li { font-size: 13.5px; }
+.lf-side .say { font-size: 17px; }
+.lf-side .btn { margin: 8px 0 4px; }
+
+/* people */
+.rows li .lf-row { display: flex; justify-content: space-between; gap: 12px; width: 100%; text-align: left; }
+.rows.lf-people li > span:first-child, .rows li .lf-row > span:first-child { min-width: 0; }
+.rows.lf-people small, .lf-row small { display: block; margin-top: 2px; font-size: 12.5px; }
+.rows.lf-people .v, .lf-row .v { font: italic 400 15px/1.3 var(--display); color: var(--ink-2); white-space: nowrap; }
+.rows.lf-people .v.warn { color: var(--brass-2); }
+.rows.lf-owed .v { font: 500 14px/1.3 var(--body); color: var(--ink); }
+.rows.lf-owed .v.good { color: var(--green); } .rows.lf-owed .v.warn { color: var(--brass-2); }
+.lf-star { color: var(--brass-2); }
+.lf-filter { margin: 4px 0 6px; }
+.lf-invite { margin: 10px 0 4px; padding: 2px 0 4px 16px; border-left: 2px solid var(--brass); }
+.lf-invite p { font-size: 14px; color: var(--ink-2); }
+.lf-invite .mini { margin: 6px 0 4px; }
+.lf-her { margin: 16px 0 6px; padding: 16px 18px; border: 1px solid var(--line); border-radius: var(--r); background: var(--card); }
+.lf-her__head { display: flex; gap: 16px; align-items: center; }
+.lf-her__head .avatar.pt { width: 68px; height: 68px; }
+.lf-her__head h3 { font: 500 24px/1.1 var(--display); margin: 0; }
+.lf-her__head p { margin: 6px 0 0; font-size: 13.5px; color: var(--muted); }
+.lf-her h3.sub { margin-top: 18px; }
+
+/* what you know */
+.lf-heard { list-style: none; margin: 0; padding: 0; }
+.lf-heard li { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.lf-heard li:last-child { border-bottom: 0; }
+.lf-fact { color: var(--ink); text-decoration: none; font-size: 14.5px; line-height: 1.45; }
+.lf-fact:hover { color: var(--brass-2); }
+.lf-when { flex: none; font: italic 400 14px/1.2 var(--display); color: var(--muted); white-space: nowrap; }
+@media (min-width: 900px) { .lf-phone { display: none !important; } } /* the rail says these on desktop */
+.lf-tags { font-weight: 400 !important; font-size: 12.5px; color: var(--muted) !important; }
+@media (max-width: 420px) { .lf-heard li { flex-direction: column; gap: 2px; } .lf-me .avatar.pt { width: 76px; height: 76px; } .lf-me h1 { font-size: 30px; } }
 </style>
 <div id="app"></div>
 <script type="module" src="./main.ts"></script>
