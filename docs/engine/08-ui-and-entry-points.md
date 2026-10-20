@@ -25,13 +25,13 @@ This group is everything that sits between a person and the simulation. In game 
 | [src/ui/blackjack.ts](../../src/ui/blackjack.ts) | 40 | Casino lobby and blackjack table; thin wrappers over the engine `blackjack.ts`. |
 | [src/ui/portrait.ts](../../src/ui/portrait.ts) | 258 | Procedurally painted SVG portraits. Must never change (CLAUDE.md). |
 | [src/ui/portraits_pack.ts](../../src/ui/portraits_pack.ts) | 3 | Intentionally empty override slot for supplied portrait images. |
-| [web/template.html](../../web/template.html) | 303 | Page shell: title, meta tags, Google Fonts link, all CSS (light/dark tokens), `<div id="app">`. |
+| [web/index.html](../../web/index.html) | 304 | Page shell (Vite's HTML entry): title, meta tags, Google Fonts link, all CSS (light/dark tokens), `<div id="app">`. |
 | [src/cli.ts](../../src/cli.ts) | 220 | `sim` (headless run and history report) and `play` (old text-mode game with autosave). |
 | [src/bot.ts](../../src/bot.ts) | 106 | Scripted player policy that exercises jobs, meetings, schemes and books. |
 | [src/stress.ts](../../src/stress.ts) | 73 | Long-run stress player with per-step consistency audit. |
 | [playtest/pt.ts](../../playtest/pt.ts) | 146 | Command-per-invocation play-test harness with persistent state and an action log. |
 
-Build: [build-web.sh](../../build-web.sh) bundles `src/web.ts` with esbuild (`--bundle --format=iife --minify --target=es2020`) to `dist/web.js`, refuses a bundle containing `</script`, then concatenates `web/template.html` + `<script>` + bundle into `dist/omerta.html`. Because the script is appended after `<div id="app"></div>`, the top-level `render()` call at [web.ts:878](../../src/web.ts) finds `#app` without waiting for `DOMContentLoaded`.
+Build: [vite.config.ts](../../vite.config.ts) (`vite build`, root `web/`) bundles `src/web.ts` through the one-line entry [web/main.ts](../../web/main.ts) into a minified ES module (`target: es2020`). `vite-plugin-singlefile` inlines it into `web/index.html` as `<script type="module">`, written to `dist/omerta.html`. A small plugin (`omerta:single-page`) puts the script at the end of the page, after `<div id="app"></div>`, which keeps `<meta charset>` in the first 1024 bytes. It also fails the build unless the result is one file with one inline script. The script is a deferred module that comes after `#app`, so the top-level `render()` call at [web.ts:878](../../src/web.ts) still finds `#app` without waiting for `DOMContentLoaded`. See [03-build-and-setup.md](../03-build-and-setup.md#the-pipeline).
 
 ## Rendering model
 
@@ -599,9 +599,9 @@ Internal functions worth knowing: `save(): boolean` (wraps `storage.writeSave`, 
 
 **Known issues (report only, do not fix here).** `aria-label="${c.name}"` is unescaped (see "Escaping"). SVG element ids are `p<hash(c.id)>…`, so the same man drawn twice on a page duplicates ids (harmless because the definitions are identical). The local `fam` is computed and never used. Each portrait carries several filters including `feTurbulence`, and every click re-renders every portrait on the page, which is the heaviest part of a render on long lists (recruit, plan, grudges).
 
-## web/template.html
+## web/index.html
 
-**Purpose.** The page shell that the bundle is appended to: `<title>Omertà</title>`, UTF-8 and viewport meta (`viewport-fit=cover`, plus `claude:viewport-fit-sides` for the claude.ai host), a Google Fonts stylesheet (Big Shoulders Display, Public Sans), one `<style>` block and `<div id="app"></div>`.
+**Purpose.** The page shell that Vite inlines the bundle into (formerly `web/template.html`): `<title>Omertà</title>`, UTF-8 and viewport meta (`viewport-fit=cover`, plus `claude:viewport-fit-sides` for the claude.ai host), a Google Fonts stylesheet (Big Shoulders Display, Public Sans), one `<style>` block and `<div id="app"></div>`.
 
 **Theming.** Colours are custom properties on `:root` (`--bg`, `--card`, `--soft`, `--line`, `--ink`, `--muted`, green/brass/red/blue with soft variants, family colours `--f0`–`--f4`, `--fx`, fonts `--display`/`--body`). Dark values apply under `@media (prefers-color-scheme: dark)` unless `[data-theme="light"]`, and under `:root[data-theme="dark"]`. No code sets `data-theme`; it is there for a host to set. Layout is mobile-first: `#app` max 560 px with safe-area padding, a fixed six-column bottom tab bar, body bottom padding to clear it, 44 px minimum touch targets.
 

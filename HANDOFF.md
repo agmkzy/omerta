@@ -6,12 +6,12 @@ Live: Claude artifact https://claude.ai/artifact/YDyiAu7Aw8bZdwMjaBRVV3 (V85) an
 
 ## Setup
 `npm install && npm run build && npm run test:all`
-Node 22. esbuild is now a devDependency (previously the build used an external path).
+Node 22.12+. The build is Vite (`vite.config.ts`, `npm run dev` for a live-reload server); it replaced the V85 esbuild script `build-web.sh`.
 
 ## Layout
 - `src/` engine and game logic (`engine.ts` tick, `world.ts` generation, `core.ts` relationships, `actions.ts` NPC choices incl. retaliation, `jobs.ts`, `encounters.ts`, `career.ts`, `consequences.ts`, `crewlife.ts`, `situations.ts`, `ledger.ts`/`econ.ts` money).
 - Dialogue: `dialogue.ts` (options, nodes, used-option memory, `say()`), `flows.ts` (standing, promotion, sit-downs, threats, crew, recruitment, rivals), `voice.ts`/`voicesheet.ts` (archetype voices).
-- UI: `src/web.ts` (entry), `src/ui/*` views, `web/template.html` (page shell/CSS).
+- UI: `src/web.ts` (entry), `src/ui/*` views, `web/index.html` (page shell/CSS, Vite's entry).
 - `src/storage.ts` saves; `serialize/deserialize` in the world code (SCHEMA 7).
 - `src/tests/` regression suites: storage, v72–v79 (v77–v79 = conversation overhaul crawler/info-leak/memory tests).
 - `playtest/pt.ts` command-line harness for unassisted play (`state.json`, `actions.log`; seed 3, "Tony Marino", reached day 35). `npx tsx playtest/pt.ts status|talk <name>|do <code>|wait <n>|leave|…`
