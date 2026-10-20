@@ -87,7 +87,7 @@ const bumpTried = (x: Stance, k: string) => { (x.tried ??= {})[k] = (x.tried[k] 
 const tried = (x: Stance, k: string) => x.tried?.[k] ?? 0;
 
 // ------------------------------------------------------------------ opening
-export function openAsk(w: World, ak: string, a: Character, t: Character, o: { biz?: Id; amt?: number; what?: string; about?: Id; why?: string; depth?: number; parent?: Id } = {}): Situation | undefined {
+export function openAsk(w: World, ak: string, a: Character, t: Character, o: { biz?: Id; amt?: number; what?: string; about?: Id; why?: string; depth?: number; parent?: Id; m?: Situation['m'] } = {}): Situation | undefined {
   const K = ASKS[ak];
   if (!K || a.id === t.id) return undefined;
   const existing = askBetween(w, ak, a.id, t.id, o.biz);
@@ -96,7 +96,7 @@ export function openAsk(w: World, ak: string, a: Character, t: Character, o: { b
   const s = spawn(w, 'ask', key, a.id, {
     cause: o.why ?? `${a.name} wants something from ${t.name}`, sev: K.sev, phase: 'open', next: w.now + 2 * DAY,
     parties: [{ id: a.id, role: K.roles[0] }, { id: t.id, role: K.roles[1] }], biz: o.biz,
-    orgs: [...new Set([a.familyId, t.familyId].filter(Boolean) as Id[])],
+    orgs: [...new Set([a.familyId, t.familyId].filter(Boolean) as Id[])], m: o.m,
   });
   if (!s) return undefined;
   s.ak = ak;
@@ -313,6 +313,9 @@ function step(w: World, s: Situation) {
   if (isOpen(s) && (s.next ?? 0) <= w.now) s.next = w.now + (2 + Math.floor((jitter(w, s, 'gap') + 0.08) * 25)) * DAY;
 }
 registerStep('ask', step);
+// V89: a plan that is waiting on an ask (goals.ts) may take the asker's turn itself when it falls due, so a plan stepped on its own
+// (as the tests do) still moves its ask along. The same step the daily tick takes; nothing extra.
+export const askTurn = (w: World, s: Situation) => { if (isOpen(s) && (s.next ?? 0) <= w.now) step(w, s); };
 
 // An NPC chooses his next move from who he is and how the last answer went.
 function npcMove(w: World, s: Situation, a: Character, t: Character, S: Stance): AskMove {
@@ -332,7 +335,8 @@ function npcMove(w: World, s: Situation, a: Character, t: Character, S: Stance):
     ['wait', last === 'stall' ? 0.3 + T.caution * 0.3 : 0.05 + T.caution * 0.15],
     ['drop', 0.02 + T.caution * 0.2 + (rounds >= 7 ? 0.55 : rounds >= 5 ? 0.2 : 0) + (s.m?.help ? T.caution * 0.4 : 0) - T.ambition * 0.12 - T.greed * 0.1],
   ];
-  return u.map(([m, v]) => [m, v + jitter(w, s, m)] as [AskMove, number]).sort((x, y) => y[1] - x[1])[0][0];
+  // (a kind that names its moves is held to them: nobody pressures a man into a loan he is asking for)
+  return u.filter(([m]) => !K.moves || K.moves.includes(m)).map(([m, v]) => [m, v + jitter(w, s, m)] as [AskMove, number]).sort((x, y) => y[1] - x[1])[0][0];
 }
 
 // When the man is asking the player, the player is asked: once, with the same answers anyone has.
@@ -342,13 +346,13 @@ function askPlayer(w: World, s: Situation, a: Character, t: Character, K: AskKin
     const S = stance(w, s, t.id); S.last = 'no'; bumpTried(S, 'no');
     delete s.ask;
     const mv = npcMove(w, s, a, t, S);
-    if (mv === 'drop') { move(w, s, 'drop'); return; }
+    if (mv === 'drop' || s.m?.once) { move(w, s, 'drop'); return; } // (a man who asks once, on a plan of his own, takes silence as no)
   }
   const S = stance(w, s, t.id);
   const opts = [{ code: 'yes', label: 'Agree', hint: 'Do what he asks.' }, { code: 'no', label: 'Refuse', hint: 'He will remember it.' }];
   if (K.counter && s.terms?.amt) opts.splice(1, 0, { code: 'counter', label: 'Name your own terms', hint: 'Meet him part way.' });
   opts.push({ code: 'stall', label: 'Buy time', hint: 'Not yes, not no. Not for ever.' });
-  const e = addEnc(w, { kind: 'ask', from: a.id, title: K.title(w, s), days: 4, lines: [K.phrase.ask(w, s)], opts, data: { sit: s.id } });
+  const e = addEnc(w, { kind: 'ask', from: a.id, title: K.title(w, s), days: 4, lines: [...(s.m?.why ? [String(s.m.why)] : []), K.phrase.ask(w, s)], opts, data: { sit: s.id } });
   s.ask = e.id; s.next = e.expires; void S;
 }
 
@@ -366,6 +370,7 @@ export function answerAsk(w: World, p: Character, e: Enc, code: string): { lines
   S.last = 'no'; bumpTried(S, 'no'); rel(a, p.id).grudge = clamp(rel(a, p.id).grudge + 0.06);
   tell(w, s, `${p.name} turned ${a.name} down.`, { actor: p.id, victim: a.id, minor: true });
   { const x = K.onNo?.(w, s, a, p); if (x) { closeSit(w, s, 'refused', [`${first(p)} said no`], K.cool ?? 6); return { lines: [`You tell ${first(a)} no.`, x], minutes: 15 }; } }
+  if (s.m?.once) { closeSit(w, s, 'refused', [`${first(p)} said no`], K.cool ?? 6); return { lines: [`You tell ${first(a)} no. He nods, and he won’t ask you again.`], minutes: 15 }; }
   s.next = w.now + 2 * DAY;
   return { lines: [`You tell ${first(a)} no. He doesn’t like it, and he doesn’t pretend to.`], minutes: 15 };
 }
