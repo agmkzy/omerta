@@ -1,5 +1,6 @@
 import { doMove } from './sitmoves';
 import { matterAct } from './matters';
+import { playerMove, type AskMove } from './asks';
 import { subjectRows } from './talk';
 // Mobile web front end. Same engine as the CLI, different skin.
 import { generate, perform } from './actions';
@@ -265,7 +266,7 @@ function body(): string {
     case 'grudges': return grudgesView();
     case 'goals': return goalsView();
     case 'dispute': return disputeView(v.id, v.lines);
-    case 'story': return storyView(v.id);
+    case 'story': return storyView(v.id, v.lines);
     case 'way': return wayView(v.id, v.lines);
     case 'settle': return settleView(v.id, v.lines, v.kill);
     case 'place': return placeView(v.id);
@@ -413,9 +414,9 @@ function handle(a: string, v: string) {
       const opp = d.a === pp.id || w.chars[d.a]?.bossId === pp.id ? w.chars[d.b] : w.chars[d.a];
       if (code === 'talk') return talkTo(opp.id);
       if (code === 'settle') return go({ t: 'settle', id: opp.id, lines: [] });
-      if (code === 'ignore') { ignoreDispute(d, w); return pass(5, ['You let it ride. The other side will notice.'], { t: 'dispute', id: did, lines: [] }); }
+      if (code === 'ignore') { ignoreDispute(d, w); return pass(5, ['You let it ride. The other side will notice.'], { t: 'dispute', id: did, lines: ['You let it ride. The other side will notice.'] }); }
       if (code === 'look') { const r = investigate(w, pp, d); return pass(r.minutes, [], { t: 'dispute', id: did, lines: r.lines }); }
-      if (code === 'sit') { const ls = callSitdown(w, pp, d); return pass(30, ls, { t: 'dispute', id: did, lines: [] }); }
+      if (code === 'sit') { const ls = callSitdown(w, pp, d); return pass(30, ls, { t: 'dispute', id: did, lines: ls }); }
       return;
     }
     case 'recruit': return go({ t: 'recruit' });
@@ -594,15 +595,20 @@ function handle(a: string, v: string) {
         save();
         return;
       }
-      return pass(r.minutes, r.lines, { t: 'tab', name: 'today' });
+      // (answered from a story, the answer is read there, under the story it belongs to)
+      return pass(r.minutes, r.lines, S.view.t === 'story' ? { t: 'story', id: S.view.id, lines: r.lines } : { t: 'tab', name: 'today' });
     }
     case 'mt': { // V89: something the player does in a matter, from its story
       const r = matterAct(w, P(), args[0], args[1], args[2] || undefined);
-      return pass(r.minutes, r.lines, { t: 'story', id: 'sit:' + args[0] });
+      return pass(r.minutes, r.lines, { t: 'story', id: 'sit:' + args[0], lines: r.lines });
     }
     case 'mv': {
       const r = doMove(w, P(), args[0], args[1], args[2] || undefined);
-      return pass(r.minutes, r.lines, { t: 'story', id: 'sit:' + args[0] });
+      return pass(r.minutes, r.lines, { t: 'story', id: 'sit:' + args[0], lines: r.lines });
+    }
+    case 'am': { // V89: a move in a negotiation the player is pursuing (asks.ts), made from its story
+      const r = playerMove(w, P(), args[0], args[1] as AskMove);
+      return pass(r.minutes, r.lines, { t: 'story', id: 'sit:' + args[0], lines: r.lines });
     }
     case 'help': return go({ t: 'help', who: v, lines: [] });
     case 'helpdo': {

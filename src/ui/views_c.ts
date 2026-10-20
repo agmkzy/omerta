@@ -244,7 +244,7 @@ export function goalsView(): string {
 
 // ---------------------------------------------------------------- disputes
 import { Dispute, Character } from '../types';
-import { storyPage } from './stories';
+import { disputePage, storyKnown, storyPage } from './stories';
 import { disputesOf } from '../disputes';
 import { famName } from '../core';
 
@@ -264,6 +264,9 @@ export function disputeView(id: string, lines: string[]): string {
   const w = W(), p = P();
   const d = (w.disputes ?? []).find((x) => x.id === id);
   if (!d) return back() + `<div class="card"><p>That matter is closed.</p></div>`;
+  // V89: laid out like every other story (stories.ts); the old card below is kept for a quarrel whose people are gone
+  const page = disputePage(id, lines);
+  if (page) return page;
   const a = w.chars[d.a], b = w.chars[d.b];
   const opp = d.a === p.id || a?.bossId === p.id ? b : a;
   const biz = d.biz ? w.biz[d.biz] : undefined;
@@ -309,6 +312,7 @@ export function seatStoryKeys(w: World, p: import('../types').Character): string
 export function storyExists(w: World, key: string): boolean {
   if (key.startsWith('seat:')) return true;
   if (key.startsWith('hunt:')) return !!w.fam[key.slice(5)]?.hunt;
+  if (/^(sit|debt|man|threat|turf):/.test(key)) return storyKnown(w, key);
   return !!(w.disputes ?? []).find((d) => d.id === key);
 }
 // Who moved last. If it was you (you struck first, or you answered and he hasn't), it is not your move.
@@ -340,19 +344,7 @@ export function seatStage(w: World, p: import('../types').Character, rank: strin
   if (f) return 'Turned down for now';
   return 'Open';
 }
-export function storyView(key: string): string {
-  const w = W(), p = P();
-  if (!key.startsWith('seat:')) return /^d\d+$/.test(key) ? (S.seen[key] = W().now, disputeView(key, [])) : storyPage(key);
-  const rank = key.slice(5);
-  const fam = p.familyId ? w.fam[p.familyId] : undefined;
-  const boss = fam ? w.chars[fam.bossId] : undefined;
-  const facts = Object.keys(p.known).map((id) => w.facts[id]).filter((f) => f?.story === key).sort((a, b) => b.t - a.t);
-  let out = back() + `<div class="card"><h2>A seat at the table<small><span class="tag amber">${esc(seatStage(w, p, rank))}</span></small></h2><p class="muted">The family can only carry so many ${esc(rank)}s. More seats mean more rank for the men waiting, and more mouths to feed out of the same take.</p></div>`;
-  out += `<h2 class="sect">What has happened<small>newest first</small></h2><div class="card"><ul class="rows">${facts.length ? facts.map((f) => `<li><span>${esc(shortTime(f.t))}</span><span class="v" style="text-align:left;margin-left:12px">${lk(f.text)}</span></li>`).join('') : '<li><span class="muted">Nothing yet.</span></li>'}</ul></div>`;
-  out += `<h2 class="sect">What you can do</h2><div class="list">`;
-  if (boss) out += `<button class="opt" data-a="talk:${boss.id}"><b>Go and see ${esc(boss.name)}</b><span class="because">He decides. Ask him in person, or make your case.</span></button>`;
-  const q = seatQ(w, p);
-  if (q?.c && w.chars[q.c]) out += `<button class="opt" data-a="talk:${q.c}"><b>Talk to ${esc(w.chars[q.c].name)}</b><span class="because">He’s the one who put your name forward.</span></button>`;
-  out += `<button class="opt" data-a="tab:family"><b>See who else is waiting</b><span class="because">The family tree shows who’s ahead of you.</span></button></div>`;
-  return out;
+export function storyView(key: string, lines: string[] = []): string {
+  if (/^d\d+$/.test(key)) return disputeView(key, lines);
+  return storyPage(key, lines);
 }
