@@ -7,6 +7,13 @@ Current version: **V85**.
 ## Requirements
 - Node.js 22 (any recent LTS should work) and npm.
 
+## Quick start
+```
+make            # npm ci (if needed), typecheck, build dist/omerta.html
+make help       # every target
+```
+Without make: `npm ci && npm run typecheck && npm run build`. Setup from scratch on a new machine: [docs/03-build-and-setup.md](docs/03-build-and-setup.md).
+
 ## Install
 ```
 npm install
@@ -37,6 +44,8 @@ npm run playtest -- status                # unassisted-play harness (see playtes
 The game is a static file. Copy `dist/omerta.html` to `index.html` of any static host. The existing deployment is at https://agmkzy.github.io/omerta/ (hosting setup not verified from the migration session; check it before changing anything). A copy is also published as a Claude artifact. Do not change hosting configuration as part of unrelated work.
 
 ## Documentation
+- [`docs/README.md`](docs/README.md) – start here: stack, saves and compatibility, build, architecture, testing, deployment, guidelines, framework migration, and a per-system [engine reference](docs/engine/README.md).
 - `CLAUDE.md` – project context and rules for Claude Code.
 - `HANDOFF.md` – state at V85, known issues, open items.
-- `docs/` – the binding specs (conversation overhaul, final regression/playtest brief), the architecture audit, earlier version reports and the original README.
+- `docs/` also holds the binding specs (conversation overhaul, final regression/playtest brief), the pre-V72 architecture audit, earlier version reports and the original README.
+- Known bugs are tracked in the [V85 baseline review](https://github.com/agmkzy/omerta/milestone/1) milestone.
