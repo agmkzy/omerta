@@ -1,0 +1,75 @@
+# Typecheck, build and run every regression suite on each push and pull request.
+# Free for public repositories on GitHub-hosted runners. Suites run as parallel jobs, so the
+# wall-clock time is roughly that of the slowest suite instead of the ~7.5 minute serial `test:all`.
+# See docs/05-testing.md.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Typecheck and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: make all
+      - name: Committed build matches the source
+        # The build is deterministic, so a rebuild of an up-to-date tree changes nothing.
+        run: |
+          if ! git diff --quiet -- dist/omerta.html; then
+            echo "::warning file=dist/omerta.html::dist/omerta.html is stale - run 'make pages' and commit before deploying"
+          fi
+          if ! cmp -s dist/omerta.html index.html; then
+            echo "::warning file=index.html::index.html differs from the build - run 'make pages' before deploying"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: omerta-html
+          path: dist/omerta.html
+          retention-days: 14
+
+  suite:
+    name: ${{ matrix.name }}
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: storage, run: 'npx tsx src/tests/storage.test.ts' }
+          - { name: v72 simulation and saves, run: 'npx tsx src/tests/v72.test.ts fast' }
+          - { name: v73 economy, run: 'npx tsx src/tests/v73.test.ts fast' }
+          - { name: v74 NPC agency, run: 'npx tsx src/tests/v74.test.ts fast' }
+          - { name: v75 situations, run: 'npx tsx src/tests/v75.test.ts fast' }
+          - { name: v76 organisations, run: 'npx tsx src/tests/v76.test.ts fast' }
+          - { name: v77 voices and memory, run: 'npx tsx src/tests/v77.test.ts fast' }
+          - { name: v78 conversation layers, run: 'npx tsx src/tests/v78.test.ts fast' }
+          - { name: v79 conversation crawler, run: 'npx tsx src/tests/v79.test.ts fast' }
+          - { name: old saves, run: 'npx tsx src/tests/oldsave.test.ts' }
+          - { name: determinism, run: 'npx tsx src/test.ts' }
+          - { name: schema migrations, run: 'make test-compat' }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: ${{ matrix.run }}
