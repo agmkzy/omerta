@@ -34,7 +34,7 @@ npm run typecheck                         # tsc --noEmit
 npm run test:all                          # every suite plus schema migrations, in parallel (Vitest)
 npx vitest run v77                        # a single suite; add -t "<name>" for a single check
 ```
-Suites (`src/tests/*.test.ts`, found automatically): `storage` (save/load safety), `v72`–`v76` (simulation, economy ledger, NPC autonomy, careers, clubs), `v77`–`v79` (conversation overhaul: crawler, no repeated lines, no internal-data leaks, memory across save/load), `v86`–`v87` (names, backgrounds, starting lives), `oldsave` (loads genuine older saves from `src/tests/fixtures/`), `determinism`. `v75` is the slow one. Long simulations are opt-in: `npm run test:slow`. See [docs/05-testing.md](docs/05-testing.md).
+Suites (`src/tests/*.test.ts`, found automatically): `storage` (save/load safety), `v72`–`v76` (simulation, economy ledger, NPC autonomy, careers, clubs), `v77`–`v79` (conversation overhaul: crawler, no repeated lines, no internal-data leaks, memory across save/load), `v86`–`v87` (names, backgrounds, starting lives), `portrait` (V88 portraits), `oldsave` (loads genuine older saves from `src/tests/fixtures/`), `determinism`. `v75` is the slow one. Long simulations are opt-in: `npm run test:slow`. See [docs/05-testing.md](docs/05-testing.md).
 
 ## Other commands
 ```

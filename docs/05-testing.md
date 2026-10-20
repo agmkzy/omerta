@@ -14,7 +14,7 @@ function fast() {
 describe('v77 fast', fast);
 ```
 
-Every file matching `src/tests/**/*.test.ts` is found by name. Nothing lists the suites, so a new `src/tests/vNN.test.ts` runs in `npm test`, `make test-all` and CI as soon as it exists. (The lists that used to be kept by hand in `package.json`, the Makefile and the CI matrix had drifted: `v86` and `v87` ran nowhere until the move to Vitest.)
+Every file matching `src/tests/**/*.test.ts` is found by name. Nothing lists the suites, so a new `src/tests/vNN.test.ts` runs in `npm test`, `make test-all` and CI as soon as it exists. (The lists that used to be kept by hand in `package.json`, the Makefile and the CI matrix had drifted: `v86`, `v87` and the V88 `portrait` suite ran nowhere until the move to Vitest.)
 
 How a run behaves:
 
@@ -48,6 +48,7 @@ The suites used to take a mode argument (`process.argv[2]`). Those modes are now
 | [v79.test.ts](../src/tests/v79.test.ts) | **Conversation crawler**: random walks through every menu for many characters at many trust levels. Checks for no crashes, no dead ends, nothing rewarded twice, nothing that talks like a database (`DUMP=file` writes the problems found) | 6 | — | 7 s |
 | [v86.test.ts](../src/tests/v86.test.ts) | The opening: name lists, generated and typed names, backgrounds on old records, name/look/background survive a save | 7 | — | <1 s |
 | [v87.test.ts](../src/tests/v87.test.ts) | Backgrounds and starting lives: each package is real state in the ordinary systems, applied once, and the world runs on from it for 35 days | 8 | eight seeds instead of four | 21 s |
+| [portrait.test.ts](../src/tests/portrait.test.ts) | Portraits (V88): deterministic, well-formed SVG for every rank × gender × option, old looks still render, the face survives a promotion, the creator's options, size and speed. Each numbered section is one check that evaluates all its conditions (2,097 in all) and lists every one that failed | 7 | — | <1 s |
 | [oldsave.test.ts](../src/tests/oldsave.test.ts) | Every `fixtures/*.save` loads, plays 3 days and round-trips byte-identically | 2 (one per fixture) | — | 1 s |
 | [determinism.test.ts](../src/tests/determinism.test.ts) | **Determinism** (seed 7, 120 days, built twice in separate processes, gives identical serialisation), save/load continuation, 8 seeds × 180 days with no NaN cash | 10 | — | 20 s† |
 
@@ -94,7 +95,7 @@ The long-term target is 80% of lines. The most uncovered lines are in `dialogue.
 
 Coverage costs about a quarter more run time (v75: 197 s → 244 s), which is why plain `test:all` runs without it. The determinism suite's worlds are built in child processes, which coverage doesn't see. Everything they run is also exercised in-process by other suites.
 
-The suites are written per version (V72–V87) around the features of that version, so coverage follows recent work. Code that predates V72 (`actions.ts`, `jobs.ts`, `encounters.ts`, `meetings.ts`, much of `dialogue.ts`) is exercised by the long simulations and the crawler, but rarely asserted directly. The HTML report shows which lines are never reached. The UI layer (`web.ts`, `ui/*`, about 4,000 lines) has **no tests at all**. A Playwright smoke test of the core loop (new game, talk, wait, save, reload, continue) is the recommended next step ([08-framework-migration.md](08-framework-migration.md#5-suggested-order-and-checkpoints)).
+The suites are written per version (V72–V88) around the features of that version, so coverage follows recent work. Code that predates V72 (`actions.ts`, `jobs.ts`, `encounters.ts`, `meetings.ts`, much of `dialogue.ts`) is exercised by the long simulations and the crawler, but rarely asserted directly. The HTML report shows which lines are never reached. Apart from the portrait suite, which renders `ui/portrait.ts` directly, the UI layer (`web.ts`, `ui/*`, about 4,000 lines) has **no tests**. A Playwright smoke test of the core loop (new game, talk, wait, save, reload, continue) is the recommended next step ([08-framework-migration.md](08-framework-migration.md#5-suggested-order-and-checkpoints)).
 
 ## Is there a GitHub Actions test runner?
 
@@ -140,7 +141,7 @@ make ci
 
 ## Gaps
 
-- There is no UI test of any kind.
+- Apart from the portrait suite, nothing tests the UI.
 - `playtest/` is not typechecked, and its harness has a hardcoded path.
 - There are only two real old-save fixtures (schema 2 and schema 7).
 - v75 is a single file of slow serial checks and sets the wall-clock time of every run, locally and in CI.
