@@ -3,50 +3,68 @@
 ## The pipeline
 
 ```
-src/**/*.ts ──┐
+src/**/*.ts, web/, vite.config.ts
               │  tsc --noEmit           (npm run typecheck)   types only, emits nothing
               │
-src/web.ts ───┴─ esbuild --bundle --format=iife --minify --target=es2020
-                        │
-                        ▼
-                  dist/web.js           (intermediate, git-ignored)
-                        │  guard: fail if the bundle contains "</script"
-                        ▼
-web/template.html ── cp ──► dist/omerta.html ◄── append "<script>" + dist/web.js + "</script>"
-                                     │
-                                     ├─► index.html            (manual copy, GitHub Pages)
-                                     └─► claude.ai artifact    (manual publish)
+web/index.html ── <script type="module" src="./main.ts"> ── import '../src/web'
+              │
+              │  vite build             (npm run build)
+              │    Rolldown bundles everything reachable from src/web.ts into one ES module,
+              │    minified by Oxc for es2020
+              │  omerta:single-page moves the entry <script> to the end of the page (after #app)
+              │  vite-plugin-singlefile inlines it there as <script type="module">
+              │  omerta:single-page then fails the build unless the output is one HTML file with
+              │    one inline script and <meta charset> in its first 1024 bytes
+              ▼
+       dist/omerta.html
+              ├─► index.html            (manual copy, GitHub Pages)
+              └─► claude.ai artifact    (manual publish)
 ```
 
-[build-web.sh](../build-web.sh), in full:
+[vite.config.ts](../vite.config.ts) does the following:
 
-1. `esbuild src/web.ts --bundle --format=iife --minify --target=es2020 --outfile=dist/web.js`. Everything reachable from `web.ts` goes into one immediately-invoked function. It has no runtime dependencies, so nothing external is bundled.
-2. Refuse to continue if the bundle contains the text `</script`, which would end the inline script early.
-3. Copy `web/template.html` (the page shell: meta tags, all CSS, `<div id="app">`) to `dist/omerta.html`, then append the bundle inside a `<script>` tag.
-
-`npm run build` sets `ESBUILD=./node_modules/.bin/esbuild` so the local devDependency is used.
+1. **Root is `web/`.** [web/index.html](../web/index.html) is the page shell (title, meta tags, the Google Fonts link, all CSS, `<div id="app">`). The repository root is not used as Vite's root because its `index.html` is the GitHub Pages copy of the build.
+2. **Entry is [web/main.ts](../web/main.ts)**, a one-line `import '../src/web'`. Pointing the HTML straight at `../src/web.ts` builds, but the dev server can't serve it: the browser resolves the URL against `/` and asks for `/src/web.ts`, which is outside the root. A module import is resolved on the filesystem, so it works in both.
+3. **`vite-plugin-singlefile`** inlines the bundle into the HTML and escapes `</script>` and `<!--` inside it (as `\x3C…`). Its `outputFileName` option writes `dist/omerta.html` rather than `dist/index.html`. It also sets `base: './'` and turns off code splitting.
+4. **`omerta:single-page`** is a small plugin in the config. It does two jobs:
+   - **It moves the script to the end of the page.** Vite puts the entry script first, ahead of `<meta charset="utf-8">`. Once 1 MB of code is inlined there, the charset declaration is no longer in the first 1024 bytes, which is the only place browsers look for it. Unlike esbuild, Rolldown writes non-ASCII characters (`→`, `’`) as raw UTF-8, so when the server sends no charset (`file://`, a plain static server), the browser guesses, and it can guess windows-1252, which garbles the text. This happened in testing. GitHub Pages sends `charset=utf-8`, so it was never affected.
+   - **It checks the result.** `vite-plugin-singlefile` only warns about files it couldn't inline, so this plugin fails the build unless the output is exactly `omerta.html` with one inline `<script>`, no `src=`, and `<meta charset="utf-8">` in the first 1024 bytes. It replaces the old `</script` guard in `build-web.sh`.
+5. **`cssMinify: false`.** The hand-written CSS ships exactly as authored. Minifying it would save about 3 KB on a 1.07 MB page, but Lightning CSS also rewrites rules (it adds prefixes and merges declarations), so the page shell would no longer match `web/index.html`.
+6. **`target: 'es2020'`** keeps the language level the esbuild build used. **`modulePreload.polyfill: false`** stops a preload polyfill being inlined into a single-chunk page.
 
 **Properties:**
 
-- **Fast.** esbuild takes about 15 ms. The whole build is well under a second.
-- **Deterministic.** Rebuilding an unchanged tree produces a byte-identical `dist/omerta.html` (verified: a rebuild on a clean checkout leaves `git status` clean).
-- **No type checking during the build.** esbuild strips types without checking them. `npm run typecheck` is a separate step, and the Makefile's default target runs both.
+- **Fast.** `vite build` takes about 0.1 s.
+- **Deterministic.** Rebuilding an unchanged tree produces a byte-identical `dist/omerta.html`.
+- **The page shell is copied byte for byte.** Everything outside the inline script is identical to `web/index.html`, and the script sits at the end of the page, after `#app`, as it did in the esbuild build. It's a module script, so it runs once the document has been parsed.
+- **No doctype is added.** The shell has none, so the page still renders in quirks mode outside claude.ai, just as before (see [engine/08-ui-and-entry-points.md](engine/08-ui-and-entry-points.md#webindexhtml)).
+- **No type checking during the build.** Vite strips types without checking them. `npm run typecheck` is a separate step, and the Makefile's default target runs both.
 - **No source maps, no hashing, no code splitting.** These would contradict the single-file goal.
 
 Nothing else is built. Tests, the CLI and the playtest harness run straight from TypeScript with `tsx`.
+
+### The dev server
+
+```bash
+make dev
+```
+
+This (or `npm run dev`) serves the game at http://localhost:5173 and reloads the page whenever a file under `src/` or `web/` changes. A reload resumes from the localStorage save, so you stay where you were. It's a full reload, not hot module replacement, because the UI keeps its state in the module-level `S` and isn't written for HMR. The dev server's origin differs from `file://`, GitHub Pages and the artifact, so it has its own saves.
+
+`make preview` builds if needed, then serves `dist/omerta.html` over HTTP at http://localhost:4173 and opens it in the browser. Use it to check a production build. `dist/` has no `index.html`, so a small plugin in `vite.config.ts` (`omerta:preview-at-root`) answers `/` with the page. Without it, the address Vite prints would return a 404. `/omerta.html` also works.
 
 ## Tooling
 
 | Tool | Version (lockfile) | Used for |
 | --- | --- | --- |
-| Node.js | 22 LTS or newer ([.nvmrc](../.nvmrc)). Verified on 25.8 | Running `tsx`, `tsc`, `esbuild` |
+| Node.js | 22.12 or newer ([.nvmrc](../.nvmrc)); Vite 8 needs `^20.19 \|\| >=22.12`. Verified on 25.8 | Running `tsx`, `tsc`, `vite` |
 | npm | Ships with Node | Installing from `package-lock.json` |
 | TypeScript | ^5.6 | `tsc --noEmit` |
 | tsx | ^4.19 | Running `.ts` directly (tests, CLI, playtest) |
-| esbuild | ^0.28.2 | Bundling |
+| Vite | ^8.3 | Bundling (Rolldown, Oxc minifier) and the dev server |
+| vite-plugin-singlefile | ^2.3 | Inlining the bundle into one HTML file |
 | @types/node | ^22 | Types for tests/CLI (`node:assert`, `node:fs`) |
 | make | Any POSIX make (macOS/Linux built-in) | Optional convenience wrapper |
-| sh, cp, grep, cat | POSIX | Used by `build-web.sh` |
 
 ## Setting up from scratch on a new machine
 
@@ -94,7 +112,7 @@ git clone https://github.com/agmkzy/omerta.git && cd omerta && nvm install && ma
 
 ### Windows
 
-Use WSL2 (Ubuntu) and follow the Linux steps. Native Windows can run `npm ci`, `npm run typecheck` and the tests, but `npm run build` calls `sh build-web.sh`, which needs Git Bash or WSL.
+Use WSL2 (Ubuntu) and follow the Linux steps. The build no longer needs a POSIX shell, so native Windows should be able to run `npm ci`, `npm run typecheck`, `npm run build`, `npm run dev` and single suites with `npx tsx` (not tested). `npm run test:all` is a shell `for` loop, and `make` needs a POSIX environment, so those still need Git Bash or WSL.
 
 ### Without make
 
@@ -117,10 +135,12 @@ make test
 | Target | Does |
 | --- | --- |
 | `make` / `make all` | `install` (only if `package.json`/`package-lock.json` changed), then `typecheck`, then `build` |
-| `make check-node` | Fails with a clear message unless Node ≥ 22 and npm are on the PATH |
+| `make check-node` | Fails with a clear message unless Node ≥ 22.12 (Vite's minimum) and npm are on the PATH |
 | `make install` | `npm ci`. It uses `node_modules/.package-lock.json` as a stamp, so it is a no-op when nothing changed |
 | `make typecheck` | `npm run typecheck` |
-| `make build` | `npm run build`. It only rebuilds when a source `.ts` file, `web/template.html` or `build-web.sh` is newer than `dist/omerta.html` |
+| `make build` | `npm run build`. It only rebuilds when a source `.ts` file, `web/index.html`, `web/main.ts` or `vite.config.ts` is newer than `dist/omerta.html` |
+| `make dev` | `npm run dev`: the Vite dev server with live reload on http://localhost:5173. Extra Vite flags go in `ARGS`, for example `make dev ARGS=--host` to open the game from a phone on the same network |
+| `make preview` | Build if needed, then `npm run preview`: serves `dist/omerta.html` over HTTP and opens it in the browser |
 | `make test` | Typecheck plus v77, v78 and v79 (fast) |
 | `make test-all` | Typecheck plus `npm run test:all` (storage, v72–v79, oldsave, determinism) |
 | `make test-compat` | The synthetic migration checks in v73/v74/v75 (`compat` mode), which `test:all` does not run |
@@ -128,9 +148,10 @@ make test
 | `make ci` | `all` + `test-all` + `test-compat`. This is what CI runs |
 | `make pages` | Build, then copy `dist/omerta.html` to `index.html` for GitHub Pages |
 | `make play` / `make sim` | The terminal interface and the unattended simulation ([cli.ts](../src/cli.ts)) |
+| `make bot SEED=3 DAYS=120` | The random-policy player smoke test ([bot.ts](../src/bot.ts)) |
 | `make playtest ARGS="status"` | The command-line playtest harness. **Currently broken outside the original environment:** [playtest/pt.ts](../playtest/pt.ts) hardcodes `DIR = '/home/claude/omerta/playtest'` |
 | `make open` | Build, then open the game in the default browser |
-| `make clean` / `make distclean` | Remove `dist/web.js` / also remove `node_modules`. The committed `dist/omerta.html` is kept |
+| `make clean` / `make distclean` | Remove Vite's cache (`node_modules/.vite`) / also remove `node_modules`. The committed `dist/omerta.html` is kept |
 
 Design notes:
 
@@ -143,7 +164,9 @@ Design notes:
 | Script | Command |
 | --- | --- |
 | `typecheck` | `tsc --noEmit` |
-| `build` | `ESBUILD=./node_modules/.bin/esbuild sh build-web.sh` |
+| `dev` | `vite`: dev server with live reload (see [The dev server](#the-dev-server)) |
+| `build` | `vite build` → `dist/omerta.html` |
+| `preview` | `vite preview`: serves `dist/omerta.html` at http://localhost:4173 and opens it |
 | `test` | `tsx src/test.ts`: determinism, save round trip, multi-seed sanity |
 | `test:all` | `storage`, `v72` … `v79` (each `fast`), then `oldsave`, then `test.ts`. It stops at the first failing suite |
 | `test:v72` / `test:v73` / `test:v74` | Single version suites. v73/v74 include `compat` mode |
@@ -154,7 +177,6 @@ Design notes:
 
 ## Known build gaps
 
-- `tsconfig.json` includes only `src/`, so **`playtest/pt.ts` is never typechecked**.
+- `tsconfig.json` includes `src/`, `web/` and `vite.config.ts` but not `playtest/`, so **`playtest/pt.ts` is never typechecked**.
 - There is no linter or formatter configuration. The code style is consistent by convention only (see [07-guidelines.md](07-guidelines.md)).
-- `build-web.sh` needs a POSIX shell. A ~20-line Node script (`scripts/build.mjs` using esbuild's JS API) would make the build cross-platform with no new dependencies.
-- `dist/web.js` is git-ignored but `dist/omerta.html` is committed. See [06-deployment.md](06-deployment.md#are-the-dist-files-committed) for why and the recommendation.
+- `dist/omerta.html` is committed. See [06-deployment.md](06-deployment.md#are-the-dist-files-committed) for why and the recommendation.

@@ -16,7 +16,7 @@ A single-player sandbox mafia RPG in **1970 New York**. The pitch: a world that 
 - **Commitments:** memos (promise/threat/agreement/question/favour), favours (`addFavour`), debts (`createDebt`, weekly payments, missed payments, collections), encounters (`encounters.ts`), jobs (`jobs.ts`, `orders.ts`), meetings and sit-downs (`meetings.ts`).
 - **Organisations & careers:** `orgs.ts`, `rank.ts`, `career.ts`, clubs (`club.ts`), rackets, Sunday envelopes.
 - **Conversation & negotiation:** `dialogue.ts` (intents, nodes, used-option memory, `say()`), `flows.ts` (standing, promotion, sit-downs, threats, crew management, recruitment, rival organisations), `negotiate.ts`, voices in `voice.ts`/`voicesheet.ts` (archetypes proud, bitter, schemer, earnest, hothead, cold, jovial, frightened). Rules: used options grey out and give no benefit until a new conversation; no repeated lines (`Convo.spoken`); no database language or internal numbers shown; rank changes authority and choices; NPCs disclose only what they plausibly know; counteroffers must have a stated reason grounded in finances/motives.
-- **UI:** `web.ts` entry, `ui/*` views, `web/template.html`. Built by `build-web.sh` into one HTML file.
+- **UI:** `web.ts` entry, `ui/*` views, `web/index.html` (page shell and CSS). Built by Vite (`vite.config.ts`, `vite-plugin-singlefile`) into one HTML file.
 
 ## Hard requirements
 - **Save compatibility:** `serialize/deserialize` (SCHEMA 7). Never break loading of older saves; new fields must be optional with safe defaults; add migrations, never delete them. `src/tests/oldsave.test.ts` loads genuine old saves (`src/tests/fixtures/`, incl. a schema-2 save) – keep it passing and add a fixture whenever the schema changes.
@@ -30,6 +30,7 @@ npm install
 npm run typecheck
 npm run test:all          # or: npx tsx src/tests/<suite>.test.ts fast
 npm run build             # -> dist/omerta.html
+npm run dev               # live-reload dev server, http://localhost:5173
 ```
 Before shipping any change: typecheck + v77–v79 at minimum, full `test:all` for anything touching sim, saves or economy. Deploy = publish `dist/omerta.html` (GitHub Pages `index.html` at https://agmkzy.github.io/omerta/; artifact https://claude.ai/artifact/YDyiAu7Aw8bZdwMjaBRVV3). Don’t poll with sleep loops; run long tests in the background.
 

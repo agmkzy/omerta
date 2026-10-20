@@ -7,7 +7,7 @@ This document assesses whether moving to a standard framework (Vue 3) with a dep
 | Change | Viable? | Effort | Risk | Recommendation |
 | --- | --- | --- | --- | --- |
 | **Vitest** for the existing tests | Yes, almost mechanical | 1–2 days | Low: no game code changes | **Do it first** |
-| **Vite** as the bundler (with `vite-plugin-singlefile`) | Yes | ½ day | Low | Do it together with Vitest, or before Vue |
+| **Vite** as the bundler (with `vite-plugin-singlefile`) | Yes | ½ day | Low | **Done** (section 2) |
 | **Vue 3** for the UI layer (`web.ts` + `src/ui/*`, about 4,000 lines) | Yes, incrementally | Several weeks, part-time | Medium: there are no UI tests today | Do it when the UI needs component state, partial updates or richer screens. Port incrementally |
 | **Pinia** for UI state (`S`) | Yes | Part of the Vue work | Low if the world is kept raw | Use it for `S` only. The world stays a raw object inside it |
 | Vue/Pinia **inside the simulation** | **No** | — | High | Keep the engine plain TypeScript with zero dependencies |
@@ -59,13 +59,14 @@ Watch out for:
 
 **Coverage target suggestion.** First measure, then set the threshold just below the measured figure so it can only go up. Aim for 80% line coverage of `src/*.ts`, excluding `web.ts`, `ui/`, `cli.ts`, `bot.ts` and `stress.ts`. The simulation is heavily exercised by the long runs, so this should already be close.
 
-## 2. Vite (bundler)
+## 2. Vite (bundler): done
 
-Vite builds with esbuild and Rollup and is the natural pair for both Vitest and Vue. It can be adopted without Vue:
+Vite is the bundler. It builds with Rolldown and the Oxc minifier as of Vite 8, and it's the natural pair for both Vitest and Vue. It was adopted without Vue. How it's configured is in [03-build-and-setup.md](03-build-and-setup.md#the-pipeline). In short:
 
-- `vite build` with `vite-plugin-singlefile` inlines all JS and CSS into one `index.html`, which preserves the single-file and artifact property. `build-web.sh` and its `</script` guard go away, and so does the POSIX-shell dependency (it then builds on Windows).
-- `vite` dev server: instant reload while working on the UI, instead of rebuilding and refreshing.
-- `web/template.html` becomes Vite's `index.html` entry. The CSS can move to a `.css` file that Vite inlines.
+- `vite build` with `vite-plugin-singlefile` inlines the bundle into one HTML file, `dist/omerta.html`, so the single-file and artifact property is kept. `build-web.sh` and the POSIX-shell dependency are gone. A small plugin in `vite.config.ts` replaces the `</script` guard, and also fails the build if anything is left un-inlined.
+- `npm run dev` runs a dev server that reloads the page on every change, instead of rebuilding and refreshing by hand.
+- `web/template.html` became `web/index.html`, with Vite's root set to `web/` (the repository root's `index.html` is the GitHub Pages copy). The CSS stays inline in the shell and ships unminified. Moving it into a `.css` file that Vite inlines is still an option.
+- The esbuild and Vite builds were compared in a browser: the same save and the same 300 clicks gave byte-identical screens and a byte-identical final save.
 
 ## 3. Vue 3 for the UI
 
@@ -85,7 +86,7 @@ About 45 `View` variants ([ui/state.ts](../src/ui/state.ts)), each rendered by a
 - `portrait.ts` must not change (CLAUDE.md). Render its SVG string output with `v-html` inside an `<Avatar>` component, and leave the module untouched.
 
 ### Migration plan (strangler pattern)
-1. **Vite and Vitest first** (above). Nothing visible changes.
+1. **Vite and Vitest first** (above; Vite is done). Nothing visible changes.
 2. **Mount Vue around the existing renderer.** Create one root component with a `<div v-html="html">` where `html` is a `computed` that calls today's `body()` and `tabs()`, keyed on a `version` counter bumped after every `handle()`. Keep the delegated `data-a` listener as-is. At this point Vue is in place and nothing else has changed.
 3. **Introduce the Pinia store** for `S` (section 4). `handle()` becomes a store action. The `data-a` listener calls it.
 4. **Port views one at a time,** leaves first: `brief`, `sunday`, `blackjack`, `family`, then the tabs, then `talk`/`meeting`. Each ported view replaces its `case` in `body()` with a component. Buttons call store actions directly (`@click="act('ent', c.id)"`), so `data-a` codes can be retired gradually.
@@ -159,7 +160,7 @@ If the simulation moves into a Web Worker later (recommended once long waits fee
 ## 5. Suggested order and checkpoints
 
 1. Vitest plus CI (green on today's tests, with coverage measured).
-2. Vite build with `vite-plugin-singlefile`. Diff-test that the produced HTML runs, and load an existing save in it.
+2. ~~Vite build with `vite-plugin-singlefile`. Diff-test that the produced HTML runs, and load an existing save in it.~~ Done.
 3. A Playwright smoke test of the core loop.
 4. Wrap the existing renderer in Vue and the store. Ship it, which proves the plumbing.
 5. Port views incrementally, shipping after each batch.

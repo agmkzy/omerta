@@ -43,7 +43,7 @@ One document per group of systems. Each covers every module's purpose, the `Worl
 | jobs.ts | [06](06-jobs-encounters.md) | | types.ts | [01](01-core-simulation.md#typests) |
 | ledger.ts | [02](02-economy.md) | | violence.ts | [03](03-npc-autonomy.md) |
 | life.ts | [05](05-social-meetings-life.md) | | voice.ts, voicesheet.ts | [07](07-conversation.md) |
-| ways.ts | [06](06-jobs-encounters.md) | | web.ts, ui/*, web/template.html | [08](08-ui-and-entry-points.md) |
+| ways.ts | [06](06-jobs-encounters.md) | | web.ts, ui/*, web/index.html | [08](08-ui-and-entry-points.md) |
 | where.ts | [01](01-core-simulation.md#wherets) | | world.ts | [01](01-core-simulation.md#worldts) |
 | playtest/pt.ts | [08](08-ui-and-entry-points.md) | | tests | [../05-testing.md](../05-testing.md) |
 

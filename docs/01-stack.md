@@ -7,18 +7,18 @@ This document covers what OMERTÀ is built with, why, what that costs, and where
 | Layer | Technology | Where |
 | --- | --- | --- |
 | Language | TypeScript 5.6, `strict: true`, typechecked only (`noEmit`) | [tsconfig.json](../tsconfig.json) |
-| Runtime (game) | Any modern browser. The whole game is **one self-contained HTML file** with an inline `<script>` | [web/template.html](../web/template.html), `dist/omerta.html` |
+| Runtime (game) | Any modern browser. The whole game is **one self-contained HTML file** with an inline `<script type="module">` | [web/index.html](../web/index.html), `dist/omerta.html` |
 | Runtime (tools/tests) | Node.js 22 (see [.nvmrc](../.nvmrc)) running TypeScript directly through `tsx` | [package.json](../package.json) |
-| Bundler | esbuild 0.28 → one minified IIFE (`--target=es2020`), concatenated into the HTML template by a 10-line shell script | [build-web.sh](../build-web.sh) |
+| Bundler | Vite 8 (Rolldown, Oxc minifier) → one minified ES module (`target: es2020`), inlined into the page shell by `vite-plugin-singlefile`. `npm run dev` gives a live-reload dev server | [vite.config.ts](../vite.config.ts) |
 | UI | No framework. Views are functions returning HTML strings. `render()` assigns them to `#app.innerHTML`. One delegated click listener dispatches `data-a="action:value"` codes | [src/web.ts](../src/web.ts), [src/ui/](../src/ui) |
-| Styling | Hand-written CSS in the template, CSS custom properties, no preprocessor | [web/template.html](../web/template.html) |
+| Styling | Hand-written CSS in the page shell, CSS custom properties, no preprocessor. It ships as authored, without minification | [web/index.html](../web/index.html) |
 | Graphics | Procedurally painted SVG portraits (must not change, see CLAUDE.md) | [src/ui/portrait.ts](../src/ui/portrait.ts) |
 | Simulation | Plain TypeScript functions over one serialisable `World` object. A seeded PRNG (mulberry32) and a discrete event queue | [src/engine.ts](../src/engine.ts), [src/rng.ts](../src/rng.ts), [src/types.ts](../src/types.ts) |
 | Persistence | `localStorage` (main save + up to 3 rolling snapshots), plus manual JSON download/upload | [src/storage.ts](../src/storage.ts), [src/web.ts](../src/web.ts) |
 | Tests | Plain scripts using `node:assert`, run with `tsx`. Each suite has a tiny local `ok(name, fn)` helper. There is no test framework | [src/tests/](../src/tests), [src/test.ts](../src/test.ts) |
 | Hosting | Static file: GitHub Pages (legacy build from `main`, path `/`, serves `index.html`) and a claude.ai artifact | [06-deployment.md](06-deployment.md) |
 
-**Runtime dependencies: none.** The four dev dependencies are `typescript`, `tsx`, `esbuild` and `@types/node`. They install 7 packages in total. Nothing is fetched at runtime, and the page makes no network requests.
+**Runtime dependencies: none.** The five dev dependencies are `typescript`, `tsx`, `vite`, `vite-plugin-singlefile` and `@types/node`. They install 23 packages in total, most of them Vite's (Rolldown, Lightning CSS, PostCSS and their platform-specific native binaries). Nothing is fetched at runtime, and the page makes no network requests.
 
 Size: about 27,700 lines of TypeScript (roughly 21,000 engine, 3,000 UI, 3,500 tests) in about 85 files. The bundle is about 1.08 MB, including the template and CSS.
 
@@ -30,7 +30,7 @@ The project has no written decision record. The reasons below are inferred from 
 2. **Determinism and testability over UI richness.** The early README is explicit: "If the world can't produce good stories as plain text, no illustrated map will save it." The simulation was built first, as pure functions over plain data, runnable headless in Node (`cli.ts sim`, `bot.ts`, `playtest/pt.ts`). A UI framework would have added nothing to that.
 3. **Plain-data world = free saves.** Keeping the whole game in one JSON-serialisable object means a save is `JSON.stringify(world)`. Determinism tests compare serialised worlds byte for byte. No ORM, store or class hierarchy gets in the way.
 4. **Zero-dependency runtime.** Nothing can break from upstream releases. The page works offline and from `file://`, and is trivially hostable anywhere.
-5. **Fast inner loop.** esbuild bundles in about 15 ms. `tsx` runs any TypeScript file directly, so any module or test is one command away with no compile step.
+5. **Fast inner loop.** The original esbuild build took about 15 ms. The Vite build that replaced it takes about 0.1 s and adds a live-reload dev server. `tsx` runs any TypeScript file directly, so any module or test is one command away with no compile step.
 
 ## Cons of the current stack
 
@@ -44,7 +44,7 @@ The project has no written decision record. The reasons below are inferred from 
 | Tests | No runner: no isolation, no watch mode, no filtering, no parallelism, no coverage. A failed assertion in one `ok()` block is caught and counted, but there is no report format CI can parse. The full suite runs serially and takes many minutes | [05-testing.md](05-testing.md) |
 | Type safety at the edges | `tsc` checks `src/` only. `playtest/` is not in `tsconfig.json`. Saves are parsed with `JSON.parse` and cast to `World` with no runtime validation. `ensureShape` and the migration chain are the only defence | [tsconfig.json](../tsconfig.json), `deserialize` in [engine.ts](../src/engine.ts) |
 | Persistence | `localStorage` is synchronous, about 5 M characters per origin, and blocks the main thread on every save. Saves grow with play (measured below) | [storage.ts](../src/storage.ts) |
-| Build | The HTML concatenation is a shell script (`sh`, `grep`, `cat`), so it doesn't run natively on Windows. There are no source maps in the shipped file and no linter or formatter config | [build-web.sh](../build-web.sh) |
+| Build | There are no source maps in the shipped file and no linter or formatter config | [vite.config.ts](../vite.config.ts) |
 | Main-thread simulation | `advance()` runs synchronously on the UI thread. A long wait (days) freezes the page until the simulation catches up | `advance()` in [engine.ts](../src/engine.ts) |
 
 ## Where the hurdles will be as the project grows
