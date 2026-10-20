@@ -249,6 +249,9 @@ export function deserialize(s: string): World {
   rng.state = o.rng;
   const w = { ...o, rng } as World;
   ensureShape(w);
+  // V89 repair: men recruited from civilian life before the fix kept a civilian's 0% share. No rate in the game goes below 5%,
+  // so a man in the life on exactly nothing is one of them: he goes onto the usual share.
+  for (const c of Object.values(w.chars)) if (c.rank !== 'civilian' && !c.isPlayer && c.kickRate === 0 && BASE_RATE[c.rank] > 0) c.kickRate = BASE_RATE[c.rank];
   // Schema version: bump SCHEMA when a change needs old saves repaired, and add a step below.
   const v = (o.schema as number | undefined) ?? 1;
   // v7 (V76): organisations carry history, treasury, standing and relations; ensureShape (via ensureOrgs) gives older saves all of it.
