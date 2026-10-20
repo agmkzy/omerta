@@ -161,6 +161,9 @@ function weekly(w: World) {
   situationTick(w);
   sitWeek(w);
   mattersWeek(w);
+  // V89: bad feeling between families cools when nothing feeds it (it used to only ever rise; docs/V89_HEALTH.md). A tenth a week
+  // above a floor of quiet suspicion, so old wars are remembered but a quiet month is felt.
+  for (const f of Object.values(w.fam)) for (const k of Object.keys(f.tension)) if (f.tension[k] > 1) f.tension[k] = Math.round((1 + (f.tension[k] - 1) * 0.9) * 100) / 100;
   friendsTell(w);
   pulseWeek(w);
   // Bosses revise the size of their families now and then: a family at war wants soldiers, a rich one wants more earners.

@@ -122,7 +122,7 @@ export function generate(w: World, c: Character, kind: Kind): Action[] {
       if (!made || c.hurtUntil > now) break;
       for (const x of alive) {
         const r = c.rels[x.id];
-        if (!r || r.grudge < 0.45 || (x.familyId && x.familyId === c.familyId) || x.jailedUntil > now) continue;
+        if (!r || r.grudge < 0.5 || (x.familyId && x.familyId === c.familyId) || x.jailedUntil > now) continue; // (V89: 0.45 → 0.5, docs/V89_HEALTH.md)
         if (c.isPlayer && !sanctioned(w, c, x)) continue;
         const hi = x.rank === 'boss' || x.rank === 'underboss' ? 0.4 : 0;
         const base = r.grudge * 0.7 + T.violence * 0.35 - T.caution * 0.45 + T.ambition * 0.05 - hi - crime - 0.08;

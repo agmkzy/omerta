@@ -242,8 +242,10 @@ function answer(w: World, s: Situation, a: Character, t: Character, K: AskKind, 
     return { answer: 'counter', lines };
   }
   // a man who already pays someone to stand behind him doesn't play for time: he sends for him
+  // (V89 health: only when it is protection he is being asked for. A loan offer to a shop that pays someone used to bring the
+  // protector in too, and the warnings that followed filled every negotiation slot in the city.)
   const b = s.biz ? w.biz[s.biz] : undefined;
-  const backed = !!b?.protection && b.protection.collectorId !== a.id && !!live(w, b.protection.collectorId);
+  const backed = s.ak === 'protect' && !!b?.protection && b.protection.collectorId !== a.id && !!live(w, b.protection.collectorId);
   if (!backed && S.fear > 0.35 && S.resolve < 0.6 && tried(S, 'stalled') < 2) {
     bumpTried(S, 'stalled'); S.last = 'stall'; s.phase = 'stalled'; s.next = w.now + 3 * DAY;
     lines.push(a.isPlayer && K.voice?.stall ? K.voice.stall(w, s, a, t) : K.phrase.stall);
@@ -302,7 +304,7 @@ function seekHelp(w: World, s: Situation, a: Character, t: Character): string[] 
     // he comes to the man making trouble, with an ask of his own: leave it alone
     const depth = Number(s.m?.depth ?? 0) + 1;
     const warn = openAsk(w, 'warn', helper, a, { about: s.id, why: `${t.name} asked ${helper.name} to make ${a.name} back off`, depth });
-    if (warn) { warn.next = w.now + 1 * DAY; if (helper.familyId && a.familyId && helper.familyId !== a.familyId) tension(w, helper, a, 1); }
+    if (warn) { warn.next = w.now + 1 * DAY; if (helper.familyId && a.familyId && helper.familyId !== a.familyId) tension(w, helper, a, 0.5); }
     // A man from another family who is asked to protect a shop sees an opening: his people will look after it, for less.
     if (b && s.ak === 'protect' && helper !== protector && helper.familyId && helper.familyId !== a.familyId && b.protection?.familyId !== helper.familyId) {
       const offer = openAsk(w, 'protect', helper, t, { biz: b.id, amt: Math.max(10, Math.round(feeOf(b) * 0.7 / 5) * 5), why: `${helper.name} offered to look after ${b.name} himself`, depth });
@@ -548,9 +550,11 @@ ASKS.protect = {
     return `Chairs break, glass goes. ${b.name} will be shut a while.`;
   },
   // a refusal is an event in the world like any other (the first one is news; after that it is the same story going on)
+  // (V89 health: only the first refusal is recorded as a refusal. Each one used to add to the collector's grudge, so three
+  // no's in one negotiation made him beat the shopkeeper; repeats are now told as the same story going on.)
   onNo: (w, s, a, t) => {
     const b = w.biz[s.biz!];
-    const f = tell(w, s, `${t.name} told ${a.name} to get out of ${b.name}.`, { kind: 'protection_refused', actor: t.id, victim: a.id, witnesses: witnessesAt(w, b.district, [a.id, t.id], 2), minor: !!s.m?.refusal });
+    const f = tell(w, s, `${t.name} told ${a.name} to get out of ${b.name}.`, { kind: s.m?.refusal ? 'rumour' : 'protection_refused', actor: t.id, victim: a.id, witnesses: witnessesAt(w, b.district, [a.id, t.id], 2), minor: !!s.m?.refusal });
     s.m = { ...(s.m ?? {}), refusal: s.m?.refusal ?? f.id };
     return undefined;
   },
@@ -569,7 +573,7 @@ ASKS.warn = {
     const want = o ? stance(w, o, t.id).resolve : 0.5; // how much he wants the thing he is being warned off
     const outranked = (rk(a) - rk(t)) * 0.15;
     const sameFam = a.familyId && a.familyId === t.familyId ? 0.15 : 0;
-    return outranked + sameFam - want * 0.4 + 0.05;
+    return outranked + sameFam - want * 0.4 + 0.4; // (V89 health: was +0.05; almost every warning was refused and half of them ended in a beating)
   },
   yes: (w, s, a, t) => {
     const o = sits(w).find((x) => x.id === String(s.m?.about));
@@ -583,7 +587,7 @@ ASKS.warn = {
   force: (w, s, a, t) => {
     t.hurtUntil = Math.max(t.hurtUntil, w.now + 3 * DAY);
     tell(w, s, `${a.name}'s people roughed up ${t.name} to make the point.`, { kind: 'beating', actor: a.id, victim: t.id, witnesses: witnessesAt(w, t.district, [a.id, t.id], 2) });
-    if (a.familyId && t.familyId && a.familyId !== t.familyId) tension(w, a, t, 2);
+    if (a.familyId && t.familyId && a.familyId !== t.familyId) tension(w, a, t, 1);
     return `${t.isPlayer ? 'You are' : `${first(t)} is`} roughed up, to make the point.`;
   },
   phrase: {
@@ -698,7 +702,7 @@ ASKS.lend = {
   lean: (w, s, a, t) => {
     const b = ownerBiz(w, t.id);
     const need = b && (b.cash < 250 || b.distress > 0) ? 0.35 : t.cash < 150 ? 0.25 : 0.05;
-    return need + (1 - t.traits.caution) * 0.15 - 0.3;
+    return need + (1 - t.traits.caution) * 0.15 + 0.4; // (V89 health: was -0.3, which turned nearly every offer down; V88 took about half)
   },
   counter: (w, s, a, t) => { const amt = s.terms?.amt ?? 0, b = ownerBiz(w, t.id); return amt >= 1000 && !(b && b.distress > 0) ? { amt: 500, why: 'I don’t need more than that' } : undefined; },
   yes: (w, s, a, t) => {
