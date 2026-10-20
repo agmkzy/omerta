@@ -62,10 +62,10 @@ test-sim: install ## The long simulations (tagged sim and slow): make test-sim S
 test-slow: install ## Everything, including every long run (stable, sim, roundtrip, growth): make test-slow SEED=3
 	SEED=$(or $(SEED),3) DAYS=$(or $(DAYS),180) $(NPM) run test:slow
 
-test-cov: install ## test-all with coverage of src/ (fails below the thresholds in vitest.config.ts); HTML report in coverage/
+test-cov: install ## test-all with coverage of src/ (fails below the thresholds in vitest.config.ts); HTML report in coverage/. Not run in CI
 	$(NPM) run test:cov
 
-ci: all test-cov ## What the CI workflow checks (typecheck, build, test-all with coverage)
+ci: all test-all ## What the CI workflow checks (typecheck, build, every test except the opt-in long runs)
 
 pages: build ## Copy the build to index.html (the GitHub Pages entry point)
 	cp $(DIST) index.html

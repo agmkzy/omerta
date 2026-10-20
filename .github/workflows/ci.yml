@@ -1,7 +1,7 @@
 # Typecheck, build and run every regression suite on each push and pull request.
 # Free for public repositories on GitHub-hosted runners. The tests (Vitest) run in three parallel jobs of roughly equal work,
-# so the wall-clock time is that of one job. Each job writes a blob report with its coverage; the last job merges them into
-# one report and checks the coverage thresholds in vitest.config.ts. See docs/05-testing.md.
+# so the wall-clock time is that of one job; failures are annotated on the pull request. Coverage is not measured here (it
+# slows every test by about a quarter); run `make test-cov` locally to check the thresholds. See docs/05-testing.md.
 name: CI
 
 on:
@@ -56,9 +56,9 @@ jobs:
           # Split by work, not by meaning: situations/ is the most simulation, and the determinism suite builds ten worlds in
           # child processes. Everything else runs in the third job, including any new test file: Vitest finds the files,
           # nothing here lists them.
-          - { name: situations, id: situations, files: src/tests/situations }
-          - { name: determinism, id: determinism, files: src/tests/determinism.test.ts }
-          - { name: other tests, id: rest, files: "--exclude 'src/tests/situations/**' --exclude src/tests/determinism.test.ts" }
+          - { name: situations, files: src/tests/situations }
+          - { name: determinism, files: src/tests/determinism.test.ts }
+          - { name: other tests, files: "--exclude 'src/tests/situations/**' --exclude src/tests/determinism.test.ts" }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -66,33 +66,5 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      # Coverage of a part is partial, so its thresholds are checked only on the merged report (job `report`).
       # --maxWorkers=100%: Vitest leaves one core idle by default, a quarter of a 4-core runner.
-      - run: npx vitest run ${{ matrix.files }} --maxWorkers=100% --coverage --coverage.thresholds=false --reporter=default --reporter=blob --outputFile.blob=blob-reports/${{ matrix.id }}.json
-      - uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
-        with:
-          name: blob-${{ matrix.id }}
-          path: blob-reports/
-          retention-days: 1
-
-  report:
-    name: All suites and coverage
-    needs: suite
-    if: ${{ !cancelled() }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: blob-*
-          path: blob-reports
-          merge-multiple: true
-      # Fails if any suite failed, or if coverage of src/ fell below the thresholds.
-      - run: npx vitest run --merge-reports=blob-reports --coverage
+      - run: npx vitest run ${{ matrix.files }} --maxWorkers=100%
