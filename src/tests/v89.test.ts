@@ -6,7 +6,9 @@ import { audit } from '../consistency';
 import { ledgerCheck } from '../econ';
 import { advance, deserialize, serialize } from '../engine';
 import { regard, rel } from '../core';
-import { asksOf, askBetween, move, openAsk, openAsks, playerMove, playerMoves, read, stance } from '../asks';
+import { amendsAsk, asksOf, askBetween, callFavour, favoursWeek, move, openAsk, openAsks, playerMove, playerMoves, putToPlayer, rateAsk, read, stance } from '../asks';
+import { haggleJob, mkJob, resolve } from '../jobs';
+import { addFavour, choose } from '../encounters';
 import { kinOf, closeKin, madeKin } from '../kin';
 import { addFact } from '../core';
 import { ORIGIN, startRivalry, topicsWith, matterAct } from '../matters';
@@ -192,7 +194,7 @@ ok('revenge: a beaten man’s brother wants the man who did it, asks his boss fo
     const asked = (w.situations ?? []).find((y) => y.ak === 'permit' && y.m?.parent === s.id);
     assert.ok(asked || s.out || s.phase !== 'asking leave', 'he asked leave, or it went another way: ' + s.phase);
     if (asked && asked.stage === 'resolved') assert.ok(s.m?.['child:permit'], 'and the answer reached the revenge');
-    assert.ok(s.stage === 'resolved' || s.phase === 'asking leave' || s.phase === 'looking' || s.phase === 'struck', 'the matter moved on: ' + s.phase);
+    assert.ok(s.stage === 'resolved' || ['asking leave', 'looking', 'struck', 'resolved to'].includes(s.phase!), 'the matter moved on: ' + s.phase);
     clean(w, 'after revenge');
   }
   assert.ok(found, 'a brother went after someone');
@@ -321,5 +323,233 @@ ok('what you know of a man is what he has shown you: nothing is noted that he di
   talkAbout(w, p, m, 'tk:trouble');
   assert.equal(notesOf(p, m).length, 0, 'a guarded man who says nothing gives you nothing to write down');
   assert.ok(!m.problem.revealed, 'and his trouble stays his');
+});
+
+// ------------------------------------------------------------------ V89: the one-shot interactions, converted to asks
+const haggler = (w: World, s: import('../types').Situation, id: string) => { const S = stance(w, s, id); S.resolve = 0.3; S.fear = 0.05; S.good = 0.2; S.anger = 0; return S; };
+const dig = (w: World, s: import('../types').Situation) => { const S = stance(w, s, s.terms!.of); S.resolve = 0.95; S.fear = 0; S.good = 0; S.anger = 0.6; return S; };
+const live = (w: World) => Object.values(w.chars).filter((c) => c.alive && !c.isPlayer);
+const prospect = (w: World) => live(w).find((c) => c.prospect && c.rank === 'civilian' && !ownerBiz(w, c.id))!;
+const stats = (w: World) => w.sitpace?.stats ?? {};
+const closed = (s: import('../types').Situation) => s.stage === 'resolved';
+const anyAsk = (w: World, ak: string, by: string, of: string) => [...(w.situations ?? [])].reverse().find((x) => x.ak === ak && x.terms?.by === by && x.terms?.of === of);
+
+ok('recruitment: an offer turned down stays open, and there is more than one way to go on', () => {
+  const w = createWorld(3, 'Tony Marino'), p = P(w), t = prospect(w);
+  p.cash = 2000; (p.intro ??= {})[t.id] = w.now;
+  t.traits.courage = 1; t.traits.caution = 1; t.traits.ambition = 0; // a careful man, in no hurry to be anybody's
+  const r = say(w, p, t, startConvo(t.id), 'recruit_offer');
+  const s = anyAsk(w, 'recruit', p.id, t.id)!;
+  assert.ok(s && r.lines.length, 'the offer is a matter between you');
+  if (closed(s)) return; // (he took it at once: fine, the next test covers the rest)
+  dig(w, s); playerMove(w, p, s.id, 'persuade');
+  assert.ok(!closed(s) && t.rank === 'civilian', 'a man dug in says no, and it is still open');
+  const moves = playerMoves(w, p, s).filter((m) => !m.off).map((m) => m.move);
+  for (const m of ['sweeten', 'pressure', 'drop']) assert.ok(moves.includes(m as never), 'he can go on: ' + moves);
+  assert.ok(options(w, p, t, startConvo(t.id)).some((o) => o.code.startsWith('mv:' + s.id)), 'the matter is in the conversation');
+  assert.ok(!options(w, p, t, startConvo(t.id)).some((o) => o.code === 'recruit_offer'), 'and the one-shot offer is not offered twice');
+  clean(w, 'after a refused offer');
+});
+
+ok('recruitment: his counter names the start he needs and why, and taking it puts him on your crew at that figure', () => {
+  const w = createWorld(4, 'Tony Marino'), p = P(w), t = prospect(w);
+  p.cash = 2000; t.traits.greed = 0.9; t.cash = 100; // greedy, and nothing in his pocket
+  const s = openAsk(w, 'recruit', p, t, { amt: 150 })!;
+  haggler(w, s, t.id);
+  const o = move(w, s, 'ask');
+  assert.equal(o.answer, 'counter', 'a greedy man haggles: ' + o.lines.join(' '));
+  assert.match(String(s.m?.why), /nothing in his pocket/, 'and his reason is true of him');
+  const offer = Number(s.m!.offer), cash0 = p.cash, his0 = t.cash;
+  assert.ok(offer > 150);
+  playerMove(w, p, s.id, 'take');
+  assert.equal(t.bossId, p.id, 'he runs with you now');
+  assert.equal(t.rank, 'associate');
+  assert.equal(cash0 - p.cash, offer, 'it cost what he asked');
+  assert.equal(t.cash - his0, offer, 'and the money went to him');
+  clean(w, 'after a recruit');
+});
+
+ok('recruitment: NPCs make the same offer on their own, and answers come from the man asked', () => {
+  let n = 0;
+  for (const seed of [3, 7]) {
+    const w = createWorld(seed, 'Tony Marino'); advance(w, w.now + 35 * DAY);
+    n += stats(w)['open.recruit'] ?? 0;
+    clean(w, 'recruits seed ' + seed);
+  }
+  assert.ok(n >= 1, 'somebody offered somebody a place: ' + n);
+});
+
+ok('a quiet word is a matter: a refusal leaves the job open, and when he agrees later the job is done and paid', () => {
+  const w = createWorld(3, 'Tony Marino'), p = P(w);
+  const [v, t] = live(w).filter((c) => c.rank === 'civilian' && !ownerBiz(w, c.id)).slice(0, 2);
+  const f = addFact(w, { kind: 'beating', actor: t.id, victim: v.id, text: `${t.name} beat up ${v.name}.`, district: v.district }, { witnesses: [v.id] });
+  v.cash = 1000; t.cash = 400;
+  const j = mkJob(w, { kind: 'handle', title: `Speak to ${t.name} for ${v.name}`, brief: '', giver: v.id, via: 'tip', assignee: p.id, target: t.id, cause: f.id, pay: 100, status: 'active', days: 14 });
+  t.traits.courage = 1; t.traits.caution = 0; rel(t, v.id).grudge = 0.9; // he wants at him, and he is not afraid
+  resolve(w, j, 'warn');
+  const s = anyAsk(w, 'layoff', p.id, t.id)!;
+  assert.ok(s, 'the word is a matter between you');
+  if (closed(s)) return;
+  assert.equal(j.status, 'active', 'the job is not lost on the first answer');
+  assert.equal(s.m?.job, j.id);
+  const moves = playerMoves(w, p, s).filter((m) => !m.off).map((m) => m.move);
+  assert.ok(moves.includes('pressure') && moves.includes('force') && moves.includes('drop'), 'you can go back to him: ' + moves);
+  const S = stance(w, s, t.id); S.resolve = 0; S.fear = 0.9; S.anger = 0; t.traits.courage = 0.1; // he has thought better of it
+  const cash0 = p.cash;
+  const o = playerMove(w, p, s.id, 'pressure');
+  assert.ok(closed(s), 'he agrees: ' + o.lines.join(' '));
+  assert.equal(j.status, 'done', 'and the job is done');
+  assert.ok(p.cash > cash0, 'and paid');
+  assert.ok(rel(t, v.id).grudge < 0.9, 'and he lets the bad blood go');
+  clean(w, 'after a quiet word');
+});
+
+ok('a quiet word: NPCs have one with the man who hurt their own, and it goes on past the first answer', () => {
+  let n = 0, rounds = 0;
+  for (const seed of [3, 7]) {
+    const w = createWorld(seed, 'Tony Marino'); advance(w, w.now + 35 * DAY);
+    n += stats(w)['open.layoff'] ?? 0;
+    for (const s of (w.situations ?? []).filter((x) => x.ak === 'layoff')) rounds = Math.max(rounds, (s.hist ?? []).length);
+    clean(w, 'quiet words seed ' + seed);
+  }
+  assert.ok(n >= 1, 'somebody had a word: ' + n);
+  assert.ok(rounds >= 2, 'and it took more than one exchange');
+});
+
+ok('a favour called in from the player: refusing what you owe costs you and gets around, and he comes back to it', () => {
+  const w = createWorld(3, 'Tony Marino'), p = P(w);
+  const c = live(w).find((x) => x.rank === 'soldier' && x.familyId === p.familyId)!;
+  const f = addFavour(w, c.id, p.id, 2, 'the time he covered for you');
+  const s = callFavour(w, c, p, f, 'money', 300)!;
+  putToPlayer(w, s, [`${c.name} asks to speak to you.`]);
+  const e = w.enc.find((x) => x.kind === 'ask' && x.status === 'open' && x.from === c.id)!;
+  assert.ok(e && e.opts.some((o) => o.code === 'counter'), 'he asks, and you can offer part of it');
+  const st0 = p.standing, r0 = rel(c, p.id).respect;
+  choose(w, p, e, 'no');
+  assert.ok(p.standing < st0 && rel(c, p.id).respect < r0, 'refusing a favour you owe costs you');
+  assert.ok(Object.values(w.facts).some((x) => x.kind === 'favour' && x.actor === p.id && x.victim === c.id && !x.minor), 'and it is talked about');
+  assert.ok(!closed(s) && !f.settled, 'and it is still owed, and still open');
+  s.next = w.now; advance(w, w.now + 3 * DAY);
+  assert.ok(closed(s) || w.enc.some((x) => x.kind === 'ask' && x.status === 'open' && x.from === c.id) || Object.keys(stance(w, s, c.id).tried ?? {}).length > 1, 'he comes back to it');
+  clean(w, 'after a refused favour');
+});
+
+ok('a favour called in by the player: he offers part, with his reason, and taking it settles it through the real money', () => {
+  const w = createWorld(4, 'Tony Marino'), p = P(w);
+  const t = live(w).find((x) => x.rank === 'soldier' && x.familyId === p.familyId)!;
+  const f = addFavour(w, p.id, t.id, 2, 'the money you slipped him');
+  t.cash = 350; (p.intro ??= {})[t.id] = w.now;
+  assert.ok(options(w, p, t, startConvo(t.id)).some((o) => o.code === 'favcall:' + f.id), 'the favour can be called in in conversation');
+  say(w, p, t, startConvo(t.id), 'favcall:' + f.id);
+  const s = anyAsk(w, 'favour', p.id, t.id)!;
+  assert.ok(s, 'it is a matter between you');
+  if (closed(s)) { assert.ok(f.settled); return; }
+  haggler(w, s, t.id); stance(w, s, t.id).last = undefined;
+  const o = move(w, s, 'ask');
+  if (o.answer === 'counter') {
+    assert.match(String(s.m?.why), /short/, 'he is short, and says so');
+    const offer = Number(s.m!.offer), cash0 = p.cash, his0 = t.cash;
+    playerMove(w, p, s.id, 'take');
+    assert.ok(f.settled, 'the favour is square');
+    assert.equal(p.cash - cash0, offer); assert.equal(his0 - t.cash, offer);
+  } else assert.ok(f.settled || !closed(s), 'either he paid or it is still open');
+  clean(w, 'after calling in a favour');
+});
+
+ok('favours owed between other men are called in by them, the same way', () => {
+  const w = createWorld(3, 'Tony Marino');
+  const [a, t] = live(w).filter((c) => c.rank === 'soldier').slice(0, 2);
+  a.cash = 50; t.cash = 2000;
+  const f = addFavour(w, a.id, t.id, 2, 'getting his brother out');
+  f.t = w.now - 12 * DAY;
+  favoursWeek(w); // (the weekly round, as the engine runs it)
+  const s = (w.situations ?? []).find((x) => x.ak === 'favour' && x.m?.fav === f.id);
+  assert.ok(s, 'the man owed called it in');
+  assert.ok(Object.keys(stance(w, s!, a.id).tried ?? {}).length >= 1, 'and put it to him');
+  advance(w, w.now + 8 * DAY);
+  assert.ok(f.settled || closed(s!) || Object.values(stance(w, s!, a.id).tried ?? {}).reduce((x, y) => x + y, 0) >= 2 || s!.next! > w.now, 'and it went somewhere: ' + s!.phase);
+  clean(w, 'after favours between men');
+});
+
+ok('making it right after a broken promise: he can refuse, name a price with his reason, and taking it settles it', () => {
+  const w = createWorld(3, 'Tony Marino'), p = P(w);
+  const t = live(w).find((x) => x.rank === 'soldier' && x.familyId === p.familyId)!;
+  addFact(w, { kind: 'ruling', actor: p.id, victim: t.id, minor: true, text: `${p.name} didn’t keep his word to ${t.name}.`, district: t.district }, { witnesses: [t.id] });
+  (p.intro ??= {})[t.id] = w.now; p.cash = 3000; t.cash = 100;
+  assert.ok(options(w, p, t, startConvo(t.id)).some((o) => o.code === 'word_make'));
+  say(w, p, t, startConvo(t.id), 'word_make');
+  const s = anyAsk(w, 'amends', p.id, t.id)!;
+  assert.ok(s, 'making it right is a matter between you');
+  dig(w, s);
+  playerMove(w, p, s.id, 'ask');
+  assert.ok(!closed(s), 'words alone are not enough for a man dug in');
+  const moves = playerMoves(w, p, s).filter((m) => !m.off).map((m) => m.move);
+  assert.ok(moves.includes('sweeten') && moves.includes('persuade'), 'you can put money with it, or explain: ' + moves);
+  haggler(w, s, t.id); stance(w, s, t.id).last = undefined; t.traits.violence = 0.2; rel(t, p.id).trust = 0.4; // he has cooled
+  const o = move(w, s, 'ask');
+  assert.equal(o.answer, 'counter', 'a man who has cooled names his price: ' + o.lines.join(' '));
+  assert.match(String(s.m?.why), /counting on you/, 'he names what it cost him (he is short)');
+  const offer = Number(s.m!.offer), cash0 = p.cash, his0 = t.cash;
+  playerMove(w, p, s.id, 'take');
+  assert.equal(cash0 - p.cash, offer, 'you pay what he named');
+  assert.equal(t.cash - his0, offer, 'to him');
+  assert.ok(closed(s), 'and it is made right');
+  if (closed(s)) assert.ok(!options(w, p, t, startConvo(t.id)).some((o) => o.code === 'word_make'), 'and once it is made right it is not raised again');
+  clean(w, 'after amends');
+});
+
+ok('making peace between other men is the same offer, and its answer ends their quarrel', () => {
+  const w = createWorld(3, 'Tony Marino');
+  const [a, b] = live(w).filter((x) => x.rank === 'soldier' && x.familyId).slice(0, 2);
+  rel(a, b.id).grudge = 0.4; rel(b, a.id).grudge = 0.4;
+  const s = startRivalry(w, a, b, 'test')!;
+  const am = amendsAsk(w, a, b, { parent: s.id })!;
+  assert.ok(am, 'an offer of amends inside the quarrel');
+  haggler(w, am, b.id); rel(b, a.id).trust = 0.8; a.cash = 2000;
+  move(w, am, 'ask');
+  if (am.st?.[b.id]?.last === 'counter') { assert.ok(am.m?.why, 'his price comes with his reason'); move(w, am, 'take'); }
+  assert.ok(closed(am) && ['agreed', 'gave in'].includes(am.out!), 'he accepts, at his price or at none: ' + am.out + '/' + am.st?.[b.id]?.last);
+  assert.ok(rel(b, a.id).grudge < 0.4, 'and the bad blood goes down');
+  s.next = w.now; advance(w, w.now + 2 * DAY);
+  assert.equal(s.stage, 'resolved', 'their quarrel ends with it');
+  clean(w, 'after peace between men');
+});
+
+ok('asking to pass up less: a counter comes with a real reason, and taking it is the new rate', () => {
+  const w = createWorld(3, 'Tony Marino'), p = P(w), boss = w.chars[p.bossId!];
+  p.kickRate = 0.2; p.books.arrears = 200; // behind with him: that is his reason
+  const s = rateAsk(w, p, boss)!;
+  assert.ok(s, 'the ask is made');
+  haggler(w, s, boss.id); rel(boss, p.id).trust = 0.9; boss.traits.greed = 0;
+  const o = move(w, s, 'ask');
+  if (o.answer === 'counter') {
+    assert.match(String(s.m?.why), /behind/, 'he says why');
+    playerMove(w, p, s.id, 'take');
+    assert.equal(Math.round(p.kickRate * 100), Number(s.terms!.amt), 'the new rate is his figure');
+  } else assert.ok(o.answer === 'yes' || !closed(s), 'it ends or stays open: ' + o.answer);
+  // and refused, it is still there to come back to
+  const w2 = createWorld(4, 'Tony Marino'), p2 = P(w2), b2 = w2.chars[p2.bossId!];
+  p2.kickRate = 0.2;
+  const s2 = rateAsk(w2, p2, b2)!; dig(w2, s2);
+  playerMove(w2, p2, s2.id, 'ask');
+  assert.ok(!closed(s2) && playerMoves(w2, p2, s2).some((m) => m.move === 'sweeten' && !m.off), 'he can ask for less of a cut');
+  clean(w, 'after a rate ask');
+});
+
+ok('pushing for more money on a job: the giver comes up, meets you part way with his reason, or not; and the figure is real', () => {
+  const w = createWorld(3, 'Tony Marino'), p = P(w);
+  const g = live(w).find((x) => x.rank === 'soldier' && x.familyId === p.familyId)!;
+  const t = live(w).find((x) => x.rank === 'civilian')!;
+  g.cash = 300; rel(g, p.id).trust = 0.6; g.traits.courage = 0.3; g.traits.caution = 0.3; g.traits.greed = 0.3; // a reasonable man, short of cash
+  const j = mkJob(w, { kind: 'handle', title: `Deal with ${t.name}`, brief: '', giver: g.id, via: 'tip', assignee: p.id, target: t.id, pay: 500, status: 'offered', days: 7 });
+  haggleJob(w, j);
+  const s = anyAsk(w, 'jobpay', p.id, g.id)!;
+  assert.ok(s && s.m?.job === j.id, 'the haggle is a matter between you');
+  assert.equal(s.st?.[g.id]?.last, 'counter', 'a man short of cash meets you part way');
+  assert.match(String(s.m?.why), /lay my hands on/, 'he is short, and says so');
+  playerMove(w, p, s.id, 'take');
+  assert.equal(j.pay, Number(s.m!.offer), 'the job pays his figure');
+  assert.ok(j.pay > 500);
+  clean(w, 'after haggling');
 });
 console.log('all passed');

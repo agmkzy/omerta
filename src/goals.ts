@@ -7,6 +7,7 @@ import { INVEST_CAP, addStake, bizMove, transferBusiness, trade } from './econ';
 import { LADDER, leaveCrew } from './rank';
 import { isRunner, members, readiness } from './career';
 import { RECRUIT_COST, recruitProspect } from './orders';
+import { askBetween, move as askMove, openAsk } from './asks';
 import { addEnc } from './encounters';
 import { Agency, Business, Character, DAY, Debt, Enc, Goal, GoalEnd, GoalKind, Id, Rank, WEEK, World } from './types';
 
@@ -455,7 +456,6 @@ function recruitStep(w: World, g: Goal, c: Character) {
   if (LADDER.indexOf(c.rank) < 1) return endGoal(w, g, 'dropped', 'no standing to bring anyone on');
   if (crewSize(w, c) >= (CREW_ROOM[c.rank] ?? 0)) return endGoal(w, g, 'done', 'his crew is full');
   if (c.cash < RECRUIT_COST + 50) { g.obstacle = 'short of cash'; g.tries++; if (g.tries >= 6) return endGoal(w, g, 'dropped', 'could not afford to'); return later(w, g, 2); }
-  const t = c.traits;
   if (g.stage === 'spot') {
     const pool = prospectsFor(w, c).sort((a, b) => Number(b.district === c.district) - Number(a.district === c.district) || (a.id < b.id ? -1 : 1));
     const pick = pool.filter((x) => !g.no?.includes(x.id))[0];
@@ -464,6 +464,7 @@ function recruitStep(w: World, g: Goal, c: Character) {
     return later(w, g, 1);
   }
   const p = g.target ? w.chars[g.target] : undefined;
+  if (p?.alive && p.bossId === c.id && (p.rank as Rank) === 'associate') { bump(w, 'recruit'); return endGoal(w, g, 'done', `took on ${p.name}`); } // (V89: he said yes to the offer)
   if (!p?.alive || !p.prospect || p.rank !== 'civilian') { // someone else got him, or he's gone
     if (p && p.rank !== 'civilian' && p.bossId !== c.id) { g.tries++; bump(w, 'lostRecruit'); }
     delete g.target; g.stage = 'spot'; g.tries++;
@@ -475,16 +476,23 @@ function recruitStep(w: World, g: Goal, c: Character) {
     const sp = c.bossId ? w.chars[c.bossId] : undefined;
     if (!(sp?.alive && rel(sp, c.id).trust >= 0.35) && c.rank === 'soldier') { g.obstacle = 'nobody to vouch for him'; g.tries++; g.no = [...(g.no ?? []), p.id].slice(-4); delete g.target; g.stage = 'spot'; if (g.tries >= 4) return endGoal(w, g, 'failed', 'could not vouch for his man'); return later(w, g, 2); }
   }
-  bump(w, 'recruitTry'); bump(w, 'inter.recruit');
-  const chance = 0.3 + t.sociability * 0.25 + (c.rank === 'capo' ? 0.1 : 0) + p.traits.ambition * 0.15 - p.traits.caution * 0.2 + clamp(c.standing / 100, 0, 1) * 0.15;
-  if (!w.rng.chance(chance)) {
+  // V89: the offer is a matter between them (asks.ts 'recruit'), not a single roll: he answers from what he wants and needs, may name
+  // his own start, and the recruiter goes on with it in his own way (asks.ts step); the goal waits on how it ends.
+  if (askBetween(w, 'recruit', c.id, p.id)) { g.stage = 'asking'; g.next = `wait for ${first(p)}'s answer`; return later(w, g, 0.5); }
+  const refused = () => {
     g.tries++; g.no = [...(g.no ?? []), p.id].slice(-4); delete g.target; g.stage = 'spot'; bump(w, 'refused.recruit');
     if (g.tries >= 4) return endGoal(w, g, 'failed', 'they would not come');
     return later(w, g, 1.5);
-  }
-  recruitProspect(w, c, p);
+  };
+  if (g.stage === 'asking') return refused(); // it ended, and not with him on the crew (that is handled above)
+  if ((w.sitcool?.[`ask:recruit:${c.id}:${p.id}:`] ?? 0) > w.now) return refused(); // he was asked not long ago, and it came to nothing
+  const s = openAsk(w, 'recruit', c, p, { amt: RECRUIT_COST, why: `${c.name} offered ${p.name} a place` });
+  if (!s) { g.obstacle = 'too much going on'; return later(w, g, 1); } // the street is busy with other matters; he tries again later
+  bump(w, 'recruitTry'); bump(w, 'inter.recruit');
+  askMove(w, s, 'ask');
   if ((p.rank as Rank) === 'associate' && p.bossId === c.id) { bump(w, 'recruit'); return endGoal(w, g, 'done', `took on ${p.name}`); }
-  g.tries++; return later(w, g, 1);
+  g.stage = 'asking'; g.next = `wait for ${first(p)}'s answer`;
+  return later(w, g, 0.5);
 }
 
 // ---------------------------------------------------------------- advancement

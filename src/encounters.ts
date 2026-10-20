@@ -1,4 +1,4 @@
-import { answerAsk, answerWord } from './asks';
+import { answerAsk, answerWord, callFavour, putToPlayer } from './asks';
 import { answerMatter } from './matters';
 // People come to you. Each approach is a small scene in the man's own voice, with choices that carry weight:
 // a loan is a debt, a favour is a debt of another kind, a no is remembered. Nothing here is a menu of numbers.
@@ -312,6 +312,10 @@ function callIn(w: World, p: Character): Cand[] {
           earnest: [`I hate to do this. But after ${f.what}, I have nobody else to ask.`],
         });
         const txt = ask === 'money' ? 'He needs $300 and he needs it quietly.' : ask === 'muscle' ? 'There’s a man who needs to be persuaded, and he wants you standing beside him when it happens.' : 'He needs you to say nothing about something you saw. Not to the boss, not to anyone.';
+        // V89: calling in a favour is a matter between you (asks.ts 'favour'): you can agree, offer part of it, ask for time or
+        // refuse, and he comes back to it in his own way; refusing what you owe costs you, and gets around.
+        const s = callFavour(w, c, p, f, ask as 'money' | 'muscle' | 'silence', ask === 'money' ? 300 : undefined);
+        if (s) { putToPlayer(w, s, [`${c.name} asks to speak to you.`, `"${lead}"`, txt]); return; }
         addEnc(w, {
           kind: 'callin', from: c.id, title: `${first(c)} calls in a favour`,
           lines: [`${c.name} asks to speak to you.`, `"${lead}"`, txt],
@@ -796,12 +800,26 @@ function tipReply(w: World, p: Character, e: Enc, c: Character, code: string, li
   if (code === 'no') return done(5);
   let pay = price;
   if (code === 'haggle') {
-    pay = Math.round(price / 2);
-    if (!w.rng.chance(0.4 + c.traits.greed * -0.2 + 0.3)) {
-      lines.push(`${c.name} shrugs and finishes his drink. "Another time, then." The offer is gone.`);
+    // V89 (the V85 bug: haggling with no reason was taken too easily). He takes half only if he needs the money now, and says so;
+    // otherwise he names his own figure with the reason he has, or, a greedy man who doesn't need it, walks.
+    const need = c.cash < price || (!!c.problem && ['debt', 'gambling'].includes(c.problem.kind) && c.problem.sev > 0.3);
+    const kind = String(e.data?.kind);
+    if (need && c.traits.greed <= 0.7) {
+      pay = Math.round(price / 2);
+      lines.push(`${c.name} looks at the money a long moment. "${c.cash < price ? 'I need it more than I need to argue.' : 'I owe a man who doesn’t wait.'} All right."`);
+    } else if (c.traits.greed > 0.6 && !need && rel(c, p.id).trust < 0.5) {
+      lines.push(`${c.name} shrugs and finishes his drink. "I don’t need your money that badly. Another time, then." The offer is gone.`);
       return done(10);
+    } else {
+      const counter = Math.round(price * 0.75 / 10) * 10;
+      const why = kind === 'side' || kind === 'trouble' || kind === 'leaving' ? 'It’s about one of your own men. That’s worth more than half.' : 'There’s real money at the end of it, more than this.';
+      e.data = { ...(e.data ?? {}), counter };
+      e.opts = [{ code: 'counter', label: `Pay his ${money(counter)}`, hint: 'His figure. He told you why.' }, { code: 'buy', label: `Pay the ${money(price)} after all`, hint: 'What he asked in the first place.' }, { code: 'no', label: 'No thanks' }];
+      lines.push(`${c.name} shakes his head. "${money(counter)}. ${why}"`);
+      return keep(10);
     }
   }
+  if (code === 'counter') pay = Number(e.data?.counter ?? price);
   if (p.cash < pay) {
     lines.push('You don’t have that on you.');
     return keep(5);

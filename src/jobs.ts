@@ -7,6 +7,8 @@ import { arch, bossWhy, dodge, injury, pitch, whyOf } from './voice';
 import { confide, perform, share, tension } from './actions';
 import { afterClient, afterKilling } from './consequences';
 import { addFact, clamp, concealedGap, earn, factText, handleDeath, money, newId, notifyProtector, ownerBiz, recordCareer, regard, rel, repute, shortTime, travelTime, witnessesAt } from './core';
+import { askBetween, move as askMove, openAsk } from './asks';
+import { isOpen } from './situ';
 import { gigApproaches, gigTick, gigOffer, gigResolve, gigStale, GIG_HELP, GIG_LABEL } from './gigs';
 import { Action, Character, DAY, Id, Job, World } from './types';
 
@@ -482,6 +484,15 @@ function conclude(w: World, j: Job, res: Result): Result {
   } else if (res.ok && giver && (j.via === 'tip' || j.via === 'contract')) res.lines.push(`${giver.name} owes you one now. In this life that’s worth more than cash.`);
   return res;
 }
+// V89: a job whose outcome was left open (a quiet word the man has not yet answered, asks.ts 'layoff') is finished later, when the
+// matter is: paid and concluded exactly as if it had come off on the day.
+export function finishJob(w: World, j: Job, ok: boolean, lines: string[] = []): Result {
+  if (j.status !== 'active') return { lines, minutes: 0, ok: false };
+  const doer = w.chars[j.assignee], giver = j.giver ? w.chars[j.giver] : undefined;
+  let gained = 0;
+  if (ok && doer && j.pay > 0) { gained = paid(w, doer, j.pay, giver, 'handle'); if (gained > 0 && doer.isPlayer) lines.push(`${giver?.name ?? 'He'} pays you ${money(gained)}.`); }
+  return conclude(w, j, { lines, minutes: 0, ok, money: gained || undefined });
+}
 
 export function resolve(w: World, j: Job, code: string): Result {
   const lines: string[] = [];
@@ -563,7 +574,20 @@ export function resolve(w: World, j: Job, code: string): Result {
       const guilty = j.cause ? w.facts[j.cause]?.actor === t.id : true;
       minutes = travelTime(doer.district, t.district) + 60;
       doer.district = t.district;
-      if (code === 'warn') {
+      // V89: a quiet word is a matter between the two men (asks.ts 'layoff'), not a roll: he weighs who is asking, whether he did
+      // it at all and how much he wants at the man; whatever he says, the doer can go back to him, and if he agrees later the job
+      // is done then. (If the world's matters are too many for one more, the old single answer stands in.)
+      const quiet = code === 'warn' ? askBetween(w, 'layoff', doer.id, t.id) ?? openAsk(w, 'layoff', doer, t, { about: giver.id, why: `${giver.name} wants ${t.name} to leave him alone` }) : undefined;
+      if (quiet) {
+        quiet.m = { ...(quiet.m ?? {}), for: giver.id, ...(j.cause ? { fact: j.cause } : {}) };
+        const o = askMove(w, quiet, 'ask');
+        lines.push(...o.lines);
+        ok = o.answer === 'yes';
+        if (!ok && isOpen(quiet)) {
+          if (doer.isPlayer) { quiet.m.job = j.id; lines.push(`It isn’t settled. ${t.name.split(' ')[0]} knows what you came for, and you can go back to him.`); return { lines, minutes, ok: false }; }
+          if (!guilty) note = `${t.name} swore it wasn't him.`;
+        }
+      } else if (code === 'warn') {
         const pr = clamp(0.45 + adj * 0.25 + (t.traits.caution - 0.5) * 0.5 - (t.traits.courage - 0.4) * 0.3, 0.1, 0.9);
         if (guilty && rng.chance(pr)) {
           const rest = Math.min(Math.round((t.cash * 0.5) / 10) * 10, 800);
@@ -1231,6 +1255,15 @@ export function haggleJob(w: World, j: Job): { lines: string[]; minutes: number 
   const g = j.giver ? w.chars[j.giver] : undefined;
   j.haggled = true;
   if (!g) return { lines: ['There’s no one to haggle with.'], minutes: 10 };
+  // V89: pushing for more is an ask (asks.ts 'jobpay'): he comes up, meets you part way with the reason he has, or won't; and it
+  // stays between you, so you can take his figure later, settle for less, or let it go, in conversation with him.
+  const other = askBetween(w, 'jobpay', p.id, g.id); // (one haggle with a man at a time: another job's stays as it was)
+  const s = other ? (other.m?.job === j.id ? other : undefined) : openAsk(w, 'jobpay', p, g, { amt: Math.round((j.pay * 1.3) / 50) * 50, about: j.id, why: `${p.name} wanted more for ${j.title}` });
+  if (s) {
+    s.m = { ...(s.m ?? {}), job: j.id };
+    const o = askMove(w, s, 'ask');
+    return { lines: o.lines.map((l) => note(j, l)), minutes: 15 };
+  }
   const pr = clamp(0.35 + p.standing / 100 * 0.3 - g.traits.greed * 0.2 + rel(g, p.id).respect * 0.2, 0.1, 0.75);
   if (w.rng.chance(pr)) {
     j.pay = Math.round((j.pay * 1.3) / 50) * 50;

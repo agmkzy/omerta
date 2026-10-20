@@ -5,11 +5,12 @@ import type { Convo, FollowOpt, Said } from './dialogue';
 import { readiness } from './career';
 import { addFact, clamp, learn, money, rel } from './core';
 import { addFavour } from './encounters';
-import { recruitProspect, RECRUIT_COST } from './orders';
+import { RECRUIT_COST } from './orders';
+import { amendsAsk, askBetween, openAsk, playerMove, playerMoves, type AskMove } from './asks';
 import { arch } from './voice';
 import { standingWord } from './jobs';
 import { PROBLEM_LABEL } from './people';
-import { Character, DAY, Id, World } from './types';
+import { Character, DAY, Id, Situation, World } from './types';
 import type { Arch } from './voice';
 
 type Pool = Partial<Record<Arch, string[]>> & { _: string[] };
@@ -38,6 +39,8 @@ const memoOnce = (t: Character, p: Character, w: World, kind: 'agreement' | 'thr
   t.memos.push({ id: 'm' + w.nextId++, t: w.now, other: p.id, kind, text, ...(due ? { due } : {}) });
 };
 const D = (w: World) => Math.floor(w.now / 1440);
+// V89: what you can do next in a matter you have just raised with him, as the conversation's next choices (the same moves as anywhere)
+const movesOf = (w: World, p: Character, s: Situation): FollowOpt[] | undefined => { const m = playerMoves(w, p, s).filter((x) => !x.off); return m.length ? m.map((x) => ({ code: `mv:${s.id}:${x.move}`, label: x.label, hint: x.hint, big: ['take', 'sweeten', 'pressure'].includes(x.move) })) : undefined; };
 const stamp = (t: Character, key: string, w: World) => { (t.talk ??= {})[key] = { d: D(w), sig: 'x', n: 1 }; };
 const recent = (t: Character, key: string, w: World, days: number) => { const m = t.talk?.[key]; return !!m && D(w) - m.d <= days; };
 
@@ -54,27 +57,18 @@ export function flow(w: World, p: Character, t: Character, c: Convo, code: strin
   if (c0 === 'word_make') {
     const f0 = brokenWord(w, p, t);
     if (!f0) { lines.push('“It’s done with. Let it be.”'); return said(lines, c, undefined, 3); }
-    c.ctx.deal = { kind: 'word', ask: 150 };
     lines.push(pick(w, t, { hothead: [`“You said you would. You didn’t. Talk is cheap, ${p.name.split(' ').slice(1).join(' ') || p.name}.”`], proud: ['“I don’t forget when a man gives his word and sits on it.”'], _: ['“You told me you’d see to it. Then nothing. I noticed.”'] }));
-    return said(lines, c, [
-      { code: 'fl:word_pay', label: 'Put $150 in his hand for his trouble', hint: 'Costs $150. It goes a long way toward mending it.', big: true },
-      { code: 'fl:word_explain', label: 'Tell him straight why it fell through', hint: 'Costs nothing. He may not care why.' },
-      drop,
-    ], 15);
+    // V89: making it right is a matter between you (asks.ts 'amends'): own up, put money with it, tell him why; he may accept,
+    // name what it would take and why, or turn you away, and you can come back to it.
+    const s = askBetween(w, 'amends', p.id, t.id) ?? amendsAsk(w, p, t, { word: f0.id, why: `${p.name} came to make it right with ${t.name}` });
+    return said(lines, c, s ? movesOf(w, p, s) : undefined, 15);
   }
+  // (the V85 follow-ups, kept so an old conversation still answers: they are moves in the same matter now)
   if (c0 === 'fl' && (arg === 'word_pay' || arg === 'word_explain')) {
     const f0 = brokenWord(w, p, t);
-    if (!f0) { lines.push('“Already settled.”'); return said(lines, c, undefined, 3); }
-    stamp(t, 'word:' + f0.id, w);
-    if (arg === 'word_pay') {
-      if (p.cash < 150) { lines.push('You haven’t got it on you.'); return said(lines, c, c.ctx.follow, 0); }
-      p.cash -= 150; t.cash += 150; tweak(0.07, 0.03, 0.03); r.grudge = clamp(r.grudge - 0.05);
-      lines.push('He counts it and doesn’t say thank you. “All right. We’re square. Next time it’s you I’ll expect first.”');
-    } else {
-      const fair = r.trust >= 0.4;
-      tweak(fair ? 0.03 : 0.0, 0, fair ? 0.0 : -0.03);
-      lines.push(fair ? '“Hmph. I can live with that. Don’t make it a habit.”' : '“I’m sure it made sense to you.” He doesn’t believe you or disbelieve you. He has stopped caring.');
-    }
+    const s = f0 ? askBetween(w, 'amends', p.id, t.id) ?? amendsAsk(w, p, t, { word: f0.id }) : undefined;
+    if (!s) { lines.push('“Already settled.”'); return said(lines, c, undefined, 3); }
+    lines.push(...playerMove(w, p, s.id, arg === 'word_pay' ? 'sweeten' : 'persuade').lines);
     return said(lines, c, undefined, 15);
   }
 
@@ -280,33 +274,25 @@ export function flow(w: World, p: Character, t: Character, c: Convo, code: strin
   if (c0 === 'recruit_offer') {
     if (!t.prospect || t.rank !== 'civilian') { lines.push('“Not for me. I’ve got my own life.”'); return said(lines, c, undefined, 5); }
     if (rk(p) < 1) { lines.push('“You? You’re nobody yet. Come back when you are somebody.”'); return said(lines, c, undefined, 5); }
-    if (recent(t, 'recruit', w, 5)) { lines.push('“I gave you my answer. Ask when something’s different.”'); return said(lines, c, undefined, 3); }
-    stamp(t, 'recruit', w);
-    const greedy = t.traits.greed > 0.6, bold = t.traits.ambition > 0.6;
-    const want = greedy ? RECRUIT_COST * 2 : RECRUIT_COST;
-    c.ctx.deal = { kind: 'recruit', ask: want, offer: RECRUIT_COST };
-    lines.push(greedy
-      ? `“Work for you? What’s it pay up front? A man with nothing in his pocket works for nobody. ${money(want)}, and I’m yours.”`
-      : bold ? '“I’ve been waiting for somebody to ask. I want to know what I’m getting, and who I answer to.”'
-        : '“It’s a big thing, to put my name to yours. I want to know what you expect.”');
-    lines.push(`He understands that what he does will be put against your name.`);
-    return said(lines, c, [
-      { code: 'fl:rc_std', label: `Offer the usual: ${money(RECRUIT_COST)} to start`, hint: greedy ? 'He wants more. He may walk.' : 'Fair. He will probably take it.', big: true },
-      ...(greedy ? [{ code: 'fl:rc_more', label: `Pay what he asks: ${money(want)}`, hint: 'More than usual. He will remember you were generous.', big: true } as FollowOpt] : []),
-      { code: 'fl:rc_wait', label: 'Tell him to think it over' },
-    ], 20);
+    // V89: an offer of a place is a matter between you (asks.ts 'recruit'). He may take it, name the start he needs and why, want
+    // time, or say no; and whatever he says, you can come back to it: offer more, make your case, lean on him, or let it go.
+    if (p.cash < RECRUIT_COST) { lines.push(`You need ${money(RECRUIT_COST)} to bring a man on properly.`); return said(lines, c, undefined, 3); }
+    const open = askBetween(w, 'recruit', p.id, t.id);
+    const s = open ?? openAsk(w, 'recruit', p, t, { amt: RECRUIT_COST, why: `${p.name} offered ${t.name} a place` });
+    if (!s) { lines.push('“I gave you my answer. Ask when something’s different.”'); return said(lines, c, undefined, 3); }
+    const bold = t.traits.ambition > 0.6;
+    if (!open) lines.push(bold ? '“I’ve been waiting for somebody to ask. I want to know what I’m getting, and who I answer to.”' : '“It’s a big thing, to put my name to yours. I want to know what you expect.”');
+    lines.push(...playerMove(w, p, s.id, 'ask').lines);
+    return said(lines, c, movesOf(w, p, s), 20);
   }
-  if (c0 === 'fl' && (arg === 'rc_std' || arg === 'rc_more')) {
-    const extra = arg === 'rc_more' ? RECRUIT_COST : 0;
-    if (p.cash < RECRUIT_COST + extra) { lines.push('You haven’t got that on you.'); return said(lines, c, c.ctx.follow, 0); }
-    const greedy = t.traits.greed > 0.6;
-    if (greedy && arg === 'rc_std' && !w.rng.chance(clamp(0.25 + r.trust * 0.6, 0.15, 0.8))) { tweak(-0.03, 0, -0.02); lines.push('He looks at the money as if it had insulted him. “Not for that. Maybe later.”'); return said(lines, c, undefined, 10); }
-    const out = recruitProspect(w, p, t);
-    if (extra) { p.cash -= extra; t.cash += extra; tweak(0.05, 0.03, 0); }
-    lines.push(...out.map((l) => l));
-    return said(lines, c, undefined, 30);
+  // (the V85 follow-ups, kept so an old conversation still answers: they are the same matter now)
+  if (c0 === 'fl' && (arg === 'rc_std' || arg === 'rc_more' || arg === 'rc_wait')) {
+    const s = askBetween(w, 'recruit', p.id, t.id);
+    if (!s) { lines.push('“We’ve been through that.”'); return said(lines, c, undefined, 3); }
+    const mv: AskMove = arg === 'rc_wait' ? 'wait' : arg === 'rc_more' ? (s.st?.[t.id]?.last === 'counter' ? 'take' : 'sweeten') : 'ask';
+    lines.push(...playerMove(w, p, s.id, mv).lines);
+    return said(lines, c, undefined, 20);
   }
-  if (c0 === 'fl' && arg === 'rc_wait') { lines.push('“I’ll think. Don’t take too long. I’ve had other offers.”'); return said(lines, c, undefined, 5); }
 
   // ------------------------------------------------------------------ orders that meet resistance
   if (c0 === 'assign_low' || c0 === 'assign_hustle') {

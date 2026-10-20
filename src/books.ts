@@ -1,4 +1,5 @@
 import { skimNoticed } from './situ';
+import { move as askMove, rateAsk } from './asks';
 import { say as vsay } from './voicesheet';
 // Kick-ups and financial records.
 // Every dollar a character earns is recorded against a source (c.books.gross). Once a week each member
@@ -317,15 +318,22 @@ export function settleOne(w: World, c: Character) {
 // trusts him, whether the family is under a levy, whether he needs the money himself. He agrees, meets him part way, or says no.
 // (This is the one place a rate changes by agreement. The older one-way version - a crewman asking the PLAYER for a lower share -
 // is the 'rate' event in pulse.ts and still works; the player and the NPCs now ask upward too.)
-export function askRate(w: World, c: Character, boss: Character, byPlayer = false): { outcome: 'agree' | 'counter' | 'refuse'; lines: string[] } {
-  const rng = w.rng;
+// How a boss sees a man's request to pass up less, from the real books: whether he has paid steadily, whether a slump shows, whether
+// the family is levying everyone, whether the boss himself is short. Shared by the old one-shot answer and the V89 ask ('rate').
+export function rateView(w: World, c: Character, boss: Character) {
   const fam = c.familyId ? w.fam[c.familyId] : undefined;
   const levy = !!(fam?.levy && fam.levy.until > w.now);
   const h = c.books.history.slice(-6);
   const steady = h.length >= 4 && h.filter((x) => x.tone === 'paid' || x.tone === 'downturn' || x.tone === undefined).length >= h.length - 0 && c.books.missed === 0 && c.books.arrears <= 0;
   const slump = visibleSlump(c) < 0.75;
   const floor = Math.max(0.05, BASE_RATE[c.rank] - 0.1);
-  const score = 0.2 + rel(boss, c.id).trust * 0.45 - boss.traits.greed * 0.4 + (steady ? 0.2 : -0.15) + (slump ? 0.1 : 0) - (levy ? 0.2 : 0) - (boss.cash < LIVING[boss.rank] * 3 ? 0.1 : 0);
+  const short = boss.cash < LIVING[boss.rank] * 3;
+  const score = 0.2 + rel(boss, c.id).trust * 0.45 - boss.traits.greed * 0.4 + (steady ? 0.2 : -0.15) + (slump ? 0.1 : 0) - (levy ? 0.2 : 0) - (short ? 0.1 : 0);
+  return { levy, h, steady, slump, floor, short, score, behind: c.books.missed > 0 || c.books.arrears > 0 };
+}
+export function askRate(w: World, c: Character, boss: Character, byPlayer = false): { outcome: 'agree' | 'counter' | 'refuse'; lines: string[] } {
+  const rng = w.rng;
+  const { h, steady, floor, score } = rateView(w, c, boss);
   const bf = boss.name.split(' ')[0];
   const now = Math.round(c.kickRate * 100);
   if (c.kickRate <= floor + 0.001) return { outcome: 'refuse', lines: [`${bf} points out you already pass up less than most. There's nothing left to give.`] };
@@ -356,7 +364,9 @@ function rateTalks(w: World) {
     if ((c.cooldown['rate:ask'] ?? 0) > w.now || c.books.history.length < 5 || c.books.missed > 0) continue;
     if (!rng.chance(0.012 + (c.traits.ambition > 0.6 ? 0.01 : 0))) continue;
     c.cooldown['rate:ask'] = w.now + 8 * WEEK;
-    askRate(w, c, boss);
+    // V89: the same ask the player makes (asks.ts 'rate'): it goes on in its own time, with the same answers
+    const s = rateAsk(w, c, boss);
+    if (s) askMove(w, s, 'ask'); else askRate(w, c, boss); // (no room in the world's matters: the old single answer stands in)
   }
 }
 
