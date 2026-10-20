@@ -63,7 +63,7 @@ After loading, the daily `reconcile(w)` ([consistency.ts](../src/consistency.ts)
 
 ## 3. Browser persistence
 
-[storage.ts](../src/storage.ts) is pure logic over a `StoreLike` (`getItem`/`setItem`/`removeItem`), so it is unit-tested with a fake store ([tests/storage.test.ts](../src/tests/storage.test.ts)).
+[storage.ts](../src/storage.ts) is pure logic over a `StoreLike` (`getItem`/`setItem`/`removeItem`), so it is unit-tested with a fake store ([tests/saves/storage.test.ts](../src/tests/saves/storage.test.ts)).
 
 | Key | Contents |
 | --- | --- |
@@ -132,8 +132,8 @@ The constraint is reactivity, not loading. The world is 1–3 MB of nested objec
 | `schema` number + ordered migrations | Each change that needs data repaired bumps `SCHEMA` and adds an `if (v < N)` step. Steps are never deleted, so a schema-1 save still upgrades through every step | `deserialize` in [engine.ts](../src/engine.ts) |
 | Optional fields with defaults | New fields are declared optional (`?`) in `types.ts`. Code reads them with `??` defaults or `ensureShape`/`ensureOrgs`/`ensureClubs` fills them on load. Most schema bumps need no explicit migration because of this | [types.ts](../src/types.ts), [world.ts](../src/world.ts), [orgs.ts](../src/orgs.ts), [clubdata.ts](../src/clubdata.ts) |
 | Runtime repair | `reconcile` (daily) and `repairAll` (weekly) fix drifted references, so a slightly inconsistent old save heals | [consistency.ts](../src/consistency.ts), [rank.ts](../src/rank.ts) |
-| Real old saves in the test suite | `oldsave.test.ts` loads every `src/tests/fixtures/*.save` (currently `pre-v85-club.save`, schema 2, and `v84-day35-mid.save`, schema 7, day 28). It plays each one for 3 days and checks the round trip is byte-stable. It is part of `npm run test:all` | [tests/oldsave.test.ts](../src/tests/oldsave.test.ts) |
-| Synthetic migration tests | `v73`, `v74` and `v75` each have a `compat` mode that builds an old-shaped save (for example schema 3 with `path.stakes`) and checks the migration result. These are **not** in `test:all`; run them with `make test-compat` | [tests/v73.test.ts](../src/tests/v73.test.ts) etc. |
+| Real old saves in the test suite | [saves/oldsave.test.ts](../src/tests/saves/oldsave.test.ts) loads every `src/tests/fixtures/*.save` (currently `pre-v85-club.save`, schema 2, and `v84-day35-mid.save`, schema 7, day 28). It plays each one for 3 days and checks the round trip is byte-stable. It is part of `npm run test:all` | [tests/oldsave.test.ts](../src/tests/oldsave.test.ts) |
+| Synthetic migration tests | The economy, agency and situation tests each build an old-shaped save (schema 3 with `path.stakes`, schema 4 without `agency`, schema 5 without `sitpace`) and check the migration result. They are tagged `compat`, so they run in `test:all`, and `make test-compat` runs them with the other compat tests | [economy/ledger.test.ts](../src/tests/economy/ledger.test.ts), [agency/goals.test.ts](../src/tests/agency/goals.test.ts), [situations/lifecycle.test.ts](../src/tests/situations/lifecycle.test.ts) |
 | Corruption safety | Read-back verification, rollback, snapshots and a fallback to the newest readable snapshot on load | [storage.ts](../src/storage.ts), `load()` in [web.ts](../src/web.ts) |
 | Manual escape hatch | Players can download a JSON backup at any time, and the save-failure banner offers it | [web.ts](../src/web.ts) |
 
@@ -142,7 +142,7 @@ The constraint is reactivity, not loading. The world is 1–3 MB of nested objec
 1. Make the new field optional, and default it where it is read (`x ??= …`) or in `ensureShape`/`ensure*`.
 2. If old data has to be *transformed* (moved, renamed or reinterpreted), bump `SCHEMA` and add an `if (v < N)` block **above** the existing ones. Comment it with the version and what changed. Never edit or remove an older block.
 3. Generate a save with the **previous** build (play it a few weeks), and commit it to `src/tests/fixtures/` with a descriptive name such as `v86-day40.save`. This is the only real proof that old saves load.
-4. Run `npm run test:all`, which includes the synthetic migrations (`make test-compat` runs only those).
+4. Run `npm run test:all`. It includes every save-compatibility test, real and synthetic; `make test-compat` runs only those (every test tagged `compat`).
 5. Never rename `KEY`. If the storage layout must change, read the old key as a fallback and migrate.
 
 ### Gaps

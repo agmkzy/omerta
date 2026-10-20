@@ -3,12 +3,17 @@
 // repository root and need none of its plugins. Vitest reads this file instead of vite.config.ts whenever it exists.
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
+import { TAGS } from './src/tests/tags';
 
 export default defineConfig({
   root: fileURLToPath(new URL('.', import.meta.url)),
   test: {
-    // Every suite is found by name, so a new src/tests/vNN.test.ts runs in npm test, make test-all and CI without being listed anywhere.
+    // Every test file is found by name, so a new src/tests/<system>/<topic>.test.ts runs in npm test, make test-all and CI without
+    // being listed anywhere.
     include: ['src/tests/**/*.test.ts'],
+    // The kinds of test (unit, scenario, sim, …) and the opt-in `slow` runs; setup.ts fails a file whose tests lack a kind.
+    tags: [...TAGS],
+    setupFiles: ['src/tests/setup.ts'],
     // Files run in parallel, one worker each; the checks inside a file run in order. Some checks simulate a year of play, and
     // CI runners are slower than a laptop, so the limits are generous: they catch a hang, not a slow machine.
     testTimeout: 20 * 60_000,

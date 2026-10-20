@@ -19,7 +19,7 @@ A single-player sandbox mafia RPG in **1970 New York**. The pitch: a world that 
 - **UI:** `web.ts` entry, `ui/*` views, `web/index.html` (page shell and CSS). Built by Vite (`vite.config.ts`, `vite-plugin-singlefile`) into one HTML file.
 
 ## Hard requirements
-- **Save compatibility:** `serialize/deserialize` (SCHEMA 7). Never break loading of older saves; new fields must be optional with safe defaults; add migrations, never delete them. `src/tests/oldsave.test.ts` loads genuine old saves (`src/tests/fixtures/`, incl. a schema-2 save) – keep it passing and add a fixture whenever the schema changes.
+- **Save compatibility:** `serialize/deserialize` (SCHEMA 7). Never break loading of older saves; new fields must be optional with safe defaults; add migrations, never delete them. `src/tests/saves/oldsave.test.ts` loads genuine old saves (`src/tests/fixtures/`, incl. a schema-2 save) – keep it passing and add a fixture whenever the schema changes.
 - **Portraits** are procedurally painted in `src/ui/portrait.ts` (`portraits_pack.ts` is an intentionally empty override slot). From V88 the owner has asked for them to be reworked (rank shown through dress, more variety and options). Keep them deterministic (same character, same face) and save-compatible: the existing `Look` fields keep their meaning, and new options are optional with defaults.
 - Preserve V72–V76 mechanics, the ledger, NPC information restrictions and the conversation overhaul.
 - Don't add gameplay systems or change balance unless asked; report integration gaps instead of hiding them.
@@ -28,12 +28,13 @@ A single-player sandbox mafia RPG in **1970 New York**. The pitch: a world that 
 ```
 npm install
 npm run typecheck
-npm run test:all          # Vitest: every suite + schema migrations, in parallel
-npx vitest run v73 -t ledger   # one suite (file name filter), one check (name filter)
+npm run test:all          # Vitest: every test except the opt-in long runs, in parallel (~50 s)
+npm run test:unit         # only the unit tests (~6 s)
+npx vitest run economy -t ledger   # one system (path filter), one check (name filter)
 npm run build             # -> dist/omerta.html
 npm run dev               # live-reload dev server, http://localhost:5173
 ```
-Tests are Vitest files (`src/tests/*.test.ts`, found by name; assertions are `node:assert`). Slow modes are opt-in via env: `COMPAT=1` (schema migrations, included in `test:all`), `SLOW=1` with `SEED`/`DAYS` (long simulations, `npm run test:slow`); see `src/tests/modes.ts` and `docs/05-testing.md`. Before shipping any change: typecheck + v77–v79 at minimum (`make test`), full `test:all` for anything touching sim, saves or economy. Deploy = publish `dist/omerta.html` (GitHub Pages `index.html` at https://agmkzy.github.io/omerta/; artifact https://claude.ai/artifact/YDyiAu7Aw8bZdwMjaBRVV3). Don’t poll with sleep loops; run long tests in the background.
+Tests live in `src/tests/<system>/` (architecture, saves, hierarchy, economy, agency, situations, organisations, dialogue, creation, determinism), are found by name, use `node:assert`, and each carries exactly one kind as a Vitest tag (`unit`, `scenario`, `sim`, `determinism`, `compat`, `architecture`, `property`; see `src/tests/tags.ts`). A new test goes in the file of the system whose rule it proves; build worlds with the named fixtures (`newWorld(7)`, `agencyWorld(7, 20)`, `world60()`, …), never a hidden-default `fresh()`. Long runs are tagged `slow` and run only with `SLOW=1` (`npm run test:slow`, `SEED`/`DAYS`). See `docs/05-testing.md`. Before shipping any change: typecheck + the dialogue tests at minimum (`make test`), full `test:all` for anything touching sim, saves or economy. Deploy = publish `dist/omerta.html` (GitHub Pages `index.html` at https://agmkzy.github.io/omerta/; artifact https://claude.ai/artifact/YDyiAu7Aw8bZdwMjaBRVV3). Don’t poll with sleep loops; run long tests in the background.
 
 ## Playtesting
 `playtest/pt.ts` drives the real sim from the command line with persistent state (`playtest/state.json`, `actions.log`). The V85 playtest used seed 3, “Tony Marino”, 35 days, no manual state edits. Judge gameplay by tracing consequences (action → recorded state → later behaviour), not by passing tests.

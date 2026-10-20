@@ -114,7 +114,7 @@ git clone https://github.com/agmkzy/omerta.git && cd omerta && nvm install && ma
 
 ### Windows
 
-Use WSL2 (Ubuntu) and follow the Linux steps. The build no longer needs a POSIX shell, so native Windows should be able to run `npm ci`, `npm run typecheck`, `npm run build`, `npm run dev` and `npm test` (not tested). `npm run test:all`, `test:compat` and `test:slow` set an environment variable the POSIX way (`COMPAT=1 vitest run`), and `make` needs a POSIX environment, so those still need Git Bash or WSL (or set the variable first and run `npx vitest run`).
+Use WSL2 (Ubuntu) and follow the Linux steps. The build no longer needs a POSIX shell, so native Windows should be able to run `npm ci`, `npm run typecheck`, `npm run build`, `npm run dev` and `npm test` (not tested). Only `npm run test:slow` sets an environment variable the POSIX way (`SLOW=1 vitest run`), and `make` needs a POSIX environment, so those still need Git Bash or WSL (or set `SLOW=1` first and run `npx vitest run`).
 
 ### Without make
 
@@ -128,7 +128,7 @@ npm ci && npm run typecheck && npm run build
 make test
 ```
 
-`make test` runs the minimum pre-ship check from CLAUDE.md: a typecheck plus the v77–v79 conversation suites, in about ten seconds on a recent laptop. Use `make test-all` for the full suite, which takes a few minutes.
+`make test` runs the minimum pre-ship check from CLAUDE.md: a typecheck plus the conversation tests (`src/tests/dialogue/`), in about ten seconds on a recent laptop. Use `make test-all` for everything, which takes under a minute.
 
 ## The Makefile
 
@@ -143,13 +143,14 @@ make test
 | `make build` | `npm run build`. It only rebuilds when a source `.ts` file, `web/index.html`, `web/main.ts` or `vite.config.ts` is newer than `dist/omerta.html` |
 | `make dev` | `npm run dev`: the Vite dev server with live reload on http://localhost:5173. Extra Vite flags go in `ARGS`, for example `make dev ARGS=--host` to open the game from a phone on the same network |
 | `make preview` | Build if needed, then `npm run preview`: serves `dist/omerta.html` over HTTP and opens it in the browser |
-| `make test` | Typecheck plus v77, v78 and v79 (`npm test -- v77 v78 v79`) |
-| `make test-all` | Typecheck plus `npm run test:all`: every suite in `src/tests/` plus the synthetic schema migrations, in parallel |
-| `make test-compat` | Only the synthetic migration checks in v73/v74/v75 (also part of `test-all`) |
-| `make test-sim SEED=3 DAYS=180` | The long v74/v75/v76 simulations for one seed (or a list: `SEED=3,7`) |
-| `make test-slow SEED=3` | Every long run: stable, sim, roundtrip, growth, the v76 trace and v87's full seeds |
-| `make test-cov` | `test-all` with coverage. It fails below the thresholds in `vitest.config.ts`, and writes an HTML report to `coverage/` |
-| `make ci` | `all` + `test-cov`: typecheck, build, every suite and the coverage thresholds. This is what CI checks |
+| `make test` | Typecheck plus the conversation tests (`npm test -- src/tests/dialogue`) |
+| `make test-unit` | Only the tests tagged `unit` (about 6 s) |
+| `make test-all` | Typecheck plus `npm run test:all`: every test in `src/tests/` except the opt-in long runs, in parallel |
+| `make test-compat` | Only the save-compatibility tests, every test tagged `compat` (also part of `test-all`) |
+| `make test-sim SEED=3 DAYS=180` | The long simulations, every test tagged `sim` and `slow`, for one seed (or a list: `SEED=3,7`) |
+| `make test-slow SEED=3` | Every long run (tagged `slow`): stability, sims, round trips, save growth, the trace of the player's road to boss, the full seed set for backgrounds |
+| `make test-cov` | `test-all` with coverage. It fails below the thresholds in `vitest.config.ts`, and writes an HTML report to `coverage/`. CI doesn't run it |
+| `make ci` | `all` + `test-all`: typecheck, build and every test except the opt-in long runs. This is what CI checks |
 | `make pages` | Build, then copy `dist/omerta.html` to `index.html` for GitHub Pages |
 | `make play` / `make sim` | The terminal interface and the unattended simulation ([cli.ts](../src/cli.ts)) |
 | `make bot SEED=3 DAYS=120` | The random-policy player smoke test ([bot.ts](../src/bot.ts)) |
@@ -171,12 +172,13 @@ Design notes:
 | `dev` | `vite`: dev server with live reload (see [The dev server](#the-dev-server)) |
 | `build` | `vite build` → `dist/omerta.html` |
 | `preview` | `vite preview`: serves `dist/omerta.html` at http://localhost:4173 and opens it |
-| `test` | `vitest run`: the fast checks of every suite in `src/tests/`. Extra arguments filter, for example `npm test -- v73 -t ledger` |
-| `test:all` | `COMPAT=1 vitest run`: the fast set plus the synthetic schema migrations. All files run in parallel, and a failure doesn't stop the others |
-| `test:compat` | `COMPAT=1 vitest run -t compat`: only the schema migrations |
+| `test` | `vitest run`: every test in `src/tests/` except the opt-in long runs (tagged `slow`). All files run in parallel, and a failure doesn't stop the others. Extra arguments filter, for example `npm test -- economy -t ledger` |
+| `test:all` | The same as `test` (kept because the docs and habits use it) |
+| `test:unit` | `vitest run --tagsFilter unit`: only the unit tests |
+| `test:compat` | `vitest run --tagsFilter compat`: only the save-compatibility tests |
 | `test:slow` | `SLOW=1 vitest run`: everything, including the long simulations (`SEED`, `DAYS`) |
 | `test:watch` | `vitest`: re-runs the affected suites on every change |
-| `test:cov` | `test:all` with coverage and thresholds |
+| `test:cov` | `vitest run --coverage`: `test:all` with coverage and thresholds |
 | `sim` | `tsx src/cli.ts sim`, for example `npm run sim -- --seed 4 --days 180` |
 | `play` | `tsx src/cli.ts play`, for example `npm run play -- --new --seed 4` (legacy text UI, saves to `omerta-save.json`) |
 | `bot` | `tsx src/bot.ts <seed> <days>`: a random-policy player used as a smoke test |

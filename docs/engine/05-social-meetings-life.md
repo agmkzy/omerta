@@ -51,7 +51,7 @@ Presence rules in `clubPresent` ([clubdata.ts:60](../../src/clubdata.ts)): only 
 
 **Depends on / used by.**
 - Imports: `core.travelTime` (distance modifier), `voice.hash` (deterministic presence roll), `types`.
-- Imported by: [club.ts](../../src/club.ts) (types, `clubOf`, `clubOpen`, `clubPresent`, `memOf`, `weekday`), [world.ts](../../src/world.ts) (`ensureClubs`), [orgs.ts](../../src/orgs.ts) (`ensureClubs`, `clubOf`), [places.ts](../../src/places.ts) (`clubOf`, `clubPresent`: the club as a visitable place), [web.ts](../../src/web.ts) (`clubOf`), [ui/views_a.ts](../../src/ui/views_a.ts), [engine.ts:240](../../src/engine.ts) (imports `ensureClubs` but does not call it), tests `v72`, `v76`.
+- Imported by: [club.ts](../../src/club.ts) (types, `clubOf`, `clubOpen`, `clubPresent`, `memOf`, `weekday`), [world.ts](../../src/world.ts) (`ensureClubs`), [orgs.ts](../../src/orgs.ts) (`ensureClubs`, `clubOf`), [places.ts](../../src/places.ts) (`clubOf`, `clubPresent`: the club as a visitable place), [web.ts](../../src/web.ts) (`clubOf`), [ui/views_a.ts](../../src/ui/views_a.ts), [engine.ts:240](../../src/engine.ts) (imports `ensureClubs` but does not call it), the saves and organisations tests.
 
 **Invariants and rules.**
 - At most one club per family, keyed by family id; `Club.id` is `'club:' + familyId` and orgs.ts uses it as `Family.hq`.
@@ -109,7 +109,7 @@ Two properties matter to anyone changing this:
 - **Effects shown once.** Several nodes have effects that happen when the node is first displayed, not when an option is chosen (revealing a problem, teaching a fact, charging for a drink, asking the boss for work). They are wrapped in `once(key, fn)`, which stores the produced lines in `data['L_' + key + '_' + topic + '_' + node]`; later renders, a re-render inside `sceneAct`, and a reload all read the cache rather than rerunning the effect. Because `web.ts` saves after `startScene` but before the first render, a reload before the next action replays the effect from the saved RNG state and produces the same result.
 - **The clock is frozen during a scene.** `w.now` does not move until `closeScene` hands its minutes to `pass()`. All choices are evaluated at the scene's start time.
 
-The save/load round-trip is covered by the `v72` test "mid-scene save/load resumes the same scene" ([tests/v72.test.ts:228](../../src/tests/v72.test.ts)).
+The save/load round-trip is covered by "mid-scene save/load resumes the same scene" in [saves/save-load.test.ts](../../src/tests/saves/save-load.test.ts).
 
 ### Topics
 
@@ -158,7 +158,7 @@ The save/load round-trip is covered by the `v72` test "mid-scene save/load resum
 
 **Depends on / used by.**
 - Imports: `disputes` (`amends`, `callSitdown`, `ignoreDispute`, `mineAgainst`, `againstMe`, `playerActed`: quarrel topic), `core` (`addFact`, `clamp`, `learn`, `money`, `payDebt`, `rel`), `career` (`recommend`, `recommendable`), `clubdata`, `encounters` (`addFavour`, `choose`: enc topic and covered envelopes), `jobs` (`forceBossOffer`, `takeJob`, `declineJob`), `ledger` (`post`, `statement`), `reports.relevance` (what is worth repeating), `situations` (`askAbout`, `helpWith`, `sitOf`), `voice.hash`.
-- Imported by: [web.ts](../../src/web.ts) (`closeScene`, `sceneAct`, `startScene`, `topicsFor`), [ui/clubview.ts](../../src/ui/clubview.ts) (`clubOf`, `clubOpen`, `clubPresent`, `sceneNode`, `topicsFor`, `waiting`), [ui/views_a.ts](../../src/ui/views_a.ts) (`waiting`), `tests/v72.test.ts`.
+- Imported by: [web.ts](../../src/web.ts) (`closeScene`, `sceneAct`, `startScene`, `topicsFor`), [ui/clubview.ts](../../src/ui/clubview.ts) (`clubOf`, `clubOpen`, `clubPresent`, `sceneNode`, `topicsFor`, `waiting`), [ui/views_a.ts](../../src/ui/views_a.ts) (`waiting`), `tests/saves/save-load.test.ts`.
 
 **Invariants and rules.**
 - One scene at a time; `web.ts` will not start a second while `w.scene` is set.
@@ -286,7 +286,7 @@ Internal helpers worth knowing: `pickN` (rng sample), `noisy` (rng-noisy truth),
 
 **Depends on / used by.**
 - Imports: `orgs.noteDeal` (record a cross-family settlement), `career` (`inductPlayer`, `sponsorOf`, `turnedDown`), `books` (`effectiveRate`, `influence`, `react`, `rule`, `subordinates`; `RULINGS` imported but unused), `core` (`addFact`, `clamp`, `recordCareer`, `createDebt`, `famName`, `isAwake`, `learn`, `money`, `rel`, `shortTime`), `jobs` (`mkJob`, `tipFrom`, `traitWords`), `actions.share` (gossip at dinners and meetings), `hustle.HUSTLES` (labels), `disputes` (`callSitdown`, `settleDispute`), `encounters.addFavour`.
-- Imported by: [engine.ts](../../src/engine.ts) (`summonsTick`), [web.ts](../../src/web.ts), [dialogue.ts](../../src/dialogue.ts) (`openSitdown`, `Meeting`), [bot.ts](../../src/bot.ts), [ui/state.ts](../../src/ui/state.ts) (type), [ui/views_b.ts](../../src/ui/views_b.ts) (`available`, `current`), tests `v76`, `v78`, `v76_trace_probe`.
+- Imported by: [engine.ts](../../src/engine.ts) (`summonsTick`), [web.ts](../../src/web.ts), [dialogue.ts](../../src/dialogue.ts) (`openSitdown`, `Meeting`), [bot.ts](../../src/bot.ts), [ui/state.ts](../../src/ui/state.ts) (type), [ui/views_b.ts](../../src/ui/views_b.ts) (`available`, `current`), the organisations and dialogue tests, `tools/v76_trace_probe`.
 - Other creators of summons the meeting code must handle: [career.ts:390](../../src/career.ts) and [path.ts:324](../../src/path.ts) (induction, with `extra.to`), [books.ts:369](../../src/books.ts) (accounts, with `extra.amt` and `extra.kind`).
 
 **Invariants and rules.**
@@ -444,7 +444,7 @@ Internal: `MONEY_KINDS`, `story()` (the man's account in his own voice, honest o
 
 **Depends on / used by.**
 - Imports: `rank.applyRank` (recruitment), `core` (`addFact`, `clamp`, `learn`, `money`, `ownerBiz`, `recordCareer`, `rel`, `shortTime`, `travelTime`; `witnessesAt` unused), `people` (`aptitude`, `grow`, `lateOf`, `PROBLEM_LABEL`), `econ` (`clearArrears`, `owedOf`, `takeFromBiz`: shakedowns), `voice` (`arch`, `admit`, `excuse`, `pick`), `jobs` (`activityOf`, `approaches`, `assign`, `mkJob`, `resolve`), `actions.perform` (a confrontation becomes a beating), `types`.
-- Imported by: [jobs.ts](../../src/jobs.ts) (`ERRAND_KINDS`, `bossErrand`, `resolveErrand`, `runCrewJob`: a direct import cycle), [goals.ts](../../src/goals.ts), [flows.ts](../../src/flows.ts), [ambition.ts](../../src/ambition.ts), [stress.ts](../../src/stress.ts), [web.ts](../../src/web.ts), [ui/views_b.ts](../../src/ui/views_b.ts), [ui/views_c.ts](../../src/ui/views_c.ts), [ui/state.ts](../../src/ui/state.ts) (types), `tests/v72.test.ts`.
+- Imported by: [jobs.ts](../../src/jobs.ts) (`ERRAND_KINDS`, `bossErrand`, `resolveErrand`, `runCrewJob`: a direct import cycle), [goals.ts](../../src/goals.ts), [flows.ts](../../src/flows.ts), [ambition.ts](../../src/ambition.ts), [stress.ts](../../src/stress.ts), [web.ts](../../src/web.ts), [ui/views_b.ts](../../src/ui/views_b.ts), [ui/views_c.ts](../../src/ui/views_c.ts), [ui/state.ts](../../src/ui/state.ts) (types), `tests/hierarchy/promotion.test.ts`.
 
 **Invariants and rules.**
 - A man never has two active non-summons jobs (`activityOf` / `assign`; checked by `consistency.audit`).
