@@ -30,7 +30,9 @@ export function situationTick(w: World) {
   if (!p?.alive) return;
   const list = (w.situations ??= []);
   // Emerge: anyone near the player's world who is in real trouble. Most of it never needs the player.
-  const near = (c: Character) => c.bossId === p.id || c.familyId === p.familyId || w.biz[ownerBiz(w, c.id)?.id ?? '']?.protection?.collectorId === p.id;
+  // (V89: a man above you does not come to you with his money troubles)
+  const RK = (x: Character) => ['civilian', 'associate', 'soldier', 'capo', 'underboss', 'boss'].indexOf(x.rank);
+  const near = (c: Character) => (c.bossId === p.id || c.familyId === p.familyId || w.biz[ownerBiz(w, c.id)?.id ?? '']?.protection?.collectorId === p.id) && (c.rank === 'civilian' || RK(c) <= RK(p));
   for (const c of Object.values(w.chars)) {
     if (!c.alive || c.isPlayer || c.rank === 'boss' || !near(c) || list.some((s) => s.who === c.id && s.stage !== 'resolved')) continue;
     if (list.some((s) => s.who === c.id && w.now - (s.resolvedAt ?? 0) < 4 * WEEK)) continue;

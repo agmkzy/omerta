@@ -1,6 +1,8 @@
 // The social club, as conversations. A man has something to say because something in the world gives him a reason,
 // and you have a few things you can raise with him yourself. Each conversation is a short scene that changes real state
 // (books, debts, favours, quarrels, situations, jobs, careers) and then ends. The scene is kept in the world so a reload resumes it.
+import { pass, versionOf } from './rumour';
+import { fp } from './voice';
 import { amends, callSitdown, ignoreDispute, mineAgainst, againstMe, playerActed } from './disputes';
 import { addFact, clamp, learn, money, payDebt, rel } from './core';
 import { recommend, recommendable } from './career';
@@ -256,7 +258,7 @@ function script(w: World, p: Character, cl: Club, c: Character, s: Scene): Node 
     case 'heard': {
       const stored = s.data.L_heard_heard_open;
       const fact = stored !== undefined ? undefined : Object.keys(c.known).map((id) => w.facts[id]).filter((x) => x && !p.known[x.id] && w.now - x.t < 30 * DAY && relevance(w, p, x).level >= 1 && !x.minor).sort((a, b) => b.t - a.t)[0];
-      const ls = once('heard', () => { if (!fact) return [`${f} thinks about it. "Nothing worth repeating."`]; learn(w, p.id, fact, c.id, true); return [`${f} lowers his voice. "${fact.text}"`]; });
+      const ls = once('heard', () => { if (!fact) return [`${f} thinks about it. "Nothing worth repeating."`]; pass(w, c, p, fact, !!c.known[fact.id]?.knowsActor); return [`${f} lowers his voice. “${fp(versionOf(w, p, fact), c)}”`]; });
       return { lines: ls, opts: [o('x', fact || /lowers/.test(ls[0] ?? '') ? 'Nod and say nothing' : 'Fair enough', '', () => END([], 10))] };
     }
     case 'drink': {

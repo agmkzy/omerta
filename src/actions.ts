@@ -2,6 +2,7 @@ import { menace } from './danger';
 import { noteGrievance } from './orgs';
 import { sanctioned } from './politics';
 import { pass, salience, versionOf } from './rumour';
+import { fp } from './voice';
 import { askBetween, collectAsk, move as askMove, openAsk, shopInPlay } from './asks';
 import {
   addFact, clamp, createDebt, factText, famName, handleDeath, learn, money, notifyProtector,
@@ -182,7 +183,7 @@ export function share(w: World, from: Character, to: Character, lines: string[],
       const again = f.amount && told.some((g) => g.actor === f.actor && g.amount === f.amount);
       told.push(f);
       if (again) continue;
-      lines.push(`${spoken++ ? vsay(w, from, to, 'lead2') : vsay(w, from, to, 'lead')} “${opt?.say ? opt.say(f, knows) : versionOf(w, to, f)}”`);
+      lines.push(`${spoken++ ? vsay(w, from, to, 'lead2') : vsay(w, from, to, 'lead')} “${opt?.say ? opt.say(f, knows) : fp(versionOf(w, to, f), from)}”`);
     }
   }
   return told;
