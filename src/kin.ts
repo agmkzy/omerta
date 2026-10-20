@@ -37,12 +37,17 @@ export function kinOf(w: World, c: Character): Tie[] {
   else if (pl) { const k = w.life?.kin.find((x) => x.id === c.id); if (k) out.push({ id: pl.id, role: k.role === 'mother' || k.role === 'father' ? 'son' : k.role === 'son' || k.role === 'daughter' ? 'father' : k.role === 'sister' ? 'brother' : (k.role as KinRole) }); }
   if (!c.isPlayer) {
     const same = index(w).get(surname(c)) ?? [];
-    if (same.length <= 6) // a common name in a big city is not one family
+    // A shared name is a hint, not a family: most men who carry it are no relation. Each man belongs to a line of the name (decided
+    // by his own id, so it never changes); men of the same line are brothers, and now and then two lines are cousins.
+    if (same.length <= 6) {
+      const lines = Math.max(6, same.length * 4);
+      const line = (id: string) => hash(surname(c) + '#' + id) % lines;
       for (const id of same) {
         if (id === c.id) continue;
-        const pair = [c.id, id].sort().join(':');
-        out.push({ id, role: hash(pair) % 3 === 0 ? 'brother' : 'cousin' });
+        if (line(id) === line(c.id)) out.push({ id, role: 'brother' });
+        else if (hash([c.id, id].sort().join(':')) % 100 < 7) out.push({ id, role: 'cousin' });
       }
+    }
   }
   return out;
 }
@@ -58,5 +63,5 @@ export function closeKin(w: World, a: Character, b: Character): boolean {
   if (role !== 'cousin') return true;
   const r = a.rels[b.id];
   if (r && (r.affection >= 0.35 || r.trust >= 0.45)) return true;
-  return hash([a.id, b.id].sort().join('~close')) % 5 < 2;
+  return hash([a.id, b.id].sort().join('~close')) % 4 === 0;
 }

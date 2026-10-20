@@ -107,7 +107,7 @@ function trouble(x: X): Subject | undefined {
         if (pr.kind === 'gambling' && t.traits.vice > 0.65) { pr.sev = clamp(pr.sev + 0.2); }
         return { lines: [`You count ${money(amt)} into his hand.`, q(t, by(t, { proud: 'I’ll pay you back. Every cent. I want you to know that.', jovial: 'You’re a prince. A real prince.', cold: 'I won’t forget this.', _: 'I don’t know what to say. Thank you.' })), 'He owes you now, and he knows it.'], choices: [] };
       }
-      if (code === 'lend' && p.cash >= amt) {
+      if (code === 'lend' && p.cash >= amt && !w.debts.some((d) => d.status === 'active' && d.creditor === p.id && d.debtor === t.id)) {
         p.cash -= amt; t.cash += amt; pr.sev = clamp(pr.sev - 0.25); said(w, t, key, 'lend');
         const d = createDebt(w, p.id, t.id, amt, 0.04, 'a loan between friends');
         warm(x, 0.04, 'helped');
@@ -134,7 +134,8 @@ function trouble(x: X): Subject | undefined {
     note(p, t, ({ gambling: 'In deep with a bookmaker.', debt: 'Owes money to the wrong people.', family: 'Trouble at home. Someone is sick.', drink: 'Drinks more than he should, and knows it.', house: 'Saving every dollar for a house out of the city.', resentment: 'Feels he isn’t paid what he’s worth.', woman: 'Seeing a woman who isn’t his wife.' } as Record<string, string>)[pr.kind] ?? 'Has troubles of his own.');
     const amt = T.need?.(x) ?? 0;
     const cs: Choice[] = [];
-    if (amt && p.cash >= amt) { cs.push(ch('trouble', 'gift', `Give him ${money(amt)}, no strings`, 'He will owe you, and he will know it.', true)); cs.push(ch('trouble', 'lend', `Lend him ${money(amt)}`, 'Four percent a week. A friend’s rate, and a debt all the same.', true)); }
+    const owes = w.debts.some((d) => d.status === 'active' && d.creditor === p.id && d.debtor === t.id);
+    if (amt && p.cash >= amt) { cs.push(ch('trouble', 'gift', `Give him ${money(amt)}, no strings`, 'He will owe you, and he will know it.', true)); if (!owes) cs.push(ch('trouble', 'lend', `Lend him ${money(amt)}`, 'Four percent a week. A friend’s rate, and a debt all the same.', true)); }
     if (pr.kind === 'family' && t.bossId === p.id) cs.push(ch('trouble', 'time', 'Tell him to take a week', 'He earns nothing for you while he is gone. He will remember it.'));
     if (pr.kind !== 'house') cs.push(ch('trouble', 'straighten', 'Tell him to straighten himself out', 'Some men need to hear it. Some men hate hearing it.'));
     cs.push(ch('trouble', 'listen', 'Just hear him out', 'Sometimes that is all a man wants.'));
@@ -340,12 +341,12 @@ function wants(x: X): Subject | undefined {
       if (code === 'careful') { regard(w, t, p, 'trust', 0.04, 'advice'); (p.insight ??= {})[t.id] = [...new Set([...(p.insight[t.id] ?? []), 'leaving'])]; return { lines: [q(t, 'I know who I’m talking to. I hope.')], choices: [] }; }
       if (code === 'stake') {
         const amt = Math.max(500, Math.round(t.traits.greed * 2000 / 100) * 100);
-        const cs: Choice[] = p.cash >= amt ? [ch(key, 'fund', `Stake him ${money(amt)}`, 'A loan at five a week. A man with a start remembers who gave it him.', true), done(key)] : [done(key)];
+        const cs: Choice[] = p.cash >= amt && !w.debts.some((d) => d.status === 'active' && d.creditor === p.id && d.debtor === t.id) ? [ch(key, 'fund', `Stake him ${money(amt)}`, 'A loan at five a week. A man with a start remembers who gave it him.', true), done(key)] : [done(key)];
         return { lines: [q(t, `${money(amt)}, maybe. Enough to start.`)], choices: cs };
       }
       if (code === 'fund') {
         const amt = Math.max(500, Math.round(t.traits.greed * 2000 / 100) * 100);
-        if (p.cash < amt) return { lines: ['You can’t spare it.'], choices: [] };
+        if (p.cash < amt || w.debts.some((d) => d.status === 'active' && d.creditor === p.id && d.debtor === t.id)) return { lines: [p.cash < amt ? 'You can’t spare it.' : 'He still owes you from the last time.'], choices: [] };
         p.cash -= amt; t.cash += amt; createDebt(w, p.id, t.id, amt, 0.05, 'a stake'); warm(x, 0.06, 'stake');
         addFavour(w, p.id, t.id, 2, 'you staked him when nobody else would');
         return { lines: [`You give him ${money(amt)}. He looks at it a long time before he puts it away.`, q(t, 'You’ll see it back. With interest.')], choices: [] };

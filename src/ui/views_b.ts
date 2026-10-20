@@ -83,9 +83,12 @@ export function waitChoices(full = false): WaitOpt[] {
   for (const u of up) out.push({ label: u.name[0].toUpperCase() + u.name.slice(1), sub: `until ${hhmm((u.at % DAY) / 60)}${Math.floor(u.at / DAY) !== Math.floor(now / DAY) ? ' ' + dayOf(u.at) : ''}`, mins: u.at - now });
   out.push({ label: 'Next event', sub: 'until something comes up', mins: 24 * 60, event: true });
   void tod;
-  const dow = Math.floor(now / DAY) % 7;
-  const monday = (Math.floor(now / DAY) + ((7 - dow) % 7 || 7)) * DAY + 9 * 60;
-  out.push({ label: 'Next week', sub: 'until Monday 09:00', mins: monday - now });
+  // V89: the week ends on Sunday evening, just after the books are settled (the weekly reckoning runs at 20:00): envelopes fall due,
+  // and you are there for it, with the rest of Sunday evening and Monday to hand yours over in person.
+  const dow = Math.floor(now / DAY) % 7; // 0 = Monday
+  let sunday = (Math.floor(now / DAY) + (6 - dow)) * DAY + 20 * 60 + 30;
+  if (sunday - now < 60) sunday += 7 * DAY;
+  out.push({ label: 'Until Sunday', sub: 'the envelopes, 20:30', mins: sunday - now });
   if (full) out.push({ label: 'Two days', sub: 'let things ripen', mins: 48 * 60 }, { label: 'A full week', sub: 'envelopes fall due Sunday', mins: 7 * 24 * 60 });
   return out;
 }

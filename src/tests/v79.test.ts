@@ -109,7 +109,7 @@ function fast() {
     const w2 = deserialize(serialize(w));
     assert.equal(JSON.stringify(w2.chars[m.id].talk), talkBefore, 'conversational memory survives a save ' + m.name + ' ' + talkBefore + ' => ' + JSON.stringify(w2.chars[m.id].talk));
     const again = say(w2, w2.chars[w2.playerId!], w2.chars[m.id], startConvo(m.id), 'how');
-    assert.match(again.lines[0], /already|changed|enough|same|ask/i, 'and he remembers after reload: ' + again.lines[0]);
+    assert.match(again.lines[0], /already|changed|enough|same|ask|went over|memory|told you/i, 'and he remembers after reload: ' + again.lines[0]);
   });
 
   ok('backing: asking, pressing and agreeing records one favour and one backer, never twice', () => {

@@ -73,7 +73,8 @@ export function situationTick(w: World) {
       } else if (s.weeks >= patience + 3 && t < 0.3) {
         // He goes to someone he trusts more. The situation moves on without you.
         const friend = Object.values(w.chars).filter((x) => x.alive && x.id !== c.id && x.id !== p.id && x.cash > 800 && (c.rels[x.id]?.trust ?? 0) > 0.3).sort((a, b) => b.cash - a.cash)[0];
-        if (friend) { const g = Math.min(500, Math.round(friend.cash * 0.2)); friend.cash -= g; const b = s.biz ? w.biz[s.biz] : undefined; if (b) { bizMove(w, b, g, 'aid', friend.id); b.distress = 0; } else c.cash += g; createDebt(w, friend.id, c.id, g, 0.05, 'a loan'); rel(c, friend.id).trust = clamp(rel(c, friend.id).trust + 0.1); s.weeks = 0; }
+        // (a friend who already has money out to him does not lend again on top of it)
+        if (friend && !w.debts.some((d) => d.status === 'active' && d.creditor === friend.id && d.debtor === c.id)) { const g = Math.min(500, Math.round(friend.cash * 0.2)); friend.cash -= g; const b = s.biz ? w.biz[s.biz] : undefined; if (b) { bizMove(w, b, g, 'aid', friend.id); b.distress = 0; } else c.cash += g; createDebt(w, friend.id, c.id, g, 0.05, 'a loan'); rel(c, friend.id).trust = clamp(rel(c, friend.id).trust + 0.1); s.weeks = 0; }
       }
     }
     // Left to rot, a business gives out (the economy engine closes it); the situation records it.

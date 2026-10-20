@@ -102,7 +102,7 @@ export function todayView(): string {
   if (dg.level > 0 && dg.who) out += `<div class="callout bad"><b>Watch your back.</b> ${lk(dg.who.name)} is after you: ${esc(LADDER_WORDS[dg.level])}. It won’t stop by itself.</div>`;
   if (S.log.length) out += `<section class="g-just" aria-label="Just now">${S.log.map((l) => `<p>${l}</p>`).join('')}</section>`;
   if (S.chips.length) out += `<div class="chips">${S.chips.map((c) => `<span class="chip2 ${c.tone}">${esc(c.t)}</span>`).join('')}</div>`;
-  if (S.news.length) out += `<section class="g-word"><h3 class="sub">Word reaches you</h3><ul class="news">${S.news.map((n) => `<li>${n}</li>`).join('')}</ul>${S.routine ? `<p class="muted" style="margin:8px 0 0">${S.routine} routine matter${S.routine > 1 ? 's' : ''} besides, filed under History.</p>` : ''}</div>`;
+  if (S.news.length) out += `<section class="g-word"><h3 class="sub">Word reaches you</h3><ul class="news">${S.news.map((n) => `<li>${n}</li>`).join('')}</ul>${S.routine ? `<p class="muted" style="margin:8px 0 0">${S.routine} routine matter${S.routine > 1 ? 's' : ''} besides, filed under History.</p>` : ''}</section>`;
   if (w.scene) out += `<button class="need" data-a="place:club"><span class="dot amber"></span><span><span class="t">In the middle of a conversation</span><span class="s" style="display:block">${esc(w.chars[w.scene.npc]?.name ?? 'Someone')} at the club.</span></span></button>`;
   out += `<div class="g-pass"><h3 class="sub">Let time pass</h3>${timeBar()}</div>`;
   out += guideCard();
