@@ -334,6 +334,11 @@ function handle(a: string, v: string) {
     if (a === 'talk') { g['g:talk'] = w.now; if (v === w.chars[w.playerId].bossId) g['g:boss'] = w.now; else g['g:friend'] = w.now; }
     if (a === 'waitgo') g['g:wait'] = w.now;
     if (['job', 'approach', 'delegate', 'sendorder'].includes(S.view.t) && !['back', 'tab', 'ent', 'biz', 'fact', 'tog'].includes(a)) g['g:job'] = w.now;
+    // V89 first-week guide: what's on his mind, a word aside at the club, the Stories page, and one story followed
+    if (a === 'say' && S.view.t === 'talk' && S.dopts[Number(v)]?.code.startsWith('tk:')) g['g:tk'] = w.now;
+    if (a === 'caside') { g['g:aside'] = w.now; if (args[1]) g['g:tk'] = w.now; }
+    if (a === 'tab' && v === 'stories') g['g:stories'] = w.now;
+    if (a === 'story') g['g:story'] = w.now;
   }
   if (a === 'new') {
     const n = draftName();

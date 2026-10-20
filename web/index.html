@@ -368,6 +368,28 @@ body.g-scene .tabs { display: none; }
 .g-guide__acts .btn { width: auto; margin: 0; padding: 12px 20px; }
 .g-guide__acts details { flex: 1 1 100%; order: 3; }
 .g-guide__acts .more { width: auto; }
+/* V89 Today: what needs you. A man who has come to you has his face; anything else a quiet mark. */
+.td-rows { margin: 0 0 4px; }
+.td-row { all: unset; box-sizing: border-box; cursor: pointer; display: flex; gap: 14px; align-items: flex-start; width: 100%; padding: 13px 6px 14px 2px; border-top: 1px solid var(--line); transition: background .15s; }
+.td-row:hover { background: rgba(255, 255, 255, .02); }
+.td-row:focus-visible { outline: 1px solid var(--brass); outline-offset: -1px; }
+.td-row > .st-mark { margin: 25px 5px 0 4px; }
+.td-face { flex: none; margin-top: 2px; }
+.td-face .avatar.pt { width: 44px; height: 44px; box-shadow: none; }
+.td-face--red .avatar.pt { border-color: var(--red); }
+.td-row__body { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.td-row__top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.td-row__top .st-origin:last-child:not(:first-child) { text-align: right; }
+.td-name { font: 600 13px/1.4 var(--body); color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.td-row__title { font: 500 19px/1.25 var(--display); color: var(--ink); margin-top: 2px; }
+.td-row__sub { font-size: 13.5px; line-height: 1.45; color: var(--muted); margin-top: 2px; }
+.td-heard { margin: 26px 0 4px; }
+.td-heard__row { all: unset; box-sizing: border-box; cursor: pointer; display: block; width: 100%; padding: 10px 2px 11px; border-top: 1px solid var(--line); }
+.td-heard__row:hover { background: rgba(255, 255, 255, .02); }
+.td-heard__row:focus-visible { outline: 1px solid var(--brass); outline-offset: -1px; }
+.td-heard__text { display: block; font: italic 400 16.5px/1.45 var(--display); color: var(--ink-2); }
+.td-heard__src { display: block; font-size: 12px; color: var(--dim); margin-top: 3px; }
+.td-heard__src b { font-weight: 500; color: var(--brass); white-space: nowrap; }
 .way.compact { min-height: 54px; padding: 9px 12px; margin: 4px 0; }
 .way.compact .ico { width: 30px; height: 30px; } .way.compact .ico svg { width: 15px; height: 15px; }
 .way.compact .wt b { font-size: 17px; }
