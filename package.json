@@ -7,23 +7,26 @@
   "scripts": {
     "sim": "tsx src/cli.ts sim",
     "play": "tsx src/cli.ts play",
-    "test": "tsx src/test.ts",
-    "test:v72": "tsx src/tests/storage.test.ts && tsx src/tests/v72.test.ts fast",
-    "test:v73": "tsx src/tests/v73.test.ts fast && tsx src/tests/v73.test.ts compat",
-    "test:v74": "tsx src/tests/v74.test.ts fast && tsx src/tests/v74.test.ts compat",
+    "test": "vitest run",
+    "test:all": "COMPAT=1 vitest run",
+    "test:compat": "COMPAT=1 vitest run -t compat",
+    "test:slow": "SLOW=1 vitest run",
+    "test:watch": "vitest",
+    "test:cov": "COMPAT=1 vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "bot": "tsx src/bot.ts",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test:all": "for t in storage v72 v73 v74 v75 v76 v77 v78 v79; do echo \"== $t\"; tsx src/tests/$t.test.ts fast || exit 1; done; tsx src/tests/oldsave.test.ts && tsx src/test.ts",
     "playtest": "tsx playtest/pt.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^5.0.5",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
     "vite": "^8.3.4",
-    "vite-plugin-singlefile": "^2.3.4"
+    "vite-plugin-singlefile": "^2.3.4",
+    "vitest": "^5.0.5"
   }
 }

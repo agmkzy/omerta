@@ -1,5 +1,7 @@
-// V74 regression suite: NPC agency. Usage: tsx src/tests/v74.test.ts fast | sim:<seed>[:days] | roundtrip:<seed> | compat
+// V74 regression suite: NPC agency. COMPAT=1 adds the schema-4 migration; SLOW=1 the long sim (SEED, DAYS) and roundtrip runs (see ./modes.ts).
 import assert from 'node:assert';
+import { afterEach, describe, test as ok } from 'vitest';
+import { COMPAT, DAYS, SEEDS, SLOW } from './modes';
 import { SCHEMA, advance, deserialize, serialize } from '../engine';
 import { createWorld } from '../world';
 import { DAY, WEEK, Business, Character, Goal, World } from '../types';
@@ -11,10 +13,9 @@ import { choose } from '../encounters';
 import { applyRank } from '../rank';
 import { readiness } from '../career';
 
-let failed = 0;
-const ok = (name: string, f: () => void) => {
-  try { f(); console.log('ok   ' + name); } catch (e) { failed++; console.log('FAIL ' + name + ': ' + (e as Error).message.split('\n').slice(0, 6).join(' ')); }
-};
+// Some checks switch on the per-step money audit; a failing one must not leave it on for the next.
+const AUDIT = AGENCY.audit;
+afterEach(() => { AGENCY.audit = AUDIT; });
 const P = (w: World) => w.chars[w.playerId!];
 const fresh = (seed = 7, days = 20) => { const w = createWorld(seed, 'Tony Marino'); advance(w, w.now + days * DAY); const a = agencyOf(w); a.goals = []; a.cool = {}; a.stats = {}; a.ended = []; return w; };
 // run one goal to its end (or `max` reviews) without moving the rest of the world
@@ -298,10 +299,10 @@ function compat() {
     assert.equal(serialize(deserialize(serialize(l))), serialize(l));
   });
 }
-const [kind, a1, a2] = (process.argv[2] ?? 'fast').split(':');
-if (kind === 'fast') fast();
-else if (kind === 'sim') ok('sim ' + a1, () => sim(+a1, +(a2 ?? 180)));
-else if (kind === 'roundtrip') ok('roundtrip ' + a1, () => roundtrip(+a1));
-else if (kind === 'compat') compat();
+describe('v74 fast', fast);
+describe.skipIf(!COMPAT)('v74 compat', compat);
+describe.skipIf(!SLOW)('v74 slow', () => {
+  ok.each(SEEDS)(`sim %i, ${DAYS} days`, (seed) => sim(seed, DAYS));
+  ok.each(SEEDS)('roundtrip %i', roundtrip);
+});
 void applyRank; void readiness; void (null as unknown as Business);
-setTimeout(() => { console.log(failed ? `${failed} FAILED` : 'all passed'); process.exit(failed ? 1 : 0); }, 50);

@@ -61,10 +61,10 @@ Match the surrounding code. The existing style is deliberate and consistent:
 
 ## 3. Tests
 
-- Add checks to the suite for the version you're working on, or start a new `vNN.test.ts`. Follow the existing pattern: a local `ok(name, fn)` helper, `fast` mode in a few seconds, and slower modes behind arguments.
+- Add checks to the suite for the version you're working on, or start a new `vNN.test.ts`. Follow the existing pattern: Vitest's `test` imported as `ok`, fast checks in a few seconds, and slower runs behind `SLOW`/`COMPAT` (see [05-testing.md](05-testing.md#writing-a-test)).
 - Any change to simulation, economy or saves must keep `audit(w)` and `ledgerCheck(w)` empty after a run. Most suites assert this.
 - Gameplay is judged by tracing consequences (action → recorded state → later behaviour), not by green tests. Use `playtest/pt.ts` and the `*_measure.ts` / `*_trace.ts` scripts.
-- Minimum before shipping: `make test` (typecheck plus v77–v79). Anything touching the simulation, saves or economy needs `make test-all`. Schema changes also need `make test-compat` and a new fixture.
+- Minimum before shipping: `make test` (typecheck plus v77–v79). Anything touching the simulation, saves or economy needs `make test-all`. Schema changes also need a new fixture (`make test-all` already runs the synthetic migrations).
 
 ## 4. Pull request checklist
 

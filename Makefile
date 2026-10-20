@@ -14,7 +14,7 @@ DIST      := dist/omerta.html
 SRC       := $(shell find src -name '*.ts' -not -path 'src/tests/*') web/index.html web/main.ts vite.config.ts
 
 .DEFAULT_GOAL := all
-.PHONY: all help check-node install typecheck build test test-all test-compat test-sim pages dev preview play sim bot playtest open clean distclean ci
+.PHONY: all help check-node install typecheck build test test-all test-compat test-sim test-slow test-cov pages dev preview play sim bot playtest open clean distclean ci
 
 all: install typecheck build ## Install deps if needed, typecheck, build dist/omerta.html
 
@@ -42,24 +42,26 @@ $(DIST): $(STAMP) $(SRC)
 
 build: $(DIST) ## Vite: bundle src/web.ts into web/index.html -> dist/omerta.html
 
+# The suites run under Vitest (vitest.config.ts); every src/tests/*.test.ts is found by name. See docs/05-testing.md.
 test: typecheck ## Minimum pre-ship check: typecheck + v77, v78, v79 (conversation suites)
-	npx tsx src/tests/v77.test.ts fast
-	npx tsx src/tests/v78.test.ts fast
-	npx tsx src/tests/v79.test.ts fast
+	$(NPM) test -- v77 v78 v79
 
-test-all: typecheck ## Full regression: storage, v72–v79, old saves, determinism (several minutes)
+test-all: typecheck ## Full regression: every suite's fast checks plus the schema migrations, in parallel
 	$(NPM) run test:all
 
-test-compat: install ## Synthetic schema-migration checks (v73/v74/v75 compat modes; not part of test:all)
-	npx tsx src/tests/v73.test.ts compat
-	npx tsx src/tests/v74.test.ts compat
-	npx tsx src/tests/v75.test.ts compat
+test-compat: install ## Synthetic schema-migration checks only (v73/v74/v75 compat; also part of test-all)
+	$(NPM) run test:compat
 
-test-sim: install ## Long simulations: make test-sim SEED=3 DAYS=180
-	npx tsx src/tests/v74.test.ts sim:$(or $(SEED),3):$(or $(DAYS),180)
-	npx tsx src/tests/v75.test.ts sim:$(or $(SEED),3):$(or $(DAYS),180)
+test-sim: install ## Long simulations (v74/v75/v76 sim): make test-sim SEED=3 DAYS=180 (SEED may be a list: SEED=3,7)
+	SEED=$(or $(SEED),3) DAYS=$(or $(DAYS),180) $(NPM) run test:slow -- -t 'slow > sim'
 
-ci: all test-all test-compat ## What the CI workflow runs
+test-slow: install ## Everything, including every long run (stable, sim, roundtrip, growth): make test-slow SEED=3
+	SEED=$(or $(SEED),3) DAYS=$(or $(DAYS),180) $(NPM) run test:slow
+
+test-cov: install ## test-all with coverage of src/ (fails below the thresholds in vitest.config.ts); HTML report in coverage/
+	$(NPM) run test:cov
+
+ci: all test-cov ## What the CI workflow checks (typecheck, build, test-all with coverage)
 
 pages: build ## Copy the build to index.html (the GitHub Pages entry point)
 	cp $(DIST) index.html

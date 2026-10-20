@@ -555,7 +555,7 @@ Defaulted debts no longer accrue interest and are not collected by the loop. The
 - `goals.moneyTotal(w)` ([goals.ts:31](../../src/goals.ts)) = all character cash + all business cash + all treasuries. v74 asserts it is unchanged by business purchases, financed purchases, failed plans, extra debt payments and every goal step over a 60-day run; v76 by `treasuryWeek`, `treasuryMove` and the boss's fund draw. goals.ts also uses it at runtime when `AGENCY.audit` is on, counting "leaks" per goal step.
 - v73 "money paid up the chain is conserved": total character cash before and after `settleWeek`, with side operations disabled.
 - `treasuryCheck`/`orgIssues`: v76.
-- [test.ts](../../src/test.ts): every character's and business's cash is a finite number.
+- [determinism.test.ts](../../src/tests/determinism.test.ts): every character's and business's cash is a finite number.
 
 The V73 report states the position plainly: conservation of transfers was verified, not of the total, because wages and living costs are faucets and sinks ([V73_REPORT.md](../V73_REPORT.md)).
 

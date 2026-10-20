@@ -1,12 +1,12 @@
 // V86: the opening. Names are plausible and safe, backgrounds are history only, and old backgrounds still read.
 import assert from 'node:assert/strict';
+import { test as ok } from 'vitest';
 import { applyBackground, BACKGROUNDS, bgLabel } from '../background';
 import { serialize, deserialize } from '../engine';
 import { cleanName, FIRST_NAMES, rollFirst, rollName, rollSurname, SURNAMES } from '../names';
 import { createWorld, FEMALE, STANDARD_ORGS } from '../world';
 import { Rng } from '../rng';
 
-const ok = (name: string, f: () => void) => { f(); console.log('ok   ' + name); };
 const rng = new Rng(86);
 const rand = () => rng.next();
 
@@ -65,4 +65,3 @@ ok('the chosen name, look and background survive save and load', () => {
   const q = deserialize(serialize(w)).chars[w.playerId!];
   assert.equal(q.name, "Gaetano D'Agostino"); assert.equal(q.bg, 'union'); assert.deepEqual(q.look, p.look);
 });
-console.log('all passed');

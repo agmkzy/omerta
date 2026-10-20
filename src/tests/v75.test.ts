@@ -1,5 +1,7 @@
-// V75 regression suite: emergent situations. Usage: tsx src/tests/v75.test.ts fast | sim:<seed>[:days] | compat | trace
+// V75 regression suite: emergent situations. COMPAT=1 adds the schema-5 migration; SLOW=1 the long sim (SEED, DAYS) and roundtrip runs (see ./modes.ts).
 import assert from 'node:assert';
+import { describe, test as ok } from 'vitest';
+import { COMPAT, DAYS, SEEDS, SLOW } from './modes';
 import { SCHEMA, advance, deserialize, serialize } from '../engine';
 import { createWorld } from '../world';
 import { DAY, WEEK, Character, Situation, World } from '../types';
@@ -11,10 +13,6 @@ import { crewChoose } from '../crewlife';
 import { attendees, closeSit, hold, isOpen, promotedOver, sitDay, sitIssues, sitWeek, skimNoticed, spawn, tell, titleOf } from '../situ';
 import { clubTalk, friendsTell, whisper, doMove, negotiateDebt, movesFor, personTexture, visibleTo } from '../sitmoves';
 
-let failed = 0;
-const ok = (name: string, f: () => void) => {
-  try { f(); console.log('ok   ' + name); } catch (e) { failed++; console.log('FAIL ' + name + ': ' + (e as Error).message.split('\n').slice(0, 6).join(' ')); }
-};
 const P = (w: World) => w.chars[w.playerId!];
 const sortKeys = (v: unknown): unknown => Array.isArray(v) ? v.map(sortKeys) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v as object).sort(([a], [b]) => (a < b ? -1 : 1)).map(([k, x]) => [k, sortKeys(x)])) : v;
 const canon = (w: World) => JSON.stringify(sortKeys(JSON.parse(serialize(w))));
@@ -352,10 +350,10 @@ function roundtrip(seed: number) {
   advance(w, w.now + 90 * DAY); advance(l, l.now + 90 * DAY); assert.equal(canon(l), canon(w));
   console.log(`seed ${seed}: round trip OK with ${open} open situations at the cut`);
 }
-const [kind, a1, a2] = (process.argv[2] ?? 'fast').split(':');
-if (kind === 'fast') fast();
-else if (kind === 'sim') ok('sim ' + a1, () => sim(+a1, +(a2 ?? 180)));
-else if (kind === 'roundtrip') ok('roundtrip ' + a1, () => roundtrip(+a1));
-else if (kind === 'compat') compat();
+describe('v75 fast', fast);
+describe.skipIf(!COMPAT)('v75 compat', compat);
+describe.skipIf(!SLOW)('v75 slow', () => {
+  ok.each(SEEDS)(`sim %i, ${DAYS} days`, (seed) => sim(seed, DAYS));
+  ok.each(SEEDS)('roundtrip %i', roundtrip);
+});
 void sitWeek; void attendees; void (null as unknown as Character);
-setTimeout(() => { console.log(failed ? `${failed} FAILED` : 'all passed'); process.exit(failed ? 1 : 0); }, 50);

@@ -15,7 +15,7 @@ This document covers what OMERTÀ is built with, why, what that costs, and where
 | Graphics | Procedurally painted SVG portraits (must not change, see CLAUDE.md) | [src/ui/portrait.ts](../src/ui/portrait.ts) |
 | Simulation | Plain TypeScript functions over one serialisable `World` object. A seeded PRNG (mulberry32) and a discrete event queue | [src/engine.ts](../src/engine.ts), [src/rng.ts](../src/rng.ts), [src/types.ts](../src/types.ts) |
 | Persistence | `localStorage` (main save + up to 3 rolling snapshots), plus manual JSON download/upload | [src/storage.ts](../src/storage.ts), [src/web.ts](../src/web.ts) |
-| Tests | Plain scripts using `node:assert`, run with `tsx`. Each suite has a tiny local `ok(name, fn)` helper. There is no test framework | [src/tests/](../src/tests), [src/test.ts](../src/test.ts) |
+| Tests | Vitest 5 runs the suites in parallel, with `@vitest/coverage-v8` for coverage. The assertions are `node:assert` | [src/tests/](../src/tests), [vitest.config.ts](../vitest.config.ts), [05-testing.md](05-testing.md) |
 | Hosting | Static file: GitHub Pages (legacy build from `main`, path `/`, serves `index.html`) and a claude.ai artifact | [06-deployment.md](06-deployment.md) |
 
 **Runtime dependencies: none.** The five dev dependencies are `typescript`, `tsx`, `vite`, `vite-plugin-singlefile` and `@types/node`. They install 23 packages in total, most of them Vite's (Rolldown, Lightning CSS, PostCSS and their platform-specific native binaries). Nothing is fetched at runtime, and the page makes no network requests.
@@ -41,7 +41,7 @@ The project has no written decision record. The reasons below are inferred from 
 | UI ↔ sim coupling | `web.ts` (879 lines) imports 43 modules and mutates the world directly in some handlers. Views also read deep into the `World` shape. There is no query layer | [04-architecture.md](04-architecture.md) |
 | Global mutable singleton | UI state is one exported object `S` holding the world, the current view, a back stack and about 40 loose fields. Any module can write any of it | [ui/state.ts](../src/ui/state.ts) |
 | Module tangle | 30 engine modules form one strongly connected import cycle (core ↔ econ ↔ world ↔ …). Nothing stops it growing | [04-architecture.md](04-architecture.md#dependency-structure) |
-| Tests | No runner: no isolation, no watch mode, no filtering, no parallelism, no coverage. A failed assertion in one `ok()` block is caught and counted, but there is no report format CI can parse. The full suite runs serially and takes many minutes | [05-testing.md](05-testing.md) |
+| Tests | Since the move to Vitest there is a runner with filtering, watch mode, parallel files and coverage thresholds. What's left: the UI has no tests at all, and v75 is one slow file that sets the wall-clock time of every run | [05-testing.md](05-testing.md) |
 | Type safety at the edges | `tsc` checks `src/` only. `playtest/` is not in `tsconfig.json`. Saves are parsed with `JSON.parse` and cast to `World` with no runtime validation. `ensureShape` and the migration chain are the only defence | [tsconfig.json](../tsconfig.json), `deserialize` in [engine.ts](../src/engine.ts) |
 | Persistence | `localStorage` is synchronous, about 5 M characters per origin, and blocks the main thread on every save. Saves grow with play (measured below) | [storage.ts](../src/storage.ts) |
 | Build | There are no source maps in the shipped file and no linter or formatter config | [vite.config.ts](../vite.config.ts) |

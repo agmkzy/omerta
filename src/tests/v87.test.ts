@@ -1,6 +1,9 @@
 // V87: backgrounds and starting lives. Each package is real state in the ordinary simulation, applied once at creation,
 // and the world runs on from it: the skills, the stock, the share, the job, the debt, the car, and the brother.
+// The fast set checks four seeds (one for the 35-day run); SLOW=1 checks eight (two) (see ./modes.ts).
 import assert from 'node:assert/strict';
+import { test as ok } from 'vitest';
+import { SLOW } from './modes';
 import { readdirSync, readFileSync } from 'node:fs';
 import { BACKGROUNDS, bgOf, FLOOR, LEAD, SECOND, startingLines } from '../background';
 import { audit } from '../consistency';
@@ -17,8 +20,7 @@ import { handleDeath } from '../core';
 import { DAY, type Character, type World } from '../types';
 import { createWorld } from '../world';
 
-const fast = process.argv.includes('fast');
-const ok = (name: string, f: () => void) => { f(); console.log('ok   ' + name); };
+const fast = !SLOW;
 const NAME = 'Salvatore DeMarco';
 const SEEDS = fast ? [1, 2, 3, 4] : [1, 2, 3, 4, 5, 6, 7, 8];
 const P = (w: World) => w.chars[w.playerId!];
@@ -204,4 +206,3 @@ ok('35 days on, every starting life is still running through the ordinary system
     console.log(`     ${b.id.padEnd(10)} seed ${s}: day-35 cash ${p.cash} (started ${bgOf(b.id)!.cash}), standing ${Math.round(p.standing)}, heat ${p.heat.toFixed(2)}`);
   }
 });
-console.log('all passed');

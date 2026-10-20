@@ -1,5 +1,7 @@
-// V76 suite: dynamic criminal organisations. Usage: tsx src/tests/v76.test.ts fast | sim:<seed>[:days] | det | trace
+// V76 suite: dynamic criminal organisations. SLOW=1 adds the long sim (SEED, DAYS) and the trace of the player's road to boss (see ./modes.ts).
 import assert from 'node:assert';
+import { describe, test as ok } from 'vitest';
+import { DAYS, SEEDS, SLOW } from './modes';
 import { readFileSync, readdirSync } from 'node:fs';
 import { advance, deserialize, serialize } from '../engine';
 import { createWorld, EXTRA_ORGS, STANDARD_ORGS } from '../world';
@@ -18,10 +20,6 @@ import { present, sitAtClub } from '../places';
 import { setHeir, setConsigliere } from '../powers2';
 import { candidates, chooseLeader, defect, foundOrg, hostility, interestsOf, leave, leaderOf, membersOf, noteDeal, noteGrievance, orgIssues, orgList, orgRecord, orgWeek, relWeek, succeed, treasuryCheck, treasuryMove, treasuryWeek, hierarchyOf } from '../orgs';
 
-let failed = 0;
-const ok = (name: string, f: () => void) => {
-  try { f(); console.log('ok   ' + name); } catch (e) { failed++; console.log('FAIL ' + name + ': ' + (e as Error).message.split('\n').slice(0, 6).join(' ')); }
-};
 const P = (w: World) => w.chars[w.playerId!];
 const clone = (w: World) => deserialize(serialize(w));
 const cache = new Map<string, string>();
@@ -256,16 +254,15 @@ function sim(seed: number, days: number) {
   const w = createWorld(seed, 'Tony Marino'); let n = 0; const t0 = Date.now(); const size = () => orgList(w).map((f) => membersOf(w, f.id).length).join('/'); const s0 = size();
   for (let d = 0; d < days; d += 30) {
     advance(w, w.now + Math.min(30, days - d) * DAY); n++;
-    try { clean(w, `day ${d + 30}`); } catch (e) { failed++; console.log('FAIL sim audit: ' + (e as Error).message.slice(0, 400)); return; }
+    clean(w, `day ${d + 30}`);
     for (const f of orgList(w)) assert.equal(treasuryCheck(f), 0);
   }
   const ev = orgList(w).flatMap((f) => (f.hist ?? []).map((h) => h.kind)); const k: Record<string, number> = {}; for (const x of ev) k[x] = (k[x] ?? 0) + 1;
-  console.log(`ok   sim seed ${seed}, ${days} days, ${n} audits clean in ${Math.round((Date.now() - t0) / 1000)}s; orgs ${orgList(w).length}; events ${JSON.stringify(k)}; members ${s0} -> ${size()}; player ${P(w).rank}`);
+  console.log(`sim seed ${seed}, ${days} days, ${n} audits clean in ${Math.round((Date.now() - t0) / 1000)}s; orgs ${orgList(w).length}; events ${JSON.stringify(k)}; members ${s0} -> ${size()}; player ${P(w).rank}`);
 }
 
-const mode = process.argv[2] ?? 'fast';
-if (mode === 'fast') { fast(); don(); det(); }
-else if (mode === 'trace') { const { w, p, log } = playerRun(); console.log(log.join('\n')); console.log(`${p.name} is boss of the ${w.fam[p.familyId!].name} family`); }
-else if (mode.startsWith('sim')) { const [, s, d] = mode.split(':'); sim(Number(s ?? 3), Number(d ?? 180)); }
-console.log(failed ? `\n${failed} FAILED` : '\nall passed');
-process.exit(failed ? 1 : 0);
+describe('v76 fast', () => { fast(); don(); det(); });
+describe.skipIf(!SLOW)('v76 slow', () => {
+  ok.each(SEEDS)(`sim %i, ${DAYS} days`, (seed) => sim(seed, DAYS));
+  ok('trace: the player\'s road to boss', () => { const { w, p, log } = playerRun(); console.log(log.join('\n')); console.log(`${p.name} is boss of the ${w.fam[p.familyId!].name} family`); });
+});

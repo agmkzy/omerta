@@ -31,10 +31,10 @@ While working on the UI, `make dev` (or `npm run dev`) serves the game at http:/
 ## Type-check and test
 ```
 npm run typecheck                         # tsc --noEmit
-npm run test:all                          # storage, v72–v79, old-save compatibility, legacy test
-npx tsx src/tests/v77.test.ts fast        # a single suite
+npm run test:all                          # every suite plus schema migrations, in parallel (Vitest)
+npx vitest run v77                        # a single suite; add -t "<name>" for a single check
 ```
-Suites: `storage` (save/load safety), `v72`–`v76` (simulation, economy ledger, NPC autonomy, careers, clubs), `v77`–`v79` (conversation overhaul: crawler, no repeated lines, no internal-data leaks, memory across save/load), `oldsave` (loads genuine older saves from `src/tests/fixtures/`). `v74` and `v75` are slow.
+Suites (`src/tests/*.test.ts`, found automatically): `storage` (save/load safety), `v72`–`v76` (simulation, economy ledger, NPC autonomy, careers, clubs), `v77`–`v79` (conversation overhaul: crawler, no repeated lines, no internal-data leaks, memory across save/load), `v86`–`v87` (names, backgrounds, starting lives), `oldsave` (loads genuine older saves from `src/tests/fixtures/`), `determinism`. `v75` is the slow one. Long simulations are opt-in: `npm run test:slow`. See [docs/05-testing.md](docs/05-testing.md).
 
 ## Other commands
 ```
