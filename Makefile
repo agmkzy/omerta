@@ -14,7 +14,7 @@ DIST      := dist/omerta.html
 SRC       := $(shell find src -name '*.ts' -not -path 'src/tests/*') web/index.html web/main.ts vite.config.ts
 
 .DEFAULT_GOAL := all
-.PHONY: all help check-node install typecheck build test test-all test-compat test-sim test-slow test-cov pages dev preview play sim bot playtest open clean distclean ci
+.PHONY: all help check-node install typecheck build test test-unit test-all test-compat test-sim test-slow test-cov pages dev preview play sim bot playtest open clean distclean ci
 
 all: install typecheck build ## Install deps if needed, typecheck, build dist/omerta.html
 
@@ -42,18 +42,22 @@ $(DIST): $(STAMP) $(SRC)
 
 build: $(DIST) ## Vite: bundle src/web.ts into web/index.html -> dist/omerta.html
 
-# The suites run under Vitest (vitest.config.ts); every src/tests/*.test.ts is found by name. See docs/05-testing.md.
-test: typecheck ## Minimum pre-ship check: typecheck + v77, v78, v79 (conversation suites)
-	$(NPM) test -- v77 v78 v79
+# The tests run under Vitest (vitest.config.ts): src/tests/<system>/*.test.ts, found by name and tagged by kind (src/tests/tags.ts).
+# See docs/05-testing.md.
+test: typecheck ## Minimum pre-ship check: typecheck + the conversation tests (src/tests/dialogue/)
+	$(NPM) test -- src/tests/dialogue
 
-test-all: typecheck ## Full regression: every suite's fast checks plus the schema migrations, in parallel
+test-unit: install ## Only the unit tests (seconds): every test tagged unit
+	$(NPM) run test:unit
+
+test-all: typecheck ## Full regression: every test except the opt-in long runs, in parallel
 	$(NPM) run test:all
 
-test-compat: install ## Synthetic schema-migration checks only (v73/v74/v75 compat; also part of test-all)
+test-compat: install ## Only the save-compatibility tests (real old saves and synthetic migrations; also part of test-all)
 	$(NPM) run test:compat
 
-test-sim: install ## Long simulations (v74/v75/v76 sim): make test-sim SEED=3 DAYS=180 (SEED may be a list: SEED=3,7)
-	SEED=$(or $(SEED),3) DAYS=$(or $(DAYS),180) $(NPM) run test:slow -- -t 'slow > sim'
+test-sim: install ## The long simulations (tagged sim and slow): make test-sim SEED=3 DAYS=180 (SEED may be a list: SEED=3,7)
+	SEED=$(or $(SEED),3) DAYS=$(or $(DAYS),180) $(NPM) run test:slow -- --tagsFilter 'sim && slow'
 
 test-slow: install ## Everything, including every long run (stable, sim, roundtrip, growth): make test-slow SEED=3
 	SEED=$(or $(SEED),3) DAYS=$(or $(DAYS),180) $(NPM) run test:slow

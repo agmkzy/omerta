@@ -31,7 +31,7 @@ async function pool<T>(jobs: Job[], n: number, f: (j: Job) => Promise<T>): Promi
   return res;
 }
 
-describe('determinism', () => {
+describe('determinism', { tags: ['determinism'] }, () => {
   // Longest jobs first, so no core is left with a long one at the end. A failed job is kept as its error and fails only its own check.
   const jobs: Job[] = [...SEEDS.map((seed) => ({ kind: 'seed' as const, seed })), { kind: 'det', roundTrip: true }, { kind: 'det', roundTrip: false }];
   let res: unknown[] = [];
