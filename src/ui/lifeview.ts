@@ -21,7 +21,7 @@ import { kinWord, stageWord, warmthWord, DATES, datingPool } from '../life';
 import { pathInfo } from '../path';
 import { favourWord, owedTo, owing } from '../encounters';
 import { TAGS } from '../notebook';
-import { readSnaps } from '../storage';
+import { deepStorage, saveBox, storageNote } from '../savestore';
 import { avatar, skillBars, traitTags } from './common';
 import { esc, lk, P, pl, S, W, youify } from './links';
 import { toSide } from './layout';
@@ -127,15 +127,16 @@ function standing(w: World, p: Character): string {
   return careerLines(w, p).map((l) => `<p class="lf-bg">${lk(l)}</p>`).join('');
 }
 
-const snapList = (): { day: number; key: string; label: string }[] => { try { return readSnaps(localStorage); } catch { return []; } };
+const snapList = (): { day: number; key: string; label: string }[] => saveBox()?.snaps ?? [];
 // The game itself: saving, backups, going back a day, starting over. Kept out of the way, at the foot of the page.
 function savesFold(): string {
   const open = !!S.open['saves'] || S.confirmReset;
   let out = `<div class="lf-saves"><button class="lf-saves__t" data-a="tog:saves" aria-expanded="${open}">Saves and backups <span>${open ? '&lsaquo;' : '&rsaquo;'}</span></button>`;
   if (!open) return out + `</div>`;
-  out += `<div class="list"><button class="opt" data-a="save:"><b>Save now</b><span class="because">${S.save ? (S.save.ok ? `Last saved ${esc(fmtTime(W().now))}. This game takes ${(S.save.bytes / 1e6).toFixed(2)} MB; with ${S.save.snapshots} earlier-day snapshot${S.save.snapshots === 1 ? '' : 's'}, ${(S.save.used / 1e6).toFixed(2)} MB of roughly 5 MB this browser allows.` : 'NOT saved: ' + esc(S.save.error ?? '')) : 'The game saves itself after every action, in this browser only.'}</span></button>`;
+  out += `<div class="list"><button class="opt" data-a="save:"><b>Save now</b><span class="because">${S.save ? (S.save.ok ? `Last saved ${esc(S.saveGood || fmtTime(W().now))}. This game takes ${(S.save.bytes / 1e6).toFixed(2)} MB; with ${S.save.snapshots} earlier-day snapshot${S.save.snapshots === 1 ? '' : 's'}, ${(S.save.used / 1e6).toFixed(2)} MB${deepStorage() ? ' in all, kept in this browser' : ' of roughly 5 MB this browser allows'}.` : 'NOT saved: ' + esc(S.save.error ?? '')) : 'The game saves itself after every action, in this browser only.'}</span></button>`;
   out += `<button class="opt" data-a="dlsave:"><b>Download a backup file</b><span class="because">A copy you can keep outside the browser.</span></button><button class="opt" data-a="ulsave:"><b>Load a backup file</b><span class="because">Replaces the game you are playing.</span></button>`;
   out += `<button class="opt ${S.confirmReset ? 'danger' : ''}" data-a="reset:"><b>${S.confirmReset ? 'Tap again to erase this game and start over' : 'Start a new game'}</b></button></div><input type="file" id="ulfile" accept=".json,application/json" hidden>`;
+  if (storageNote()) out += `<div class="callout info">${esc(storageNote())}</div>`;
   const l = snapList();
   if (l.length) out += `<h3 class="sub">Earlier days, if you need to undo</h3><div class="list">${l.map((x) => `<button class="opt" data-a="restore:${x.key}"><b>${esc(x.label)}</b><span class="because">Go back to this day. Everything since is lost.</span></button>`).join('')}</div>`;
   return out + `</div>`;

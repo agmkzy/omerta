@@ -47,35 +47,43 @@ import {
 } from './ui/views_b';
 import { treeView } from './ui/views_a';
 import { leaveCrew } from './rank';
-import { KEY, readSnaps, usageStatus, writeSave, type SaveStatus } from './storage';
+import type { Snap } from './storage';
+import { onSaved, openSaves, saveBox, storageNote } from './savestore';
 import { briefView } from './ui/brief';
 import { bottomTabs, rail, takeSide, topBar } from './ui/layout';
 import { roomOf } from './ui/lifeview';
 import { startingLines } from './background';
-import { draftBg, draftDone, draftName, openingAct, openingView, typed } from './ui/opening';
+import { draftBg, draftDone, draftName, forgetSummary, openingAct, openingView, typed } from './ui/opening';
 import { fullName } from './names';
 import { sundayView, sKey } from './ui/sunday';
 import { racketsView, wayView } from './ui/views_c';
 
 
 // ------------------------------------------------------------------ storage
-// Three older saves are kept, a few game-days apart, so one bad day is never the end of a run.
-export function snapList(): { day: number; key: string; label: string }[] {
-  try { return readSnaps(localStorage); } catch { return []; }
+// The save lives in IndexedDB (savestore.ts), read into memory once before the first screen. A week of earlier days is
+// kept, one per game day, so one bad day is never the end of a run.
+export function snapList(): Snap[] {
+  return saveBox()?.snaps ?? [];
 }
-// Saving is never silent: every outcome lands in S.save, and render() shows it whenever it is bad.
-function save(): boolean {
-  if (!S.w) return false;
-  let st: SaveStatus;
+// Saving is never silent: every outcome lands in S.save, and render() shows it whenever it is bad. The world is
+// serialized now, so later changes cannot race the write; the write itself happens in the background.
+function save(): void {
+  if (!S.w) return;
+  const b = saveBox();
+  if (!b) { S.save = { ok: false, available: false, bytes: 0, used: 0, snapshots: 0, error: 'this browser will not let the game keep anything' }; return; }
   try {
-    st = writeSave(localStorage, serialize(S.w), Math.floor(S.w.now / 1440), fmtTime(S.w.now));
+    b.put(serialize(S.w), Math.floor(S.w.now / 1440), fmtTime(S.w.now));
   } catch (e) {
-    st = { ok: false, available: false, bytes: 0, used: 0, snapshots: 0, error: e instanceof Error ? e.message : 'storage is blocked' };
+    S.save = { ok: false, available: true, bytes: 0, used: 0, snapshots: 0, error: e instanceof Error ? e.message : 'the game could not be written down' };
   }
-  if (st.ok) S.saveGood = fmtTime(S.w.now);
-  S.save = st;
-  return st.ok;
 }
+// A finished write: a failure (or the first good write after one) is shown at once; a quiet success waits for the next screen.
+onSaved((st) => {
+  const was = S.save;
+  if (st.ok && S.w) S.saveGood = fmtTime(S.w.now);
+  S.save = st;
+  if (S.w && (!st.ok || (was && !was.ok))) { const y = window.scrollY; render(); window.scrollTo(0, y); }
+});
 function downloadSave() {
   if (!S.w) return;
   const name = `omerta-day-${Math.floor(S.w.now / 1440)}.json`;
@@ -97,31 +105,20 @@ function downloadSave() {
   a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 }
-const hasSave = () => {
-  try {
-    return !!localStorage.getItem(KEY);
-  } catch {
-    return false;
+const hasSave = () => !!saveBox()?.hasSave();
+// The saved game, opened. If the main save will not open, the newest snapshot that does is used, and the player is told.
+async function load(): Promise<World | null> {
+  const b = saveBox();
+  const s = b?.main;
+  if (!b || !s) return null;
+  try { return deserialize(s); } catch (e) { console.error(e); }
+  for (const sn of b.snaps) {
+    const raw = await b.readSnap(sn.key);
+    if (!raw) continue;
+    try { const w = deserialize(raw); S.notice = `Your latest save could not be opened, so this is the snapshot from ${sn.label}. The damaged save will be replaced by your next save.`; return w; } catch { /* try the next */ }
   }
-};
-function load(): World | null {
-  try {
-    const s = localStorage.getItem(KEY);
-    if (s) {
-      try { return deserialize(s); } catch (e) { console.error(e); }
-      // The main save would not open: fall back to the newest snapshot that does, and say so.
-      for (const sn of snapList()) {
-        const raw = localStorage.getItem(sn.key);
-        if (!raw) continue;
-        try { const w = deserialize(raw); S.notice = `Your latest save could not be opened, so this is the snapshot from ${sn.label}. The damaged save will be replaced by your next save.`; return w; } catch { /* try the next */ }
-      }
-      S.notice = 'Your saved game could not be opened and no readable snapshot was found. It has not been deleted.';
-    }
-    return null;
-  } catch {
-    S.notice = 'Saved games are not available in this browser.';
-    return null;
-  }
+  S.notice = 'Your saved game could not be opened and no readable snapshot was found. It has not been deleted.';
+  return null;
 }
 
 // -------------------------------------------------------------------- news
@@ -353,19 +350,24 @@ function handle(a: string, v: string) {
     S.news = [];
     S.stack = [];
     S.view = { t: 'tab', name: 'today' };
+    // a new man starts with a clean slate: the old game and its earlier days go first, then he is saved
+    saveBox()?.erase().catch(() => { /* nothing to clear */ });
     save();
     return;
   }
   if (a === 'continue') {
-    const s = load();
-    if (s) {
-      S.w = s;
-      try { S.save = usageStatus(localStorage); } catch { /* ignore */ }
-      S.log = ['Welcome back.'];
-      S.news = [];
-      S.stack = [];
-      S.view = { t: 'tab', name: 'today' };
-    }
+    load().then((s) => {
+      if (s) {
+        S.w = s;
+        S.save = saveBox()?.status ?? null;
+        S.log = ['Welcome back.'];
+        S.news = [];
+        S.stack = [];
+        S.view = { t: 'tab', name: 'today' };
+      }
+      render();
+      window.scrollTo(0, 0);
+    }, (e) => { console.error(e); S.notice = 'Your saved game could not be opened. It has not been deleted.'; render(); });
     return;
   }
   if (!w) return;
@@ -465,7 +467,17 @@ function handle(a: string, v: string) {
     }
     case 'ntag': { toggleTag(P(), args[0], Number(args[1])); save(); return; }
     case 'npin': { togglePin(P(), v); save(); return; }
-    case 'restore': { const s = snapList().find((x) => x.key === v); const raw = s ? localStorage.getItem(s.key) : null; if (raw) { S.w = deserialize(raw); S.log = ['You go back to an earlier day.']; S.news = []; S.stack = []; S.view = { t: 'tab', name: 'today' }; save(); } return; }
+    case 'restore': {
+      const b = saveBox();
+      if (!b) return;
+      b.idle().then(() => b.readSnap(v)).then((raw) => {
+        if (!raw) { S.notice = 'That earlier day could not be found any more.'; render(); return; }
+        try { S.w = deserialize(raw); } catch { S.notice = 'That earlier day could not be opened.'; render(); return; }
+        S.log = ['You go back to an earlier day.']; S.news = []; S.stack = []; S.view = { t: 'tab', name: 'today' };
+        save(); render(); window.scrollTo(0, 0);
+      });
+      return;
+    }
     case 'brief': S.paperAt = undefined; return go({ t: 'brief' });
     case 'sunday': return go({ t: 'sunday' });
     case 'sbooks': {
@@ -813,16 +825,25 @@ function handle(a: string, v: string) {
     case 'pass': declineJob(w, job(v)!); save(); S.stack = []; S.view = { t: 'tab', name: 'today' }; return;
     case 'drop': dropJob(w, job(v)!); save(); S.stack = []; S.view = { t: 'tab', name: 'today' }; return;
     case 'amb': { const p = P(); p.ambition = { kind: v, since: w.now, rank0: p.rank }; save(); return; }
-    case 'save': { const ok = save(); S.log = [ok ? 'Saved.' : 'Could not save: ' + (S.save?.error ?? 'unknown problem') + '. Your last good save is untouched.']; tab('today'); return; }
+    case 'save': {
+      save();
+      const b = saveBox();
+      S.log = ['Saving…'];
+      tab('today');
+      (b ? b.idle() : Promise.resolve(null)).then((st) => {
+        const ok = !!st?.ok && S.save?.ok !== false;
+        if (S.view.t === 'tab' && S.log[0] === 'Saving…') { S.log = [ok ? 'Saved.' : 'Could not save: ' + (S.save?.error ?? 'unknown problem') + '. Your last good save is untouched.']; render(); }
+      });
+      return;
+    }
     case 'dlsave': downloadSave(); return;
     case 'ulsave': document.getElementById('ulfile')?.click(); return;
     case 'reset':
       if (v === 'go' || S.confirmReset) {
-        try {
-          localStorage.removeItem(KEY);
-        } catch {
-          /* nothing to clear */
-        }
+        saveBox()?.erase().catch(() => { /* nothing to clear */ });
+        forgetSummary();
+        S.save = null;
+        S.saveGood = '';
         S.w = null;
         S.confirmReset = false;
         S.intro = 'title';
@@ -881,5 +902,5 @@ document.addEventListener('change', (e) => {
   });
 });
 
-render();
-void KEY;
+// The saved game is read once, before anything is drawn: the opening screen has to know whether there is one.
+openSaves().then(() => { const n = storageNote(); if (n && !S.notice) S.notice = n; }, (e) => console.error(e)).then(() => render());
