@@ -79,16 +79,18 @@ A test tagged `slow` as well as its kind is skipped unless `SLOW=1`. These are t
 
 ## How long it takes, and why
 
-`npm test` takes about **72 seconds** on an 18-core Apple-silicon Mac (6 performance and 12 efficiency cores) with Node 25. When the tests were one file per release it took 192 seconds, because the v75 file alone ran for over three minutes.
+`npm test` takes about **47 seconds** on an 18-core Apple-silicon Mac (6 performance and 12 efficiency cores) with Node 25. When the tests were one file per release it took 192 seconds, because the v75 file alone ran for over three minutes. Splitting the files by system brought it to 72 s, and two fixes in the simulation brought it to 47 s.
 
-**Almost all the time is simulation.** A world costs about 14 ms to generate and about 70 ms per simulated day to run, so a 60-day world takes about 4.7 seconds. Saving and loading that world (1.5 MB) takes 6–7 ms. Two things follow:
+**Almost all the time is simulation.** A world costs about 14 ms to generate and, since the fixes, about 40 ms per simulated day to run (60 days take about 2.3 s). Saving and loading that world (1.5 MB) takes 6–7 ms. Two things follow:
 
-- **Reuse worlds rather than rebuild them.** The cached builders simulate a world once per file and hand each check a copy loaded from the save. `agencyWorld` used to simulate again for every check. Caching it halved the agency tests' CPU time (57 s → 32 s).
-- **The wall-clock floor is a handful of single checks.** For example, a 400-day run and loops that build 16–24 worlds take 20–35 seconds each on their own, and up to about 55 s when every file runs at once and some land on efficiency cores. A check can't be split without changing what it checks, so the floor drops only if the simulation gets faster.
+- **Reuse worlds rather than rebuild them.** The cached builders simulate a world once per file and hand each check a copy loaded from the save. `agencyWorld` used to simulate again for every check. Caching it halved the agency tests' CPU time (57 s → 32 s). A file whose unit tests start from a cached world builds it in `beforeAll`, so a unit test's time limit measures only its own work.
+- **The wall-clock floor is a handful of single checks.** A 400-day run and loops that build 16–24 worlds each take tens of seconds, more when every file runs at once and some land on efficiency cores. A check can't be split without changing what it checks, so the floor drops only if the simulation gets faster.
 
-**Where the simulation spends its time** (a CPU profile of a 60-day run): 30% in `ownerBiz` (core.ts), which counts every business (`Object.keys(w.biz).length`) on each of millions of calls to decide whether its cache is stale, and 55% in NPC action generation and scoring (`generate`, `chooseAction`, `share`, `aliveList` in actions.ts). Skipping that count makes a 60-day run 33% faster (3.8 s → 2.6 s). That would be a change to game code, which has to keep every history byte-identical, so it belongs in its own change, checked by comparing saves from several seeds before and after.
+**Where the simulation spends its time.** A CPU profile of a 60-day run used to put 30% in `ownerBiz` (core.ts), which counted every business on each of millions of calls to decide whether its cache was stale. It no longer counts: whatever adds a business calls `ownersChanged`, so the map is rebuilt at exactly the same moments. `generate` (actions.ts) copied the list of living men without the actor on every call, although only three kinds of action use it, and now copies it only when needed. Together, 60 days went from 3.81 s to 2.33 s. Every history stayed byte-identical: [history_hashes.ts](../src/tests/tools/history_hashes.ts) fingerprints 28 points across eight seeds, a seven-family world, a background start and a reloaded save, and the fingerprints match before and after. Use it for any further engine speed-up.
 
-What doesn't help: sharing a world across files through Vitest's `globalSetup` would save CPU but add its build time to the start of every run, and the 60-day world costs only about 6 s per file. The determinism suite already spreads its ten worlds over child processes (about 190 CPU-seconds in 20 s).
+What's left is NPC decision-making in actions.ts: `chooseAction` and `generate` (about 40% between them: one option object and one random draw per candidate, and the draws must stay in the same order), `aliveList` (12%: rebuilt once per game minute), and `share` (12%: sorts what a man knows each time he passes something on). Each would need restructuring checked the same way.
+
+What doesn't help: sharing a world across files through Vitest's `globalSetup` would save CPU but add its build time to the start of every run, and the 60-day world costs only a few seconds per file. The determinism suite already spreads its ten worlds over child processes.
 
 ### Not tests: measurement and trace scripts
 
@@ -100,6 +102,7 @@ These live in [src/tests/tools/](../src/tests/tools) and assert nothing. They pr
 | `agency_measure.ts <seed> [days] [off]` | What NPCs achieved unattended, optionally with goals switched off for comparison |
 | `sit_measure.ts`, `sit_freq.ts`, `sit_trace.ts` | Situation frequency, and situations followed from cause to consequence |
 | `v76_smoke.ts`, `v76_trace_probe.ts` | Organisation smoke runs with `audit()` |
+| `history_hashes.ts [case …]` | Fingerprints of world histories at 28 points. Run it before and after an engine change and diff: an identical output means no history changed |
 | [src/stress.ts](../src/stress.ts), [src/bot.ts](../src/bot.ts) | Long random-policy player runs |
 | [playtest/pt.ts](../playtest/pt.ts) | The interactive command-line harness used for the V85 playtest. **It hardcodes `/home/claude/omerta/playtest`**, so it fails on any other machine until that path is fixed |
 
@@ -126,7 +129,7 @@ These live in [src/tests/tools/](../src/tests/tools) and assert nothing. They pr
 
 The long-term target is 80% of lines. The most uncovered lines are in `dialogue.ts` (63% covered, 620 lines not reached), `jobs.ts` (28%), `meetings.ts` (24%), `encounters.ts` (33%), `powers2.ts` (39%), `orders.ts` (24%) and `life.ts` (21%). `revenge.ts` (140 lines) is never reached at all by the fast set. When coverage rises, raise the thresholds to match.
 
-Coverage costs about a quarter more run time (v75: 197 s → 244 s), which is why plain `test:all` runs without it. The determinism suite's worlds are built in child processes, which coverage doesn't see. Everything they run is also exercised in-process by other suites.
+Coverage costs about a quarter more run time, which is why plain `test:all` runs without it. **CI doesn't measure it for now**: run `make test-cov` before a change that could lower it. The determinism suite's worlds are built in child processes, which coverage doesn't see. Everything they run is also exercised in-process by other suites.
 
 The tests were written per release (V72–V88) around the features of that release, so coverage follows recent work. Code that predates V72 (`actions.ts`, `jobs.ts`, `encounters.ts`, `meetings.ts`, much of `dialogue.ts`) is exercised by the long simulations and the crawler, but rarely asserted directly. The HTML report shows which lines are never reached. Apart from the portrait suite, which renders `ui/portrait.ts` directly, the UI layer (`web.ts`, `ui/*`, about 4,000 lines) has **no tests**. A Playwright smoke test of the core loop (new game, talk, wait, save, reload, continue) is the recommended next step ([08-framework-migration.md](08-framework-migration.md#5-suggested-order-and-checkpoints)).
 
@@ -134,11 +137,10 @@ The tests were written per release (V72–V88) around the features of that relea
 
 **Yes:** [.github/workflows/ci.yml](../.github/workflows/ci.yml). It runs on every push to `main`, on every pull request, and on manual dispatch.
 
-- **Free tier compatible.** The repository is public, and GitHub-hosted runners are free for public repositories. The workflow uses only `ubuntu-latest` and first-party actions (`checkout`, `setup-node` with the npm cache, `upload-artifact`, `download-artifact`). If the repository ever goes private, the free plan includes 2,000 minutes a month.
+- **Free tier compatible.** The repository is public, and GitHub-hosted runners are free for public repositories. The workflow uses only `ubuntu-latest` and first-party actions (`checkout`, `setup-node` with the npm cache, `upload-artifact`). If the repository ever goes private, the free plan includes 2,000 minutes a month.
 - **Job `build`** runs `make all` (install, typecheck, build) and uploads `dist/omerta.html` as a downloadable artifact. It warns, without failing, if the committed `dist/omerta.html` or `index.html` no longer match a fresh build (the build is deterministic, so any difference means a stale commit).
-- **Job `suite`** runs the tests with coverage in three parallel jobs of roughly equal work, with `fail-fast: false` and `--maxWorkers=100%` (Vitest otherwise leaves one of the runner's four cores idle). The jobs are `situations/` (the most simulation), the determinism suite (ten worlds in child processes), and everything else. The third uses `--exclude`, not a list, so a new file lands there by itself. Each job uploads a Vitest blob report, which includes its coverage.
-- **Job `report`** ("All suites and coverage") merges the three blob reports (`vitest run --merge-reports --coverage`). It prints every check's result in one place, adds GitHub annotations for failures, and checks the coverage thresholds on the merged coverage. The parts can't check thresholds themselves, because each one covers only part of the code.
-- To make it a gate, go to **Settings → Branches → Branch protection** for `main` and require the `Typecheck and build` and `All suites and coverage` checks.
+- **Job `suite`** runs the tests in three parallel jobs of roughly equal work, with `fail-fast: false` and `--maxWorkers=100%` (Vitest otherwise leaves one of the runner's four cores idle). The jobs are `situations` (the most simulation), `determinism` (ten worlds in child processes), and `other tests`, everything else. The third uses `--exclude`, not a list, so a new file lands there by itself. Vitest annotates failures on the pull request. Coverage isn't measured in CI for now (see above).
+- To make it a gate, go to **Settings → Branches → Branch protection** for `main` and require `Typecheck and build`, `situations`, `determinism` and `other tests`.
 
 To run what CI checks locally:
 
@@ -167,7 +169,7 @@ make ci
 ## Writing a test
 
 1. Put it where it belongs ([Where a new test goes](#where-a-new-test-goes)) and give it one kind ([tags](#what-kind-of-test-tags)). A new file is picked up automatically. Import `describe` and `test as ok` from `vitest`. Use `node:assert` (`assert.equal`, `assert.deepEqual`, `assert.ok`) for the checks.
-2. Build worlds with a named builder from [helpers.ts](../src/tests/helpers.ts) or the folder's `fixtures.ts`, with every argument written out: `newWorld(7)` (day 0), `agencyWorld(7, 20)`, `situationWorld(7, 20)`, `orgWorld(3, 20, 5)`, `world60()`. The cached builders simulate once per file, keep the world as a save and hand each check a fresh copy. Simulating is about 70 ms per day, and loading a save is about 7 ms, so reusing a world is far cheaper than building it again. For a new kind of world, add a builder that says what it builds, never a `fresh()` with hidden defaults.
+2. Build worlds with a named builder from [helpers.ts](../src/tests/helpers.ts) or the folder's `fixtures.ts`, with every argument written out: `newWorld(7)` (day 0), `agencyWorld(7, 20)`, `situationWorld(7, 20)`, `orgWorld(3, 20, 5)`, `world60()`. The cached builders simulate once per file, keep the world as a save and hand each check a fresh copy. Simulating is about 40 ms per day, and loading a save is about 7 ms, so reusing a world is far cheaper than building it again. If unit tests start from a cached world, build it in `beforeAll` (`beforeAll(() => { situationWorld(7, 20); })`) so it isn't charged to the first test's 10 s limit. For a new kind of world, add a builder that says what it builds, never a `fresh()` with hidden defaults.
 3. Assert behaviour through the state downstream systems read, not the field you just wrote. That is the "integration" rule in [07-guidelines.md](07-guidelines.md).
 4. End scenario tests with `assert.deepEqual(audit(w), [])`, and also `ledgerCheck(w)` if money moved.
 5. Keep a file under about 30 seconds. Put long runs in a `describe` tagged with their kind plus `slow`, and parameterise them by `SEEDS`/`DAYS` from [modes.ts](../src/tests/modes.ts) with `ok.each(SEEDS)(…)`.
@@ -179,5 +181,5 @@ make ci
 - Apart from the portrait suite, nothing tests the UI.
 - `playtest/` is not typechecked, and its harness has a hardcoded path.
 - There are only two real old-save fixtures (schema 2 and schema 7).
-- A handful of single checks of 20–35 s each (a 400-day run, loops over 16–24 worlds) set the floor of a local run. They can't be split without changing what they check. Making the simulation faster would lower it (see [How long it takes](#how-long-it-takes-and-why)).
-- Coverage doesn't see the worlds the determinism suite builds in child processes.
+- A handful of long single checks (a 400-day run, loops over 16–24 worlds) set the floor of a local run. They can't be split without changing what they check. Only a faster simulation lowers it (see [How long it takes](#how-long-it-takes-and-why)).
+- Coverage isn't measured in CI, and it doesn't see the worlds the determinism suite builds in child processes.

@@ -28,7 +28,7 @@ A single-player sandbox mafia RPG in **1970 New York**. The pitch: a world that 
 ```
 npm install
 npm run typecheck
-npm run test:all          # Vitest: every test except the opt-in long runs, in parallel (~75 s)
+npm run test:all          # Vitest: every test except the opt-in long runs, in parallel (~50 s)
 npm run test:unit         # only the unit tests (~6 s)
 npx vitest run economy -t ledger   # one system (path filter), one check (name filter)
 npm run build             # -> dist/omerta.html

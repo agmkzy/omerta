@@ -128,7 +128,7 @@ npm ci && npm run typecheck && npm run build
 make test
 ```
 
-`make test` runs the minimum pre-ship check from CLAUDE.md: a typecheck plus the conversation tests (`src/tests/dialogue/`), in about ten seconds on a recent laptop. Use `make test-all` for everything, which takes about a minute and a quarter.
+`make test` runs the minimum pre-ship check from CLAUDE.md: a typecheck plus the conversation tests (`src/tests/dialogue/`), in about ten seconds on a recent laptop. Use `make test-all` for everything, which takes under a minute.
 
 ## The Makefile
 
@@ -149,8 +149,8 @@ make test
 | `make test-compat` | Only the save-compatibility tests, every test tagged `compat` (also part of `test-all`) |
 | `make test-sim SEED=3 DAYS=180` | The long simulations, every test tagged `sim` and `slow`, for one seed (or a list: `SEED=3,7`) |
 | `make test-slow SEED=3` | Every long run (tagged `slow`): stability, sims, round trips, save growth, the trace of the player's road to boss, the full seed set for backgrounds |
-| `make test-cov` | `test-all` with coverage. It fails below the thresholds in `vitest.config.ts`, and writes an HTML report to `coverage/` |
-| `make ci` | `all` + `test-cov`: typecheck, build, every suite and the coverage thresholds. This is what CI checks |
+| `make test-cov` | `test-all` with coverage. It fails below the thresholds in `vitest.config.ts`, and writes an HTML report to `coverage/`. CI doesn't run it |
+| `make ci` | `all` + `test-all`: typecheck, build and every test except the opt-in long runs. This is what CI checks |
 | `make pages` | Build, then copy `dist/omerta.html` to `index.html` for GitHub Pages |
 | `make play` / `make sim` | The terminal interface and the unattended simulation ([cli.ts](../src/cli.ts)) |
 | `make bot SEED=3 DAYS=120` | The random-policy player smoke test ([bot.ts](../src/bot.ts)) |

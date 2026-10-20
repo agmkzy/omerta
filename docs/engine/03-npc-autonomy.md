@@ -145,7 +145,7 @@ What `perform` does by kind:
 
 **Known issues / gaps.**
 - `perform`'s `retaliate` branch silently turns any non-player actor without `approved: true` into a deferred intention. `orders.ts:144` (a crew member told to "confront") and `jobs.ts:601`/`621` (beat or hit when the assignee is an NPC: `orders.ts:130` calls `jobs.resolve` with the crew member as assignee) pass no `approved`, so an ordered beating or hit is queued, can be abandoned in `intentDue` (no grudge, a cautious boss, or 18% chance), and the caller's immediate check (`t.hurtUntil > w.now`, `!t.alive`) sees nothing. Probably unintended.
-- `aliveCache` is keyed by `w.now`, so a man killed earlier in the same minute can still appear in candidate lists; `lend` does not recheck `alive`.
+- `aliveCache` is keyed by `w.now`, so a man killed earlier in the same minute can still appear in candidate lists; `lend` does not recheck `alive`. `generate` calls `aliveList` on every call (that fixes the minute's list for everyone acting in it) but copies it without the actor only for the kinds that use it (socialise, lend, retaliate).
 - In `generate`, `made` means any non-civilian, so associates count as "made" for lending and retaliation.
 - The shakedown refusal branch has a duplicated nested `if` (lines 346 to 347); harmless.
 - The cooldown bag grows without bound (see above), which bears on the save-size question in CLAUDE.md.
