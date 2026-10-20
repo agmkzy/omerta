@@ -58,7 +58,7 @@ export function typed(el: HTMLInputElement) {
   if (v !== el.value) el.value = v;
   if (el.id === 'om-first') d.first = v; else d.last = v;
   const t = document.getElementById(el.id === 'om-first' ? 'om-name-first' : 'om-name-last');
-  if (t) t.textContent = v.trim() || ' ';
+  if (t) { t.textContent = v.trim() || ' '; t.style.setProperty('--n', String(Math.max(4, v.trim().length))); }
 }
 
 // Every tap on the opening screens comes through here (data-a="om:…").
@@ -190,7 +190,7 @@ function createView(n: string, saved: boolean): string {
         <figure class="om-portrait">${portrait(preview)}</figure>
         <div class="om-identity">
           <p class="om-eyebrow">Associate · Corrente family</p>
-          <h1 class="om-name"><span id="om-name-first">${esc(d.first) || '&nbsp;'}</span><span id="om-name-last">${esc(d.last) || '&nbsp;'}</span></h1>
+          <h1 class="om-name"><span id="om-name-first" style="--n:${Math.max(4, d.first.length)}">${esc(d.first) || '&nbsp;'}</span><span id="om-name-last" style="--n:${Math.max(4, d.last.length)}">${esc(d.last) || '&nbsp;'}</span></h1>
           <p class="om-identity__bg">${esc(bgLabel(d.bg) ?? '')}</p>
         </div>
       </section>

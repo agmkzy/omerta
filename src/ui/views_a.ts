@@ -262,9 +262,12 @@ export function personView(id: Id): string {
   const infoEnd = out.length;
 
   const k = kinOf(w, c.id);
-  if (k && c.alive) out += `<div class="callout info">${kinWord(k)}. ${warmthWord(k.warmth)}. Last seen ${Math.max(0, Math.floor((w.now - k.lastSeen) / DAY))} days ago.</div><div class="row2"><button class="btn primary" data-a="visit:${c.id}">Spend an hour</button><button class="btn" data-a="tab:life">Your life</button></div>`;
+  // A relative who is in the life (a made brother) is a man like any other: everything you could do with anyone, and family besides.
+  const inLife = !!k && c.rank !== 'civilian';
+  const seen = k ? Math.max(0, Math.floor((w.now - k.lastSeen) / DAY)) : 0;
+  if (k && c.alive) out += `<div class="callout info">${kinWord(k)} · ${warmthWord(k.warmth)} · last seen ${seen === 0 ? 'today' : seen === 1 ? 'yesterday' : seen + ' days ago'}</div>` + (inLife ? '' : `<div class="row2"><button class="btn primary" data-a="visit:${c.id}">Spend an hour</button><button class="btn" data-a="tab:life">Your life</button></div>`);
   else if (isPartner(w, c.id) && c.alive) out += `<div class="callout info">${esc(stageWord[w.life!.partner!.stage])}. ${warmthWord(w.life!.partner!.warmth)}.</div><div class="row2"><button class="btn primary" data-a="date:${c.id}">Take her out ($60)</button><button class="btn" data-a="tab:life">Your life</button></div>`;
-  if (!isMe && c.alive && !k && !isPartner(w, c.id)) {
+  if (!isMe && c.alive && (!k || inLife) && !isPartner(w, c.id)) {
     out += `<div class="row2"><button class="btn primary" data-a="talk:${c.id}" ${(() => { const wh = whereIs(w, p, c); return wh.kind === 'jail' ? 'disabled' : ''; })()}>${(() => { const wh = whereIs(w, p, c); return wh.kind === 'jail' ? 'Locked up' : `Go to ${esc(wh.name)} and talk`; })()}</button>`;
     if (c.bossId === p.id) out += `<button class="btn primary" data-a="orders:${c.id}">Give orders</button>`;
     else out += `<button class="btn" data-a="tree:${c.familyId ?? ''}" ${c.familyId ? '' : 'disabled'}>Their family</button>`;
@@ -272,6 +275,7 @@ export function personView(id: Id): string {
     const sec: string[] = [];
     if (c.bossId === p.id) sec.push(`<button class="btn" data-a="books:${c.id}">His books</button>`);
     if (c.bossId === p.id && c.problem) sec.push(`<button class="btn" data-a="help:${c.id}">Something is wrong</button>`);
+    if (inLife) sec.push(`<button class="btn" data-a="visit:${c.id}">Family time (an hour)</button>`);
     sec.push(`<button class="btn danger" data-a="settle:${c.id}">Take action against him</button>`);
     if (b) sec.push(`<button class="btn" data-a="biz:${b.id}">His business</button>`);
     if (sec.length) out += `<div class="row2">${sec.join('')}</div>`;

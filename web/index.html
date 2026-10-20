@@ -612,8 +612,10 @@ body.om-open #app { max-width: none; padding: 0; }
 .om-portrait svg { display: block; width: 100%; height: 100%; }
 .om-identity { min-width: 0; padding-bottom: 2px; }
 .om-name { margin: var(--om-2) 0 0; font: 500 clamp(28px, 7.6vw, 40px)/1.02 var(--om-serif); color: var(--om-ivory); }
-.om-name span { display: block; overflow-wrap: anywhere; }
-.om-name span:first-child { font-style: italic; font-weight: 400; font-size: .78em; color: var(--om-ivory-2); }
+.om-identity { container-type: inline-size; }
+/* A name never breaks inside a word: it shrinks to fit its column (--n is its length in letters). */
+.om-name span { display: block; white-space: nowrap; font-size: min(1em, calc(100cqi / (var(--n, 8) * .5))); }
+.om-name span:first-child { font-style: italic; font-weight: 400; font-size: min(.78em, calc(100cqi / (var(--n, 8) * .46))); color: var(--om-ivory-2); }
 .om-identity__bg { margin-top: var(--om-2); font: italic 500 17px/1.2 var(--om-serif); color: var(--om-brass-2); }
 .om-seg { display: grid; grid-template-columns: repeat(3, 1fr); margin-bottom: var(--om-5); border-bottom: 1px solid var(--om-line); }
 .om-seg__tab { position: relative; display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 48px; padding: 0 2px; border: 0; background: none; color: var(--om-ivory-3); font: 600 12px var(--om-sans); letter-spacing: .1em; text-transform: uppercase; transition: color var(--om-fast); }
@@ -639,7 +641,7 @@ body.om-open #app { max-width: none; padding: 0; }
   .om-prologue { font-size: 23px; }
   .om-prologue__lead { font-size: 30px; }
 }
-@media (min-width: 900px) and (max-height: 760px) { .om-hero { grid-template-columns: 220px 1fr; align-items: end; } }
+@media (min-width: 900px) and (max-height: 760px) { .om-create__grid { grid-template-columns: minmax(340px, 440px) 1fr; } .om-dock { grid-template-columns: minmax(340px, 440px) 1fr; } .om-hero { grid-template-columns: 160px 1fr; align-items: end; } }
 @media (prefers-reduced-motion: reduce) { .om *, .om *::before, .om *::after { animation: none !important; transition: none !important; } }
 </style>
 <div id="app"></div>
