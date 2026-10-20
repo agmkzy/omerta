@@ -364,7 +364,7 @@ function npcMove(w: World, s: Situation, a: Character, t: Character, S: Stance):
     ['sweeten', last === 'counter' || last === 'no' ? (K.better?.(w, s) !== undefined ? 0.2 + T.caution * 0.2 - T.greed * 0.2 : -1) : -1],
     ['persuade', 0.15 + a.skills.charm * 0.35 + T.sociability * 0.15 - tried(A, 'persuade') * 0.2],
     ['pressure', 0.1 + T.violence * 0.35 + a.skills.nerve * 0.15 - tried(A, 'pressure') * 0.18],
-    ['force', K.force && last === 'no' && tried(S, 'no') >= 1 ? T.violence * 0.6 - T.caution * 0.4 + (tried(S, 'no') >= 2 && !tried(A, 'force') ? 0.15 : 0) - ((a.cooldown.restraint ?? 0) > w.now ? 1 : 0) : -1],
+    ['force', K.force && last === 'no' && tried(S, 'no') >= 1 ? T.violence * 0.6 - T.caution * 0.4 + (s.ak === 'protect' && tried(S, 'no') >= 2 && !tried(A, 'force') ? 0.15 : 0) - ((a.cooldown.restraint ?? 0) > w.now ? 1 : 0) : -1],
     ['leverage', leverageOf(w, a, t) && tried(A, 'leverage') === 0 ? 0.3 + T.caution * 0.2 : -1],
     ['wait', last === 'stall' ? 0.3 + T.caution * 0.3 : 0.05 + T.caution * 0.15],
     // a man told no again and again, or kept waiting for weeks, gives it up (or has already made his point by force)
