@@ -79,7 +79,7 @@ A test tagged `slow` as well as its kind is skipped unless `SLOW=1`. These are t
 
 ## How long it takes, and why
 
-`npm test` takes about **47 seconds** on an 18-core Apple-silicon Mac (6 performance and 12 efficiency cores) with Node 25. When the tests were one file per release it took 192 seconds, because the v75 file alone ran for over three minutes. Splitting the files by system brought it to 72 s, and two fixes in the simulation brought it to 47 s.
+`npm test` takes about **47 seconds** on an 18-core Apple-silicon Mac (6 performance and 12 efficiency cores) with Node 26 (Node 25 gave the same times). When the tests were one file per release it took 192 seconds, because the v75 file alone ran for over three minutes. Splitting the files by system brought it to 72 s, and two fixes in the simulation brought it to 47 s.
 
 **Almost all the time is simulation.** A world costs about 14 ms to generate and, since the fixes, about 40 ms per simulated day to run (60 days take about 2.3 s). Saving and loading that world (1.5 MB) takes 6–7 ms. Two things follow:
 

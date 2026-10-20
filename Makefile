@@ -7,7 +7,7 @@
 # Everything goes through the npm scripts in package.json, so `make` and `npm run …` never disagree.
 # See docs/03-build-and-setup.md for the pipeline this drives.
 
-NODE_MIN  := 22.12
+NODE_MIN  := 26.0
 NPM       := npm
 STAMP     := node_modules/.package-lock.json
 DIST      := dist/omerta.html
@@ -22,9 +22,9 @@ help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[1m%-13s\033[0m %s\n", $$1, $$2}'
 
 check-node: ## Fail early unless Node (see NODE_MIN) and npm are installed
-	@command -v node >/dev/null 2>&1 || { echo "Node.js is not installed. Install Node $(NODE_MIN) LTS (e.g. 'nvm install' reads .nvmrc)."; exit 1; }
+	@command -v node >/dev/null 2>&1 || { echo "Node.js is not installed. Install Node 26 (e.g. 'nvm install' reads .nvmrc)."; exit 1; }
 	@command -v $(NPM) >/dev/null 2>&1 || { echo "npm is not installed (it ships with Node.js)."; exit 1; }
-	@node -e 'const [m, n] = process.versions.node.split(".").map(Number), [rm, rn] = "$(NODE_MIN)".split(".").map(Number); if (m < rm || (m === rm && n < rn)) { console.error("Node " + process.versions.node + " found; $(NODE_MIN) or newer is required (Vite needs it)."); process.exit(1) }'
+	@node -e 'const [m, n] = process.versions.node.split(".").map(Number), [rm, rn] = "$(NODE_MIN)".split(".").map(Number); if (m < rm || (m === rm && n < rn)) { console.error("Node " + process.versions.node + " found; $(NODE_MIN) or newer is required (see .nvmrc; run nvm install)."); process.exit(1) }'
 
 # npm ci installs exactly what package-lock.json records and writes node_modules/.package-lock.json,
 # which we use as the stamp so dependencies are only reinstalled when the manifest or lockfile change.
