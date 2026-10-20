@@ -174,6 +174,8 @@ function shop(x: X): Subject | undefined {
       const cs: Choice[] = [];
       if (rival) cs.push(ch(key, 'rival', 'Ask who’s taking his trade', 'He will have a name.'));
       if (fee && col && col.id !== p.id && col.familyId !== null) cs.push(ch(key, 'col', `Ask how he gets on with ${first(col)}`, 'How a man feels about who he pays is worth knowing.'));
+      // a shop nobody of yours looks after is an opening, raised as part of talking about the place
+      if (p.familyId && b.protection?.familyId !== p.familyId && !(fee && col && sore) && t.rank === 'civilian') cs.push(ch(key, 'friends', 'Say a place like this could use some friends', b.protection ? 'He pays someone already. You would be asking him to change.' : 'Nobody looks after him. Yet.', true));
       if ((b.distress > 0 || b.cash < 300) && p.cash >= 500) cs.push(ch(key, 'invest', 'Offer to put some money in', 'A loan, on the books. He may want less, or nothing.'));
       cs.push(done(key));
       return { lines, choices: cs };
@@ -213,6 +215,12 @@ function shop(x: X): Subject | undefined {
         if (!s) return { lines: [q(t, 'Not now. Too many people asking.')], choices: [] };
         const S = stance(w, s, t.id); S.good = clamp(S.good + 0.25); S.resolve = clamp(S.resolve - 0.15);
         return { lines: [q(t, 'Less? And you’d actually come when I called?'), 'He hasn’t said yes. He hasn’t said no. It is between you now.'], choices: [], go: { node: 'root' } };
+      }
+      if (code === 'friends') {
+        said(w, t, key, 'friends');
+        const s = openAsk(w, 'protect', p, t, { biz: b.id, amt: Math.max(15, Math.round((b.income * 0.07) / 5) * 5), why: `${p.name} offered to look after ${b.name}` });
+        if (!s) return { lines: [q(t, 'Not now. Too many people asking.')], choices: [] };
+        return { lines: [`You let it be known that ${b.name} could do with friends in the neighbourhood.`, q(t, by(t, { frightened: 'Friends. I see. How much do friends cost?', hothead: 'I look after my own place.', jovial: 'Everybody needs friends! What do they cost these days?', _: 'And what would that cost me?' })), 'It is between you now. Put your terms to him when you are ready.'], choices: [], go: { node: 'root' } };
       }
       if (code === 'invest') {
         said(w, t, key, 'invest');
