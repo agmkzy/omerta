@@ -1,3 +1,5 @@
+import { asker, askee, read as mRead, titleOf as mTitle } from '../matters';
+import { money } from '../core';
 // Stories: every ongoing matter in one place. Where it began, where it stands, what happened since, what you can do.
 import { dangerLevel, LADDER_WORDS } from '../danger';
 import { shortTime } from '../core';
@@ -135,6 +137,25 @@ function turfStories(w: World, p: Character): Story[] {
 }
 
 // Matters between other people that you are in or have been told about. Only what you know is shown, never how it will end.
+// V89: an ask (matters.ts) as the player sees it: where it stands in words, what he has learned of it, and the way back to the man.
+function askStory(w: World, p: Character, s: import('../types').Situation, closed: boolean, tl: { t: number; text: string }[]): Story | undefined {
+  const a = asker(w, s), t = askee(w, s);
+  if (!a || !t) return undefined;
+  const mine = a.id === p.id, his = t.id === p.id, other = mine ? t : his ? a : undefined;
+  const S = s.st?.[mine ? t.id : a.id];
+  const where = closed ? (s.out === 'agreed' || s.out === 'gave in' ? 'Settled' : 'Over')
+    : his ? (s.ask ? 'Waiting on your answer' : 'He wants something from you')
+    : mine ? (S?.last === 'counter' ? `He offered ${money(Number(s.m?.offer ?? 0))}` : S?.last === 'stall' ? 'He asked for time' : S?.last === 'no' ? 'He turned you down' : S?.last === 'help' || s.m?.help ? 'He went to someone' : 'Open')
+    : 'You’ve heard about it';
+  return {
+    key: 'sit:' + s.id, kind: 'matter', title: mTitle(w, s), closed, stage: where,
+    tone: closed ? '' : his || s.m?.help ? 'red' : 'amber', last: tl[0]?.t ?? s.since, lastText: tl[0]?.text ?? s.cause, timeline: tl,
+    blurb: `${s.cause.replace(/^./, (m) => m.toUpperCase())}.${mine && !closed ? ` He is ${mRead(w, s, t.id)}.` : ''}${!mine && !his && !closed ? ' What you have is what people say.' : ''}`,
+    why: mine ? 'You started it.' : his ? 'It is put to you.' : 'It concerns people around you.',
+    actions: closed || !other ? [] : [{ a: `talk:${other.id}`, label: `Go and see ${other.name.split(' ')[0]}`, hint: mine ? 'Take it up with him again: better terms, an argument, pressure, or let it go.' : 'Hear him out.' }, { a: `ent:${other.id}`, label: 'Look at who he is', hint: 'What you know of him, and how he sees you.' }],
+  };
+}
+
 function matterStories(w: World, p: Character): Story[] {
   const out: Story[] = [];
   for (const s of w.situations ?? []) {
@@ -145,6 +166,7 @@ function matterStories(w: World, p: Character): Story[] {
     if (!tl.length && closed) continue;
     const asking = s.stage === 'asking';
     const mine = isParty(s, p.id);
+    if (s.kind === 'ask') { const st = askStory(w, p, s, closed, tl); if (st) out.push(st); continue; }
     out.push({
       key: 'sit:' + s.id, kind: 'matter', title: titleOf(w, s), closed,
       stage: closed ? 'Over' : asking ? 'Waiting on your answer' : mine ? 'You’re in it' : 'You’ve heard about it',

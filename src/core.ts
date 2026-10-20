@@ -38,6 +38,38 @@ export function rel(c: Character, id: Id): Rel {
   return (c.rels[id] ??= { trust: 0.1, respect: 0.3, affection: 0.1, grudge: 0, lastMet: -1e9 });
 }
 
+// V89: what a man thinks of the player is earned, not accumulated. Every gain in an NPC's regard for the player goes through
+// here: it shrinks as the regard rises (the last stretch to complete trust is the hardest) and halves each time the same kind of
+// gesture is repeated with the same man within a week (a third drink in a week buys almost nothing). Losses are not damped.
+// Only the player's relationships are tracked this way, so the per-man bookkeeping stays small.
+export function regard(w: World, npc: Character, player: Character, field: 'trust' | 'respect' | 'affection', amount: number, kind: string): number {
+  const r = rel(npc, player.id);
+  if (amount <= 0) { r[field] = clamp(r[field] + amount); return amount; }
+  const week = Math.floor(w.now / (7 * 1440));
+  const key = `rg:${npc.id}:${kind}`;
+  const seen = player.cooldown[key] ?? 0; // encoded as week * 100 + times this week
+  const times = Math.floor(seen / 100) === week ? seen % 100 : 0;
+  player.cooldown[key] = week * 100 + Math.min(99, times + 1);
+  const gain = amount * Math.pow(0.5, times) * Math.max(0.15, 1 - r[field]);
+  r[field] = clamp(r[field] + gain);
+  return gain;
+}
+
+// Standing (reputation) is earned the same way: each gain shrinks as reputation climbs and as the same kind of deed repeats
+// within a week. Losses are not damped: a name is quicker lost than made. Returns the change actually applied.
+export function repute(w: World, p: Character, amount: number, kind: string): number {
+  if (amount <= 0) { const before = p.standing; p.standing = clamp(p.standing + amount, 0, 100); return p.standing - before; }
+  const week = Math.floor(w.now / (7 * 1440));
+  const key = `st:${kind}`;
+  const seen = p.cooldown[key] ?? 0;
+  const times = Math.floor(seen / 100) === week ? seen % 100 : 0;
+  p.cooldown[key] = week * 100 + Math.min(99, times + 1);
+  const gain = amount * Math.pow(0.6, times) * Math.max(0.2, 1 - Math.max(0, p.standing - 40) / 70);
+  const before = p.standing;
+  p.standing = clamp(p.standing + gain, 0, 100);
+  return p.standing - before;
+}
+
 export function link(a: Character, b: Character, trust: number) {
   for (const [x, y] of [
     [a, b],

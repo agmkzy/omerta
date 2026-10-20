@@ -1,9 +1,10 @@
 import { menace } from './danger';
 import { noteGrievance } from './orgs';
 import { sanctioned } from './politics';
+import { askBetween, move as askMove, openAsk, shopInPlay } from './matters';
 import {
   addFact, clamp, createDebt, factText, famName, handleDeath, learn, money, notifyProtector,
-  ownerBiz, payDebt, rel, travelTime, witnessesAt,
+  ownerBiz, payDebt, regard, rel, travelTime, witnessesAt,
 } from './core';
 import { afterKilling } from './consequences';
 import { Action, Character, DAY, Fact, Id, Kind, World } from './types';
@@ -92,7 +93,7 @@ export function generate(w: World, c: Character, kind: Kind): Action[] {
       if (!c.familyId || !(c.rank === 'associate' || c.rank === 'soldier')) break;
       const fam = w.fam[c.familyId];
       for (const b of Object.values(w.biz)) {
-        if (!b.open || b.kind === 'casino' || b.protection?.familyId === c.familyId || cd('shake:' + b.id)) continue;
+        if (!b.open || b.kind === 'casino' || b.protection?.familyId === c.familyId || cd('shake:' + b.id) || shopInPlay(w, b.id)) continue; // a shop somebody is already working on is left to him
         // Word gets round: nobody else leans on a shop for a week after someone has.
         if (b.lastApproach !== undefined && now - b.lastApproach < 7 * DAY) continue;
         const o = w.chars[b.ownerId];
@@ -241,12 +242,15 @@ export function perform(w: World, a: Action): { minutes: number; lines: string[]
       const r1 = rel(c, t.id);
       const r2 = rel(t, c.id);
       r1.lastMet = r2.lastMet = w.now;
-      r1.trust = clamp(r1.trust + 0.025);
-      r2.trust = clamp(r2.trust + 0.025);
-      r1.affection = clamp(r1.affection + 0.025 + 0.03 * t.traits.sociability);
-      r2.affection = clamp(r2.affection + 0.025 + 0.03 * c.traits.sociability);
-      r1.respect = clamp(r1.respect + 0.01);
-      r2.respect = clamp(r2.respect + 0.01);
+      // V89: what any man thinks of the player is earned at a believable pace (core.regard); between NPCs nothing changes.
+      const warm = (a: Character, b: Character, r: typeof r1) => {
+        if (b.isPlayer) { regard(w, a, b, 'trust', 0.025, 'visit'); regard(w, a, b, 'affection', 0.025 + 0.03 * b.traits.sociability, 'visit'); regard(w, a, b, 'respect', 0.01, 'visit'); return; }
+        r.trust = clamp(r.trust + 0.025);
+        r.affection = clamp(r.affection + 0.025 + 0.03 * (a === c ? t : c).traits.sociability);
+        r.respect = clamp(r.respect + 0.01);
+      };
+      warm(c, t, r1);
+      warm(t, c, r2);
       share(w, c, t, lines);
       if (!a.quiet) { share(w, t, c, lines); confide(w, c, t, lines); }
       return { minutes: m, lines };
@@ -318,46 +322,11 @@ export function perform(w: World, a: Action): { minutes: number; lines: string[]
         lines.push('There’s nothing to do there.');
         return { minutes: m, lines };
       }
-      const prev = b.protection;
-      const sap = a.approach;
-      const p = clamp(0.35 + c.traits.violence * 0.35 + (sap === 'soft' ? -0.12 : sap === 'hard' ? 0.25 : 0) + (c.rank === 'soldier' ? 0.1 : 0) - o.traits.courage * 0.45 - (prev ? 0.3 : 0), 0.05, 0.95);
-      const wit = witnessesAt(w, b.district, [c.id, o.id], 2);
-      if (rng.chance(p)) {
-        const fee = Math.round((b.income * 0.08) / 5) * 5;
-        setCollector(w, b, c.id, c.familyId!, { fee });
-        rel(o, c.id).grudge = clamp(rel(o, c.id).grudge + (sap === 'hard' ? 0.35 : sap === 'soft' ? 0 : 0.1));
-        if (sap === 'hard') {
-          b.damaged = Math.max(b.damaged, 1);
-          c.heat = clamp(c.heat + 0.1, 0, 1.5);
-          lines.push(`You wreck half the shop to make your point. Nobody tries to stop you.`);
-        }
-        if (prev && prev.collectorId !== c.id) {
-          const pc = w.chars[prev.collectorId];
-          const f = addFact(w, { kind: 'poach', actor: c.id, victim: pc.id, business: b.id, text: `${c.name} (${famName(w, c)}) muscled in on ${b.name}, which had been paying ${pc.name} (${famName(w, pc)}).`, district: b.district }, { witnesses: [o.id, ...wit], victimKnows: false });
-          b.informPrev = { who: pc.id, fact: f.id };
-          tension(w, c, pc, 2);
-          lines.push(`${o.name} agrees to pay ${money(fee)} a week, to you now, not ${pc.name}. That will get back to ${pc.name}, and he won’t like it.`);
-        } else {
-          addFact(w, { kind: 'protection_started', actor: c.id, victim: o.id, business: b.id, amount: fee, text: `${c.name} now collects ${money(fee)} a week from ${b.name}.`, district: b.district }, { witnesses: wit });
-          lines.push(`${o.name} looks at the floor and agrees to ${money(fee)} a week. Protection, you call it. He calls it nothing at all.`);
-        }
-      } else {
-        const refusal = addFact(w, { kind: 'protection_refused', actor: o.id, victim: c.id, business: b.id, text: `${o.name} told ${c.name} to get out of ${b.name}.`, district: b.district }, { witnesses: wit });
-        if (c.traits.violence > 0.5 || sap === 'hard') {
-          if (c.traits.violence > 0.5 || sap === 'hard') {
-            b.damaged = 2;
-            c.cooldown.restraint = w.now + 10 * DAY;
-            bizMove(w, b, -150, 'damage');
-            c.heat = clamp(c.heat + 0.1, 0, 1.5);
-            const f = addFact(w, { kind: 'vandalism', actor: c.id, victim: o.id, business: b.id, cause: refusal.id, text: `${c.name}'s crew smashed up ${b.name} after ${o.name} refused to pay.`, district: b.district }, { witnesses: wit });
-            notifyProtector(w, b, f);
-            lines.push(`${o.name} refuses. Chairs break, glass goes. ${b.name} will be shut a while.`);
-            return { minutes: m, lines };
-          }
-        }
-        rel(o, c.id).grudge = clamp(rel(o, c.id).grudge + 0.05);
-        lines.push(`${o.name} refuses. You let it lie, for now. A refusal is only a delay.`);
-      }
+      // V89: an approach is the first move in a matter, not the whole of it (matters.ts). The owner answers from where he stands;
+      // a refusal leaves the matter open, to be pursued, dropped, or taken further by the people around him.
+      const sit = askBetween(w, 'protect', c.id, o.id, b.id) ?? openAsk(w, 'protect', c, o, { biz: b.id, amt: Math.max(15, Math.round((b.income * 0.08) / 5) * 5), why: `${c.name} wants ${b.name} to pay him` });
+      if (!sit) { lines.push(`${o.name} has too many people at his door already. Not today.`); return { minutes: m, lines }; }
+      lines.push(...askMove(w, sit, a.approach === 'hard' ? 'pressure' : 'ask').lines);
       return { minutes: m, lines };
     }
 

@@ -97,6 +97,9 @@ function fast() {
 
   ok('every option keeps the same action and hint as V76; only the wording changes', () => {
     const snap = JSON.parse(readFileSync(join(here, 'v77_codes.json'), 'utf8')) as Record<string, string[]>;
+    const all = Object.values(snap).flat();
+    const HINT = new Map<string, string>(), KHINT = new Map<string, Set<string>>(), known = new Set<string>();
+    for (const x of all) { const code = x.slice(0, x.indexOf('|')), hint = x.slice(x.indexOf('|') + 1), kind = code.split(':')[0]; HINT.set(code, hint); known.add(kind); (KHINT.get(kind) ?? KHINT.set(kind, new Set()).get(kind)!).add(hint); }
     const w = fresh(), p = P(w);
     const ms = men(w);
     for (const m of ms) (p.intro ??= {})[m.id] = w.now;
@@ -104,12 +107,16 @@ function fast() {
     for (const m of ms) for (const node of ['personal', 'business', 'family', 'disputes', 'orders', 'memos', 'amends', 'shop', 'crew', 'debt', 'myboss', 'rival', 'pick_member', 'pick_concern']) { // root was restructured in V78; v78.test.ts proves nothing was lost
       const c = startConvo(m.id); c.node = node;
       const got = options(w, p, m, c).map((o) => `${o.code}|${o.hint ?? ''}`);
-      // The world differs slightly from the V76 snapshot (V78 tells you one thing at a time), so who is listed can differ; what each kind of
-      // option does and says about itself cannot.
-      const kinds = (l: string[]) => [...new Set(l.map((x) => x.split(':')[0].split('|')[0]))].sort();
-      const exp = snap[`${m.id}:${node}`];
-      if (node === 'pick_concern' || node === 'pick_member') assert.deepEqual(kinds(got), kinds(exp), `${m.name} ${node}`);
-      else assert.deepEqual(got, exp, `${m.name} ${node}`);
+      // The world the snapshot was taken in has moved on (V78 tells you one thing at a time; V89 changes how regard is earned), so
+      // which men have which options can differ. What every option does and says about itself cannot: each one shown must be a
+      // V76 option with exactly its V76 hint, and nothing outside that record may appear.
+      for (const o of got) {
+        const [code, hint] = [o.slice(0, o.indexOf('|')), o.slice(o.indexOf('|') + 1)];
+        const kind = code.split(':')[0];
+        assert.ok(known.has(kind), `${m.name} ${node}: unknown option ${code}`);
+        if (HINT.has(code)) assert.equal(hint, HINT.get(code), `${m.name} ${node}: ${code} hint changed`);
+        else assert.ok(KHINT.get(kind)?.has(hint), `${m.name} ${node}: ${code} has a hint V76 never gave that kind of option: "${hint}"`);
+      }
       n += got.length;
     }
     assert.ok(n > 1000);

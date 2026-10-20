@@ -12,7 +12,7 @@ import { begin as beginGoal, goalsOf, priceOf } from './goals';
 import { addEnc } from './encounters';
 import { Business, Character, DAY, Debt, Enc, Fact, FactKind, Id, Situation, SitKind, WEEK, World } from './types';
 
-export const SIT = { on: true, cap: { open: 30, closed: 60, hist: 8, claims: 3, cons: 5 } };
+export const SIT = { on: true, cap: { open: 30, asks: 70, closed: 60, hist: 8, claims: 3, cons: 5 } };
 const first = (c: Character) => c.name.split(' ')[0];
 const P = (w: World) => w.chars[w.playerId ?? ''];
 export const isOpen = (s: Situation) => s.stage !== 'resolved';
@@ -40,7 +40,8 @@ export function spawn(w: World, kind: SitKind, key: string, who: Id, o: Init): S
   if (l.some((s) => s.key === key && isOpen(s))) return undefined;
   const mirror = kind === 'dispute' || kind === 'crew'; // mirrors of records that exist elsewhere follow their source, not a cooling-off period
   if (!mirror && (w.sitcool?.[key] ?? 0) > w.now) return undefined;
-  if (!mirror && l.filter((x) => isOpen(x) && x.kind !== 'dispute' && x.kind !== 'crew').length >= SIT.cap.open) return undefined;
+  // asks (V89) are many and small; they have their own ceiling and do not crowd out the other kinds
+  if (kind === 'ask' ? l.filter((x) => isOpen(x) && x.kind === 'ask').length >= SIT.cap.asks : !mirror && l.filter((x) => isOpen(x) && x.kind !== 'dispute' && x.kind !== 'crew' && x.kind !== 'ask').length >= SIT.cap.open) return undefined;
   const major = o.sev >= 0.5;
   if (major && !allowMajor(w, o.parties.some((p) => p.id === w.playerId))) return undefined;
   const s: Situation = { id: 's' + w.nextId++, kind, who, since: w.now, weeks: 0, stage: 'brewing', cause: o.cause, knows: false, told: false, parties: o.parties, phase: o.phase, sev: Math.round(o.sev * 100) / 100, next: o.next, key, hist: [], k: {}, claims: [], cons: [] };
@@ -839,6 +840,10 @@ function crewWord(w: World) {
 // ---------------------------------------------------------------- the clock
 
 const STEP: Partial<Record<SitKind, (w: World, s: Situation) => void>> = { skim: skimStep, intel: intelStep, tribute: tributeStep, debt: debtStep, partner: partnerStep, grudge: grudgeStep };
+// V89: other modules add kinds of their own (matters.ts registers 'ask') without this file having to know them. The table lives on
+// the (hoisted) function itself, so a module may register while the import cycle is still loading this one.
+export function registerStep(kind: SitKind, f: (w: World, s: Situation) => void) { ((registerStep as unknown as { steps?: Partial<Record<SitKind, (w: World, s: Situation) => void>> }).steps ??= {})[kind] = f; }
+const extraStep = (k: SitKind) => (registerStep as unknown as { steps?: Partial<Record<SitKind, (w: World, s: Situation) => void>> }).steps?.[k];
 // Daily: whatever is due moves one step. Most days nothing is.
 export function sitDay(w: World) {
   if (!SIT.on) return;
@@ -854,7 +859,7 @@ export function sitDay(w: World) {
       if (chair && kitOf(s)) { settleByNpc(w, s, chair); continue; }
     }
     if ((s.next ?? 1e18) > w.now) continue;
-    const f = STEP[s.kind];
+    const f = STEP[s.kind] ?? extraStep(s.kind);
     if (f) f(w, s);
     else if (s.kind !== 'money' && s.kind !== 'ambition' && s.kind !== 'turf' && s.kind !== 'org' && s.kind !== 'dispute' && s.kind !== 'crew') closeSit(w, s, 'unknown');
   }
@@ -904,8 +909,10 @@ export function sitIssues(w: World): string[] {
     if (s.link?.griev) { const g = w.grievances.find((x) => x.id === s.link!.griev); if (g && (g.status === 'open') !== isOpen(s) && w.now - Number(s.m?.chk ?? s.since) > 3 * DAY) out.push(`situation ${s.id}: ${isOpen(s) ? 'open' : 'closed'} but grievance ${g.id} is ${g.status}`); }
     if (s.link?.debt) { const d = w.debts.find((x) => x.id === s.link!.debt); if (d && d.status !== 'active' && isOpen(s) && w.now - (d.paid ? s.since : s.since) > 10 * DAY) out.push(`situation ${s.id}: open but debt is ${d.status}`); }
   }
-  const nonMirror = l.filter((x) => isOpen(x) && x.kind !== 'dispute' && x.kind !== 'crew').length;
+  const nonMirror = l.filter((x) => isOpen(x) && x.kind !== 'dispute' && x.kind !== 'crew' && x.kind !== 'ask').length;
   if (nonMirror > SIT.cap.open) out.push(`${nonMirror} open situations`);
+  const asks = l.filter((x) => isOpen(x) && x.kind === 'ask').length; // V89: asks have a ceiling of their own
+  if (asks > SIT.cap.asks) out.push(`${asks} open asks`);
   // one dispute, one story: a quarrel cannot be open in one place and resolved in another
   for (const d of w.disputes ?? []) if ((d.status === 'open' || d.status === 'violated') && w.now - d.created > 10 * DAY && !l.some((s) => s.link?.dispute === d.id) && live(w, d.a) && live(w, d.b) && d.created + 3 * DAY < (w.sitpace?.sync ?? -1e9) && Math.max(d.created, ...d.history.map((h) => h.t)) < (w.sitpace?.sync ?? -1e9)) out.push(`dispute ${d.id}: open with no matching situation (${d.status}, created d${Math.floor(d.created / DAY)}, synced d${Math.floor((w.sitpace?.sync ?? 0) / DAY)}, now d${Math.floor(w.now / DAY)}, ${d.a === w.playerId || d.b === w.playerId ? 'player' : 'npcs'})`);
   return out;

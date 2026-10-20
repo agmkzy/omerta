@@ -6,7 +6,7 @@ import { aptitude, grow, lateOf } from './people';
 import { arch, bossWhy, dodge, injury, pitch, whyOf } from './voice';
 import { confide, perform, share, tension } from './actions';
 import { afterClient, afterKilling } from './consequences';
-import { addFact, clamp, concealedGap, earn, factText, handleDeath, money, newId, notifyProtector, ownerBiz, recordCareer, rel, shortTime, travelTime, witnessesAt } from './core';
+import { addFact, clamp, concealedGap, earn, factText, handleDeath, money, newId, notifyProtector, ownerBiz, recordCareer, regard, rel, repute, shortTime, travelTime, witnessesAt } from './core';
 import { gigApproaches, gigTick, gigOffer, gigResolve, gigStale, GIG_HELP, GIG_LABEL } from './gigs';
 import { Action, Character, DAY, Id, Job, World } from './types';
 
@@ -470,16 +470,15 @@ function conclude(w: World, j: Job, res: Result): Result {
   if (j.assignee !== p.id) recordCareer(w, w.chars[j.assignee], `${res.ok ? 'Finished' : 'Botched'}: ${j.title}`, res.ok);
   if (w.chars[j.assignee]) grow(w.chars[j.assignee], j.kind, res.ok ? 0.02 : 0.008);
   if (giver && giver.id !== p.id) {
-    const r = rel(giver, p.id);
+    // V89: earned at a believable pace (core.regard): the tenth errand in a month is not worth what the first one was.
     if (res.ok) {
-      r.trust = clamp(r.trust + 0.08);
-      r.respect = clamp(r.respect + 0.05);
-    } else r.trust = clamp(r.trust - 0.06);
+      regard(w, giver, p, 'trust', 0.08, 'job');
+      regard(w, giver, p, 'respect', 0.05, 'job');
+    } else regard(w, giver, p, 'trust', -0.06, 'job');
   }
   if (j.via === 'boss' && giver) {
-    const d = res.ok ? 4 : -5;
-    p.standing = clamp(p.standing + d, 0, 100);
-    res.lines.push(res.ok ? `${giver.name} will hear it went well. (standing +${d})` : `${giver.name} won’t like this. (standing ${d})`);
+    const d = repute(w, p, res.ok ? 4 : -5, 'bossjob');
+    res.lines.push(res.ok ? (d >= 2 ? `${giver.name} will hear it went well. That does your name some good.` : `${giver.name} will hear it went well, for what one more errand is worth.`) : `${giver.name} won’t like this. It costs you.`);
   } else if (res.ok && giver && (j.via === 'tip' || j.via === 'contract')) res.lines.push(`${giver.name} owes you one now. In this life that’s worth more than cash.`);
   return res;
 }
@@ -1083,11 +1082,9 @@ export function performMove(w: World, m: Move): { minutes: number; lines: string
         case 'drink': {
           if (p.cash < 40) return { minutes: 10, lines: ["You can't afford the round."] };
           p.cash -= 40;
-          for (const [a, b] of [[t, p], [p, t]] as [Character, Character][]) {
-            const r = rel(a, b.id);
-            r.trust = clamp(r.trust + 0.06);
-            r.affection = clamp(r.affection + 0.06);
-          }
+          regard(w, t, p, 'trust', 0.06, 'drink');
+          regard(w, t, p, 'affection', 0.06, 'drink');
+          { const r = rel(p, t.id); r.trust = clamp(r.trust + 0.06); r.affection = clamp(r.affection + 0.06); }
           lines.push(`You buy ${t.name} a drink. His shoulders drop an inch.`);
           return { minutes: 45, lines };
         }

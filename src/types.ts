@@ -449,7 +449,17 @@ export interface Venture {
   open: boolean;
 }
 
-export type SitKind = 'money' | 'ambition' | 'turf' | 'org' | 'skim' | 'tribute' | 'debt' | 'partner' | 'grudge' | 'intel' | 'dispute' | 'crew';
+export type SitKind = 'money' | 'ambition' | 'turf' | 'org' | 'skim' | 'tribute' | 'debt' | 'partner' | 'grudge' | 'intel' | 'dispute' | 'crew' | 'ask';
+// V89: where one person stands in a matter. Read and changed by matters.ts; all optional, so older saves load as they were.
+export interface Stance {
+  resolve: number; // 0..1 how firmly he holds his position
+  fear: number; // 0..1 of the other side
+  anger: number; // 0..1 at the other side
+  good: number; // 0..1 goodwill towards the other side
+  tried?: Record<string, number>; // what has been tried on him, and how often (pressure wears thin, persuasion wears out)
+  last?: string; // his last answer, in the matter's own terms ('no', 'counter', 'stall', 'help', 'yes')
+  coerced?: boolean; // he said yes because he was afraid, not because he wanted to
+}
 export interface Situation {
   id: Id; who: Id; biz?: Id; since: number; weeks: number;
   stage: 'brewing' | 'handling' | 'asking' | 'resolved';
@@ -474,6 +484,10 @@ export interface Situation {
   meet?: { chair: Id; parts: Id[]; pos: Record<Id, string>; held?: number };
   ask?: Id; // the encounter put to the player, if any
   m?: Record<string, number | string>; // kind-specific scratch (bounded, plain values)
+  // V89: an ask (kind 'ask'): somebody wants something from somebody, on terms, and both sides have a stance (matters.ts).
+  ak?: string; // which kind of ask ('protect', 'collect', 'warn', ...)
+  terms?: { by: Id; of: Id; amt?: number; first?: number; what?: string }; // who asks whom; the amount on the table; the opening amount
+  st?: Record<Id, Stance>;
 }
 export interface World {
   clubs?: Record<string, import('./clubdata').Club>; // the social clubs, one to a family

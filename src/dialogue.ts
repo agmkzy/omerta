@@ -1,3 +1,4 @@
+import { askBetween, openAsk, openAsks as openMatters, playerMove, playerMoves, read as mRead, titleOf as mTitle, type AskMove } from './matters';
 import { historyLines } from './powers2';
 import { askAbout, helpWith, sitOf } from './situations';
 // Conversations. Options are generated from what the other man knows, how he feels about you and what has happened.
@@ -431,6 +432,9 @@ function flatRoot(w: World, p: Character, t: Character, c: Convo): DOpt[] {
   const known = incidentsOf(w, t).filter(({ f }) => p.known[f.id] && involvedIn(w, t, f)).slice(0, 1); // one thread, not a row per record
   const contextual: DOpt[] = known.map(({ f }) => ({ code: 'inc:' + f.id, label: f.victim === t.id ? 'I heard you ran into some trouble. What happened?' : f.actor === t.id ? 'There’s talk you had a hand in something. Is it true?' : 'I heard something about what went on at your place.', hint: involvedIn(w, t, f) ? 'He was there.' : 'He may only know what he’s heard.', story: 'go' as const }));
   const askRows: DOpt[] = asksOf(w, t).slice(0, 1).flatMap((e) => e.opts.map((o) => ({ code: `enc:${e.id}:${o.code}`, label: o.label, hint: o.hint, story: 'go' as const, big: true })));
+  // V89: a matter you are pursuing with him (matters.ts). The moves it allows, each saying what it costs; those not open say why.
+  for (const s of openMatters(w).filter((x) => x.terms?.by === p.id && x.terms?.of === t.id).slice(0, 1))
+    for (const m of playerMoves(w, p, s)) askRows.push({ code: `mv:${s.id}:${m.move}`, label: m.label, hint: m.off ?? `${mTitle(w, s)}: he is ${mRead(w, s, t.id)}. ${m.hint}`, story: m.move === 'drop' || m.move === 'take' ? 'end' : 'go', big: !m.off && ['force', 'pressure', 'leverage', 'take'].includes(m.move), done: !!m.off });
   // He told you it wasn't him, and you have since learned it was. That is a matter between you now.
   const lied = Object.keys(t.denied ?? {}).map((id) => w.facts[id]).find((f) => f && f.actor === t.id && p.known[f.id]?.knowsActor && p.known[f.id].from !== t.id);
   const broken = brokenWord(w, p, t);
@@ -498,7 +502,8 @@ function markStories(w: World, p: Character, t: Character, c: Convo, o: DOpt[]):
   return o.map((x) => { const k = key(x.code); return end.has(k) ? { ...x, story: 'end' as const } : go.has(k) ? { ...x, story: 'go' as const } : x; });
 }
 
-function optionsRaw(w: World, p: Character, t: Character, c: Convo): DOpt[] {
+// The whole set of things a man allows right now, before the conversation arranges them (tests compare this with what is reachable).
+export function optionsRaw(w: World, p: Character, t: Character, c: Convo): DOpt[] {
   const o: DOpt[] = [];
   const add = (code: string, label: string, hint?: string) => o.push({ code, label, hint });
   const back = () => add('root', c.node === 'root' ? 'Take your leave' : 'Change the subject');
@@ -567,7 +572,7 @@ function optionsRaw(w: World, p: Character, t: Character, c: Convo): DOpt[] {
       if (b && b.protection?.collectorId === p.id) {
         add('terms_cut', "Offer to cut his protection fee 25%", 'Buys goodwill, costs money.');
         add('terms_raise', 'Tell him the fee is going up 25%');
-      } else if (b && b.protection?.familyId !== p.familyId && t.rank === 'civilian') add('suggest', 'Suggest he could use some friends', 'Opens the protection conversation.');
+      } else if (b && b.protection?.familyId !== p.familyId && t.rank === 'civilian' && !askBetween(w, 'protect', p.id, t.id, b.id)) add('suggest', 'Suggest he could use some friends', 'Opens the protection conversation.');
       if (t.rank !== 'civilian' && t.cash >= 1500 && (t.rels[p.id]?.trust ?? 0) >= 0.4) add('borrow', 'Ask to borrow $1,000', '5% a week.');
       if (b && t.rank === 'civilian' && p.cash >= 900 && !w.debts.some((d) => d.status === 'active' && d.debtor === t.id)) add('offer_loan', 'Offer him a loan ($500)');
       back();
@@ -845,6 +850,11 @@ export function say(w: World, p: Character, t: Character, c: Convo, code: string
       const lt = lighten(t, !!c.named, ls);
       return { lines: lt.lines, minutes: 2, convo: { ...c, named: lt.named, used: [...(c.used ?? []), usedKey(c, code)] } };
     }
+  }
+  if (code.startsWith('mv:')) {
+    const [, sid, mv] = code.split(':');
+    const r = playerMove(w, p, sid, mv as AskMove);
+    return { lines: r.lines.map((l) => speechFor(w, p, t, l)), minutes: r.minutes, convo: { ...c, node: 'root' } };
   }
   const opt = options(w, p, t, c).find((o) => o.code === code);
   const snap = () => { const q = rel(t, p.id), m = rel(p, t.id); return { tr: q.trust, af: q.affection, rs: q.respect, gr: q.grudge, cash: p.cash, st: p.standing, ht: p.heat, tc: t.cash }; };
@@ -1193,8 +1203,11 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
     case 'suggest': {
       const b = ownerBiz(w, t.id)!;
       lines.push('You steer the conversation toward the neighbourhood and who watches over it.');
-      const mins = softLean(w, p, t, b.id, lines).minutes;
-      return { lines, minutes: mins, convo: { id: c.id, node: 'business', ctx: c.ctx } };
+      // V89: an offer opens a matter between you (matters.ts); whatever he says, it is still there next time you come in.
+      const s = askBetween(w, 'protect', p.id, t.id, b.id) ?? openAsk(w, 'protect', p, t, { biz: b.id, amt: Math.max(15, Math.round((b.income * 0.07) / 5) * 5), why: `${p.name} offered to look after ${b.name}` });
+      if (!s) { lines.push(`${t.name} has had enough people at his door this week.`); return { lines, minutes: 20, convo: { id: c.id, node: 'root', ctx: c.ctx } }; }
+      lines.push(...playerMove(w, p, s.id, 'ask').lines);
+      return { lines, minutes: 35, convo: { id: c.id, node: 'root', ctx: c.ctx } };
     }
     case 'borrow': {
       if ((p.cooldown['borrow:' + t.id] ?? 0) > w.now) {
