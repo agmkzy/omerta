@@ -22,6 +22,9 @@ const P = (w: World) => w.chars[w.playerId!];
 const CATS = INTENTS;
 const men = (w: World) => Object.values(w.chars).filter((c) => c.alive && !c.isPlayer).sort((a, b) => (a.id < b.id ? -1 : 1)).slice(0, 40);
 const introAll = (w: World) => { for (const m of men(w)) (P(w).intro ??= {})[m.id] = w.now; };
+// deliberately folded into another row by the conversation (V78: one way to ask about the same thing): 'op' into what is going
+// on with him, 'recommend' into asking for backing, 'ask_rep' when he is a civilian or was just asked
+const MERGED = new Set(['op', 'recommend', 'ask_rep', 'leaders', 'promo', 'pick_concern']); // (and the last three only for a man above you)
 const reach = (w: World, id: string) => {
   const p = P(w), t = w.chars[id], codes = new Set<string>();
   const get = (more?: string[]) => { const c = startConvo(id); if (more) (c.ctx as { more?: string[] }).more = more; return options(w, p, t, c); };
@@ -61,7 +64,10 @@ function fast() {
     for (const m of men(w)) {
       const now = reach(w, m.id);
       const c = startConvo(m.id); c.node = 'root';
-      for (const o of optionsRaw(w, P(w), m, c)) { if (isNavCode(o.code) || o.code === 'root') continue; n++; if (!now.has(o.code) && !now.has('n:' + o.code.split(':')[0])) lost.push(`${m.name}:${o.code}`); }
+      // the leaves of each sub-menu too, as the conversation itself gathers them
+      const nodes = optionsRaw(w, P(w), m, c).filter((o) => o.code.startsWith('n:')).map((o) => o.code.slice(2));
+      const all = [...optionsRaw(w, P(w), m, c), ...nodes.flatMap((nd) => optionsRaw(w, P(w), m, { ...c, node: nd }))];
+      for (const o of all) { if (isNavCode(o.code) || o.code === 'root' || MERGED.has(o.code.split(':')[0])) continue; n++; if (!now.has(o.code) && !now.has('n:' + o.code.split(':')[0])) lost.push(`${m.name}:${o.code}`); }
     }
     assert.ok(n > 200);
     assert.deepEqual(lost, [], 'lost: ' + lost.slice(0, 8).join(', '));

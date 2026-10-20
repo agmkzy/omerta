@@ -370,36 +370,8 @@ export function helpView(id: Id, lines: string[]): string {
 
 // ------------------------------------------------------------------ talk
 
-const NODE_TITLE: Record<string, string> = { root: '', personal: 'Personal', business: 'Business', family: 'Family business', disputes: 'Grievances', orders: 'Work and orders', memos: 'Unfinished business', incident: '', subject: 'About him', pick_incident: '', pick_member: 'Who?', pick_concern: 'Who worries you?' };
-
-export function talkView(v: Extract<typeof S.view, { t: 'talk' }>): string {
-  const w = W();
-  const t = w.chars[v.convo.id];
-  const p = P();
-  if (!t || !t.alive) return back('Done') + `<p class="muted pad">He’s gone.</p>`;
-  const r = t.rels[p.id];
-  const mood = !r ? 'a stranger' : r.grudge >= 0.3 ? `${grudgeWord(r.grudge)} toward you` : r.trust > 0.6 ? 'trusts you' : r.trust > 0.35 ? 'knows you' : 'wary of you';
-  S.dopts = dialogueOptions(w, p, t, v.convo);
-  let out = back('Leave');
-  out += `<div class="pers">${avatar(t)}<div><h1>${pl(t)}</h1><div class="sub">${chip(t)} ${esc(t.district)} &middot; ${esc(mood)}</div></div></div>`;
-  // What was said earlier is there to be read, folded away; what was just said is the focus of the screen.
-  const exch = (q: string | undefined, ls: string[]) => `${q ? `<div class="you-said">${esc(q)}</div>` : ''}${ls.length ? `<div class="him">${ls.map((l) => (l.startsWith('⟡') ? `<p class="fx">${esc(l)}</p>` : /["“]/.test(l) ? `<p class="say">${lk(l)}</p>` : `<p class="nar">${lk(l)}</p>`)).join('')}</div>` : ''}`;
-  if (v.history?.length) out += `<details class="talk-hist"><summary>Earlier in this conversation (${v.history.length})</summary>${v.history.map((h) => exch(h.q, h.lines)).join('')}</details>`;
-  if (v.lines.length || v.q) out += `<div class="talk-now">${exch(v.q, v.lines)}</div>`;
-  const title = NODE_TITLE[v.convo.node];
-  const flat = S.dopts.some((o) => o.group);
-  const btn = (o: (typeof S.dopts)[number], i: number) => `<button class="opt ${o.story ? 'sg-' + o.story : ''}${flat && !o.big ? ' row' : ''}${o.nav ? ' nav' : ''}${o.done ? ' done' : ''}"${o.done ? ' disabled aria-disabled="true" title="Already covered. Nothing more to be had until next time."' : ` data-a="say:${i}"`}>${o.story ? `<i class="sg ${o.story}" title="${o.story === 'go' ? 'Moves a story on' : 'Can settle a story'}">${o.story === 'go' ? '!' : '&#10003;'}</i>` : ''}<b>${lk(o.label)}</b>${o.hint && (!flat || o.big || o.nav) ? `<span class="because">${esc(o.hint)}</span>` : ''}</button>`;
-  if (S.dopts.some((o) => o.group)) {
-    if (S.dopts.some((o) => o.story)) out += `<p class="small-note" style="margin:8px 0 0"><i class="sg go">!</i> moves a story on &nbsp; <i class="sg end">&#10003;</i> can settle one</p>`;
-    let cur = '';
-    S.dopts.forEach((o, i) => { if (o.group && o.group !== cur) { cur = o.group; out += `${i ? '</div>' : ''}<h2 class="sect">${esc(({ 'Between you': 'On the table', Talk: 'You could say' } as Record<string, string>)[cur] ?? cur)}</h2><div class="list">`; } else if (!o.group && cur) { cur = ''; out += `</div><div class="list">`; } out += btn(o, i); });
-    out += `</div>`;
-    return out;
-  }
-  const quiet = v.convo.node === 'incident' || v.convo.node === 'pick_incident';
-  out += `${quiet ? '' : `<h2 class="sect">${title || 'Say or do'}</h2>`}${S.dopts.some((o) => o.story) ? `<p class="small-note" style="margin:0 0 6px"><i class="sg go">!</i> moves a story on &nbsp; <i class="sg end">&#10003;</i> can settle one</p>` : ''}<div class="list">` + S.dopts.map(btn).join('') + `</div>`;
-  return out;
-}
+// V89: the conversation screen lives in talkview.ts
+export { talkView } from './talkview';
 
 export function peopleView(): string {
   const w = W();

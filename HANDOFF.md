@@ -29,3 +29,8 @@ Open: save-size failure around day ~60 (undiscussed); old-save check now exists 
 
 ## Working style the owner expects
 Autonomous execution, honest reporting (don't call tests passing "compelling gameplay"), don't add systems quietly, never poll with sleep loops.
+
+## V89 in progress (branch v89, not published)
+Done: matters layer (`src/matters.ts`: rivalry, arrest, revenge, climb, shared moves; event/goal hooks), asks engine (`src/asks.ts`: protect, collect, warn, help, borrow, lend, permit), everyday conversation subjects (`src/talk.ts`), new conversation screen (`src/ui/talkview.ts` + `.cv-*` CSS), club "take him aside", fixes (legacy situation trim deleting open matters, hard-coded "Marino", informant crash, own caps for V89 kinds).
+Tests: `src/tests/v89.test.ts` all pass. Last full `test:all` run was in progress at commit time; rerun it first.
+Next: (1) rerun full suite; (2) rumours as claims (teller, slant, telling-time text, less gambling noise); (3) Stories rebuilt on matters; (4) NPC goal resolution + NPCs approaching the player; (5) recruitment/threats/favours/amends onto asks; (6) long persona playtests with transcripts; (7) re-lock files unlocked for V89 (actions, core, engine, types, world); ask before publishing.

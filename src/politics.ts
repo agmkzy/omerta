@@ -64,7 +64,9 @@ export function politicsWeek(w: World) {
 }
 
 function indict(w: World, inf: Character) {
-  const fam = inf.familyId!;
+  // a man who has since left his family has nobody left to give them (V89: informants can now come out of an arrest)
+  if (!inf.familyId || !w.fam[inf.familyId]) { inf.informant!.exposed = true; return; }
+  const fam = inf.familyId;
   const targets = Object.values(w.chars).filter((c) => c.alive && c.familyId === fam && ['boss', 'underboss', 'capo', 'soldier'].includes(c.rank) && c.id !== inf.id).sort(() => w.rng.next() - 0.5);
   const hit = targets.filter((c) => w.rng.chance(c.rank === 'boss' ? 0.5 : c.rank === 'underboss' ? 0.6 : c.rank === 'capo' ? 0.55 : 0.3)).slice(0, 5);
   for (const c of hit) {

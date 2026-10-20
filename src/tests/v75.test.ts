@@ -176,9 +176,11 @@ function fast() {
   });
   ok('9. growth is bounded in a long run', () => {
     const w = createWorld(6, 'Tony Marino'); let maxOpen = 0;
-    for (let d = 1; d <= 400; d++) { advance(w, w.now + DAY); if (d % 20 === 0) maxOpen = Math.max(maxOpen, (w.situations ?? []).filter(isOpen).length); }
+    for (let d = 1; d <= 400; d++) { advance(w, w.now + DAY); if (d % 20 === 0) maxOpen = Math.max(maxOpen, (w.situations ?? []).filter((s) => isOpen(s) && !['ask', 'rivalry', 'arrest', 'revenge', 'climb'].includes(s.kind!)).length); } // (V89 kinds have their own ceilings, checked by sitIssues)
     const l = w.situations ?? [];
-    assert.ok(l.filter((s) => !isOpen(s)).length <= 60, 'closed: ' + l.filter((s) => !isOpen(s)).length);
+    // V89: asks and the newer matter kinds keep their own (smaller) records of what has closed, so the V75 kinds keep their sixty
+    assert.ok(l.filter((s) => !isOpen(s)).length <= 60 + 2 * 40, 'closed: ' + l.filter((s) => !isOpen(s)).length);
+    assert.ok(l.filter((s) => !isOpen(s) && ['skim', 'intel', 'tribute', 'debt', 'partner', 'grudge', 'dispute', 'crew', 'money', 'ambition'].includes(s.kind!)).length <= 60, 'closed V75: over sixty');
     assert.ok(l.every((s) => (s.hist?.length ?? 0) <= 8 && (s.claims?.length ?? 0) <= 3 && (s.cons?.length ?? 0) <= 5));
     assert.ok(maxOpen <= 60, 'open ' + maxOpen); assert.deepEqual(sitIssues(w), []); assert.deepEqual(audit(w), []);
   });

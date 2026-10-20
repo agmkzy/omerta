@@ -1,7 +1,7 @@
 import { menace } from './danger';
 import { noteGrievance } from './orgs';
 import { sanctioned } from './politics';
-import { askBetween, move as askMove, openAsk, shopInPlay } from './matters';
+import { askBetween, collectAsk, move as askMove, openAsk, shopInPlay } from './asks';
 import {
   addFact, clamp, createDebt, factText, famName, handleDeath, learn, money, notifyProtector,
   ownerBiz, payDebt, regard, rel, travelTime, witnessesAt,
@@ -266,16 +266,11 @@ export function perform(w: World, a: Action): { minutes: number; lines: string[]
         lines.push('You’re short. You can’t afford it.');
         return { minutes: m, lines };
       }
-      const need = b && (b.cash < 250 || b.distress > 0) ? 0.35 : 0.1;
-      const p = clamp(0.3 + need + (1 - t.traits.caution) * 0.15 + rel(t, c.id).trust * 0.2, 0.05, 0.95);
-      if (rng.chance(p)) {
-        c.cash -= amount;
-        t.cash += amount;
-        const d = createDebt(w, c.id, t.id, amount, 0.05, 'business loan');
-        const f = addFact(w, { kind: 'loan', actor: c.id, victim: t.id, amount, text: `${c.name} lent ${t.name} ${money(amount)}.`, district: t.district });
-        d.cause = f.id;
-        lines.push(`${t.name} takes the ${money(amount)}. ${money(d.weeklyPayment)} a week, five percent on top. He shakes on it and holds your hand a second too long.`);
-      } else lines.push(`${t.name} politely declines. He'd rather not owe anyone.`);
+      // V89: an offer of money is a matter between them (asks.ts 'lend'): he may take it, take less, think about it or say no,
+      // and the lender can come back to it
+      const s = askBetween(w, 'lend', c.id, t.id) ?? openAsk(w, 'lend', c, t, { amt: amount, biz: b?.id, why: `${c.name} offered ${t.name} a loan` });
+      if (!s) { lines.push(`${t.name} has had enough offers this week.`); return { minutes: m, lines }; }
+      lines.push(...askMove(w, s, 'ask').lines);
       return { minutes: m, lines };
     }
 
@@ -285,30 +280,16 @@ export function perform(w: World, a: Action): { minutes: number; lines: string[]
       const t = w.chars[d.debtor];
       const m = go(t) + 45;
       c.cooldown['collect:' + d.id] = w.now + 2 * DAY;
-      const due = Math.min(d.balance, d.weeklyPayment * (d.missed + 1));
-      const b = ownerBiz(w, t.id);
-      const avail = Math.floor(t.cash + (b ? Math.max(0, b.cash - 100) : 0));
-      const ap = a.approach;
-      const pressure = c.traits.violence * 0.6 + (c.familyId ? 0.25 : 0) + (ap === 'soft' ? -0.3 : ap === 'hard' ? 0.3 : ap === 'firm' ? 0.1 : 0);
-      if (avail >= due && rng.chance(clamp(0.5 + pressure - t.traits.courage * 0.5, 0.15, 0.95))) {
-        payDebt(w, d, due);
-        lines.push(`${t.name} counts out ${money(due)} and slides it across. No trouble. That’s how you like it.`);
-        return { minutes: m, lines };
-      }
-      const harsh = ap === 'hard' || (ap !== 'soft' && ap !== 'firm' && (c.traits.violence > 0.55 || pressure > 0.65) && d.missed >= 3 && rng.chance(0.6));
-      if (harsh) {
-        t.hurtUntil = w.now + 3 * DAY;
-        c.cooldown.restraint = w.now + 18 * DAY;
-        c.heat = clamp(c.heat + 0.15, 0, 1.5);
-        addFact(w, { kind: 'beating', actor: c.id, victim: t.id, amount: d.balance, text: `${c.name} beat up ${t.name} over ${money(d.balance)} owed.`, cause: d.cause, district: t.district }, { witnesses: witnessesAt(w, t.district, [c.id, t.id], 3) });
-        const take = Math.min(avail, due);
-        if (take > 0) payDebt(w, d, take);
-        lines.push(`${t.name} can't or won't pay. You make your point. You collect ${money(Math.max(0, take))}.`);
-      } else {
-        const take = Math.floor(Math.max(0, avail - 30) * 0.6);
-        if (take > 0) payDebt(w, d, Math.min(take, d.balance));
-        lines.push(take > 0 ? `${t.name} scrapes together ${money(take)} and begs for time, eyes down.` : `${t.name} turns out his pockets. Nothing. He begs for more time.`);
-      }
+      // V89: collecting is a matter between creditor and debtor (matters.ts 'collect'): he can pay, offer what he has, beg for time,
+      // refuse, or go to his people; the creditor can come back. The approach is the first move.
+      const sit = collectAsk(w, c, d);
+      if (!sit) { lines.push(`${t.name} isn’t to be found today.`); return { minutes: m, lines }; }
+      const mv = a.approach === 'hard' ? 'force' : a.approach === 'firm' ? 'pressure' : 'ask';
+      const o = askMove(w, sit, mv);
+      lines.push(...o.lines);
+      // a man who offers what he has puts it on the table there and then; the creditor takes it unless he means to hold out
+      if (o.answer === 'counter' && !c.isPlayer && c.traits.greed < 0.8) lines.push(...askMove(w, sit, 'take').lines);
+      if (mv === 'force') { c.cooldown.restraint = w.now + 18 * DAY; c.heat = clamp(c.heat + 0.07, 0, 1.5); }
       return { minutes: m, lines };
     }
 

@@ -74,10 +74,15 @@ function refund(w: World, g: Goal) {
   }
   delete g.fin;
 }
+// V89: what a man does in pursuit of a plan is something other people can see and answer (matters.ts listens here)
+type GoalHook = (w: World, g: Goal, c: Character, what: string, o?: { rival?: Id; seen?: boolean; amt?: number; how?: string }) => void;
+export function goalHooks(): GoalHook[] { const h = goalHooks as unknown as { l?: GoalHook[] }; return (h.l ??= []); }
+const emit = (w: World, g: Goal, c: Character, what: string, o?: { rival?: Id; seen?: boolean; amt?: number; how?: string }) => { for (const h of goalHooks()) h(w, g, c, what, o); };
 export function endGoal(w: World, g: Goal, how: 'done' | 'failed' | 'dropped', why: string) {
   const a = agencyOf(w);
   const i = a.goals.indexOf(g);
   if (i < 0) return;
+  { const c = w.chars[g.who]; if (c) emit(w, g, c, 'end', { how }); }
   if (how !== 'done') refund(w, g);
   a.goals.splice(i, 1);
   const e: GoalEnd = { id: g.id, who: g.who, kind: g.kind, t: w.now, how, why };
@@ -516,14 +521,14 @@ function advanceStep(w: World, g: Goal, c: Character) {
     bump(w, 'inter.ask');
     const rb = rel(boss, c.id);
     const chance = 0.1 + rb.trust * 0.45 + rb.respect * 0.25 + clamp(c.lifetimeKick / 4000, 0, 0.2) - rb.grudge * 0.4 + (LADDER.indexOf(boss.rank) >= 1 ? 0 : -1);
-    if (w.rng.chance(chance)) { c.backer = boss.id; rb.trust = clamp(rb.trust + 0.04); g.next = 'wait for the nod'; bump(w, 'backed'); return later(w, g, 3); }
-    g.tries++; bump(w, 'refused.ask'); rb.respect = clamp(rb.respect - 0.01);
+    if (w.rng.chance(chance)) { c.backer = boss.id; rb.trust = clamp(rb.trust + 0.04); g.next = 'wait for the nod'; bump(w, 'backed'); emit(w, g, c, 'backed'); return later(w, g, 3); }
+    g.tries++; bump(w, 'refused.ask'); rb.respect = clamp(rb.respect - 0.01); emit(w, g, c, 'refused');
     if (g.tries >= 6) return endGoal(w, g, 'failed', 'his superior would not back him');
     return later(w, g, 3);
   }
   if (pick === 'gift' && boss) {
     const amt = Math.round(Math.min(c.cash * 0.15, 250) / 10) * 10;
-    if (amt >= 50 && give(c, boss, amt)) { rel(boss, c.id).trust = clamp(rel(boss, c.id).trust + 0.04); rel(boss, c.id).respect = clamp(rel(boss, c.id).respect + 0.02); c.standing = clamp(c.standing + 0.8, 0, 100); bump(w, 'inter.gift'); g.next = 'keep his name in front of them'; }
+    if (amt >= 50 && give(c, boss, amt)) { rel(boss, c.id).trust = clamp(rel(boss, c.id).trust + 0.04); rel(boss, c.id).respect = clamp(rel(boss, c.id).respect + 0.02); c.standing = clamp(c.standing + 0.8, 0, 100); bump(w, 'inter.gift'); g.next = 'keep his name in front of them'; emit(w, g, c, 'gift', { amt }); }
     return later(w, g, 6);
   }
   if (pick === 'undermine') {
@@ -533,11 +538,13 @@ function advanceStep(w: World, g: Goal, c: Character) {
     bump(w, 'inter.undermine');
     rv.standing = clamp(rv.standing - 2, 0, 100);
     if (boss?.alive) rel(boss, rv.id).trust = clamp(rel(boss, rv.id).trust - 0.03);
-    if (w.rng.chance(0.15 + (1 - t.caution) * 0.2)) { // he was seen doing it
+    const seen = w.rng.chance(0.15 + (1 - t.caution) * 0.2);
+    if (seen) { // he was seen doing it
       rel(rv, c.id).grudge = clamp(rel(rv, c.id).grudge + 0.25); rel(rv, c.id).trust = clamp(rel(rv, c.id).trust - 0.2);
       if (boss?.alive) rel(boss, c.id).respect = clamp(rel(boss, c.id).respect - 0.04);
       bump(w, 'caught');
     }
+    emit(w, g, c, 'undermine', { rival: rv.id, seen });
     return later(w, g, 4);
   }
   if (pick === 'crew') {

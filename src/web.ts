@@ -1,4 +1,6 @@
 import { doMove } from './sitmoves';
+import { matterAct } from './matters';
+import { subjectRows } from './talk';
 // Mobile web front end. Same engine as the CLI, different skin.
 import { generate, perform } from './actions';
 import { crewOf } from './crewlife';
@@ -383,6 +385,15 @@ function handle(a: string, v: string) {
       save(); return;
     }
     case 'cact': { sceneAct(w, P(), v); save(); return; }
+    case 'caside': { // V89: from the club's small talk into a proper conversation, perhaps starting with something on his mind
+      const [id, code] = args;
+      const mins = closeScene(w), t = w.chars[id];
+      if (!t?.alive) return pass(mins, [], { t: 'place', id: 'club' });
+      if (!code) return pass(mins, [], { t: 'talk', convo: startConvo(id), lines: [`You and ${t.name.split(' ')[0]} find a table at the back.`] });
+      const label = subjectRows(w, P(), t, 6).find((o) => o.code === code)?.label;
+      const res = say(w, P(), t, startConvo(id), code);
+      return pass(mins + res.minutes, [], { t: 'talk', convo: res.convo ?? startConvo(id), lines: res.lines, q: label });
+    }
     case 'cend': { const mins = closeScene(w); return pass(mins, [], v === 'stay' ? { t: 'place', id: 'club' } : { t: 'tab', name: 'today' }); }
     case 'club': {
       const r = v === 'sit' ? sitAtClub(w, P()) : v === 'shave' ? shave(w, P()) : drinkAt(w, P());
@@ -584,6 +595,10 @@ function handle(a: string, v: string) {
         return;
       }
       return pass(r.minutes, r.lines, { t: 'tab', name: 'today' });
+    }
+    case 'mt': { // V89: something the player does in a matter, from its story
+      const r = matterAct(w, P(), args[0], args[1], args[2] || undefined);
+      return pass(r.minutes, r.lines, { t: 'story', id: 'sit:' + args[0] });
     }
     case 'mv': {
       const r = doMove(w, P(), args[0], args[1], args[2] || undefined);
@@ -828,7 +843,10 @@ document.addEventListener('click', (e) => {
   }
   render();
   const inPlace = ['tog', 'gpick', 'lsub', 'pf', 'stance', 'tree', 'opdist', 'oprun', 'hjpick'].includes(raw.slice(0, i)) || /^om:(both|first|last|bg|shuffle|look|keep|new|lg)/.test(raw);
-  window.scrollTo(0, inPlace ? before : 0);
+  // a conversation keeps its place: the newest exchange is brought into view, with what was said before it just above
+  const now = S.view.t === 'talk' && raw.startsWith('say:') ? document.querySelector('.cv-now') as HTMLElement | null : null;
+  if (now) window.scrollTo(0, Math.max(0, now.getBoundingClientRect().top + window.scrollY - (window.innerWidth >= 900 ? 120 : 90)));
+  else window.scrollTo(0, inPlace ? before : 0);
   // On the opening screens a keyboard user keeps their place: the control they pressed has focus again after the redraw.
   if (!S.w && e.detail === 0) (document.querySelector(`[data-a="${CSS.escape(raw)}"]`) as HTMLElement | null)?.focus();
 });

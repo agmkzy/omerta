@@ -1,4 +1,5 @@
-import { answerAsk, answerWord } from './matters';
+import { answerAsk, answerWord } from './asks';
+import { answerMatter } from './matters';
 // People come to you. Each approach is a small scene in the man's own voice, with choices that carry weight:
 // a loan is a debt, a favour is a debt of another kind, a no is remembered. Nothing here is a menu of numbers.
 import { newOffer } from './jobs';
@@ -501,6 +502,7 @@ export function choose(w: World, p: Character, e: Enc, code: string): { lines: s
   if (e.kind === 'threat' && e.from) { const o = e.opts.find((x) => x.code === code); addFact(w, { kind: 'favour', actor: p.id, victim: e.from, story: 'threat:' + e.from, minor: true, text: `${p.name} answered ${w.chars[e.from]?.name ?? 'him'}: “${o?.label ?? code}”.`, district: p.district }, { witnesses: [p.id] }); }
   if (e.kind === 'ask') return answerAsk(w, p, e, code); // V89: the player answering an ask (matters.ts)
   if (e.kind === 'word') return answerWord(w, p, e, code); // V89: a superior's word about trouble
+  if (e.kind === 'matter') return answerMatter(w, p, e, code); // V89: someone in a matter wants the player's answer
   if (e.kind === 'crew') { lines.push(...crewChoose(w, p, e, code)); return { lines, minutes: 25 }; }
   if (e.kind === 'loan' && c) return loan(w, p, e, c, code, lines, done, keep);
   if (e.kind === 'favour_ask' && c) return favourReply(w, p, e, c, code, lines, done, keep);

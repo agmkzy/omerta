@@ -1,5 +1,6 @@
-import { asker, askee, read as mRead, titleOf as mTitle } from '../matters';
+import { asker, askee, read as mRead, titleOf as mTitle } from '../asks';
 import { money } from '../core';
+import { matterKind, matterOpts, matterStage, matterTitle } from '../matters';
 // Stories: every ongoing matter in one place. Where it began, where it stands, what happened since, what you can do.
 import { dangerLevel, LADDER_WORDS } from '../danger';
 import { shortTime } from '../core';
@@ -167,6 +168,23 @@ function matterStories(w: World, p: Character): Story[] {
     const asking = s.stage === 'asking';
     const mine = isParty(s, p.id);
     if (s.kind === 'ask') { const st = askStory(w, p, s, closed, tl); if (st) out.push(st); continue; }
+    // V89: the matters that grow from events, bad blood and ambition: their own title and stage, and what the player can do about
+    // them from where he stands (in it, close to someone in it, or only hearing of it), besides going to see the people in it
+    if (matterKind(s)) {
+      const people = (s.parties ?? []).map((x) => w.chars[x.id]).filter((c) => c?.alive && !c.isPlayer && (isParty(s, p.id) || Object.keys(c.rels).includes(p.id))).slice(0, 2);
+      out.push({
+        key: 'sit:' + s.id, kind: 'matter', title: matterTitle(w, s) ?? titleOf(w, s), closed,
+        stage: closed ? (s.cons?.at(-1) ?? 'Over').replace(/^./, (m) => m.toUpperCase()) : matterStage(w, s, p) ?? 'Open',
+        tone: closed ? '' : asking || mine ? 'red' : 'amber', last: tl[0]?.t ?? s.since, lastText: tl[0]?.text ?? s.cause, timeline: tl,
+        blurb: `${s.cause.replace(/^./, (m) => m.toUpperCase())}.${!mine && !closed ? ' What you have is what people say.' : ''}`,
+        why: mine ? 'You’re in it.' : 'It concerns people around you.',
+        actions: closed ? [] : [
+          ...matterOpts(w, s, p).map((m) => ({ a: `mt:${s.id}|${m.code}|${m.who ?? ''}`, label: m.label, hint: m.hint })),
+          ...people.map((c) => ({ a: `talk:${c.id}`, label: `Go and see ${c.name.split(' ')[0]}`, hint: 'Hear what he has to say about it.' })),
+        ].slice(0, 6),
+      });
+      continue;
+    }
     out.push({
       key: 'sit:' + s.id, kind: 'matter', title: titleOf(w, s), closed,
       stage: closed ? 'Over' : asking ? 'Waiting on your answer' : mine ? 'You’re in it' : 'You’ve heard about it',

@@ -84,7 +84,7 @@ function greet(w: World, p: Character, cl: Club, c: Character): string {
   let g: string;
   if (w.now - m.last < 5 * 60) g = pick([`${first(c)} glances up. "Forgot something?"`, `"Back already," says ${first(c)}.`]);
   else if (r.grudge > 0.35) g = `${first(c)} looks at you for a second too long. "${p.name.split(' ')[0]}."`;
-  else if (up && r.trust < 0.3) g = pick([`${first(c)} nods without getting up. "Marino."`, `${first(c)} waits to see what you want.`]);
+  else if (up && r.trust < 0.3) g = pick([`${first(c)} nods without getting up. "${p.name.split(' ').slice(1).join(' ') || p.name}."`, `${first(c)} waits to see what you want.`]);
   else if (up) g = pick([`"Sit," says ${first(c)}, and moves a chair out with his foot.`, `${first(c)} pours you a coffee without asking.`]);
   else if (down && r.respect > 0.5) g = pick([`${first(c)} half stands. "${p.name.split(' ')[0]}."`, `${first(c)} straightens up as you come over.`]);
   else if (down) g = pick([`${first(c)} looks up. "Boss."`, `"${p.name.split(' ')[0]}," says ${first(c)}.`]);

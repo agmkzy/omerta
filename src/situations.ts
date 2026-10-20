@@ -79,8 +79,10 @@ export function situationTick(w: World) {
     // Left to rot, a business gives out (the economy engine closes it); the situation records it.
     if (s.biz && w.biz[s.biz] && !w.biz[s.biz].open) { s.stage = 'resolved'; s.resolvedAt = w.now; s.how = 'closed'; }
   }
-  // keep the record from growing without end
-  if (list.length > 60) list.splice(0, list.length - 60);
+  // keep the record from growing without end. Only finished ones go (V89: this used to cut the oldest whatever their state, so
+  // matters still under way vanished mid-course once the world had more than sixty of them; situ.ts prunes its own)
+  const old = list.filter((s) => s.stage === 'resolved' && !s.key);
+  if (old.length > 60) { const drop = new Set(old.slice(0, old.length - 60)); w.situations = list.filter((s) => !drop.has(s)); }
 }
 
 function askAmbition(w: World, p: Character, c: Character, s: Situation) {

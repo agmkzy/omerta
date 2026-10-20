@@ -3,6 +3,7 @@ import { clubOf, clubOpen, clubPresent, sceneNode, topicsFor, waiting } from '..
 import { fmtTime } from '../core';
 import { sundayDue } from './sunday';
 import { avatar, back } from './common';
+import { subjectRows } from '../talk';
 import { esc, lk, P, W } from './links';
 
 export function clubView(): string {
@@ -19,7 +20,9 @@ export function clubView(): string {
     if (sc.log.length) out += `<div class="card scenelog">${sc.log.map((l) => `<p class="muted">${lk(l)}</p>`).join('')}</div>`;
     if (sc.ended) return out + `<div class="list"><button class="opt" data-a="cend:stay"><b>Stay a while</b><span class="because">Back to the room.</span></button><button class="opt" data-a="cend:leave"><b>Leave the club</b></button></div>`;
     out += `<div class="card">${sc.lines.map((l) => `<p class="say">${lk(l)}</p>`).join('')}</div>`;
-    return out + `<div class="list">${sc.opts.map((o) => `<button class="opt" data-a="cact:${o.code}"><b>${esc(o.label)}</b>${o.hint ? `<span class="because">${esc(o.hint)}</span>` : ''}</button>`).join('')}</div>`;
+    // V89: what is on his mind (talk.ts) can be taken up properly, away from the room: the full conversation, starting there
+    const aside = sc.ended ? [] : subjectRows(w, p, sc.c, 2);
+    return out + `<div class="list">${sc.opts.map((o) => `<button class="opt" data-a="cact:${o.code}"><b>${esc(o.label)}</b>${o.hint ? `<span class="because">${esc(o.hint)}</span>` : ''}</button>`).join('')}${aside.map((o) => `<button class="opt" data-a="caside:${sc.c.id}|${o.code}"><b>${esc(o.label)}</b><span class="because">Take him aside. ${esc(o.hint)}</span></button>`).join('')}<button class="opt nav" data-a="caside:${sc.c.id}|"><b>Take him aside to talk properly</b></button></div>`;
   }
 
   const here = clubPresent(w, cl);

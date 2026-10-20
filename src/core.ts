@@ -253,8 +253,14 @@ export function addFact(
     learn(w, id, fact, 'public', !fact.hiddenActor);
     if (fact.hiddenActor) suspect(w, c, fact);
   }
+  // V89: events open matters (matters.ts listens here). Not re-entered: a matter's own tellings do not start new matters.
+  const hooks = factHooks();
+  if (hooks.length && !hooking) { hooking = true; try { for (const h of hooks) h(w, fact); } finally { hooking = false; } }
   return fact;
 }
+// (kept on the hoisted function, so a module may register while the import cycle is still loading this one)
+export function factHooks(): ((w: World, f: Fact) => void)[] { const h = factHooks as unknown as { l?: ((w: World, f: Fact) => void)[] }; return (h.l ??= []); }
+let hooking = false;
 
 // Protected businessmen phone their protector when something happens.
 // What a man should have passed up over the last month and did not (as far as the books show).

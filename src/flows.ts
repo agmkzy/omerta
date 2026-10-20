@@ -55,7 +55,7 @@ export function flow(w: World, p: Character, t: Character, c: Convo, code: strin
     const f0 = brokenWord(w, p, t);
     if (!f0) { lines.push('“It’s done with. Let it be.”'); return said(lines, c, undefined, 3); }
     c.ctx.deal = { kind: 'word', ask: 150 };
-    lines.push(pick(w, t, { hothead: ['“You said you would. You didn’t. Talk is cheap, Marino.”'], proud: ['“I don’t forget when a man gives his word and sits on it.”'], _: ['“You told me you’d see to it. Then nothing. I noticed.”'] }));
+    lines.push(pick(w, t, { hothead: [`“You said you would. You didn’t. Talk is cheap, ${p.name.split(' ').slice(1).join(' ') || p.name}.”`], proud: ['“I don’t forget when a man gives his word and sits on it.”'], _: ['“You told me you’d see to it. Then nothing. I noticed.”'] }));
     return said(lines, c, [
       { code: 'fl:word_pay', label: 'Put $150 in his hand for his trouble', hint: 'Costs $150. It goes a long way toward mending it.', big: true },
       { code: 'fl:word_explain', label: 'Tell him straight why it fell through', hint: 'Costs nothing. He may not care why.' },

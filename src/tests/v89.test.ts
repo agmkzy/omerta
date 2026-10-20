@@ -6,8 +6,14 @@ import { audit } from '../consistency';
 import { ledgerCheck } from '../econ';
 import { advance, deserialize, serialize } from '../engine';
 import { regard, rel } from '../core';
-import { asksOf, askBetween, move, openAsk, openAsks, playerMove, playerMoves, read, stance } from '../matters';
-import { kinOf, closeKin } from '../kin';
+import { asksOf, askBetween, move, openAsk, openAsks, playerMove, playerMoves, read, stance } from '../asks';
+import { kinOf, closeKin, madeKin } from '../kin';
+import { addFact } from '../core';
+import { ORIGIN, startRivalry, topicsWith, matterAct } from '../matters';
+import { goalHooks, begin } from '../goals';
+import { notesOf, subjectsOf, talkAbout } from '../talk';
+import { options, say, startConvo } from '../dialogue';
+import { ownerBiz } from '../core';
 import { hierarchyIssues } from '../rank';
 import { sitIssues } from '../situ';
 import { DAY, type Business, type Character, type World } from '../types';
@@ -94,7 +100,7 @@ ok('NPCs pursue matters on their own: shops are approached once at a time, matte
     advance(w, w.now + 35 * DAY);
     const asks = (w.situations ?? []).filter((s) => s.kind === 'ask');
     assert.ok(asks.length > 20, 'matters happen without the player');
-    const open = openAsks(w).filter((s) => s.ak === 'protect');
+    const open = openAsks(w).filter((s) => s.ak === 'protect' && !s.m?.against); // (a relative's counter-offer is a second door on purpose)
     const shops = open.map((s) => s.biz);
     assert.equal(new Set(shops).size, shops.length, 'no shop has two collectors at its door');
     const outs = new Set(Object.keys(w.sitpace?.stats ?? {}).filter((k) => k.startsWith('out.ask.')));
@@ -136,5 +142,184 @@ ok('regard is earned at a believable pace: the tenth errand and the third drink 
   const lo = regard(w, boss, p, 'trust', -0.06, 'job');
   assert.equal(lo, -0.06, 'a failure costs in full');
   const x = w.chars[Object.keys(p.rels)[0]] as Character; void x;
+});
+
+ok('matters begin without anyone asking: every kind says how it began, and most begin from events, bad blood or ambition', () => {
+  const kinds = Object.entries(ORIGIN);
+  assert.ok(kinds.filter(([, o]) => o !== 'negotiation').length >= 10, 'most kinds are not negotiations');
+  for (const o of ['event', 'relationship', 'ambition', 'obligation', 'negotiation']) assert.ok(kinds.some(([, x]) => x === o), 'there are ' + o + ' matters');
+});
+
+ok('an arrest is a matter: whether he talked is decided once, and his boss reaches a verdict after he is out', () => {
+  const w = createWorld(3, 'Tony Marino');
+  const c = Object.values(w.chars).find((x) => x.alive && !x.isPlayer && x.rank === 'soldier' && x.bossId && w.chars[x.bossId]?.alive && !w.chars[x.bossId].isPlayer)!;
+  c.jailedUntil = w.now + 3 * DAY;
+  addFact(w, { kind: 'arrest', actor: c.id, text: `${c.name} was arrested.`, district: c.district }, { broadcast: [c.bossId!] });
+  const s = (w.situations ?? []).find((x) => x.kind === 'arrest' && x.parties?.some((y) => y.id === c.id))!;
+  assert.ok(s && ['talked', 'quiet'].includes(s.truth!), 'the truth is fixed when he is picked up');
+  const truth = s.truth;
+  advance(w, w.now + 20 * DAY);
+  assert.equal(s.truth, truth, 'and it does not change');
+  assert.equal(s.stage, 'resolved', 'his boss has made up his mind');
+  assert.ok(['kept quiet', 'doubted', 'talked'].includes(s.out!), 'one way or another: ' + s.out);
+  clean(w, 'after an arrest');
+});
+
+ok('the player arrested: his boss wants to know what he said, and how he answers counts', () => {
+  const w = createWorld(3, 'Tony Marino'), p = P(w);
+  p.jailedUntil = w.now + 2 * DAY;
+  addFact(w, { kind: 'arrest', actor: p.id, text: `${p.name} was arrested.`, district: p.district }, { broadcast: [p.bossId!] });
+  for (let i = 0; i < 8 && !w.enc.some((e) => e.kind === 'matter' && e.status === 'open'); i++) advance(w, w.now + DAY);
+  const e = w.enc.find((x) => x.kind === 'matter' && x.status === 'open')!;
+  assert.ok(e && e.from === p.bossId, 'the boss calls him in');
+  assert.ok(e.opts.length >= 3, 'with more than one way to answer');
+});
+
+ok('revenge: a beaten man’s brother wants the man who did it, asks his boss for leave, and the answer comes back into the matter', () => {
+  let found = false;
+  for (let seed = 1; seed <= 12 && !found; seed++) {
+    const w = createWorld(seed, 'Tony Marino');
+    const v = Object.values(w.chars).find((x) => x.alive && !x.isPlayer && madeKin(w, x).some((k) => closeKin(w, x, k) && !k.isPlayer && k.familyId));
+    if (!v) continue;
+    const av = madeKin(w, v).find((k) => closeKin(w, v, k) && !k.isPlayer && k.familyId)!;
+    av.traits.violence = 1; av.traits.caution = 0;
+    const x = Object.values(w.chars).find((y) => y.alive && !y.isPlayer && y.rank === 'soldier' && y.familyId && y.familyId !== av.familyId && y.id !== v.id)!;
+    addFact(w, { kind: 'beating', actor: x.id, victim: v.id, text: `${x.name} beat up ${v.name}.`, district: v.district }, { witnesses: [v.id], broadcast: [av.id] });
+    const s = (w.situations ?? []).find((y) => y.kind === 'revenge' && y.parties?.some((z) => z.id === av.id));
+    if (!s) continue;
+    found = true;
+    advance(w, w.now + 30 * DAY);
+    const asked = (w.situations ?? []).find((y) => y.ak === 'permit' && y.m?.parent === s.id);
+    assert.ok(asked || s.out || s.phase !== 'asking leave', 'he asked leave, or it went another way: ' + s.phase);
+    if (asked && asked.stage === 'resolved') assert.ok(s.m?.['child:permit'], 'and the answer reached the revenge');
+    assert.ok(s.stage === 'resolved' || s.phase === 'asking leave' || s.phase === 'looking' || s.phase === 'struck', 'the matter moved on: ' + s.phase);
+    clean(w, 'after revenge');
+  }
+  assert.ok(found, 'a brother went after someone');
+});
+
+ok('bad blood runs its course without the player, and ends in different ways across the world', () => {
+  const outs = new Set<string>();
+  for (const seed of [3, 7, 11]) {
+    const w = createWorld(seed, 'Tony Marino');
+    advance(w, w.now + 70 * DAY);
+    for (const s of w.situations ?? []) if (s.kind === 'rivalry' && s.out) outs.add(s.out);
+    clean(w, 'rivalries seed ' + seed);
+  }
+  assert.ok(outs.size >= 3, 'different endings: ' + [...outs]);
+});
+
+ok('ambition seen is ambition answered: a man caught doing a rival down has a rival now', () => {
+  const w = createWorld(3, 'Tony Marino');
+  const c = Object.values(w.chars).find((x) => x.alive && !x.isPlayer && x.rank === 'soldier' && x.bossId && !w.chars[x.bossId].isPlayer)!;
+  const rv = Object.values(w.chars).find((x) => x.alive && !x.isPlayer && x.rank === 'soldier' && x.familyId === c.familyId && x.id !== c.id)!;
+  const g = begin(w, c, 'advance', 'he wants more', 0.7, { stage: 'start', next: 'ask' });
+  for (const h of goalHooks()) h(w, g, c, 'undermine', { rival: rv.id, seen: true });
+  assert.ok((w.situations ?? []).some((s) => s.kind === 'climb' && s.m?.goal === g.id), 'his climb is a matter');
+  assert.ok((w.situations ?? []).some((s) => s.kind === 'rivalry' && s.parties?.some((x) => x.id === rv.id) && s.parties?.some((x) => x.id === c.id)), 'and the man he did down is his rival');
+});
+
+ok('the player can raise a matter in conversation in its own terms, and doing so changes it', () => {
+  const w = createWorld(3, 'Tony Marino'), p = P(w);
+  const [a, b] = Object.values(w.chars).filter((x) => x.alive && !x.isPlayer && x.rank === 'soldier' && x.familyId === p.familyId).slice(0, 2);
+  rel(a, b.id).grudge = 0.6; rel(b, a.id).grudge = 0.5; rel(a, p.id).trust = 0.6;
+  const s = startRivalry(w, a, b, 'test')!;
+  s.k![p.id] = { l: 2, via: 'test', t: w.now };
+  const t = topicsWith(w, p, a).map((x) => x.o.code);
+  assert.ok(t.includes('ask') && t.includes('side'), 'he can ask about it or take a side: ' + t);
+  const g0 = rel(b, p.id).grudge;
+  matterAct(w, p, s.id, 'side', a.id);
+  assert.ok(s.parties!.some((x) => x.id === p.id), 'taking a side puts him in it');
+  assert.ok(rel(a, p.id).affection > 0 && rel(b, p.id).grudge >= g0, 'and both men feel it');
+  assert.ok(!topicsWith(w, p, a).some((x) => x.o.code === 'side'), 'it is not offered twice in a day');
+});
+
+ok('anyone can be worth talking to: ordinary men have things on their minds, and they differ from man to man', () => {
+  const w = createWorld(3, 'Tony Marino'); advance(w, w.now + 20 * DAY);
+  const p = P(w), men = Object.values(w.chars).filter((c) => c.alive && !c.isPlayer).slice(0, 80);
+  for (const m of men) { rel(m, p.id).trust = Math.max(rel(m, p.id).trust, 0.5); (p.intro ??= {})[m.id] = w.now; }
+  const keys = new Set<string>(); let withSome = 0;
+  for (const m of men) { const ss = subjectsOf(w, p, m); if (ss.length) withSome++; for (const s of ss) keys.add(s.key.split(':')[0]); }
+  assert.ok(withSome >= men.length * 0.6, `most men have something to talk about: ${withSome}/${men.length}`);
+  assert.ok(keys.size >= 6, 'many kinds of subject: ' + [...keys]);
+  // and a man in no matter at all still opens with something of his own
+  const quiet = men.find((m) => !(w.situations ?? []).some((s) => s.stage !== 'resolved' && s.parties?.some((x) => x.id === m.id)) && subjectsOf(w, p, m).length)!;
+  const o = options(w, p, quiet, startConvo(quiet.id));
+  assert.ok(o.some((x) => x.code.startsWith('tk:')), 'his own subjects are offered: ' + o.map((x) => x.code));
+});
+
+ok('a subject is a conversation: he answers, you answer, and what you say changes things and is remembered', () => {
+  const w = createWorld(3, 'Tony Marino'), p = P(w);
+  const b = shop(w, (x) => !!x.protection && x.protection.collectorId !== p.id), o = w.chars[b.ownerId];
+  rel(o, p.id).trust = 0.6; rel(o, b.protection!.collectorId).grudge = 0.4; b.distress = 1;
+  const first = talkAbout(w, p, o, 'tk:shop')!;
+  assert.ok(first.lines.length && first.choices.some((c) => c.code === 'tk:shop:col'), 'he talks about the shop, and you can ask about the man he pays');
+  const second = talkAbout(w, p, o, 'tk:shop:col')!;
+  assert.ok(second.choices.some((c) => c.code === 'tk:shop:poach'), 'a man unhappy with what he pays can be offered better');
+  talkAbout(w, p, o, 'tk:shop:poach');
+  assert.ok(askBetween(w, 'protect', p.id, o.id, b.id), 'and the offer is a matter between you now');
+  assert.ok(!subjectsOf(w, p, o).some((s) => s.key === 'shop'), 'the same subject, unchanged, is not raised again straight away');
+  clean(w, 'after talking shop');
+});
+
+ok('helping a man with his trouble moves real money and leaves him owing you', () => {
+  const w = createWorld(4, 'Tony Marino'), p = P(w);
+  const m = Object.values(w.chars).find((c) => c.alive && !c.isPlayer && c.rank !== 'civilian' && c.id !== p.bossId)!;
+  m.problem = { kind: 'debt', sev: 0.6, since: w.now, revealed: true }; rel(m, p.id).trust = 0.6; p.cash = 3000;
+  const b = talkAbout(w, p, m, 'tk:trouble')!;
+  const gift = b.choices.find((c) => c.code === 'tk:trouble:gift')!;
+  assert.ok(gift, 'he can be helped: ' + b.choices.map((c) => c.code));
+  const cash0 = p.cash, his0 = m.cash, f0 = w.favours.length;
+  talkAbout(w, p, m, gift.code);
+  assert.ok(p.cash < cash0 && m.cash - his0 === cash0 - p.cash, 'the money moves from you to him');
+  assert.ok(w.favours.length > f0 && w.favours.at(-1)!.from === p.id, 'and he owes you');
+  assert.ok(m.problem!.sev < 0.6, 'and it helps');
+  clean(w, 'after helping');
+});
+
+ok('the conversation screen carries a subject through its turns and back', () => {
+  const w = createWorld(3, 'Tony Marino'), p = P(w);
+  const m = Object.values(w.chars).find((c) => c.alive && !c.isPlayer && ownerBiz(w, c.id) && subjectsOf(w, p, c).some((x) => x.key === 'shop'))!;
+  rel(m, p.id).trust = 0.6; (p.intro ??= {})[m.id] = w.now;
+  const r = say(w, p, m, startConvo(m.id), 'tk:shop');
+  assert.ok(r.lines.length, 'he answers');
+  if (r.convo?.node === 'follow') {
+    const next = options(w, p, m, r.convo).find((o) => o.code.startsWith('tk:shop:'))!;
+    assert.ok(next, 'and you can answer him');
+    const r2 = say(w, p, m, r.convo, next.code);
+    assert.ok(r2.convo, 'the conversation goes on');
+  }
+});
+
+ok('what you already know opens a man up, and standing up for him is a promise and a matter', () => {
+  const w = createWorld(3, 'Tony Marino'); advance(w, w.now + 10 * DAY);
+  const p = P(w);
+  const s = openAsks(w).find((x) => x.ak === 'protect' && x.terms?.by !== p.id && x.terms?.of !== p.id)!;
+  const t = w.chars[s.terms!.of], a = w.chars[s.terms!.by];
+  rel(t, p.id).trust = 0.2;
+  let b = talkAbout(w, p, t, 'tk:pressed:' + s.id)!;
+  assert.ok(!b.choices.length, 'a wary man with nothing to go on says nothing');
+  const f = Object.values(w.facts).find((x) => x.story === 'sit:' + s.id);
+  if (!f) return;
+  p.known[f.id] = { t: w.now, from: 'public', knowsActor: true };
+  delete t.talk!['tk:pressed:' + s.id];
+  b = talkAbout(w, p, t, 'tk:pressed:' + s.id)!;
+  const heard = b.choices.find((c) => c.code.endsWith(':heard'))!;
+  assert.ok(heard, 'but you can say what you heard');
+  b = talkAbout(w, p, t, heard.code)!;
+  assert.ok(b.choices.some((c) => c.code.endsWith(':warn')), 'and then he tells you, and you can stand up for him');
+  talkAbout(w, p, t, b.choices.find((c) => c.code.endsWith(':warn'))!.code);
+  assert.ok(askBetween(w, 'warn', p.id, a.id), 'the warning is a matter between you and the other man now');
+  assert.ok(t.memos.some((m) => m.kind === 'promise' && m.other === p.id && !m.done), 'and he is holding you to it');
+  assert.ok(notesOf(p, t).some((n) => n.includes(a.name)), 'what he told you is written down as what he told you');
+});
+
+ok('what you know of a man is what he has shown you: nothing is noted that he did not say', () => {
+  const w = createWorld(4, 'Tony Marino'), p = P(w);
+  const m = Object.values(w.chars).find((c) => c.alive && !c.isPlayer && c.rank !== 'civilian')!;
+  m.problem = { kind: 'gambling', sev: 0.7, since: w.now }; rel(m, p.id).trust = 0.1;
+  talkAbout(w, p, m, 'tk:trouble');
+  assert.equal(notesOf(p, m).length, 0, 'a guarded man who says nothing gives you nothing to write down');
+  assert.ok(!m.problem.revealed, 'and his trouble stays his');
 });
 console.log('all passed');

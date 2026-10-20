@@ -1,4 +1,4 @@
-import './matters'; // V89: registers the 'ask' situation kind with situ.ts
+import { mattersWeek } from './matters'; // V89: registers the matter kinds (and, through it, asks) with situ.ts
 import { pulseWeek } from './pulse';
 import { careerTick, promoTick } from './career';
 import { agencyWeek } from './goals';
@@ -158,6 +158,7 @@ function weekly(w: World) {
   reportTick(w);
   situationTick(w);
   sitWeek(w);
+  mattersWeek(w);
   friendsTell(w);
   pulseWeek(w);
   // Bosses revise the size of their families now and then: a family at war wants soldiers, a rich one wants more earners.

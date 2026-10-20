@@ -1,4 +1,6 @@
-import { askBetween, openAsk, openAsks as openMatters, playerMove, playerMoves, read as mRead, titleOf as mTitle, type AskMove } from './matters';
+import { matterAct, matterTitle, topicsWith } from './matters';
+import { addr, nudgeOf, subjectRows, talkAbout } from './talk';
+import { askBetween, openAsk, openAsks as openMatters, playerMove, playerMoves, read as mRead, titleOf as mTitle, type AskMove } from './asks';
 import { historyLines } from './powers2';
 import { askAbout, helpWith, sitOf } from './situations';
 // Conversations. Options are generated from what the other man knows, how he feels about you and what has happened.
@@ -251,7 +253,9 @@ export function arrive(w: World, p: Character, t: Character, r: { lines: string[
   if (open) { (t.talk ??= {})['prm:' + open.id] = { d: Math.floor(w.now / 1440), sig: 'x', n: 1 }; word.push(`“You said you’d see to it. Don’t leave it too long.”`); }
   const broke = brokenWord(w, p, t);
   if (broke && !t.talk?.['said:' + broke.id]) { (t.talk ??= {})['said:' + broke.id] = { d: Math.floor(w.now / 1440), sig: 'x', n: 1 }; word.push(pickBy(t)); }
-  const lines = [`${venue}. ${vsay(w, t, p, 'scene')}`, vsay(w, t, p, recent ? 'greet_again' : 'greet', { S: surname(p) }), ...word, ...r.lines, ...(asks.length ? [askLead(asks[0])] : [])];
+  // V89: what shows on him before he says a word, if something is weighing on him (talk.ts)
+  const shows = asks.length ? undefined : nudgeOf(w, p, t);
+  const lines = [`${venue}. ${vsay(w, t, p, 'scene')}`, vsay(w, t, p, recent ? 'greet_again' : 'greet', { S: addr(w, t, p) }), ...(shows ? [shows] : []), ...word, ...r.lines, ...(asks.length ? [askLead(asks[0])] : [])];
   return { lines, convo: { ...startConvo(t.id), named: lines.some((l) => l.includes(t.name)) } };
 }
 
@@ -434,7 +438,10 @@ function flatRoot(w: World, p: Character, t: Character, c: Convo): DOpt[] {
   const askRows: DOpt[] = asksOf(w, t).slice(0, 1).flatMap((e) => e.opts.map((o) => ({ code: `enc:${e.id}:${o.code}`, label: o.label, hint: o.hint, story: 'go' as const, big: true })));
   // V89: a matter you are pursuing with him (matters.ts). The moves it allows, each saying what it costs; those not open say why.
   for (const s of openMatters(w).filter((x) => x.terms?.by === p.id && x.terms?.of === t.id).slice(0, 1))
-    for (const m of playerMoves(w, p, s)) askRows.push({ code: `mv:${s.id}:${m.move}`, label: m.label, hint: m.off ?? `${mTitle(w, s)}: he is ${mRead(w, s, t.id)}. ${m.hint}`, story: m.move === 'drop' || m.move === 'take' ? 'end' : 'go', big: !m.off && ['force', 'pressure', 'leverage', 'take'].includes(m.move), done: !!m.off });
+    for (const m of playerMoves(w, p, s)) askRows.push({ code: `mv:${s.id}:${m.move}`, label: m.label, hint: m.off ?? m.hint, story: m.move === 'drop' || m.move === 'take' ? 'end' : 'go', big: !m.off && ['force', 'pressure', 'leverage', 'take'].includes(m.move), done: !!m.off });
+  // V89: matters that are not about terms at all: bad blood, an arrest, a man wanting payback, a man wanting to rise. What he is in,
+  // or has heard of, that you have heard of too, and what you could say about it from where you stand.
+  for (const { s, o } of topicsWith(w, p, t)) contextual.push({ code: `mt:${s.id}:${o.code}`, label: o.label, hint: `${matterTitle(w, s)}. ${o.hint}`, story: 'go', big: o.big });
   // He told you it wasn't him, and you have since learned it was. That is a matter between you now.
   const lied = Object.keys(t.denied ?? {}).map((id) => w.facts[id]).find((f) => f && f.actor === t.id && p.known[f.id]?.knowsActor && p.known[f.id].from !== t.id);
   const broken = brokenWord(w, p, t);
@@ -448,6 +455,9 @@ function flatRoot(w: World, p: Character, t: Character, c: Convo): DOpt[] {
   // LAYER 2: ordinary ways to talk, a few at a time, shaped by who he is to you
   const TALK = ['how', 'op', 'chat', 'work', 'earn', 'old_times', 'ask_want', 'pick_member'];
   const l2: Item[] = [];
+  // V89: first, what is on his mind (talk.ts): his troubles, his shop, his racket, what he wants, the men he can't stand, his family,
+  // the man he works for. Then the ordinary ways to talk, to fill the rest.
+  for (const o of subjectRows(w, p, t, 2)) if (!used.has(o.code) && !(c.used ?? []).includes(usedKey(c, o.code))) l2.push({ o: { ...o, story: undefined }, cat: INTENTS[0] });
   for (const k of TALK) { const x = items.find((y) => y.o.code.split(':')[0] === k && !used.has(y.o.code)); if (x && l2.length < 3) l2.push(x); }
   if (!l2.some((x) => x.o.code === 'pick_member')) { const fam = items.find((y) => y.o.code === 'pick_member') ?? (raw.some((o) => o.code === 'n:family') ? { o: { code: 'pick_member', label: 'Ask about one of the others', hint: 'Hear his view of someone else.' } as DOpt, cat: 'Family politics' } : undefined); if (fam && l2.length < 4 && !used.has(fam.o.code)) l2.push(fam); }
   l2.forEach((x) => used.add(x.o.code));
@@ -851,6 +861,21 @@ export function say(w: World, p: Character, t: Character, c: Convo, code: string
       return { lines: lt.lines, minutes: 2, convo: { ...c, named: lt.named, used: [...(c.used ?? []), usedKey(c, code)] } };
     }
   }
+  if (code.startsWith('tk:')) { // V89: a subject on his mind (talk.ts), raised or followed up
+    const b = talkAbout(w, p, t, code);
+    if (b) {
+      const used = [...(c.used ?? []), usedKey(c, code.split(':').slice(0, code.startsWith('tk:op:') || code.startsWith('tk:kin:') || code.startsWith('tk:tell:') ? 3 : 2).join(':')), usedKey(c, code)];
+      const lines = b.lines.map((l) => speechFor(w, p, t, l));
+      if (b.go?.node === 'subject' && b.go.subject) return { lines, minutes: b.minutes ?? 15, convo: { ...c, node: 'subject', ctx: { ...c.ctx, subject: b.go.subject }, used } };
+      if (b.choices.length) return { lines, minutes: b.minutes ?? 15, convo: { ...c, node: 'follow', ctx: { ...c.ctx, follow: b.choices.map((x) => ({ code: x.code, label: x.label, hint: x.hint, big: x.big })) }, used } };
+      return { lines: lines.length ? lines : ['You leave it there.'], minutes: b.minutes ?? 10, convo: { ...c, node: 'root', used } };
+    }
+  }
+  if (code.startsWith('mt:')) { // V89: a matter he is in or knows of (matters.ts), raised in his own terms
+    const [, sid, mc] = code.split(':');
+    const r = matterAct(w, p, sid, mc, t.id);
+    return { lines: r.lines.map((l) => speechFor(w, p, t, l)), minutes: r.minutes, convo: { ...c, node: 'root', used: [...(c.used ?? []), usedKey(c, code)] } };
+  }
   if (code.startsWith('mv:')) {
     const [, sid, mv] = code.split(':');
     const r = playerMove(w, p, sid, mv as AskMove);
@@ -982,7 +1007,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
         learn(w, p.id, f, t.id, true);
         tweak(-0.03, 0, 0.03);
       } else {
-        lines.push(`${t.name}: “Careful, Marino. You’re calling me a liar.”`);
+        lines.push(`${t.name}: “Careful, ${addr(w, t, p)}. You’re calling me a liar.”`);
         r.grudge = clamp(r.grudge + 0.1);
         tweak(-0.06, -0.03, -0.02);
       }
@@ -1210,31 +1235,17 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
       return { lines, minutes: 35, convo: { id: c.id, node: 'root', ctx: c.ctx } };
     }
     case 'borrow': {
-      if ((p.cooldown['borrow:' + t.id] ?? 0) > w.now) {
-        lines.push(vsay(w, t, p, w.debts.some((d) => d.status === 'active' && d.creditor === t.id && d.debtor === p.id) ? 'loan_first' : 'loan_again'));
-        return stay('business', 10);
-      }
+      if (w.debts.some((d) => d.status === 'active' && d.creditor === t.id && d.debtor === p.id)) { lines.push(vsay(w, t, p, 'loan_first')); return stay('business', 10); }
+      // V89: asking for money opens a matter between you (asks.ts 'borrow'). He may lend it, offer less, want time, or say no; and
+      // whatever he says, you can come back to it: ask for less, make your case, remind him of something, or let it go.
+      const open = askBetween(w, 'borrow', p.id, t.id);
+      if (!open && (p.cooldown['borrow:' + t.id] ?? 0) > w.now) { lines.push(vsay(w, t, p, 'loan_again')); return stay('business', 10); }
+      const s = open ?? openAsk(w, 'borrow', p, t, { amt: 1000, why: `${p.name} asked ${t.name} for a loan` });
+      if (!s) { lines.push(vsay(w, t, p, 'loan_again')); return stay('business', 10); }
       p.cooldown['borrow:' + t.id] = w.now + 14 * DAY;
-      const pos = loanPosition(w, t, p, 1000);
-      lines.push(`You ask ${t.name.split(' ')[0]} for $1,000.`);
-      if (pos.refuse) { lines.push(vsay(w, t, p, pos.refuse === 'trust' ? 'loan_trust' : 'loan_cash')); return stay('business', 15); }
-      if (pos.can >= 850) { // within a few hundred he simply rounds it up; he doesn't haggle over small change
-        pos.can = 1000;
-        t.cash -= 1000;
-        p.cash += 1000;
-        createDebt(w, t.id, p.id, 1000, pos.rate, 'a loan to you');
-        t.memos.push({ id: 'm' + w.nextId++, t: w.now, other: p.id, kind: 'agreement', text: `You borrowed $1,000 from him at ${Math.round(pos.rate * 100)}% a week.` });
-        lines.push(vsay(w, t, p, 'loan_yes'));
-        return stay('business', 25);
-      }
-      lines.push(vsay(w, t, p, 'loan_counter', { X: '$1,000', Y: money(pos.can) }));
-      c.ctx.deal = { kind: 'loan', ask: 1000, offer: pos.can, rate: pos.rate };
-      c.ctx.follow = [
-        { code: 'deal:take', label: `Take the ${money(pos.can)}`, hint: `${Math.round(pos.rate * 100)}% a week. He’ll want it back on time.`, big: true },
-        { code: 'deal:hold', label: 'Say you need the full thousand', hint: 'He may not like being pushed.' },
-        { code: 'deal:drop', label: 'Forget it' },
-      ];
-      return stay('follow', 20);
+      lines.push(`You ask ${t.name.split(' ')[0]} for ${money(s.terms?.amt ?? 1000)}.`);
+      lines.push(...playerMove(w, p, s.id, 'ask').lines);
+      return { lines, minutes: 25, convo: { id: c.id, node: 'root', ctx: c.ctx } };
     }
     case 'offer_loan': {
       const b = ownerBiz(w, t.id)!;
@@ -2045,7 +2056,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
         lines.push(`${t.name} says nothing for a while. “All right. It was me. I’d sooner you heard it from me than from the street.”`);
         tweak(0.02);
       } else {
-        lines.push(`${t.name}: “You’re pushing, Marino. I said what I said.”`);
+        lines.push(`${t.name}: “You’re pushing, ${addr(w, t, p)}. I said what I said.”`);
         r.grudge = clamp(r.grudge + 0.04);
         tweak(-0.03, 0, -0.02);
       }

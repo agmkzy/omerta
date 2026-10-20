@@ -12,10 +12,12 @@ import { begin as beginGoal, goalsOf, priceOf } from './goals';
 import { addEnc } from './encounters';
 import { Business, Character, DAY, Debt, Enc, Fact, FactKind, Id, Situation, SitKind, WEEK, World } from './types';
 
-export const SIT = { on: true, cap: { open: 30, asks: 70, closed: 60, hist: 8, claims: 3, cons: 5 } };
+export const SIT = { on: true, cap: { open: 30, asks: 70, climbs: 10, own: { ask: 70, climb: 10, rivalry: 14, arrest: 10, revenge: 12 } as Partial<Record<SitKind, number>>, closedOwn: 40, closed: 60, hist: 8, claims: 3, cons: 5 } };
 const first = (c: Character) => c.name.split(' ')[0];
 const P = (w: World) => w.chars[w.playerId ?? ''];
 export const isOpen = (s: Situation) => s.stage !== 'resolved';
+// what counts as the player having heard of something serious, among the V89 kinds
+const SERIOUS = new Set<string>(['beating', 'murder', 'arrest', 'informant', 'raid']);
 const sits = (w: World) => (w.situations ??= []);
 const pace = (w: World) => (w.sitpace ??= { lastMajor: -1e9, lastVisible: -1e9, weekVis: 0, wk: 0 });
 export const sitsFor = (w: World, id: Id) => sits(w).filter((s) => isOpen(s) && (s.who === id || (s.parties ?? []).some((p) => p.id === id)));
@@ -28,7 +30,7 @@ const bump = (w: World, k: string, n = 1) => { const st = (pace(w).stats ??= {})
 // Serious matters do not pile up: only so many at once, and not hard on the heels of the last one that reached the player.
 function allowMajor(w: World, touchesPlayer: boolean): boolean {
   const sp = pace(w);
-  if (sits(w).filter((s) => isOpen(s) && (s.sev ?? 0) >= 0.5).length >= 5) return false;
+  if (sits(w).filter((s) => isOpen(s) && (s.sev ?? 0) >= 0.5 && !(s.kind && SIT.cap.own[s.kind] !== undefined)).length >= 5) return false;
   if (w.now - sp.lastMajor < 3 * DAY) return false;
   if (touchesPlayer && w.now - sp.lastVisible < 7 * DAY) return false;
   return true;
@@ -41,8 +43,13 @@ export function spawn(w: World, kind: SitKind, key: string, who: Id, o: Init): S
   const mirror = kind === 'dispute' || kind === 'crew'; // mirrors of records that exist elsewhere follow their source, not a cooling-off period
   if (!mirror && (w.sitcool?.[key] ?? 0) > w.now) return undefined;
   // asks (V89) are many and small; they have their own ceiling and do not crowd out the other kinds
-  if (kind === 'ask' ? l.filter((x) => isOpen(x) && x.kind === 'ask').length >= SIT.cap.asks : !mirror && l.filter((x) => isOpen(x) && x.kind !== 'dispute' && x.kind !== 'crew' && x.kind !== 'ask').length >= SIT.cap.open) return undefined;
-  const major = o.sev >= 0.5;
+  // (ambitions too: a man wanting to rise is common, and is counted among his kind)
+  // (V89: so do the matters that grow from events, bad blood and ambition; none of them crowds out the V75 kinds)
+  const own = (k?: SitKind) => !!k && SIT.cap.own[k] !== undefined;
+  // (whatever the player himself starts always has room: the ceilings are for the world's own business)
+  const mine = o.parties.some((x) => x.id === w.playerId) && who === w.playerId;
+  if (own(kind) ? !mine && l.filter((x) => isOpen(x) && x.kind === kind).length >= SIT.cap.own[kind]! : !mirror && l.filter((x) => isOpen(x) && x.kind !== 'dispute' && x.kind !== 'crew' && !own(x.kind)).length >= SIT.cap.open) return undefined;
+  const major = o.sev >= 0.5 && !own(kind); // (the V89 kinds are paced by their own ceilings, not by the V75 pacing)
   if (major && !allowMajor(w, o.parties.some((p) => p.id === w.playerId))) return undefined;
   const s: Situation = { id: 's' + w.nextId++, kind, who, since: w.now, weeks: 0, stage: 'brewing', cause: o.cause, knows: false, told: false, parties: o.parties, phase: o.phase, sev: Math.round(o.sev * 100) / 100, next: o.next, key, hist: [], k: {}, claims: [], cons: [] };
   if (o.orgs?.length) s.orgs = o.orgs;
@@ -55,8 +62,12 @@ export function spawn(w: World, kind: SitKind, key: string, who: Id, o: Init): S
   l.push(s);
   bump(w, 'start.' + kind);
   // keep the record bounded: closed ones go first
-  const closed = l.filter((x) => !isOpen(x));
-  if (closed.length > SIT.cap.closed) { const drop = new Set(closed.slice(0, closed.length - SIT.cap.closed).map((x) => x.id)); w.situations = l.filter((x) => !drop.has(x.id)); }
+  // (asks are many and short; they are pruned among themselves, so they never push older situations out of the record)
+  const drop = new Set<Id>();
+  const ownK = (x: Situation) => !!x.kind && SIT.cap.own[x.kind] !== undefined;
+  for (const [pool, cap] of [[l.filter((x) => !isOpen(x) && x.kind === 'ask'), SIT.cap.closedOwn], [l.filter((x) => !isOpen(x) && ownK(x) && x.kind !== 'ask'), SIT.cap.closedOwn], [l.filter((x) => !isOpen(x) && !ownK(x)), SIT.cap.closed]] as [Situation[], number][])
+    if (pool.length > cap) for (const x of pool.slice(0, pool.length - cap)) drop.add(x.id);
+  if (drop.size) w.situations = l.filter((x) => !drop.has(x.id));
   return s;
 }
 export function know(w: World, s: Situation, id: Id, l: 1 | 2, via: string) {
@@ -70,7 +81,9 @@ export function tell(w: World, s: Situation, text: string, o: { kind?: FactKind;
   (s.hist ??= []).push({ t: w.now, text });
   if (s.hist.length > SIT.cap.hist) s.hist.splice(0, s.hist.length - SIT.cap.hist);
   const p = P(w);
-  if (p?.known[f.id]) { const sp = pace(w); sp.weekVis++; sp.lastVisible = w.now; s.knows = true; }
+  // (the small doings of the V89 kinds, a slight or a word in an ear, do not count as the player having heard of something serious)
+  const small = !!s.kind && SIT.cap.own[s.kind] !== undefined && (f.minor || !SERIOUS.has(f.kind));
+  if (p?.known[f.id]) { s.knows = true; if (!small) { const sp = pace(w); sp.weekVis++; sp.lastVisible = w.now; } }
   return f;
 }
 export function claim(w: World, s: Situation, by: Id, text: string, honest: boolean) {
@@ -84,6 +97,10 @@ export function closeSit(w: World, s: Situation, out: string, cons: string[] = [
   s.cons = [...(s.cons ?? []), ...cons].slice(-SIT.cap.cons);
   delete s.ask; delete s.next;
   if (s.key) (w.sitcool ??= {})[s.key] = w.now + coolWeeks * WEEK;
+  // V89: a matter opened inside a larger one (an ask for permission inside a revenge, say) reports back to it, and the larger one
+  // moves on at its next step with the answer in hand
+  const par = s.m?.parent ? sits(w).find((x) => x.id === s.m!.parent) : undefined;
+  if (par && isOpen(par)) { par.m = { ...(par.m ?? {}), ['child:' + (s.ak ?? s.kind)]: out }; par.next = Math.min(par.next ?? w.now + DAY, w.now + DAY); }
   bump(w, 'end.' + (s.kind ?? 'x')); bump(w, 'out.' + (s.kind ?? 'x') + '.' + out);
 }
 const phase = (s: Situation, ph: string, days: number, w: World) => { s.phase = ph; s.next = w.now + Math.round(days * DAY); if (s.stage === 'brewing') s.stage = 'handling'; };
@@ -871,7 +888,8 @@ export function sitWeek(w: World) {
   sp.weeks = (sp.weeks ?? 0) + 1;
   // anything about a situation that reached the player this week, by whatever road (a leak, the crew, the club, ordinary rumour)
   const pl = P(w);
-  if (pl) { const seen = Object.keys(pl.known).filter((id) => w.facts[id]?.story?.startsWith('sit:') && pl.known[id].t > w.now - WEEK).length; sp.weekVis = Math.max(sp.weekVis, seen); if (seen) sp.lastVisible = Math.max(sp.lastVisible, w.now); }
+  const smallK = new Set(sits(w).filter((s) => s.kind && SIT.cap.own[s.kind] !== undefined).map((s) => 'sit:' + s.id));
+  if (pl) { const seen = Object.keys(pl.known).filter((id) => { const f = w.facts[id]; return f?.story?.startsWith('sit:') && pl.known[id].t > w.now - WEEK && !((f.minor || !SERIOUS.has(f.kind)) && smallK.has(f.story)); }).length; sp.weekVis = Math.max(sp.weekVis, seen); if (seen) sp.lastVisible = Math.max(sp.lastVisible, w.now); }
   if (sp.weekVis === 0) sp.quiet = (sp.quiet ?? 0) + 1;
   if (sp.weekVis >= 3) sp.busy = (sp.busy ?? 0) + 1;
   sp.weekVis = 0;
@@ -909,10 +927,11 @@ export function sitIssues(w: World): string[] {
     if (s.link?.griev) { const g = w.grievances.find((x) => x.id === s.link!.griev); if (g && (g.status === 'open') !== isOpen(s) && w.now - Number(s.m?.chk ?? s.since) > 3 * DAY) out.push(`situation ${s.id}: ${isOpen(s) ? 'open' : 'closed'} but grievance ${g.id} is ${g.status}`); }
     if (s.link?.debt) { const d = w.debts.find((x) => x.id === s.link!.debt); if (d && d.status !== 'active' && isOpen(s) && w.now - (d.paid ? s.since : s.since) > 10 * DAY) out.push(`situation ${s.id}: open but debt is ${d.status}`); }
   }
-  const nonMirror = l.filter((x) => isOpen(x) && x.kind !== 'dispute' && x.kind !== 'crew' && x.kind !== 'ask').length;
+  const nonMirror = l.filter((x) => isOpen(x) && x.kind !== 'dispute' && x.kind !== 'crew' && !(x.kind && SIT.cap.own[x.kind] !== undefined)).length;
   if (nonMirror > SIT.cap.open) out.push(`${nonMirror} open situations`);
-  const asks = l.filter((x) => isOpen(x) && x.kind === 'ask').length; // V89: asks have a ceiling of their own
+  const asks = l.filter((x) => isOpen(x) && x.kind === 'ask' && x.who !== w.playerId).length; // V89: asks have a ceiling of their own
   if (asks > SIT.cap.asks) out.push(`${asks} open asks`);
+  for (const [k, cap] of Object.entries(SIT.cap.own)) { const n = l.filter((x) => isOpen(x) && x.kind === k && x.who !== w.playerId).length; if (n > cap!) out.push(`${n} open ${k}`); }
   // one dispute, one story: a quarrel cannot be open in one place and resolved in another
   for (const d of w.disputes ?? []) if ((d.status === 'open' || d.status === 'violated') && w.now - d.created > 10 * DAY && !l.some((s) => s.link?.dispute === d.id) && live(w, d.a) && live(w, d.b) && d.created + 3 * DAY < (w.sitpace?.sync ?? -1e9) && Math.max(d.created, ...d.history.map((h) => h.t)) < (w.sitpace?.sync ?? -1e9)) out.push(`dispute ${d.id}: open with no matching situation (${d.status}, created d${Math.floor(d.created / DAY)}, synced d${Math.floor((w.sitpace?.sync ?? 0) / DAY)}, now d${Math.floor(w.now / DAY)}, ${d.a === w.playerId || d.b === w.playerId ? 'player' : 'npcs'})`);
   return out;
