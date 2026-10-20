@@ -3,7 +3,7 @@ import type { Character, World } from '../types';
 import { owedOf, stakesOf } from '../econ';
 import { grudgeWord } from '../actions';
 import { RULINGS, SOURCE_LABEL, effectiveRate } from '../books';
-import { bgLabel } from '../background';
+import { bgLabel, bgOf } from '../background';
 import { repLines } from '../crewlife';
 import { careerLines, recommendable, recruitable, rewardOptions, standingTable } from '../career';
 import { factText, famName, fmtTime, money, ownerBiz, shortTime } from '../core';
@@ -585,7 +585,7 @@ export function lifeTab(): string {
   if (S.lifeSub === 'me') {
     out += `<div class="pers">${avatar(p)}<div><h1>${esc(p.name)}</h1><div class="sub">${esc(p.rank)} &middot; ${esc(famName(w, p))} &middot; ${esc(p.district)}</div></div></div>`;
     out += statsCard() + `<div class="tags">${traitTags(p)}</div><div class="card"><h2>What you’re good at</h2>${skillBars(p)}</div>`;
-    out += `<div class="card"><h2>Your standing</h2>${p.bg ? `<p class="muted">${esc(bgLabel(p.bg) ?? '')}.</p>` : ''}${careerLines(w, p).map((l) => `<p>${lk(l)}</p>`).join('')}</div>`;
+    out += `<div class="card"><h2>Your standing</h2>${p.bg && bgLabel(p.bg) ? `<p class="muted"><b>${esc(bgLabel(p.bg)!)}.</b>${bgOf(p.bg) ? ' ' + esc(bgOf(p.bg)!.blurb) : ''}</p>` : ''}${careerLines(w, p).map((l) => `<p>${lk(l)}</p>`).join('')}</div>`;
     out += `<div class="card"><h2>What they say about you<small>don’t take it personally</small></h2>${repLines(w, p).map((l) => `<p class="say">${esc(l)}</p>`).join('')}</div>`;
     out += p.job ? `<button class="btn" data-a="dayjob:">Your job: ${esc(p.job.kind)}</button>` : `<button class="btn" data-a="dayjob:">Find legitimate work</button>`;
     const L = w.life;
