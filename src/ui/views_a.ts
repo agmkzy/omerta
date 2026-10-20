@@ -214,12 +214,14 @@ export function personView(id: Id): string {
   out += `<div class="tags"><span class="tag ${st.dot}">${st.word}</span>${kn ? traitTags(c) : ''}${kn && c.problem?.revealed ? `<span class="tag amber">${esc(PROBLEM_LABEL[c.problem.kind])}</span>` : ''}${c.prospect ? '<span class="tag blue">looking for a start</span>' : ''}</div>`;
 
   if (kn && !isMe) for (const t of personTexture(w, p, c)) out += `<div class="callout">${esc(t)}</div>`;
+  const headEnd = out.length;
   if (kn && !isMe) {
     out += `<div class="card"><h2>How he sees you</h2>${(() => {
       const wd = relWords(c, p);
       return meterRow('Trust', wd.trust, r?.trust ?? 0.05) + meterRow('Respect', wd.respect, r?.respect ?? 0.05, 'brass') + meterRow('Grudge', wd.grudge, r?.grudge ?? 0.03, 'red');
     })()}</div>`;
   }
+  const infoStart = out.length;
   if (kn) {
     out += `<div class="card"><h2>Where he fits</h2><ul class="rows">`;
     if (boss) out += `<li><span>Answers to</span><span class="v">${pl(boss)}</span></li>`;
@@ -257,6 +259,7 @@ export function personView(id: Id): string {
     const facts = Object.entries(p.known).filter(([fid]) => w.facts[fid] && (w.facts[fid].actor === c.id || w.facts[fid].victim === c.id) && (!w.facts[fid].minor || w.facts[fid].kind === 'trouble')).sort((a, b) => w.facts[b[0]].t - w.facts[a[0]].t).slice(0, 6);
     out += `<div class="card"><h2>What you know</h2>${facts.length ? facts.map(([fid, k]) => `<div class="note"><a href="#" class="nm" data-a="fact:${fid}" style="text-decoration:none">${lk(factText(w.facts[fid], k.knowsActor))}</a><div class="src">${esc(shortTime(w.facts[fid].t))}</div></div>`).join('') : '<p class="muted">Nothing worth repeating.</p>'}</div>`;
   }
+  const infoEnd = out.length;
 
   const k = kinOf(w, c.id);
   if (k && c.alive) out += `<div class="callout info">${kinWord(k)}. ${warmthWord(k.warmth)}. Last seen ${Math.max(0, Math.floor((w.now - k.lastSeen) / DAY))} days ago.</div><div class="row2"><button class="btn primary" data-a="visit:${c.id}">Spend an hour</button><button class="btn" data-a="tab:life">Your life</button></div>`;
@@ -275,7 +278,9 @@ export function personView(id: Id): string {
   }
   if (isMe) out += `<button class="btn" data-a="tab:life">Your life</button>`;
   void arch;
-  return out;
+  // V88: who he is, then what you can do with him, then how he sees you. His place, your notes and what you know go beside.
+  toSide(out.slice(infoStart, infoEnd));
+  return out.slice(0, headEnd) + `<div class="g-acts">${out.slice(infoEnd)}</div>` + out.slice(headEnd, infoStart);
 }
 
 export function encView(id: string, lines: string[]): string {

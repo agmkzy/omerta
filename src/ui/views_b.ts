@@ -320,7 +320,8 @@ export function recruitView(): string {
   const ps = prospects(w, p);
   let out = back() + `<h2 class="sect">Looking for a start</h2><p class="muted pad">Taking a man on costs ${money(RECRUIT_COST)}, and what he does goes against your name.</p>`;
   if (!ps.length) return out + '<p class="muted pad">Nobody is lingering with a question. For now.</p>';
-  out += ps.map(({ c, note, vouch }) => `<div class="card"><div class="pers" style="margin:0">${avatar(c)}<div><b>${pl(c)}</b><div class="sub">${esc(c.district)} &middot; ${note} &middot; ${esc(skillLine(c))}</div></div></div>${vouch ? '<p class="muted">Ambitious. He’ll want more than a corner.</p>' : ''}<button class="btn primary" data-a="hire:${c.id}">Take him on</button></div>`).join('');
+  // V88: one row per man: his face, his name and what he is, and the offer.
+  out += `<div class="g-people">${ps.map(({ c, note, vouch }) => `<div class="g-person">${avatar(c)}<div class="g-person__t"><b>${pl(c)}</b><span>${esc(c.district)} &middot; ${note} &middot; ${esc(skillLine(c))}</span>${vouch ? '<span class="muted">Ambitious. He’ll want more than a corner.</span>' : ''}</div><button class="mini g-person__go" data-a="hire:${c.id}">Take him on</button></div>`).join('')}</div>`;
   return out;
 }
 

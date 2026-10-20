@@ -135,3 +135,14 @@ an appropriate place; the "After" column of the verification table at the end re
 | `way` | views_c.ts:cardOf | `return go({ t: 'way', id: v, lines: [] });` |
 | `wed` | views_b.ts:kids | `return pass(480, wedding(w, P()), { t: 'tab', name: 'life' });` |
 | `who` | views_b.ts:w | `return go({ t: 'sendorder', id: args[0], who: args[1] });` |
+
+## Verification after the V88 restructure (in progress)
+
+- Static check: all 129 actions above are still emitted by some screen (the seven built dynamically are unchanged in
+  `needs()` and `ui/sunday.ts`); one new action, `career:` (opens Life > Career). Nothing is emitted that the handler
+  doesn't know.
+- Moved, not removed: the Today tiles "Your crew" and "Rackets" (the bottom tabs and the desktop rail open them);
+  "Next in line" (Family → Life > Career, with a link from Family); ambition, standing, powers and milestones (Today →
+  Life > Career, with a summary card on Today); Stories (bottom tab on phones → a link on Today; still in the desktop rail).
+- Browser crawl (phone 375×812 and desktop 1440×900): 34 screen types opened, including talk, encounters, meetings,
+  jobs, rackets, the family tree, businesses, people, the Herald and blackjack; no errors, no horizontal overflow.
