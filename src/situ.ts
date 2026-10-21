@@ -52,7 +52,7 @@ export function spawn(w: World, kind: SitKind, key: string, who: Id, o: Init): S
   // must not crowd them out, nor they the others)
   const plan = kind === 'ask' && !!o.m?.goal;
   if (plan) { if (l.filter((x) => isOpen(x) && x.kind === 'ask' && x.m?.goal).length >= SIT.cap.plans) return undefined; }
-  else if (own(kind) ? !mine && l.filter((x) => isOpen(x) && x.kind === kind && !x.m?.goal).length >= SIT.cap.own[kind]! : !mirror && l.filter((x) => isOpen(x) && x.kind !== 'dispute' && x.kind !== 'crew' && !own(x.kind)).length >= SIT.cap.open) return undefined;
+  else if (own(kind) ? !mine && l.filter((x) => isOpen(x) && x.kind === kind && !(x.kind === 'ask' && x.m?.goal)).length >= SIT.cap.own[kind]! : !mirror && l.filter((x) => isOpen(x) && x.kind !== 'dispute' && x.kind !== 'crew' && !own(x.kind)).length >= SIT.cap.open) return undefined;
   const major = o.sev >= 0.5 && !own(kind); // (the V89 kinds are paced by their own ceilings, not by the V75 pacing)
   if (major && !allowMajor(w, o.parties.some((p) => p.id === w.playerId))) return undefined;
   const s: Situation = { id: 's' + w.nextId++, kind, who, since: w.now, weeks: 0, stage: 'brewing', cause: o.cause, knows: false, told: false, parties: o.parties, phase: o.phase, sev: Math.round(o.sev * 100) / 100, next: o.next, key, hist: [], k: {}, claims: [], cons: [] };

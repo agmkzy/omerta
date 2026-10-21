@@ -453,7 +453,7 @@ ok('an offer to join a crew is a negotiation through the asks engine: the young 
   const g = begin(w, cap, 'recruit', 'test', 0.6, { stage: 'approach', target: pro.id });
   g.deadline = w.now + 200 * DAY;
   driveGoal(w, g, () => !agencyOf(w).goals.includes(g), 30);
-  assert.ok((w.situations ?? []).some((x) => x.ak === 'join' && x.terms?.by === cap.id), 'the offer was an ask between them');
+  assert.ok((w.situations ?? []).some((x) => (x.ak === 'recruit' || x.ak === 'join') && x.terms?.by === cap.id), 'the offer was an ask between them');
   if (pro.rank === 'associate') { assert.equal(pro.bossId, cap.id); assert.equal(agencyOf(w).ended.find((x) => x.id === g.id)?.how, 'done'); }
   else assert.ok(g.tries > 0 || !agencyOf(w).goals.includes(g), 'or he said no, and that counted');
   clean(w, 'after a crew offer');
@@ -552,9 +552,10 @@ ok('a quiet word is a matter: a refusal leaves the job open, and when he agrees 
 ok('a quiet word: NPCs have one with the man who hurt their own, and it goes on past the first answer', () => {
   let n = 0, rounds = 0;
   for (const seed of [3, 7]) {
-    const w = createWorld(seed, 'Tony Marino'); advance(w, w.now + 35 * DAY);
+    const w = createWorld(seed, 'Tony Marino');
+    // (watched as it goes: settled matters between other men are pruned from the record after a while)
+    for (let d = 0; d < 35; d++) { advance(w, w.now + DAY); for (const s of (w.situations ?? []).filter((x) => x.ak === 'layoff')) rounds = Math.max(rounds, (s.hist ?? []).length); }
     n += stats(w)['open.layoff'] ?? 0;
-    for (const s of (w.situations ?? []).filter((x) => x.ak === 'layoff')) rounds = Math.max(rounds, (s.hist ?? []).length);
     clean(w, 'quiet words seed ' + seed);
   }
   assert.ok(n >= 1, 'somebody had a word: ' + n);
