@@ -1,5 +1,6 @@
 // Every man has his own line of work. Associates and soldiers choose a hustle from what they are good at, what they can afford,
 // what the neighbourhood already has too much of and how much heat they can stand. It pays, costs money, goes wrong, and feeds the weekly envelope.
+import { temper } from './temper';
 import { addFact, clamp, earn, money, recordCareer } from './core';
 import { askToInvest } from './reports';
 import { Character, DAY, Hustle, HustleKind, Skill, World } from './types';
@@ -39,7 +40,7 @@ function choose(w: World, c: Character): HustleKind {
     if (c.cash < d.stake * 0.7 && d.stake > 0) continue;
     if (k === 'loans' && c.cash < 400) continue;
     const heatPen = 1 - clamp(c.heat, 0, 1) * d.risk * 8;
-    const cautionPen = 1 - c.traits.caution * d.risk * 6;
+    const cautionPen = 1 - temper(c).caution * d.risk * 6;
     const want = (k === 'shakedown' || k === 'cars') ? 0.7 + c.traits.violence * 0.6 : (k === 'bookie' || k === 'loans') ? 0.7 + c.traits.greed * 0.5 : 1;
     const sc = netExpected(w, c, k, 1) * heatPen * cautionPen * want * w.rng.range(0.85, 1.15);
     if (sc > bs) { bs = sc; best = k; }
@@ -88,7 +89,7 @@ export function hustleWeek(w: World) {
     c.books.expenses += costs;
     h.gross = Math.round(gross); h.costs = costs; h.net = net; h.total += net; h.cause = cause;
     // Being on the street has a price.
-    if (rng.chance(d.risk * (1 + c.heat) * (1.2 - c.traits.caution * 0.6) * (dir && dir.until > w.now ? (dir.kind === 'push' ? 1.5 : 0.4) : 1))) {
+    if (rng.chance(d.risk * (1 + c.heat) * (1.2 - temper(c).caution * 0.6) * (dir && dir.until > w.now ? (dir.kind === 'push' ? 1.5 : 0.4) : 1))) {
       c.heat = clamp(c.heat + 0.12, 0, 1.5);
       if (rng.chance(0.35)) {
         c.jailedUntil = w.now + rng.int(2, 9) * DAY;

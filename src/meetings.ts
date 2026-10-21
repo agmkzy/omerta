@@ -1,6 +1,7 @@
 // Meetings: crew meetings, being called in over the money, family meetings, sit-downs and social gatherings.
 // A meeting is a short queue of agenda items. What comes up is built from the world as it actually is:
 // real complaints, real numbers, real facts. What you decide is written back into the world.
+import { temper } from './temper';
 import { noteDeal } from './orgs';
 import { inductPlayer, sponsorOf, turnedDown } from './career';
 import { RULINGS, effectiveRate, influence, react, rule, subordinates } from './books';
@@ -636,7 +637,7 @@ export function choose(w: World, p: Character, m: Meeting, code: string): string
       if (c0 === 'approve') {
         const kind = it.data.kind as 'boost' | 'burgle' | 'scam';
         const job = mkJob(w, { kind, title: `${who.name}'s idea: ${kind === 'boost' ? 'cars' : kind === 'burgle' ? 'burgle ' + (it.data.biz ? w.biz[it.data.biz].name : 'a shop') : 'a con'}`, brief: it.text[0], giver: null, via: 'scheme', assignee: who.id, biz: it.data.biz, target: it.data.target, pay: 0, status: 'active', days: 5 });
-        job.orders = who.traits.violence > 0.6 ? 'hard' : 'quiet';
+        job.orders = temper(who).volatility > 0.6 ? 'hard' : 'quiet';
         job.due = w.now + w.rng.int(1, 3) * DAY;
         r.trust = clamp(r.trust + 0.04);
         lines.push(`${who.name} nods. He’ll see to it and report back.`);
@@ -675,7 +676,7 @@ export function choose(w: World, p: Character, m: Meeting, code: string): string
         rb.trust = clamp(rb.trust - 0.02);
         lines.push(`"One week," ${boss.name} says. "Not a day more."`);
       } else if (c0 === 'deny') {
-        const pr = clamp(0.5 - boss.traits.caution * 0.4 - fl.n * 0.1 + p.traits.sociability * 0.3, 0.1, 0.8);
+        const pr = clamp(0.5 - temper(boss).caution * 0.4 - fl.n * 0.1 + p.traits.sociability * 0.3, 0.1, 0.8);
         if (w.rng.chance(pr)) {
           clear();
           lines.push(`${boss.name} studies you for a long time. "Fine. I’ll look again."`);
@@ -688,7 +689,7 @@ export function choose(w: World, p: Character, m: Meeting, code: string): string
         }
       } else if (c0 === 'blame') {
         const sub = w.chars[arg];
-        const pr = clamp(0.45 - boss.traits.caution * 0.4 + p.traits.sociability * 0.2, 0.1, 0.7);
+        const pr = clamp(0.45 - temper(boss).caution * 0.4 + p.traits.sociability * 0.2, 0.1, 0.7);
         if (w.rng.chance(pr)) {
           clear();
           sub.books.arrears += amt;
@@ -737,11 +738,11 @@ export function choose(w: World, p: Character, m: Meeting, code: string): string
       } else if (c0 === 'propose') {
         const f = w.facts[arg];
         const t = w.chars[f.actor!];
-        const pr = clamp(0.1 + inf * 0.8 + rel(boss, p.id).trust * 0.3 - boss.traits.caution * 0.2, 0.05, 0.9);
+        const pr = clamp(0.1 + inf * 0.8 + rel(boss, p.id).trust * 0.3 - temper(boss).caution * 0.2, 0.05, 0.9);
         if (w.rng.chance(pr)) {
           mkJob(w, { kind: 'handle', title: `${boss.name} wants ${t.name} dealt with`, brief: `You made the case in front of the family: "${f.text}" ${boss.name} agreed. It’s yours to handle.`, giver: boss.id, via: 'boss', assignee: p.id, target: t.id, cause: f.id, pay: 400 });
           p.standing = clamp(p.standing + 2, 0, 100);
-          lines.push(`The table goes quiet. ${boss.name} nods. "Do it." It’s in your inbox.`);
+          lines.push(`The table goes quiet. ${boss.name} nods. "Do it." The work is yours.`);
         } else {
           p.standing = clamp(p.standing - 1, 0, 100);
           lines.push(`${boss.name} lets the silence sit. "Not now." Somebody across the table smirks.`);

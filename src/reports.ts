@@ -1,4 +1,5 @@
 // What reaches the player, and how. The world records everything; each man decides what to tell you, and the game decides how loudly to say it.
+import { temper } from './temper';
 import { addEnc } from './encounters';
 import { addFact, clamp, learn, money, rel } from './core';
 import { Character, DAY, Enc, Fact, Id, World } from './types';
@@ -8,10 +9,10 @@ export const STYLE_WORD: Record<Style, string> = { open: 'tells you things', ala
 
 export function styleOf(c: Character): Style {
   const T = c.traits;
-  if (T.greed > 0.7 || (c.problem && !c.problem.revealed && T.courage < 0.5)) return 'hider';
-  if (T.caution > 0.68 && T.sociability < 0.5) return 'cautious';
-  if (T.caution > 0.6) return 'alarmist';
-  if (T.courage > 0.62 && T.ambition > 0.5) return 'solo';
+  if (T.greed > 0.7 || (c.problem && !c.problem.revealed && temper(c).courage < 0.5)) return 'hider';
+  if (temper(c).caution > 0.68 && T.sociability < 0.5) return 'cautious';
+  if (temper(c).caution > 0.6) return 'alarmist';
+  if (temper(c).courage > 0.62 && temper(c).pride > 0.5) return 'solo';
   return 'open';
 }
 

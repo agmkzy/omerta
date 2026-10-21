@@ -1,4 +1,5 @@
 import { skimNoticed } from './situ';
+import { temper, viewOf } from './temper';
 import { move as askMove, rateAsk } from './asks';
 import { say as vsay } from './voicesheet';
 // Kick-ups and financial records.
@@ -198,7 +199,9 @@ export function settleOne(w: World, c: Character) {
   // Skimming is a deliberate, uncommon choice: it takes real pressure on top of a greedy nature.
   const pressure = (c.cash < LIVING[c.rank] * 1.5 ? 0.12 : 0) + (rate > 0.25 ? 0.12 : 0) + pushed * 0.6 + ((c.cooldown.friction ?? 0) > w.now ? 0.04 : 0);
   const wantPush = c.want?.kind === 'rich' ? 0.06 : c.want?.kind === 'gamble' ? 0.08 : c.want?.kind === 'independent' ? 0.03 : 0;
-  const pSkim = clamp((T.greed > 0.6 ? (T.greed - 0.6) * 0.3 : 0) + wantPush + pressure - trust * 0.3 - T.caution * 0.12, 0, 0.5);
+  // (V90: a man who only fears the man he hands up to, and doesn't respect him, does what he can behind his back)
+  const vb = boss ? viewOf(w, c, boss) : undefined;
+  const pSkim = clamp((T.greed > 0.6 ? (T.greed - 0.6) * 0.3 : 0) + wantPush + pressure - trust * 0.3 - temper(c).caution * 0.12 + (vb ? Math.max(0, vb.fear - vb.respect) * 0.1 : 0), 0, 0.5);
   // Skimming is a decision, not a weekly dice roll: a man decides to hold some back, keeps doing it for a few weeks, then stops or is caught.
   let skim = 0;
   if (b.skim && (b.skim.until <= w.now || pSkim < 0.02)) delete b.skim;
@@ -285,7 +288,7 @@ export function settleOne(w: World, c: Character) {
   const gap = jailed ? 0 : Math.max(0, expected - due);
   if (gap > Math.max(40, expected * 0.15)) {
     const fl = (boss.books.flags[c.id] ??= { amt: 0, n: 0, last: 0 });
-    const p = clamp(0.3 + boss.traits.caution * 0.4 + (gap / Math.max(1, expected)) * 0.5, 0.15, 0.95);
+    const p = clamp(0.3 + temper(boss).caution * 0.4 + (gap / Math.max(1, expected)) * 0.5, 0.15, 0.95);
     if (rng.chance(p)) {
       fl.amt += gap;
       fl.n++;
@@ -310,7 +313,7 @@ export function settleOne(w: World, c: Character) {
   } else if (rate < BASE_RATE[c.rank] - 0.01) r.trust = clamp(r.trust + 0.02);
 
   // Superiors sometimes go through a man's books and find the side business.
-  if (b.side && !b.sideKnown && rng.chance(0.06 * (boss.traits.caution + 0.5))) discoverSide(w, boss, c);
+  if (b.side && !b.sideKnown && rng.chance(0.06 * (temper(boss).caution + 0.5))) discoverSide(w, boss, c);
 }
 
 // ----------------------------------------------------------------------------------------------- talking about the share
@@ -413,7 +416,7 @@ export function react(w: World, boss: Character, c: Character, fl: { amt: number
 
 export function discipline(w: World, boss: Character, c: Character, cause: Id, amt: number) {
   const protectedShops = Object.values(w.biz).filter((s) => s.protection?.collectorId === c.id);
-  if (boss.traits.violence > 0.55 && c.hurtUntil <= w.now) {
+  if (temper(boss).volatility > 0.55 && c.hurtUntil <= w.now) {
     c.hurtUntil = w.now + 3 * DAYS;
     boss.heat = clamp(boss.heat + 0.1, 0, 1.5);
     rel(c, boss.id).grudge = clamp(rel(c, boss.id).grudge + 0.25);
@@ -483,7 +486,7 @@ export function auditMember(w: World, p: Character, sub: Character): { minutes: 
   const minutes = travelTime(p.district, sub.district) + 60;
   p.district = sub.district;
   const r = rel(sub, p.id);
-  const pr = clamp(0.5 + p.traits.caution * 0.25 - sub.traits.caution * 0.35 + r.trust * 0.2, 0.15, 0.9);
+  const pr = clamp(0.5 + p.traits.caution * 0.25 - temper(sub).caution * 0.35 + r.trust * 0.2, 0.15, 0.9);
   if (!w.rng.chance(pr)) {
     r.trust = clamp(r.trust - 0.05);
     lines.push(`${sub.name} is vague and keeps changing the subject. You leave knowing nothing you could prove, and he knows you were checking.`);
@@ -582,7 +585,7 @@ export function rule(w: World, p: Character, sub: Character, code: string): { mi
 export function checkBooks(w: World, p: Character, sub: Character): string[] {
   const s = statement(w, sub);
   const r = rel(sub, p.id);
-  const pr = clamp(0.62 + p.traits.caution * 0.2 - sub.traits.caution * 0.3 + r.trust * 0.15, 0.2, 0.92);
+  const pr = clamp(0.62 + p.traits.caution * 0.2 - temper(sub).caution * 0.3 + r.trust * 0.15, 0.2, 0.92);
   if (!w.rng.chance(pr)) { r.trust = clamp(r.trust - 0.02); return [`${sub.name.split(' ')[0]} is vague about his numbers and watches you read them. You learn nothing you could prove.`]; }
   const lines: string[] = [];
   lines.push(`He passed up ${money(s.handed)} of ${money(s.due)} due${s.carry ? ` (${money(s.carry)} of that was left over from before)` : ''}.`);

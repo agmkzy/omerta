@@ -34,6 +34,7 @@ export interface Rel {
   affection: number;
   grudge: number;
   lastMet: number;
+  fear?: number; // V90: how much he fears the other man, kept apart from respect (temper.ts); absent means none
 }
 
 // A character only knows a fact if it is in their `known` map.
@@ -108,6 +109,7 @@ export interface Character {
   bg?: string; // the player's background
   insight?: Record<Id, string[]>; // what the player has worked out about people ('want', 'tie:<id>', 'loan:<id>', 'leaving')
   rep?: { kept: number; broken: number; asked: number; ignored: number; favoured: Id | null }; // the player's record for keeping his word
+  conduct?: { threats?: number; force?: number; retribution?: number; deals?: number; generous?: number; forgave?: number; defied?: number; yielded?: number; lies?: number }; // V90: what the player has done that shows what kind of man he is (temper.ts)
   notes?: Record<Id, { tags: string[]; pin?: boolean }>; // your own contact book
   intro?: Record<Id, number>; // the people you have been introduced to, and when
   name: string;

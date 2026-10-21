@@ -1,4 +1,5 @@
 import { personTexture } from '../sitmoves';
+import { viewOf } from '../temper';
 import { clubOf, clubOpen, clubPresent } from '../clubdata';
 import { owedOf, perf, trade } from '../econ';
 import { waiting } from '../club';
@@ -217,7 +218,7 @@ function guideCard(): string {
   const steps: [string, string, boolean, string, string][] = [
     ['Show your face to ' + (boss?.name ?? 'your boss'), 'He is the man you answer to. Respect starts with turning up.', !!g['g:boss'], boss ? `talk:${boss.id}` : '', 'Go and find him'],
     ['Ask a man what’s on his mind', `Every man has his own worries. In a conversation, pick something under “On his mind”: his business, not yours.${peer && peer !== boss ? ` ${peer.name} is in the same crew as you.` : ''}`, tk, peer ? `talk:${peer.id}` : 'people:', peer ? `Talk to ${firstName(peer)}` : 'Find someone'],
-    ['Take someone aside at the club', 'Sit with a man at the social club. When something is on his mind, take him aside and talk it through properly.', !!g['g:aside'], 'place:club', 'Go to the club'],
+    ['Sit down with a man at the club', 'Sit with one of your own at the social club and talk. Ask what is on his mind, or what he makes of the others.', !!g['g:aside'], 'place:club', 'Go to the club'],
     protStep,
     ['Follow a story', 'Stories keeps every matter you know of, in the order you learned it, and what you can do about it. Open one.', !!g['g:story'], 'tab:stories', 'Open Stories'],
     ['Let a week go by', 'Hit Wait. The world moves while you do: men answer you, rackets pay, stories move on.', !!g['g:wait'] && w.now >= 7 * DAY, 'wait:', 'Let time pass'],
@@ -334,7 +335,8 @@ export function personView(id: Id): string {
   if (kn && !isMe) {
     out += `<div class="card"><h2>How he sees you</h2>${(() => {
       const wd = relWords(c, p);
-      return meterRow('Trust', wd.trust, r?.trust ?? 0.05) + meterRow('Respect', wd.respect, r?.respect ?? 0.05, 'brass') + meterRow('Grudge', wd.grudge, r?.grudge ?? 0.03, 'red');
+      const f = viewOf(W(), c, p).fear; // (V90: fear is its own thing, not respect)
+      return meterRow('Trust', wd.trust, r?.trust ?? 0.05) + meterRow('Respect', wd.respect, r?.respect ?? 0.05, 'brass') + meterRow('Fear', f >= 0.55 ? 'Afraid of you' : f >= 0.3 ? 'Wary of you' : f >= 0.12 ? 'A little' : 'None', Math.max(0.03, f), 'red') + meterRow('Grudge', wd.grudge, r?.grudge ?? 0.03, 'red');
     })()}</div>`;
   }
   const infoStart = out.length;

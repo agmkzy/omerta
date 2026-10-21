@@ -10,6 +10,7 @@
 //   * money: dues up, support for men inside down, every movement through one door that keeps a ledger which reconciles
 //   * relations: cooperation / competition / grievance between organisations as persistent state that the world reads back
 // Nothing in here knows how many organisations there are or what any of them is called.
+import { temper } from './temper';
 import { addFact, clamp, recordCareer, rel } from './core';
 import { applyRank, rankIdx, repairHierarchy, WAGE } from './rank';
 import { ensureClubs, clubOf } from './clubdata';
@@ -205,7 +206,7 @@ export function leaderChanged(w: World, fid: Id, winner: Character, oldId: Id | 
   f.standing = clamp((f.standing ?? 50) + (cause === 'coup' ? -5 : sharp ? -2 : 1), 5, 95);
   // the new man may put a rival in his place
   for (const r of rivals) {
-    if (winner.traits.ambition + winner.traits.violence > 1.1 && r.c.rank === 'capo' && rel(r.c, winner.id).grudge >= 0.4 && w.rng.chance(0.4)) {
+    if (temper(winner).pride + temper(winner).volatility > 1.1 && r.c.rank === 'capo' && rel(r.c, winner.id).grudge >= 0.4 && w.rng.chance(0.4)) {
       applyRank(w, r.c, 'soldier', { fact: false, repair: false, career: `Put down to soldier by ${winner.name} after the succession`, wage: WAGE.soldier });
       note += ` ${first(winner)} put ${first(r.c)} down to soldier.`;
     }
@@ -416,7 +417,7 @@ function leadershipWeek(w: World) {
       continue;
     }
     // an old, careful boss with a quiet house may step down
-    if (!boss.isPlayer && f.leaderSince !== undefined && w.now - f.leaderSince > 156 * WEEK && boss.traits.caution > 0.6 && boss.cash > 12000 && w.rng.chance(0.006)) {
+    if (!boss.isPlayer && f.leaderSince !== undefined && w.now - f.leaderSince > 156 * WEEK && temper(boss).caution > 0.6 && boss.cash > 12000 && w.rng.chance(0.006)) {
       const heirOk = candidates(w, f.id, boss.id)[0];
       if (heirOk && !heirOk.c.isPlayer) { const next = succeed(w, f.id, boss, 'retirement'); if (next) leave(w, boss, 'retire', `He has had enough, and ${next.name} has the family's blessing.`); }
     }
@@ -462,7 +463,7 @@ function retireWeek(w: World) {
     const lead = leaderOf(w, f.id);
     for (const c of membersOf(w, f.id).sort((a, b) => (a.id < b.id ? -1 : 1))) {
       if (c.isPlayer || c.id === lead?.id || c.jailedUntil > w.now || rankIdx(c.rank) < 1 || rankIdx(c.rank) > 3) continue;
-      if (c.traits.caution > 0.6 && c.cash > ({ soldier: 3500, capo: 5500, underboss: 9000 } as Record<string, number>)[c.rank] && w.rng.chance(0.004)) { leave(w, c, 'retire', 'He has the money and the nerve for a quiet life.'); break; }
+      if (temper(c).caution > 0.6 && c.cash > ({ soldier: 3500, capo: 5500, underboss: 9000 } as Record<string, number>)[c.rank] && w.rng.chance(0.004)) { leave(w, c, 'retire', 'He has the money and the nerve for a quiet life.'); break; }
     }
   }
 }

@@ -1,4 +1,5 @@
 // What it costs to put hands on a man. Rank, family and permission decide who answers for it, and how hard.
+import { temper } from './temper';
 import { clamp, addFact, famName, rel } from './core';
 import { LADDER, members } from './career';
 import { isMade, sanctioned } from './politics';
@@ -133,7 +134,7 @@ export function aftermath(w: World, p: Character, x: Character, mode: 'beat' | '
     if (kill) hunt(xBoss.familyId, 1, `${x.name} was theirs.`, false);
   }
   if (kill) p.heat = clamp(p.heat + 0.25, 0, 1.5);
-  const kin = Object.values(w.chars).filter((y) => y.alive && y.id !== p.id && (y.rels[x.id]?.affection ?? 0) > 0.4 && y.traits.violence > 0.35).slice(0, 2);
+  const kin = Object.values(w.chars).filter((y) => y.alive && y.id !== p.id && (y.rels[x.id]?.affection ?? 0) > 0.4 && temper(y).volatility + temper(y).pride * 0.3 > 0.5).slice(0, 2);
   for (const y of kin) {
     const r = rel(y, p.id); r.grudge = Math.max(r.grudge, kill ? 0.85 : 0.5);
     if (kill) { const t = threatOf(w, y); t.level = Math.max(t.level, 1); t.truce = 0; t.last = w.now - 6 * DAY; }
@@ -157,7 +158,7 @@ const METHODS: { code: string; label: string; what: string; ok: number; seen: nu
 export function killMethods(w: World, p: Character, x: Character): KillMethod[] {
   // the harder he is to reach, the worse every method does
   const guard = Object.values(w.chars).filter((c) => c.alive && c.bossId === x.id && c.id !== p.id).length;
-  const hard = clamp(WEIGHT[x.rank] * 0.03 + guard * 0.02 + x.traits.caution * 0.05, 0, 0.3);
+  const hard = clamp(WEIGHT[x.rank] * 0.03 + guard * 0.02 + temper(x).caution * 0.05, 0, 0.3);
   const skill = (p.skills.muscle ?? 0) * 0.08;
   const crowd = Object.values(w.chars).filter((c) => c.alive && c.district === x.district && c.id !== p.id && c.id !== x.id).length;
   const busy = clamp(crowd / 80, 0, 0.12);

@@ -1,5 +1,6 @@
 // Jobs, tip-offs, schemes, ventures and conversations: everything that starts from the player.
 // All state is plain data (Job, Venture) so it saves and loads with the world.
+import { temper } from './temper';
 import { bizMove } from './econ';
 import { ERRAND_KINDS, bossErrand, resolveErrand, runCrewJob } from './orders';
 import { aptitude, grow, lateOf } from './people';
@@ -588,7 +589,7 @@ export function resolve(w: World, j: Job, code: string): Result {
           if (!guilty) note = `${t.name} swore it wasn't him.`;
         }
       } else if (code === 'warn') {
-        const pr = clamp(0.45 + adj * 0.25 + (t.traits.caution - 0.5) * 0.5 - (t.traits.courage - 0.4) * 0.3, 0.1, 0.9);
+        const pr = clamp(0.45 + adj * 0.25 + (temper(t).caution - 0.5) * 0.5 - (temper(t).courage - 0.4) * 0.3, 0.1, 0.9);
         if (guilty && rng.chance(pr)) {
           const rest = Math.min(Math.round((t.cash * 0.5) / 10) * 10, 800);
           t.cash -= rest;
@@ -607,7 +608,7 @@ export function resolve(w: World, j: Job, code: string): Result {
       } else if (code === 'squeeze') {
         const amt = Math.min(Math.round((t.cash * 0.6) / 10) * 10, 1000);
         if (amt < 100) lines.push(`${t.name} has nothing worth taking. You walk out with your pride and an empty pocket.`);
-        else if (rng.chance(clamp(0.7 + adj * 0.2 - t.traits.courage * 0.4, 0.2, 0.9))) {
+        else if (rng.chance(clamp(0.7 + adj * 0.2 - temper(t).courage * 0.4, 0.2, 0.9))) {
           t.cash -= amt;
           const toClient = Math.round(amt * 0.6);
           giver.cash += toClient;
@@ -755,7 +756,7 @@ export function resolve(w: World, j: Job, code: string): Result {
       }
       const wary = (m.cooldown.scammed ?? 0) > w.now;
       m.cooldown.scammed = w.now + 21 * DAY;
-      const pr = clamp(cfg.base - (wary ? 0.35 : 0) - (m.traits.caution - 0.5) * 0.6 + (doer.traits.sociability - 0.5) * 0.2 + adj * 0.4, 0.1, 0.9);
+      const pr = clamp(cfg.base - (wary ? 0.35 : 0) - (temper(m).caution - 0.5) * 0.6 + (doer.traits.sociability - 0.5) * 0.2 + adj * 0.4, 0.1, 0.9);
       const amt = Math.min(cfg.amt(), Math.floor(m.cash * 0.8));
       if (amt < 100) {
         if (code === 'rigged') doer.cash += 300;
@@ -772,7 +773,7 @@ export function resolve(w: World, j: Job, code: string): Result {
           bump(doer, 0.3);
           lines.push('A pyramid always comes down. He’ll bring in others, and when it falls, they’ll all want to know whose idea it was.');
         }
-        if (rng.chance(0.4 + m.traits.caution * 0.3)) {
+        if (rng.chance(0.4 + temper(m).caution * 0.3)) {
           const f = addFact(w, { kind: 'scam', actor: doer.id, victim: m.id, business: b?.id, amount: amt, hiddenActor: true, text: `${doer.name} swindled ${m.name} out of ${money(amt)}.`, textHidden: `${m.name} was swindled out of ${money(amt)} by a smooth talker.`, district: m.district }, { witnesses: wit });
           if (b) notifyProtector(w, b, f);
           lines.push(`He’ll work it out eventually. When he does, he'll go looking for whoever he thinks did it.`);
@@ -850,7 +851,7 @@ export function daily(w: World) {
         rel(g, p.id).trust = clamp(rel(g, p.id).trust - 0.05);
         // Ignoring the man who runs your end twice in a month is asking for it.
         if (j.kind === 'summons' && w.jobs.filter((q) => q.kind === 'summons' && q.status === 'expired' && w.now - q.expires < 30 * DAY).length >= 2 && p.hurtUntil <= w.now) {
-          if (g.traits.violence > 0.5) {
+          if (temper(g).volatility > 0.5) {
             p.hurtUntil = w.now + 3 * DAY;
             rel(p, g.id).grudge = clamp(rel(p, g.id).grudge + 0.3);
             addFact(w, { kind: 'discipline', actor: g.id, victim: p.id, text: `${g.name} had ${p.name} beaten for ignoring him.`, district: p.district }, { witnesses: [] });
@@ -1018,7 +1019,7 @@ export function performMove(w: World, m: Move): { minutes: number; lines: string
       if (p.cash < cost) return { minutes: 10, lines: [`You need ${money(cost)}.`] };
       const mins = travelTime(p.district, b.district) + 60;
       p.district = b.district;
-      const accept = partner ? rng.chance(clamp(0.85 - host.traits.caution * 0.3, 0.4, 0.9)) : rng.chance(clamp(0.6 - host.traits.courage * 0.5 + p.traits.violence * 0.3, 0.15, 0.9));
+      const accept = partner ? rng.chance(clamp(0.85 - temper(host).caution * 0.3, 0.4, 0.9)) : rng.chance(clamp(0.6 - temper(host).courage * 0.5 + p.traits.violence * 0.3, 0.15, 0.9));
       if (!accept) {
         rel(host, p.id).grudge = clamp(rel(host, p.id).grudge + (partner ? 0.05 : 0.25));
         lines.push(`${host.name} wants no part of it. He looks past you at the street.`);
@@ -1083,12 +1084,12 @@ export function performMove(w: World, m: Move): { minutes: number; lines: string
         case 'work':
         case 'bossjob': {
           if (m.code === 'bossjob') {
-            lines.push(bossOffer(w, true) ? `${t.name} has something for you. It’s waiting in your inbox.` : `${t.name} tells you to finish what’s already on your plate first.`);
+            lines.push(bossOffer(w, true) ? `${t.name} has something for you. ${jobSaid(w.jobs.at(-1)!)}` : `${t.name} tells you to finish what’s already on your plate first.`);
             return { minutes: 30, lines };
           }
           const before = w.jobs.length;
           if (rng.chance(0.35 + rel(t, p.id).trust * 0.5)) tipFrom(w, t) || oppFrom(w, t);
-          lines.push(w.jobs.length > before ? `${t.name} puts something your way. It’s waiting in your inbox.` : `${t.name} shrugs. Nothing right now. Come back when there’s news.`);
+          lines.push(w.jobs.length > before ? `${t.name} puts something your way. ${jobSaid(w.jobs.at(-1)!)}` : `${t.name} shrugs. Nothing right now. Come back when there’s news.`);
           return { minutes: 30, lines };
         }
         case 'money': {
@@ -1271,4 +1272,11 @@ export function haggleJob(w: World, j: Job): { lines: string[]; minutes: number 
   }
   rel(g, p.id).trust = clamp(rel(g, p.id).trust - 0.05);
   return { lines: [note(j, `${g.name} doesn’t like being pushed. The price stays where it was.`)], minutes: 15 };
+}
+
+// V90: a job, as the man giving it says it aloud (so asking for work is answered with the work, not with "he names something").
+const IMPERATIVE = new Set(['Bring', 'Burgle', 'Carry', 'Collect', 'Find', 'Get', 'Guard', 'Lean', 'Ride', 'Shake', 'Spend', 'Take', 'Watch', 'Work']);
+export function jobSaid(j: Job): string {
+  const first = j.title.split(' ')[0];
+  return IMPERATIVE.has(first) ? `“I need somebody to ${j.title.charAt(0).toLowerCase() + j.title.slice(1)}. It’s yours if you want it.”` : `“Here’s one for you. ${j.title}.”`;
 }

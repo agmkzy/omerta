@@ -6,29 +6,32 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { deserialize, serialize } from '../../engine';
 import { DAY } from '../../types';
-import { options, optionsRaw, say, startConvo, incidentsOf, involvedIn, isNavCode } from '../../dialogue';
-import { world60, men, introAll, reach, CATS, BASELINES } from './fixtures';
+import { options, optionsRaw, say, startConvo, incidentsOf, involvedIn, isNavCode, focusTitle, QUESTIONS } from '../../dialogue';
+import { world60, men, introAll, reach, BASELINES } from './fixtures';
 import { P } from '../helpers';
 
 // The 60-day world takes seconds to simulate; build it once, before the checks that time themselves.
 beforeAll(() => { world60(); });
 
 describe('menus', () => {
-  ok('the opening screen is short: at most 4 matters, 4 ways to talk and one door to the rest', { tags: ['unit'] }, () => {
+  ok('the opening screen is short: what he raises, at most 3 matters and a row to the rest, the 4 everyday questions, at most 2 proposals and a row to the rest', { tags: ['unit'] }, () => {
     const w = world60(); introAll(w);
     for (const m of men(w)) {
       const o = options(w, P(w), m, startConvo(m.id));
-      const g = (n: string) => o.filter((x) => x.group === n).filter((x) => !x.nav).length;
-      assert.ok(g('Between you') <= 4, `${m.name}: ${g('Between you')} matters`);
-      assert.ok(g('Talk') <= 4, `${m.name}: ${g('Talk')} talk`);
-      assert.ok(o.length <= 10, `${m.name}: ${o.length} rows`);
+      const g = (n: string) => o.filter((x) => x.group === n);
+      assert.ok(g('He brings it up').length + g('On his mind').length <= 2, `${m.name}: ${g('He brings it up').length} raised`);
+      assert.ok(g('Between you').filter((x) => x.code !== 'f:more').length <= 3, `${m.name}: ${g('Between you').length} matters`);
+      assert.deepEqual(g('Talk').map((x) => x.label), QUESTIONS, `${m.name}: the four questions, always the same`);
+      assert.ok(g('Propose').filter((x) => !x.nav).length <= 2, `${m.name}: proposals`);
+      assert.ok(o.length <= 14, `${m.name}: ${o.length} rows`);
+      assert.ok(!o.some((x) => /^(more|n):/.test(x.code)), `${m.name}: the old menus are gone`);
     }
   });
   // (deliberately folded into another row by the conversation (V78: one way to ask about the same thing): 'op' into what is
   // going on with him, 'recommend' into asking for backing, 'ask_rep' when he is a civilian or was just asked; and the last three
   // only for a man above you)
   const MERGED = new Set(['op', 'recommend', 'ask_rep', 'leaders', 'promo', 'pick_concern']);
-  ok('nothing that was reachable in V76 has been removed: every action is still within Other business', { tags: ['unit'] }, () => {
+  ok('nothing that was reachable in V76 has been removed: every action is reachable through the conversation', { tags: ['unit'] }, () => {
     // Checked against the world as it is, not a recorded one (V89): everything a man allows right now (the flat V76 list,
     // optionsRaw, and the leaves of each sub-menu) must be reachable through the arranged conversation. A frozen snapshot broke
     // whenever the world itself moved on.
@@ -89,30 +92,28 @@ describe('menus', () => {
     const drink = options(w, p, t, c).find((o) => o.code === 'drink')!;
     assert.match(drink.label, /\$40/);
   });
-  ok('Other business opens to categories, a category lists its actions, and there is always a way back', { tags: ['unit'] }, () => {
+  ok('a subject opens to only what belongs to it, is named, and there is always a way back', { tags: ['unit'] }, () => {
     const w = world60(); introAll(w);
-    const m = men(w).find((x) => x.rank !== 'civilian')!;
+    const m = men(w).find((x) => x.rank !== 'civilian' && options(w, P(w), x, startConvo(x.id)).some((o) => o.code.startsWith('f:') && o.code !== 'f:think'))!;
     let c = startConvo(m.id);
-    let o = options(w, P(w), m, c);
-    const door = o.find((x) => x.code === 'more:all')!;
-    assert.ok(door, 'door present');
-    let r = say(w, P(w), m, c, door.code); c = r.convo!;
-    o = options(w, P(w), m, c);
-    assert.ok(o.some((x) => x.code === 'more:back'));
-    const cats = o.filter((x) => x.code.startsWith('more:') && CATS.some((k) => x.code === 'more:' + k));
-    assert.ok(cats.length >= 2, 'categories');
-    r = say(w, P(w), m, c, cats[0].code); c = r.convo!;
-    o = options(w, P(w), m, c);
-    assert.ok(o.some((x) => x.code === 'more:up') && o.length >= 3);
-    r = say(w, P(w), m, c, 'more:back'); c = r.convo!;
-    assert.ok(options(w, P(w), m, c).some((x) => x.group === 'Talk'));
+    const door = options(w, P(w), m, c).find((x) => x.code.startsWith('f:') && x.code !== 'f:think')!;
+    const r = say(w, P(w), m, c, door.code); c = r.convo!;
+    assert.ok(r.lines.length >= 1, 'opening a subject is said, and answered: ' + door.code);
+    const o = options(w, P(w), m, c);
+    assert.ok(!o.some((x) => x.group), 'no hub groups inside a subject');
+    assert.ok(o.some((x) => x.code === 'f:') && o.some((x) => x.code === 'root'), 'a way back and a way out');
+    assert.ok(focusTitle(w, P(w), m, c), 'the subject is named');
+    c = say(w, P(w), m, c, 'f:').convo!;
+    assert.ok(options(w, P(w), m, c).some((x) => x.group === 'Talk'), 'back on the hub');
   });
   ok('a man who owes you money: the debt is among the matters, not buried', { tags: ['unit'] }, () => {
     const w = world60(); introAll(w); const p = P(w);
     const m = men(w).find((x) => x.rank !== 'civilian' && x.id !== p.bossId && x.bossId !== p.id)!;
     w.debts.push({ id: 'dbg1', creditor: p.id, debtor: m.id, principal: 600, balance: 600, weeklyPayment: 60, missed: 1, status: 'active', rate: 0.05, since: w.now - 20 * DAY } as never);
-    const o = options(w, p, m, startConvo(m.id)).filter((x) => x.group === 'Between you');
-    assert.ok(o.some((x) => x.code.startsWith('d_')), o.map((x) => x.code).join());
+    const o = options(w, p, m, startConvo(m.id)).filter((x) => x.group === 'Between you' || x.group === 'He brings it up');
+    assert.ok(o.some((x) => x.code === 'f:debt'), o.map((x) => x.code).join());
+    const c = say(w, p, m, startConvo(m.id), 'f:debt').convo!;
+    assert.ok(options(w, p, m, c).some((x) => x.code.startsWith('d_')), 'and inside it, what can be done about the debt');
   });
   ok('a quiet man has no manufactured matters', { tags: ['unit'] }, () => {
     const w = world60(); introAll(w); const p = P(w);
@@ -127,7 +128,6 @@ describe('menus', () => {
         const id = o.code.slice(4);
         assert.ok(p.known[id], `${m.name} offers ${id} which the player does not know`);
       }
-      const c = startConvo(m.id); (c.ctx as { more?: string[] }).more = ['all', 'Favours and requests'];
     }
   });
   ok('the incident picker does not print what the player has not learned', { tags: ['unit'] }, () => {
@@ -166,7 +166,7 @@ describe('menus', () => {
   });
   ok('the save still round-trips after browsing', { tags: ['determinism'] }, () => {
     const w = world60(); introAll(w);
-    for (const m of men(w).slice(0, 10)) { const c = startConvo(m.id); say(w, P(w), m, c, 'more:all'); }
+    for (const m of men(w).slice(0, 10)) { const c = startConvo(m.id); for (const o of options(w, P(w), m, c).filter((x) => x.code.startsWith('f:'))) say(w, P(w), m, c, o.code); }
     const s = serialize(w);
     assert.equal(serialize(deserialize(s)), s);
   });

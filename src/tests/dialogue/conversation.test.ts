@@ -63,9 +63,9 @@ describe('what people tell you', () => {
       const o = chatWith(ww, mm, { trust: 0.9, affection: 0.9, grudge: 0 });
       if (o.r.convo?.node !== 'incident') continue;
       const codes = options(ww, o.p, mm, o.r.convo).map((x) => x.code);
-      assert.ok(codes.length <= 4 && codes.includes('root'), codes.join());
-      const learn = options(ww, o.p, mm, say(ww, o.p, mm, o.r.convo, 'sub:learn').convo!).map((x) => x.code);
-      assert.ok(learn.includes('sub:back') || codes.includes('sub:learn') === false, learn.join());
+      // (V90: no menus inside a subject: the questions that follow from what he said are on screen, a few, with the way out)
+      assert.ok(codes.length <= 7 && codes.includes('root'), codes.join());
+      assert.ok(codes.some((c) => ['source', 'who', 'how_much', 'witness', 'tell_more', 'involve', 'view', 'why'].includes(c.split(':')[0])), codes.join());
       return;
     }
     assert.fail('nobody had anything to tell');
@@ -81,10 +81,9 @@ describe('what people tell you', () => {
       if (r.convo?.node === 'incident') {
         seen++;
         const top = options(w, p, t, r.convo).map((x) => x.code);
-        assert.ok(top.includes('sub:learn'), `${t.name}: ${top.join()}`);
-        const o = [...top, ...options(w, p, t, say(w, p, t, r.convo, 'sub:learn').convo!).map((x) => x.code)].map((x) => x.split(':')[0]);
+        const o = top.map((x) => x.split(':')[0]);
         assert.ok(o.some((c) => ['source', 'who', 'how_much', 'witness', 'tell_more', 'involve'].includes(c)), `${t.name}: ${o.join()}`);
-        assert.ok(o.includes('sub'), 'always a way back');
+        assert.ok(o.includes('root'), 'always a way back');
         if (seen >= 3) break;
       }
     }

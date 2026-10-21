@@ -4,6 +4,7 @@
 // leaves traces: money moved, a share taken, a trust broken, a man cut loose. The player may be in it, may be asked to
 // settle it, or may never hear of it. What anyone knows comes only from facts they witnessed or were told (core.addFact);
 // what the simulation knows to be true (`truth`) is never shown to anybody.
+import { temper } from './temper';
 import { discipline, influence } from './books';
 import { addFact, clamp, createDebt, ownerBiz, payDebt, rel } from './core';
 import { addStake, clearArrears, evidence, giveTime, seizeShare, transferBusiness } from './econ';
@@ -141,7 +142,7 @@ export function stanceOf(w: World, s: Situation, id: Id): { want: string; flex: 
   const kit = kitOf(s)!, c = w.chars[id];
   let want = kit.opts[0], best = -9;
   for (const o of kit.opts) { const u = kit.util(w, s, id, o); if (u > best) { best = u; want = o; } }
-  const flex = c ? clamp(0.18 + (1 - c.traits.ambition) * 0.14 + c.traits.caution * 0.1 + (1 - c.traits.violence) * 0.06, 0.1, 0.5) : 0.2;
+  const flex = c ? clamp(0.18 + temper(c).agreeable * 0.14 + temper(c).caution * 0.1 + (1 - temper(c).pride) * 0.06, 0.1, 0.5) : 0.2; // (V90: room to meet a man halfway)
   return { want, flex };
 }
 const weightOf = (w: World, s: Situation, id: Id) => {
@@ -163,7 +164,7 @@ export function chairPick(w: World, s: Situation, chair: Character): string {
       const st = stanceOf(w, s, id), u = kit.util(w, s, id, o), uw = kit.util(w, s, id, st.want);
       sc += weightOf(w, s, id) * u - 0.5 * weightOf(w, s, id) * Math.max(0, uw - u - st.flex);
     }
-    sc += (chair.traits.violence - 0.4) * (o === 'punish' || o === 'enforce' ? 0.3 : 0) + w.rng.range(-0.05, 0.05);
+    sc += (temper(chair).volatility - 0.4) * (o === 'punish' || o === 'enforce' ? 0.3 : 0) + w.rng.range(-0.05, 0.05);
     if (sc > best) { best = sc; pick = o; }
   }
   return pick;
@@ -302,7 +303,7 @@ const skimUtil = (w: World, s: Situation, id: Id, code: string): number => {
   const g = clamp(Number(s.m?.cert ?? 30) / 100, 0, 1), guilty = s.truth === 'guilty';
   if (id === boss.id) {
     const value = clamp(c.lifetimeKick / 8000, 0, 0.4);
-    return code === 'repay' ? 0.35 + 0.4 * g : code === 'punish' ? 0.5 * g - 0.25 * (1 - g) + 0.4 * (boss.traits.violence - 0.3) + clamp((s.amt ?? 0) / 800, 0, 0.4) - 0.1 : code === 'overlook' ? 0.25 - 0.5 * g + value : 0.25 * g - 0.35 - value * 0.5;
+    return code === 'repay' ? 0.35 + 0.4 * g : code === 'punish' ? 0.5 * g - 0.25 * (1 - g) + 0.4 * (temper(boss).volatility - 0.3) + clamp((s.amt ?? 0) / 800, 0, 0.4) - 0.1 : code === 'overlook' ? 0.25 - 0.5 * g + value : 0.25 * g - 0.35 - value * 0.5;
   }
   if (id === c.id) {
     return guilty ? ({ repay: 0.15, punish: -0.8, overlook: 0.9, expel: -0.6 } as Record<string, number>)[code] ?? 0 : ({ repay: -0.4, punish: -0.9, overlook: 0.4, expel: -0.85 } as Record<string, number>)[code] ?? 0;
@@ -351,7 +352,7 @@ function skimStep(w: World, s: Situation) {
   const cert = () => Number(m.cert ?? 0);
   if (s.phase === 'noticed') { return phase(s, 'explain', 3 + w.rng.int(0, 3), w); }
   if (s.phase === 'explain') {
-    const lie = guilty && w.rng.chance(clamp(0.5 + c.traits.caution * 0.3 - c.traits.courage * 0.2, 0.2, 0.85));
+    const lie = guilty && w.rng.chance(clamp(0.5 + temper(c).caution * 0.3 - temper(c).courage * 0.2 - temper(c).empathy * 0.1 + 0.05, 0.2, 0.85));
     const owns = guilty && !lie;
     const cause = c.problem ? ({ gambling: 'a bad run at the tables', debt: 'money he owes', family: 'trouble at home', drink: 'a rough few weeks', house: 'the house', resentment: 'a bad month', woman: 'a woman' } as Record<string, string>)[c.problem.kind] ?? 'a bad month' : 'a slow few weeks';
     const text = owns ? `${c.name} told ${boss.name} he fell short and would make it up.` : `${c.name} told ${boss.name} it was ${cause}.`;
@@ -360,7 +361,7 @@ function skimStep(w: World, s: Situation) {
     if (owns) { m.cert = 60; return phase(s, 'confront', 2, w); }
     // does he believe it? A man he trusts, with a trade that really did dip, is believed; a careful boss is harder to convince.
     const plaus = guilty ? 0.3 : 0.7;
-    const p = clamp(plaus * (0.5 + rel(boss, c.id).trust * 0.7) * (1 - boss.traits.caution * 0.35), 0.05, 0.85);
+    const p = clamp(plaus * (0.5 + rel(boss, c.id).trust * 0.7) * (1 - temper(boss).caution * 0.35), 0.05, 0.85);
     if (w.rng.chance(p)) {
       closeSit(w, s, 'understood', guilty ? ['the gap was never explained'] : [`${first(boss)} accepted ${first(c)}’s word`], 8);
       if (!guilty) rel(c, boss.id).trust = clamp(rel(c, boss.id).trust + 0.02);
@@ -439,7 +440,7 @@ function intelStep(w: World, s: Situation) {
   }
   if (s.phase === 'squeeze') {
     const ask = s.amt ?? 100;
-    const resist = clamp(c.traits.violence * 0.5 + c.traits.courage * 0.3 + (c.cash < ask ? 0.5 : 0), 0, 1);
+    const resist = clamp(temper(c).volatility * 0.5 + temper(c).courage * 0.3 + (c.cash < ask ? 0.5 : 0), 0, 1);
     if (!w.rng.chance(resist)) { // pays
       const pay = Math.min(c.cash, ask);
       c.cash -= pay; who.cash += pay;
@@ -482,7 +483,7 @@ function tributeStep(w: World, s: Situation) {
     claim(w, s, o.id, text, !lie); tell(w, s, text, { actor: o.id, victim: col.id });
     // the collector looks at the place. He can see the till, not the owner’s mind.
     const ev = evidence(w, b), richLooking = ev.some((l) => /money in the till/.test(l)), deadLooking = ev.some((l) => /nearly empty|behind with his own/.test(l));
-    const believe = clamp(0.55 + (deadLooking ? 0.3 : 0) - (richLooking ? 0.45 : 0) + rel(col, o.id).trust * 0.2 - col.traits.violence * 0.2, 0.05, 0.9);
+    const believe = clamp(0.55 + (deadLooking ? 0.3 : 0) - (richLooking ? 0.45 : 0) + rel(col, o.id).trust * 0.2 + (temper(col).empathy - 0.6) * 0.2, 0.05, 0.9);
     know(w, s, col.id, 1, 'looked at the place');
     if (w.rng.chance(believe)) { giveTime(b); tell(w, s, `${col.name} gave ${o.name} until the end of the month.`, { kind: 'terms', actor: col.id, victim: o.id }); return phase(s, 'time', 14, w); }
     return phase(s, 'press', 4, w);
@@ -490,7 +491,7 @@ function tributeStep(w: World, s: Situation) {
   if (s.phase === 'time') return phase(s, 'press', 3, w);
   if (s.phase === 'press') {
     // pressure: a visit, a smashed window. A violent collector does more of it.
-    const loud = col.traits.violence > 0.55 && w.rng.chance(0.6);
+    const loud = temper(col).volatility > 0.55 && w.rng.chance(0.6);
     if (loud) {
       b.damaged = Math.max(b.damaged, 2); col.heat = Math.min(1.5, col.heat + 0.05);
       tell(w, s, `${col.name}’s men smashed up ${b.name} to make a point.`, { kind: 'vandalism', actor: col.id, victim: o.id, broadcast: [o.id] });
@@ -498,7 +499,7 @@ function tributeStep(w: World, s: Situation) {
     rel(o, col.id).grudge = clamp(rel(o, col.id).grudge + (loud ? 0.2 : 0.08));
     // the owner looks for someone to speak for him
     const patron = col.bossId ? live(w, col.bossId) : undefined;
-    if (patron && o.traits.courage + o.traits.sociability > 0.8 || (patron && (pr.owed ?? 0) > pr.fee * 3)) return phase(s, 'appeal', 3, w);
+    if (patron && temper(o).courage + o.traits.sociability > 0.8 || (patron && (pr.owed ?? 0) > pr.fee * 3)) return phase(s, 'appeal', 3, w);
     s.m = { ...(s.m ?? {}), rounds: Number(s.m?.rounds ?? 0) + 1 };
     if (Number(s.m.rounds) >= 3) return phase(s, 'appeal', 2, w);
     return phase(s, 'press', 6, w);
@@ -520,7 +521,7 @@ KITS.tribute = {
     const b = w.biz[s.biz!]; const col = (s.parties ?? []).find((p) => p.role === 'collector')!.id;
     const owedBig = (s.amt ?? 0) > (b.protection?.fee ?? 50) * 3;
     const able = evidence(w, b).some((l) => /money in the till/.test(l));
-    if (id === col) { const v = w.chars[col].traits.violence; return ({ extend: 0.15, waive: -0.6, share: 0.55, enforce: 0.3 + v * 0.3, takeover: owedBig ? 0.5 : 0.1 } as Record<string, number>)[code] ?? 0; }
+    if (id === col) { const v = temper(w.chars[col]).volatility; return ({ extend: 0.15, waive: -0.6, share: 0.55, enforce: 0.3 + v * 0.3, takeover: owedBig ? 0.5 : 0.1 } as Record<string, number>)[code] ?? 0; }
     if (id === b.ownerId) return ({ extend: 0.7, waive: 0.9, share: -0.3, enforce: -0.8, takeover: -0.9 } as Record<string, number>)[code] ?? 0;
     return ({ extend: able ? -0.1 : 0.3, waive: -0.2, share: 0.3, enforce: -0.3, takeover: -0.1 } as Record<string, number>)[code] ?? 0;
   },
@@ -581,8 +582,8 @@ KITS.debt = {
   util: (w, s, id, code) => {
     const d = w.debts.find((x) => x.id === s.link?.debt)!;
     const cr = d.creditor, db = d.debtor, hasBiz = !!ownerBiz(w, db);
-    if (id === cr && s.truth === 'willful') return ({ extend: -0.3, restructure: 0.0, writedown: -0.7, share: hasBiz ? 0.5 : -0.3, enforce: 0.5 + w.chars[cr].traits.violence * 0.3 } as Record<string, number>)[code] ?? 0;
-    if (id === cr) return ({ extend: 0.1, restructure: 0.35, writedown: -0.5, share: hasBiz ? 0.45 : -0.3, enforce: 0.3 + w.chars[cr].traits.violence * 0.3 } as Record<string, number>)[code] ?? 0;
+    if (id === cr && s.truth === 'willful') return ({ extend: -0.3, restructure: 0.0, writedown: -0.7, share: hasBiz ? 0.5 : -0.3, enforce: 0.5 + temper(w.chars[cr]).volatility * 0.3 } as Record<string, number>)[code] ?? 0;
+    if (id === cr) return ({ extend: 0.1, restructure: 0.35, writedown: -0.5, share: hasBiz ? 0.45 : -0.3, enforce: 0.3 + temper(w.chars[cr]).volatility * 0.3 } as Record<string, number>)[code] ?? 0;
     if (id === db) return ({ extend: 0.8, restructure: 0.7, writedown: 0.95, share: hasBiz ? -0.5 : 0, enforce: -0.9 } as Record<string, number>)[code] ?? 0;
     // anyone else sides with the man he trusts more, and with whoever has the stronger case
     const lean = rel(w.chars[id], db).trust - rel(w.chars[id], cr).trust, willful = s.truth === 'willful';
@@ -689,7 +690,7 @@ function grudgeStep(w: World, s: Situation) {
     return phase(s, 'airing', 6, w);
   }
   if (s.phase === 'airing') {
-    const bold = y.traits.ambition + y.traits.courage > 1.1 || Number(s.m?.allies ?? 0) > 0;
+    const bold = temper(y).pride + temper(y).courage > 1.1 || Number(s.m?.allies ?? 0) > 0;
     if (!bold && w.rng.chance(0.6)) { tell(w, s, `${y.name} swallowed it.`, { actor: y.id }); rel(y, x.id).grudge = clamp(rel(y, x.id).grudge * 0.7); return closeSit(w, s, 'swallowed', [`${first(y)} still resents ${first(x)}`], 12); }
     tell(w, s, `${y.name} went to ${boss.name} and said he deserved better than he got.`, { actor: y.id, victim: boss.id, witnesses: [] });
     know(w, s, boss.id, 2, 'was told');

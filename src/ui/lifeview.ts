@@ -17,6 +17,7 @@ import { factText, famName, fmtTime, money, ownerBiz } from '../core';
 import { influence, influenceWord } from '../books';
 import { SPEC_LABEL, SPEC_PERK, TIER_WORD, specScores, tierOf, Spec } from '../specs';
 import { standingWord } from '../jobs';
+import { characterWords } from '../temper';
 import { kinWord, stageWord, warmthWord, DATES, datingPool } from '../life';
 import { pathInfo } from '../path';
 import { favourWord, owedTo, owing } from '../encounters';
@@ -78,6 +79,8 @@ function youRoom(): string {
 
   // where you stand, and the road ahead: one account of it, not two
   out += standing(w, p);
+  // V90: who you have shown yourself to be, in words, from what you have done (never chosen, never a score)
+  out += `<div class="card"><h2>The man you’ve shown them</h2>${characterWords(p).map((x) => `<p>${esc(x)}</p>`).join('')}<p class="muted">Each man sees you through what he has seen and heard himself.</p></div>`;
   if (p.familyId) out += queueView();
   out += ambitionCard();
 

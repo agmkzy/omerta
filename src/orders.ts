@@ -2,6 +2,7 @@
 // A man you send out is not a function call. He may do it well, do it and skim, lose half of it at cards,
 // find the debtor was not home, get distracted by something at home, start a fight, or decide the debtor
 // deserves more time. When he comes back he tells you a story, and the story may not be the true one.
+import { temper } from './temper';
 import { applyRank } from './rank';
 import { addFact, clamp, learn, money, ownerBiz, recordCareer, rel, shortTime, travelTime, witnessesAt } from './core';
 import { aptitude, grow, lateOf, PROBLEM_LABEL } from './people';
@@ -36,8 +37,8 @@ export function behaviour(w: World, j: Job, m: Character): Behaviour {
     ['gamble', money ? T.vice * 0.35 + (pr?.kind === 'gambling' ? 0.7 * pr.sev : 0) : 0],
     ['unavailable', 0.07],
     ['distracted', pr ? pr.sev * 0.7 : 0.02],
-    ['confront', ['collect', 'lean', 'handle', 'shake'].includes(j.kind) ? T.violence * 0.3 * (j.orders === 'quiet' ? 0.5 : 1.2) : 0],
-    ['mercy', j.kind === 'collect' || j.kind === 'shake' ? (1 - T.violence) * 0.18 * (j.target && (m.rels[j.target]?.affection ?? 0) > 0.2 ? 1.5 : 0.7) : 0],
+    ['confront', ['collect', 'lean', 'handle', 'shake'].includes(j.kind) ? (T.violence * 0.5 + temper(m).volatility * 0.5) * 0.3 * (j.orders === 'quiet' ? 0.5 : 1.2) : 0],
+    ['mercy', j.kind === 'collect' || j.kind === 'shake' ? temper(m).empathy * 0.18 * (j.target && (m.rels[j.target]?.affection ?? 0) > 0.2 ? 1.5 : 0.7) : 0],
   ];
   const total = weights.reduce((a, [, v]) => a + v, 0);
   let r = w.rng.next() * total;
@@ -95,8 +96,8 @@ export function runCrewJob(w: World, j: Job) {
   // He does it his way: a quick temper goes hard, a careful man goes quiet, whatever you said.
   let code = j.orders === 'hard' ? codes[codes.length - 1] : codes[0];
   if (codes.length > 1 && !m.isPlayer) {
-    if (m.traits.violence > 0.75 && w.rng.chance(0.4)) code = codes[codes.length - 1];
-    else if (m.traits.caution > 0.7 && w.rng.chance(0.3)) code = codes[0];
+    if (temper(m).volatility > 0.72 && w.rng.chance(0.4)) code = codes[codes.length - 1];
+    else if (temper(m).caution > 0.7 && w.rng.chance(0.3)) code = codes[0];
     else if (j.orders !== 'hard' && j.orders !== 'quiet') code = codes[Math.min(codes.length - 1, Math.floor(aptitude(m, j.kind) * codes.length))];
   }
   let text = '';
@@ -292,7 +293,7 @@ export function resolveErrand(w: World, j: Job, doer: Character, code: string): 
       const o = w.chars[b.ownerId];
       const owed = Math.max(b.protection.fee, owedOf(b));
       const style = code === 'soft' ? 0.8 : code === 'firm' ? 1 : 1.35;
-      const pr = clamp(0.5 + (apt - 0.5) * 0.4 + (code === 'hard' ? 0.2 : code === 'soft' ? -0.1 : 0) - (o.traits.courage - 0.5) * 0.3, 0.15, 0.95);
+      const pr = clamp(0.5 + (apt - 0.5) * 0.4 + (code === 'hard' ? 0.2 : code === 'soft' ? -0.1 : 0) - (temper(o).courage - 0.5) * 0.3, 0.15, 0.95);
       if (rng.chance(pr)) {
         const got = takeFromBiz(w, b, Math.round(owed * style), doer.id, true);
         clearArrears(b);

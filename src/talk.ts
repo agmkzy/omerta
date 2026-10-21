@@ -7,7 +7,9 @@
 // something real: it moves how he feels about you, it teaches you what he knows, and it can put something new in the world: a
 // loan, a favour owed, a promise you will be held to, an introduction, an offer for his shop, a rival made by a careless word.
 // He remembers how it went, and the next time you raise it he picks up where you left off.
-import { openAsk, openAsks, stance } from './asks';
+import { FEMALE } from './names';
+import { noteConduct, temper } from './temper';
+import { askBetween, mayAsk, openAsk, openAsks, stance } from './asks';
 import { addFact, clamp, createDebt, learn, link, money, ownerBiz, regard, peek, rel } from './core';
 import { addFavour } from './encounters';
 import { agencyOf } from './goals';
@@ -39,6 +41,8 @@ const rk = (c: Character) => Math.max(0, LADDER.indexOf(c.rank));
 const live = (w: World, id?: Id | null) => { const c = id ? w.chars[id] : undefined; return c?.alive ? c : undefined; };
 const by = (t: Character, m: Partial<Record<Arch, string>> & { _: string }) => m[arch(t)] ?? m._;
 const q = (t: Character, s: string) => `${first(t)}: “${s}”`;
+// (V90: one man's way of saying a thing, out of several: the same man says it the same way each time, two men rarely alike)
+const vary = (t: Character, salt: string, xs: string[]) => { let h = 2166136261; for (const ch of t.id + '~' + salt) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return xs[(h >>> 0) % xs.length]; };
 // what he calls you: family by your first name, everyone else by your surname
 export const addr = (w: World, t: Character, p: Character) => (kinTie(w, t, p) ? first(p) : surname(p));
 const day = (w: World) => Math.floor(w.now / DAY);
@@ -46,7 +50,7 @@ const mem = (t: Character, k: string) => t.talk?.[k];
 const remember = (w: World, t: Character, k: string, sig: string) => { const m = (t.talk ??= {}); const o = m[k]; m[k] = { d: day(w), sig, n: (o?.n ?? 0) + 1 }; };
 const said = (w: World, t: Character, key: string, code: string) => remember(w, t, 'tkc:' + key, code);
 const lastSaid = (t: Character, key: string) => mem(t, 'tkc:' + key)?.sig;
-const done = (key: string): Choice => ({ code: `tk:${key}:end`, label: 'Leave it there' });
+const done = (key: string): Choice => ({ code: `tk:${key}:end`, label: '“Let’s leave it there.”' });
 const ch = (key: string, code: string, label: string, hint?: string, big?: boolean): Choice => ({ code: `tk:${key}:${code}`, label, hint, big });
 const trust = (x: X) => peek(x.t, x.p.id).trust;
 const warm = (x: X, amt: number, kind: string) => regard(x.w, x.t, x.p, 'affection', amt, kind);
@@ -84,12 +88,12 @@ function trouble(x: X): Subject | undefined {
   const helped = lastSaid(t, key);
   return {
     key, sig, weight: 0.35 + pr.sev * 0.5 + (arch(t) === 'frightened' || arch(t) === 'earnest' ? 0.1 : 0),
-    label: pr.revealed ? `Ask how he’s managing with ${pr.kind === 'gambling' ? 'the book' : pr.kind === 'debt' ? 'what he owes' : pr.kind === 'family' ? 'things at home' : pr.kind === 'drink' ? 'the drinking' : pr.kind === 'house' ? 'his savings' : pr.kind === 'woman' ? 'the woman' : 'his complaints'}` : 'Ask what’s weighing on him',
+    label: pr.revealed ? `“How are you managing with ${pr.kind === 'gambling' ? 'the book' : pr.kind === 'debt' ? 'what you owe' : pr.kind === 'family' ? 'things at home' : pr.kind === 'drink' ? 'the drinking' : pr.kind === 'house' ? 'the money for the place' : pr.kind === 'woman' ? 'the woman' : 'it all'}?”` : '“What’s weighing on you?”',
     hint: pr.revealed ? 'He told you before. See where it stands.' : 'Something is. He may not say.',
     nudge: pr.sev > 0.55 && trust(x) >= 0.4 ? by(t, { frightened: `${first(t)} keeps looking at the door.`, proud: `${first(t)} is trying hard to look like a man with nothing on his mind.`, _: `${first(t)} looks like he hasn’t slept.` }) : undefined,
     open: (x) => {
       if (before && before.sig === sig && helped) return { lines: [q(t, helped === 'gift' || helped === 'lend' ? 'Still the same. But what you did helped. I haven’t forgotten it.' : helped === 'straighten' ? 'I’m trying. Like you said.' : 'Same as it was.')], choices: [done(key)], minutes: 10 };
-      if (!pr.revealed && trust(x) < 0.45) return { lines: [q(t, T.hidden)], choices: [ch(key, 'press', 'Tell him you can see something’s wrong', 'He may open up. He may resent being pushed.'), done(key)] };
+      if (!pr.revealed && trust(x) < 0.45) return { lines: [q(t, T.hidden)], choices: [ch(key, 'press', '“Something’s wrong. I can see it.”', 'He may open up. He may resent being pushed.'), done(key)] };
       return reveal(x);
     },
     reply: (x, code) => {
@@ -100,6 +104,7 @@ function trouble(x: X): Subject | undefined {
       }
       const amt = T.need?.(x) ?? 0;
       if (code === 'gift' && p.cash >= amt) {
+        noteConduct(p, 'generous'); // (V90: it shows what kind of man you are)
         p.cash -= amt; t.cash += amt; pr.sev = clamp(pr.sev - 0.3); said(w, t, key, 'gift');
         addFavour(w, p.id, t.id, amt >= 400 ? 2 : 1, `you helped him when he was ${pr.kind === 'debt' || pr.kind === 'gambling' ? 'in over his head' : 'short'}`);
         warm(x, 0.08, 'helped'); regard(w, t, p, 'trust', 0.05, 'helped');
@@ -135,10 +140,10 @@ function trouble(x: X): Subject | undefined {
     const amt = T.need?.(x) ?? 0;
     const cs: Choice[] = [];
     const owes = w.debts.some((d) => d.status === 'active' && d.creditor === p.id && d.debtor === t.id);
-    if (amt && p.cash >= amt) { cs.push(ch('trouble', 'gift', `Give him ${money(amt)}, no strings`, 'He will owe you, and he will know it.', true)); if (!owes) cs.push(ch('trouble', 'lend', `Lend him ${money(amt)}`, 'Four percent a week. A friend’s rate, and a debt all the same.', true)); }
-    if (pr.kind === 'family' && t.bossId === p.id) cs.push(ch('trouble', 'time', 'Tell him to take a week', 'He earns nothing for you while he is gone. He will remember it.'));
-    if (pr.kind !== 'house') cs.push(ch('trouble', 'straighten', 'Tell him to straighten himself out', 'Some men need to hear it. Some men hate hearing it.'));
-    cs.push(ch('trouble', 'listen', 'Just hear him out', 'Sometimes that is all a man wants.'));
+    if (amt && p.cash >= amt) { cs.push(ch('trouble', 'gift', `“Here. ${money(amt)}. No strings.”`, 'He will owe you, and he will know it.', true)); if (!owes) cs.push(ch('trouble', 'lend', `“I can lend you ${money(amt)}.”`, 'Four percent a week. A friend’s rate, and a debt all the same.', true)); }
+    if (pr.kind === 'family' && t.bossId === p.id) cs.push(ch('trouble', 'time', '“Take a week. Sort it out.”', 'He earns nothing for you while he is gone. He will remember it.'));
+    if (pr.kind !== 'house') cs.push(ch('trouble', 'straighten', '“You need to straighten yourself out.”', 'Some men need to hear it. Some men hate hearing it.'));
+    cs.push(ch('trouble', 'listen', '“Go on. I’m listening.”', 'Sometimes that is all a man wants.'));
     void w;
     return { lines: [q(t, T.told(x))], choices: cs };
   }
@@ -159,7 +164,7 @@ function shop(x: X): Subject | undefined {
   const sig = `${b.distress}:${Math.sign(Math.round(trend / 50))}:${fee}:${b.damaged > 0}`;
   return {
     key, sig, weight: 0.3 + (b.distress > 0 ? 0.25 : 0) + (heavy ? 0.15 : 0) + (b.damaged > 0 ? 0.2 : 0),
-    label: `Ask how ${b.name} is doing`, hint: 'His trade, his costs, his worries. A man talks about his business.',
+    label: `“How’s the place doing?”`, hint: 'His trade, his costs, his worries. A man talks about his business.',
     nudge: b.damaged > 0 ? `${first(t)} is still sweeping glass at ${b.name}.` : b.distress > 1 ? `${first(t)} looks like a man doing sums in his head.` : undefined,
     open: () => {
       const how = b.damaged > 0 ? 'Since they smashed the place, people walk past. They think it could happen while they’re eating.'
@@ -172,11 +177,11 @@ function shop(x: X): Subject | undefined {
       if (fee && col) note(p, t, sore ? `Pays ${col.name} ${money(fee)} a week, and doesn’t hide that he minds.` : `Pays ${col.name} ${money(fee)} a week.`);
       if (fee && col) lines.push(sore ? `He mentions the envelope for ${first(col)} without being asked, and his mouth goes thin.` : `The envelope goes to ${first(col)} every week. He says it like the weather.`);
       const cs: Choice[] = [];
-      if (rival) cs.push(ch(key, 'rival', 'Ask who’s taking his trade', 'He will have a name.'));
-      if (fee && col && col.id !== p.id && col.familyId !== null) cs.push(ch(key, 'col', `Ask how he gets on with ${first(col)}`, 'How a man feels about who he pays is worth knowing.'));
+      if (rival) cs.push(ch(key, 'rival', '“Who’s taking your trade?”', 'He will have a name.'));
+      if (fee && col && col.id !== p.id && col.familyId !== null) cs.push(ch(key, 'col', `“How do you get on with ${first(col)}?”`, 'How a man feels about who he pays is worth knowing.'));
       // a shop nobody of yours looks after is an opening, raised as part of talking about the place
-      if (p.familyId && b.protection?.familyId !== p.familyId && !(fee && col && sore) && t.rank === 'civilian') cs.push(ch(key, 'friends', 'Say a place like this could use some friends', b.protection ? 'He pays someone already. You would be asking him to change.' : 'Nobody looks after him. Yet.', true));
-      if ((b.distress > 0 || b.cash < 300) && p.cash >= 500) cs.push(ch(key, 'invest', 'Offer to put some money in', 'A loan, on the books. He may want less, or nothing.'));
+      if (p.familyId && b.protection?.familyId !== p.familyId && !(fee && col && sore) && t.rank === 'civilian') cs.push(ch(key, 'friends', '“A place like this could use some friends.”', b.protection ? 'He pays someone already. You would be asking him to change.' : 'Nobody looks after him. Yet.', true));
+      if ((b.distress > 0 || b.cash < 300) && p.cash >= 500) cs.push(ch(key, 'invest', '“I could put some money in.”', 'A loan, on the books. He may want less, or nothing.'));
       cs.push(done(key));
       return { lines, choices: cs };
     },
@@ -185,7 +190,7 @@ function shop(x: X): Subject | undefined {
         const o = w.chars[rival.ownerId];
         said(w, t, key, 'rival');
         const cs: Choice[] = [];
-        if (o?.alive && o.id !== p.id && p.familyId) cs.push(ch(key, 'word', `Offer to have a word with ${first(o)}`, 'A promise. He will hold you to it.', true));
+        if (o?.alive && o.id !== p.id && p.familyId) cs.push(ch(key, 'word', `“Want me to have a word with ${first(o)}?”`, 'A promise. He will hold you to it.', true));
         cs.push(done(key));
         if (o) note(p, t, `Says ${o.name} at ${rival.name} is taking his trade.`);
         return { lines: [q(t, `${rival.name}, on the next block. ${o ? first(o) : 'He'} undercuts me and smiles about it.`)], choices: cs };
@@ -204,7 +209,7 @@ function shop(x: X): Subject | undefined {
         if (!sore || trust(x) < 0.35) return { lines: [q(t, by(t, { frightened: 'Fine. Fine. Everything’s fine with him.', _: `${first(c)}? We get along. I pay, he goes.` }))], choices: [] };
         note(p, t, `Says the ${money(b.protection.fee)} a week to ${c.name} is more than the place can carry.`);
         const cs: Choice[] = [];
-        if (p.familyId && c.id !== p.id) cs.push(ch(key, 'poach', 'Say you could look after him better, for less', `Taking a shop from ${first(c)} is taking it from his family. They will notice.`, true));
+        if (p.familyId && c.id !== p.id) cs.push(ch(key, 'poach', '“I could look after you better. For less.”', `Taking a shop from ${first(c)} is taking it from his family. They will notice.`, true));
         cs.push(done(key));
         return { lines: [q(t, by(t, { bitter: `${money(b.protection.fee)} a week, and for what? When they smashed the window, where was he?`, frightened: 'I can’t say anything against him. But it’s a lot. It’s too much.', _: `It’s ${money(b.protection.fee)} a week. More than the place can carry, some weeks.` }))], choices: cs };
       }
@@ -220,13 +225,13 @@ function shop(x: X): Subject | undefined {
         said(w, t, key, 'friends');
         const s = openAsk(w, 'protect', p, t, { biz: b.id, amt: Math.max(15, Math.round((b.income * 0.07) / 5) * 5), why: `${p.name} offered to look after ${b.name}` });
         if (!s) return { lines: [q(t, 'Not now. Too many people asking.')], choices: [] };
-        return { lines: [`You let it be known that ${b.name} could do with friends in the neighbourhood.`, q(t, by(t, { frightened: 'Friends. I see. How much do friends cost?', hothead: 'I look after my own place.', jovial: 'Everybody needs friends! What do they cost these days?', _: 'And what would that cost me?' })), 'It is between you now. Put your terms to him when you are ready.'], choices: [], go: { node: 'root' } };
+        return { lines: [`You let it be known that ${b.name} could do with friends in the neighbourhood.`, q(t, by(t, { frightened: 'Friends. I see. How much do friends cost?', hothead: 'I look after my own place.', jovial: 'Everybody needs friends! What do they cost these days?', _: 'And what would that cost me?' })), 'It’s on the table now, between the two of you.'], choices: [], go: { node: 'root' } };
       }
       if (code === 'invest') {
         said(w, t, key, 'invest');
         const s = openAsk(w, 'lend', p, t, { amt: 500, biz: b.id, why: `${p.name} offered to put money into ${b.name}` });
         if (!s) return { lines: [], choices: [] };
-        return { lines: [q(t, 'You mean it?'), 'He is thinking about it. Ask him plainly when you are ready.'], choices: [], go: { node: 'root' } };
+        return { lines: [q(t, 'You mean it?'), 'He’s thinking about it. You can see him doing the sums.'], choices: [], go: { node: 'root' } };
       }
       return { lines: [], choices: [] };
     },
@@ -234,7 +239,7 @@ function shop(x: X): Subject | undefined {
 }
 
 // ================================================================== his racket
-const HUSTLE_ASK: Record<string, string> = { numbers: 'Ask how the numbers are doing', bookie: 'Ask how his book is doing', loans: 'Ask how his loans are doing', cars: 'Ask how the car business is', fence: 'Ask what’s moving through his back room', vending: 'Ask how the machines are doing', shakedown: 'Ask how his collections are going', odd: 'Ask what he’s doing for money these days' };
+const HUSTLE_ASK: Record<string, string> = { numbers: '“How are the numbers doing?”', bookie: '“How’s the book?”', loans: '“How are your loans doing?”', cars: '“How’s the car business?”', fence: '“What’s moving through the back room?”', vending: '“How are the machines doing?”', shakedown: '“How are the collections going?”', odd: '“What are you doing for money these days?”' };
 const HUSTLE_TALK: Record<string, { name: string; good: string; bad: string }> = {
   numbers: { name: 'the numbers', good: 'Everybody plays a number. Some weeks it feels like everybody plays mine.', bad: 'A man hit for big money last week. I’m still paying it out.' },
   bookie: { name: 'his book', good: 'The favourites keep losing. God bless the favourites.', bad: 'Too many winners. Something’s not right, and I mean to find out what.' },
@@ -258,16 +263,16 @@ function racket(x: X): Subject | undefined {
     open: () => {
       if (trust(x) < 0.3) return { lines: [q(t, 'It goes. Why do you ask?')], choices: [] };
       const cs: Choice[] = [];
-      if (late && (h.kind === 'loans' || h.kind === 'bookie' || h.kind === 'numbers')) cs.push(ch(key, 'late', 'Ask who’s been slow to pay', 'Someone always is.'));
-      if (h.kind === 'loans' && !w.debts.some((d) => d.status === 'active' && d.creditor === t.id && d.debtor === p.id)) cs.push(ch(key, 'borrow', 'Ask what he’d lend you', 'His rate, his terms. It becomes a matter between you.'));
-      if (!(p.notes?.[t.id]?.tags ?? []).includes('ears')) cs.push(ch(key, 'ears', 'Ask him to keep his ears open for you', 'A man in his line hears things. You would owe him the courtesy.'));
+      if (late && (h.kind === 'loans' || h.kind === 'bookie' || h.kind === 'numbers')) cs.push(ch(key, 'late', '“Who’s been slow to pay?”', 'Someone always is.'));
+      if (h.kind === 'loans' && !w.debts.some((d) => d.status === 'active' && d.creditor === t.id && d.debtor === p.id)) cs.push(ch(key, 'borrow', '“What would you lend me?”', 'His rate, his terms. It becomes a matter between you.'));
+      if (!(p.notes?.[t.id]?.tags ?? []).includes('ears')) cs.push(ch(key, 'ears', '“Keep your ears open for me, will you?”', 'A man in his line hears things. You would owe him the courtesy.'));
       cs.push(done(key));
       return { lines: [q(t, good ? H.good : H.bad)], choices: cs };
     },
     reply: (x, code) => {
       if (code === 'late' && late) {
         said(w, t, key, 'late');
-        const cs: Choice[] = p.familyId ? [ch(key, 'collect', `Offer to remind ${first(late)} for him`, 'For a cut of what comes back. He may say yes.', true), done(key)] : [done(key)];
+        const cs: Choice[] = p.familyId ? [ch(key, 'collect', `“Want me to remind ${first(late)}?”`, 'For a cut of what comes back. He may say yes.', true), done(key)] : [done(key)];
         (p.insight ??= {})[late.id] = [...new Set([...(p.insight[late.id] ?? []), 'loan:' + t.id])];
         note(p, t, `${late.name} owes him money and has stopped paying.`);
         return { lines: [q(t, `${late.name}. Sweet as you like when he borrowed it. Now I can’t find him.`)], choices: cs };
@@ -286,7 +291,7 @@ function racket(x: X): Subject | undefined {
         said(w, t, key, 'borrow');
         const s = openAsk(w, 'borrow', p, t, { amt: 1000, why: `${p.name} asked ${t.name} about a loan` });
         if (!s) return { lines: [], choices: [] };
-        return { lines: [q(t, 'For you? We can talk. Tell me what you need.'), 'It is between you now. Ask him plainly when you are ready.'], choices: [], go: { node: 'root' } };
+        return { lines: [q(t, 'For you? We can talk. Tell me what you need.'), 'It’s on the table now, between the two of you.'], choices: [], go: { node: 'root' } };
       }
       if (code === 'ears') {
         said(w, t, key, 'ears');
@@ -321,17 +326,17 @@ function wants(x: X): Subject | undefined {
   const boss = live(w, t.bossId);
   return {
     key, sig: kind + ':' + t.rank, weight: 0.2 + t.traits.ambition * 0.35,
-    label: 'Ask what he wants out of all this', hint: 'Ambitious men like to be asked. Guarded men don’t.',
+    label: '“What do you want out of all this?”', hint: 'Ambitious men like to be asked. Guarded men don’t.',
     open: () => {
       if (trust(x) < 0.4) return { lines: [q(t, by(t, { schemer: 'What everybody wants. A little more than I’ve got.', cold: 'That’s my business.', _: 'Oh, the usual things.' }))], choices: [] };
       (p.insight ??= {})[t.id] = [...new Set([...(p.insight[t.id] ?? []), 'want'])];
       note(p, t, 'Wants ' + (({ made: 'to be made', gamble: 'a game of his own', independent: 'to answer to nobody', lieutenant: 'to be close to the top', rich: 'money, real money', respect: 'to be taken seriously' } as Record<string, string>)[kind] ?? 'more') + '.');
       const cs: Choice[] = [];
-      if (kind === 'made' && t.rank === 'associate' && rk(p) >= 2) cs.push(ch(key, 'forward', 'Tell him you’ll put his name forward', 'Your name behind his. If he lets you down, you wear it.', true));
-      else if ((kind === 'made' || kind === 'lieutenant' || kind === 'respect') && boss && !boss.isPlayer && boss.id !== p.id && p.familyId) cs.push(ch(key, 'word', `Say you’ll put in a word with ${first(boss)}`, 'He will owe you. You will have said it.'));
-      if (kind === 'independent') cs.push(ch(key, 'careful', 'Tell him to be careful who he says that to', 'Good advice. He will know you could repeat it.'));
-      if ((kind === 'rich' || kind === 'gamble') && rk(t) <= rk(p) && t.cash < 1500) cs.push(ch(key, 'stake', 'Ask what it would take to get started', 'He may have a number in mind.'));
-      cs.push(ch(key, 'doubt', 'Tell him he isn’t ready', 'True or not, he will hear it.'));
+      if (kind === 'made' && t.rank === 'associate' && rk(p) >= 2) cs.push(ch(key, 'forward', '“I’ll put your name forward.”', 'Your name behind his. If he lets you down, you wear it.', true));
+      else if ((kind === 'made' || kind === 'lieutenant' || kind === 'respect') && boss && !boss.isPlayer && boss.id !== p.id && p.familyId) cs.push(ch(key, 'word', `“I’ll put in a word with ${first(boss)}.”`, 'He will owe you. You will have said it.'));
+      if (kind === 'independent') cs.push(ch(key, 'careful', '“Be careful who you say that to.”', 'Good advice. He will know you could repeat it.'));
+      if ((kind === 'rich' || kind === 'gamble') && rk(t) <= rk(p) && t.cash < 1500) cs.push(ch(key, 'stake', '“What would it take to get you started?”', 'He may have a number in mind.'));
+      cs.push(ch(key, 'doubt', '“You’re not ready.”', 'True or not, he will hear it.'));
       cs.push(done(key));
       const why = t.want?.why ? WHY[t.want.why] : undefined;
       return { lines: [q(t, by(t, WANT[kind] ?? WANT.rich) + (why ? ' ' + why : ''))], choices: cs };
@@ -349,7 +354,7 @@ function wants(x: X): Subject | undefined {
       if (code === 'careful') { regard(w, t, p, 'trust', 0.04, 'advice'); (p.insight ??= {})[t.id] = [...new Set([...(p.insight[t.id] ?? []), 'leaving'])]; return { lines: [q(t, 'I know who I’m talking to. I hope.')], choices: [] }; }
       if (code === 'stake') {
         const amt = Math.max(500, Math.round(t.traits.greed * 2000 / 100) * 100);
-        const cs: Choice[] = p.cash >= amt && !w.debts.some((d) => d.status === 'active' && d.creditor === p.id && d.debtor === t.id) ? [ch(key, 'fund', `Stake him ${money(amt)}`, 'A loan at five a week. A man with a start remembers who gave it him.', true), done(key)] : [done(key)];
+        const cs: Choice[] = p.cash >= amt && !w.debts.some((d) => d.status === 'active' && d.creditor === p.id && d.debtor === t.id) ? [ch(key, 'fund', `“I’ll stake you ${money(amt)}.”`, 'A loan at five a week. A man with a start remembers who gave it him.', true), done(key)] : [done(key)];
         return { lines: [q(t, `${money(amt)}, maybe. Enough to start.`)], choices: cs };
       }
       if (code === 'fund') {
@@ -380,19 +385,24 @@ function opinion(x: X): Subject | undefined {
   const wrong = hate ? Object.values(w.facts).filter((f) => f.actor === o.id && f.victim === t.id && t.known[f.id]?.knowsActor && !f.minor).sort((a, b) => b.t - a.t)[0] : undefined;
   return {
     key, sig: hate ? 'h' + Math.round(pick.r.grudge * 4) : 'a', weight: hate ? 0.2 + pick.r.grudge * 0.5 + (arch(t) === 'hothead' ? 0.15 : 0) : 0.15,
-    label: `Ask what he makes of ${first(o)}`, hint: hate ? 'You have a feeling you know.' : 'He seems to rate him.',
+    label: `“What do you make of ${first(o)}?”`, hint: hate ? 'You have a feeling you know.' : 'He seems to rate him.',
     nudge: hate && pick.r.grudge > 0.6 && arch(t) === 'hothead' ? `${first(t)} says ${first(o)}’s name like he is spitting out a seed.` : undefined,
     open: () => {
       note(p, t, hate ? `Can’t stand ${o.name}.${wrong ? ' Says he has reason.' : ''}` : `Thinks highly of ${o.name}.`);
       if (!hate) {
         const cs: Choice[] = [];
-        if (!p.intro?.[o.id] && peek(p, o.id).trust < 0.3) cs.push(ch(key, 'intro', `Ask him to introduce you to ${first(o)}`, 'A friend of a friend starts better than a stranger.'));
+        if (!p.intro?.[o.id] && peek(p, o.id).trust < 0.3) cs.push(ch(key, 'intro', `“Could you introduce me to ${first(o)}?”`, 'A friend of a friend starts better than a stranger.'));
         cs.push(done(key));
-        return { lines: [q(t, by(t, { jovial: `${first(o)}? Salt of the earth. I’d trust him with my sister.`, cold: `${first(o)} does what he says. There aren’t many.`, _: `${first(o)} is a good man. One of the few.` }))], choices: cs };
+        const n = first(o), tp = temper(t);
+        const pool = tp.agreeable + tp.empathy > 1.15 ? [`${n}? Salt of the earth. I’d trust him with my sister.`, `${n} looked after me when nobody else would.`, `I’d go through a door for ${n}.`]
+          : tp.caution > 0.6 ? [`${n} does what he says. There aren’t many.`, `${n}’s careful. I like careful.`, `You can count on ${n}. That’s rare.`]
+          : tp.pride > 0.6 ? [`${n}’s one of the few I’d call an equal.`, `You want to learn something, watch ${n}.`, `${n} has never once let me down.`]
+          : [`${n} is a good man. One of the few.`, `${n}’s straight. You can’t say that about many.`, `I’ve got a lot of time for ${n}.`];
+        return { lines: [q(t, vary(t, 'adm' + o.id, pool))], choices: cs };
       }
       const why = wrong ? ` After what he did, ${wrong.kind === 'beating' ? 'putting his hands on me' : wrong.kind === 'poach' ? 'taking what was mine' : 'that business'}, what do you think?` : '';
-      const cs: Choice[] = [ch(key, 'agree', `Say you never liked ${first(o)} either`, `He will warm to you. ${first(o)} may hear of it.`), ch(key, 'defend', `Stick up for ${first(o)}`, 'He may respect it. He may not.')];
-      if (wrong || pick.r.grudge > 0.45) cs.push(ch(key, 'more', 'Ask what’s really between them', 'There’s a story. You might do something about it.'));
+      const cs: Choice[] = [ch(key, 'agree', `“I never liked ${first(o)} either.”`, `He will warm to you. ${first(o)} may hear of it.`), ch(key, 'defend', `“${first(o)}’s all right. Give him a chance.”`, 'He may respect it. He may not.')];
+      if (wrong || pick.r.grudge > 0.45) cs.push(ch(key, 'more', '“What’s really between you two?”', 'There’s a story. You might do something about it.'));
       cs.push(done(key));
       return { lines: [q(t, by(t, { hothead: `${first(o)}? I’d like to break his face.${why}`, bitter: `${first(o)} smiles at you and counts your pockets.${why}`, cold: `I don’t think about ${first(o)}. When I do, it isn’t kindly.${why}`, frightened: `I keep away from ${first(o)}. That’s all I’ll say.`, _: `I’ve no use for ${first(o)}.${why}` }))], choices: cs };
     },
@@ -437,24 +447,27 @@ function family(x: X): Subject | undefined {
   const key = 'kin:' + kin.id;
   const hurt = Object.values(w.facts).filter((f) => f.victim === kin.id && (f.kind === 'beating' || f.kind === 'vandalism') && w.now - f.t < 30 * DAY && t.known[f.id]).sort((a, b) => b.t - a.t)[0];
   const venge = (w.situations ?? []).find((s) => s.kind === 'revenge' && isOpen(s) && s.parties?.some((y) => y.id === t.id && y.role === 'avenger'));
-  const what = kin.rank === 'civilian' ? (ownerBiz(w, kin.id) ? `has ${ownerBiz(w, kin.id)!.name}` : 'works straight, God help him') : `is with the ${kin.familyId ? w.fam[kin.familyId].name : ''} people${kin.familyId !== t.familyId ? ', which makes Christmas interesting' : ''}`;
+  const fam = kin.familyId ? w.fam[kin.familyId].name : '';
+  const what = kin.rank === 'civilian' ? (ownerBiz(w, kin.id) ? `has ${ownerBiz(w, kin.id)!.name}` : vary(t, 'kw' + kin.id, ['works straight, God help him', 'has a regular job and a regular life', 'keeps out of all this, thank God']))
+    : kin.familyId !== t.familyId ? vary(t, 'kf' + kin.id, [`is with the ${fam} people, which makes Christmas interesting`, `went with the ${fam} people. We don’t talk business at the table`, `is a ${fam} man. Blood’s blood, but I watch what I say`])
+    : vary(t, 'ks' + kin.id, [`is with us, with the ${fam} people`, `is one of ours. I keep an eye on him`, `came in with the ${fam} people same as me`]);
   return {
     key, sig: `${kin.rank}:${hurt?.id ?? ''}:${venge?.id ?? ''}`, weight: 0.15 + (hurt ? 0.35 : 0) + (arch(t) === 'jovial' || arch(t) === 'earnest' ? 0.1 : 0),
-    label: hurt ? `Ask about his ${k.role} ${first(kin)}, after what happened` : `Ask about his ${k.role} ${first(kin)}`, hint: hurt ? 'It is fresh.' : 'Family is what men talk about when they trust you.',
+    label: hurt ? `“How’s ${first(kin)}? After what happened.”` : `“How’s your ${k.role} ${first(kin)}?”`, hint: hurt ? 'It is fresh.' : 'Family is what men talk about when they trust you.',
     open: () => {
       (p.insight ??= {})[t.id] = [...new Set([...(p.insight[t.id] ?? []), 'tie:' + kin.id])];
-      note(p, t, `His ${k.role} is ${kin.name}, who ${what.replace(', which makes Christmas interesting', '')}.`);
+      note(p, t, `His ${k.role} is ${kin.name}${kin.rank === 'civilian' ? (ownerBiz(w, kin.id) ? `, who has ${ownerBiz(w, kin.id)!.name}` : ', who is not in the life') : `, with the ${fam} people`}.`);
       if (hurt) {
         const cs: Choice[] = [];
-        if (venge) { know(w, venge, p.id, 2, 'told by ' + t.id); cs.push(ch(key, 'calm', 'Tell him not to do anything stupid', 'He is going to do something. You might stop him.')); }
-        cs.push(ch(key, 'help', 'Tell him if he needs anything, he knows where you are', 'A man remembers who came by.'));
+        if (venge) { know(w, venge, p.id, 2, 'told by ' + t.id); cs.push(ch(key, 'calm', '“Don’t do anything stupid.”', 'He is going to do something. You might stop him.')); }
+        cs.push(ch(key, 'help', '“If you need anything, you know where I am.”', 'A man remembers who came by.'));
         cs.push(done(key));
         return { lines: [q(t, venge ? `My ${k.role}. They put him in the hospital. I know who did it, and I’m not going to sit here.` : `They hurt my ${k.role}. He says leave it. I don’t know if I can.`)], choices: cs };
       }
       const cs: Choice[] = [];
-      if (!p.intro?.[kin.id] && peek(p, kin.id).trust < 0.3 && trust(x) >= 0.4) cs.push(ch(key, 'meet', `Ask to meet ${first(kin)}`, 'Family vouches for family.'));
+      if (!p.intro?.[kin.id] && peek(p, kin.id).trust < 0.3 && trust(x) >= 0.4) cs.push(ch(key, 'meet', `“I’d like to meet ${first(kin)}.”`, 'Family vouches for family.'));
       cs.push(done(key));
-      return { lines: [q(t, `${first(kin)}? My ${k.role}. He ${what}.`), by(t, { jovial: 'He tells you a story about the two of them and a stolen ice cream truck. You suspect it has grown over the years.', bitter: 'They don’t seem to speak much.', _: 'He says it with some pride.' })], choices: cs };
+      return { lines: [q(t, `${first(kin)}? My ${k.role}. ${FEMALE.includes(first(kin)) ? 'She' : 'He'} ${what}.`), peek(t, kin.id).grudge > 0.3 ? 'They don’t seem to speak much.' : peek(t, kin.id).affection > 0.6 ? vary(t, 'kk' + kin.id, ['He tells you a story about the two of them and a stolen ice cream truck. You suspect it has grown over the years.', 'He says it with some pride.', 'His face softens when he says the name.']) : vary(t, 'kn' + kin.id, ['He leaves it there.', 'He says it the way you mention the weather.'])], choices: cs };
     },
     reply: (x, code) => {
       said(w, t, key, code);
@@ -474,13 +487,13 @@ function hisBoss(x: X): Subject | undefined {
   const key = 'boss';
   return {
     key, sig: sour ? 'sour' : 'ok', weight: 0.12 + (sour ? 0.3 : 0),
-    label: `Ask how he finds working for ${first(b)}`, hint: 'He may tell you. He may tell him you asked.',
+    label: `“How do you find working for ${first(b)}?”`, hint: 'He may tell you. He may tell him you asked.',
     open: () => {
       if (trust(x) >= 0.4 && !sour) note(p, t, `Speaks well of ${b.name}.`);
       if (trust(x) < 0.4 || !sour) return { lines: [q(t, by(t, { proud: `${first(b)} is a man you can follow.`, cold: `He pays, I work.`, jovial: `${first(b)}? Never a dull day.`, _: `${first(b)}’s fair, mostly.` }))], choices: [] };
       (p.insight ??= {})[t.id] = [...new Set([...(p.insight[t.id] ?? []), 'sour:' + b.id])];
       note(p, t, `Has no love for ${b.name}.`);
-      return { lines: [q(t, by(t, { bitter: `${first(b)} eats first, eats most, and tells us we’re family.`, hothead: `One of these days I’ll tell ${first(b)} what I think of him.`, schemer: `${first(b)} won’t be there forever. Men should think about that.`, _: `Between us? I’ve had better.` }))], choices: [ch(key, 'same', 'Say you’d feel the same', 'He will trust you more. You have agreed to something.'), ch(key, 'loyal', `Tell him ${first(b)} deserves better than that`, 'Loyalty, said aloud. He will remember which side you took.'), done(key)] };
+      return { lines: [q(t, by(t, { bitter: `${first(b)} eats first, eats most, and tells us we’re family.`, hothead: `One of these days I’ll tell ${first(b)} what I think of him.`, schemer: `${first(b)} won’t be there forever. Men should think about that.`, _: `Between us? I’ve had better.` }))], choices: [ch(key, 'same', '“I’d feel the same.”', 'He will trust you more. You have agreed to something.'), ch(key, 'loyal', `“${first(b)} deserves better than that.”`, 'Loyalty, said aloud. He will remember which side you took.'), done(key)] };
     },
     reply: (x, code) => {
       said(w, t, key, code);
@@ -506,8 +519,8 @@ function tellOn(x: X): Subject | undefined {
   const key = 'tell:' + c.id;
   return {
     key, sig: 'x', weight: 0.25,
-    label: `Mention what you’ve heard about ${first(c)}`, hint: `${first(c)} has been talking about going his own way. Telling ${first(t)} is a choice.`,
-    open: () => ({ lines: [`You could tell ${first(t)} what ${first(c)} said to you. Once it is said, it is said.`], choices: [ch(key, 'tell', `Tell him ${first(c)} is looking for a way out`, `${first(t)} will be grateful. ${first(c)} will not, if he finds out.`, true), ch(key, 'end', 'Keep it to yourself')] }),
+    label: `“I heard something about ${first(c)}.”`, hint: `${first(c)} has been talking about going his own way. Telling ${first(t)} is a choice.`,
+    open: () => ({ lines: [`You could tell ${first(t)} what ${first(c)} said to you. Once it is said, it is said.`], choices: [ch(key, 'tell', `“${first(c)} is looking for a way out.”`, `${first(t)} will be grateful. ${first(c)} will not, if he finds out.`, true), ch(key, 'end', '“Never mind. It’s nothing.”')] }),
     reply: (x, code) => {
       if (code !== 'tell') return { lines: [], choices: [] };
       (t.talk ??= {})['told:' + c.id] = { d: day(w), sig: 'x', n: 1 };
@@ -531,12 +544,12 @@ function pressed(x: X): Subject | undefined {
   const sit = s, ag = a;
   return {
     key, sig: String(last ?? ''), weight: 0.55 + (arch(t) === 'frightened' ? 0.15 : 0),
-    label: 'Ask if anyone’s been bothering him', hint: 'He looks like a man waiting for someone to come back.',
+    label: '“Anyone been bothering you?”', hint: 'He looks like a man waiting for someone to come back.',
     nudge: arch(t) === 'frightened' || last === 'no' ? `${first(t)} looks past you at the door when it opens.` : undefined,
     open: () => {
       // what you already know can open him up: a man who sees you know is a man with less to hide
       const heard = Object.keys(p.known).some((id) => w.facts[id]?.story === 'sit:' + s.id);
-      if (trust(x) < 0.3 && !(heard && s.m?.['heard:' + p.id])) return { lines: [q(t, 'Nobody. Why? What have you heard?')], choices: heard ? [ch(key, 'heard', `Say you heard ${first(a)} came round`, 'He will know it is out. He may be glad to say it.')] : [] };
+      if (trust(x) < 0.3 && !(heard && s.m?.['heard:' + p.id])) return { lines: [q(t, 'Nobody. Why? What have you heard?')], choices: heard ? [ch(key, 'heard', `“I heard ${first(a)} came round.”`, 'He will know it is out. He may be glad to say it.')] : [] };
       return tell();
     },
     reply: (x, code) => {
@@ -549,8 +562,8 @@ function pressed(x: X): Subject | undefined {
       note(p, t, `${ag.name} has been leaning on him for ${money(sit.terms?.amt ?? 0)} a week${b ? ` for ${b.name}` : ''}.`);
       const cs: Choice[] = [];
       if (p.familyId) {
-        cs.push(ch(key, 'mine', 'Offer to look after him yourself', `Then ${first(ag)} is your problem, and his people will notice.`, true));
-        cs.push(ch(key, 'warn', `Say you’ll tell ${first(ag)} to leave him alone`, 'A promise. And a conversation you will have to have.', true));
+        if (!b || mayAsk(w, 'protect', p, t, b.id)) cs.push(ch(key, 'mine', '“I’ll look after you myself.”', `Then ${first(ag)} is your problem, and his people will notice.`, true));
+        cs.push(ch(key, 'warn', `“I’ll tell ${first(ag)} to leave you alone.”`, 'A promise. And a conversation you will have to have.', true));
       }
       cs.push(done(key));
       return { lines: [q(t, last === 'no' ? `${ag.name} came in. ${money(sit.terms?.amt ?? 0)} a week, or else. I told him where to go. Now I wait for the or else.` : last === 'stall' ? `${ag.name} wants ${money(sit.terms?.amt ?? 0)} a week. I told him I’d think about it. I’m thinking.` : `${ag.name} has been coming round. You know what he wants.`)], choices: cs };
@@ -559,13 +572,13 @@ function pressed(x: X): Subject | undefined {
       said0(code);
       if (code === 'mine' && b) {
         const m = openAsk(w, 'protect', p, t, { biz: b.id, amt: Math.max(15, Math.round((sit.terms?.amt ?? 40) * 0.8 / 5) * 5), why: `${t.name} turned to ${p.name} when ${ag.name} leaned on him` });
-        if (!m) return { lines: [], choices: [] };
+        if (!m) return { lines: [q(t, askBetween(w, 'protect', p.id, t.id) ? 'You already made me an offer. I’m still thinking about it.' : 'Not now. Too many people want something from me this week.')], choices: [] }; // (he answers, even when nothing can come of it today)
         const S = stance(w, m, t.id); S.good = clamp(S.good + 0.3); S.resolve = clamp(S.resolve - 0.2);
-        return { lines: [q(t, 'You? And what happens when he comes back?'), 'It is between you now. Put your terms to him when you are ready.'], choices: [], go: { node: 'root' } };
+        return { lines: [q(t, 'You? And what happens when he comes back?'), 'It’s on the table now, between the two of you.'], choices: [], go: { node: 'root' } };
       }
       if (code === 'warn') {
         const m = openAsk(w, 'warn', p, ag, { about: sit.id, why: `${p.name} said he would tell ${ag.name} to leave ${t.name} alone` });
-        if (!m) return { lines: [], choices: [] };
+        if (!m) return { lines: [q(t, 'You’ve already said you would. I’m holding you to it.')], choices: [] };
         t.memos.push({ id: 'm' + w.nextId++, t: w.now, other: p.id, kind: 'promise', text: `You said you would tell ${ag.name} to leave him alone.`, due: w.now + 7 * DAY });
         warm(x, 0.06, 'stood-up'); regard(w, t, p, 'trust', 0.05, 'stood-up');
         return { lines: [q(t, 'You’d do that for me?'), `You will have to go and see ${first(ag)}. It is on your list, and ${first(t)} is counting on it.`], choices: [] };

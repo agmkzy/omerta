@@ -50,3 +50,7 @@ export function rollName(rand: Rand, taken: Iterable<string> = []): { first: str
 // What a typed name may contain: letters (accents included), spaces, apostrophes, hyphens and full stops.
 export const cleanName = (s: string) => s.replace(/[^\p{L}\p{M}' ’.\-]/gu, '').replace(/\s+/g, ' ').slice(0, 20);
 export const fullName = (first: string, last: string) => `${first.trim()} ${last.trim()}`.trim();
+
+// Women's first names (world.ts makes the women of the city from it; kin and talk use it to say sister, and she). (V90: here so
+// modules that only need the names don't load the world generator)
+export const FEMALE = ['Rosa', 'Maria', 'Angela', 'Connie', 'Gina', 'Theresa', 'Lucia', 'Donna', 'Carla', 'Paula', 'Francesca', 'Josephine', 'Marie', 'Lena', 'Carmela', 'Dolores', 'Nina', 'Antonia', 'Bernadette', 'Sophia'];

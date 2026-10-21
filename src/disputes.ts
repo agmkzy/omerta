@@ -1,5 +1,6 @@
 // Disputes are things in the world, not menus. A quarrel starts from an incident, then goes on without anyone watching:
 // the injured side asks its superiors, the other side presses or backs off, someone plans a reply, a sit-down gets called, terms are agreed and sometimes broken.
+import { temper, viewOf } from './temper';
 import { addEnc } from './encounters';
 import { addFact, clamp, famName, money, ownerBiz, rel, witnessesAt } from './core';
 import { Character, DAY, Dispute, Fact, Id, World } from './types';
@@ -88,12 +89,13 @@ export function disputeTick(w: World) {
     const rng = w.rng;
     // The man who did it: press, ease off, or make an offer.
     if (!b.isPlayer) {
-      const fear = rel(b, a.id).respect * 0.5 + (a.rank === 'capo' || a.rank === 'soldier' ? 0.2 : 0);
+      // (V90: what he fears of the man, not how much he respects him: temper.ts keeps the two apart)
+      const fear = viewOf(w, b, a).fear * 0.6 + (a.rank === 'capo' || a.rank === 'soldier' ? 0.2 : 0);
       const roll = rng.next();
       if (roll < 0.45 - fear * 0.3 + b.traits.greed * 0.2 && biz?.open) {
         log(w, d, `${b.name} keeps leaning on ${biz.name}. The owner is getting nervous about who he will end up paying.`);
         if (biz.protection && biz.protection.collectorId === a.id && rng.chance(0.2)) { biz.protection.hold = w.now + 8 * 1440; log(w, d, `${biz.name} is holding back its envelope. It says it’s not sure who to give it to.`); }
-      } else if (roll < 0.6 && rng.chance(b.traits.caution + 0.2)) {
+      } else if (roll < 0.6 && rng.chance(temper(b).caution + 0.2)) {
         const comp = Math.min(Math.max(0, b.cash), rng.int(100, 300));
         if (comp > 0) { a.cash += comp; b.cash -= comp; }
         rel(b, a.id).grudge = clamp(rel(b, a.id).grudge - 0.05);
@@ -105,11 +107,11 @@ export function disputeTick(w: World) {
     // The injured side, if it isn't the player: take it up the chain, or plan a reply.
     if (!a.isPlayer) {
       const boss = a.bossId ? w.chars[a.bossId] : undefined;
-      const goes = boss?.alive && !(w.pending ?? []).some((q) => q.kind === 'dispute' && q.a === a.id && q.b === b.id) && rng.chance(0.4 + a.traits.caution * 0.2 - a.traits.violence * 0.25);
+      const goes = boss?.alive && !(w.pending ?? []).some((q) => q.kind === 'dispute' && q.a === a.id && q.b === b.id) && rng.chance(0.4 + temper(a).caution * 0.2 - temper(a).volatility * 0.25);
       if (goes) {
         (w.pending ??= []).push({ id: 'p' + w.nextId++, due: w.now + rng.int(2, 4) * DAY, kind: 'dispute', a: a.id, b: b.id, c: boss!.id, tries: 0, note: 'true' });
         log(w, d, `${a.name} took it to ${boss!.name}, who says he’ll raise it.`);
-      } else if (a.traits.violence + rel(a, b.id).grudge > 0.9 && rng.chance(0.3) && a.hurtUntil <= w.now) {
+      } else if (a.traits.violence * 0.5 + temper(a).volatility * 0.5 + rel(a, b.id).grudge > 0.9 && rng.chance(0.3) && a.hurtUntil <= w.now) {
         planReply(w, a, b, d);
       }
     }

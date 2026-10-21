@@ -123,6 +123,8 @@ function audience(w: World, c: Character): Id[] {
   const pl = crew.find((x) => x.isPlayer);
   if (pl) add(pl);
   for (const x of crew.slice(0, 6)) add(x);
+  // (and the friends he talks to: a man with no boss, no family and no crew still has somebody who hears his news)
+  for (const [id] of Object.entries(c.rels).filter(([, r]) => r.affection >= 0.4 || r.trust >= 0.45).sort((a, b) => (b[1].affection + b[1].trust) - (a[1].affection + a[1].trust)).slice(0, 3)) add(w.chars[id]);
   return out;
 }
 const nm = (w: World, id?: Id | null) => (id && w.chars[id] ? w.chars[id].name : undefined);

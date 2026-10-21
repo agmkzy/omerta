@@ -3,6 +3,7 @@
 // heard of; each story says where it stands in words, what he knows in order (when he learned each thing, and from whom), who is in
 // it, what he can do, and, honestly, what he does not know. Nothing here is read from what the world knows privately: only facts the
 // player has seen or been told (p.known), the records he is himself a party to, and the words the matters give for where they stand.
+import { classOf } from '../exchange';
 import { asker, askee, playerMoves, read as mRead, titleOf as mTitle } from '../asks';
 import { factText, fmtTime, money } from '../core';
 import { versionOf, youText } from '../rumour';
@@ -98,7 +99,7 @@ function originOf(w: World, p: Character, s: Situation): string {
     case 'grudge': return 'A man passed over';
     case 'climb': return 'Ambition';
     case 'debt': case 'tribute': return 'Money owed';
-    case 'ask': return s.ak === 'warn' ? 'A warning' : s.ak === 'collect' ? 'Money owed' : s.ak === 'permit' ? 'A man asking leave' : 'A request';
+    case 'ask': return s.ak === 'warn' ? 'A warning' : s.ak === 'collect' ? 'Money owed' : s.ak === 'permit' ? 'A man asking leave' : s.ak === 'protect' ? 'Protection' : ({ demand: 'A demand', request: 'A request', offer: 'An offer', claim: 'Something owed' } as Record<string, string>)[classOf(s)];
   }
   const o = s.kind ? ORIGIN[s.kind] : undefined;
   return o ? ORIGIN_WORD[o] : 'Something going on';
@@ -325,7 +326,9 @@ function askStory(w: World, p: Character, s: Situation, closed: boolean, facts: 
     if (his && yours) terms.push(['Your answer', yours]);
     if (mine && !closed && St) terms.push(['How he seems', mRead(w, s, t.id)]);
   }
-  const moves: Act[] = mine && !closed ? playerMoves(w, p, s).map((m) => ({ a: `am:${s.id}|${m.move}`, label: m.label, hint: m.hint, off: m.off, big: !m.off && ['force', 'pressure', 'leverage', 'take'].includes(m.move) })) : [];
+  // (V90: what you say about it, you say to him: the page shows where it stands, and the way to him. Only letting it drop can be
+  // done from a distance.)
+  const moves: Act[] = mine && !closed ? playerMoves(w, p, s).filter((m) => m.move === 'drop').map((m) => ({ a: `am:${s.id}|${m.move}`, label: 'Let it drop', hint: m.hint })) : [];
   return {
     key: 'sit:' + s.id, kind: 'matter', title: mTitle(w, s), closed, stage: where, origin: originOf(w, p, s),
     group: pending || (mine && !closed && ['counter', 'no', 'stall'].includes(St?.last ?? '')) ? 'now' : mine || his ? 'in' : 'heard',
@@ -335,7 +338,7 @@ function askStory(w: World, p: Character, s: Situation, closed: boolean, facts: 
     people: peopleOf(w, p, s, facts, mTitle(w, s)), terms, pending,
     unknown: unknownOf(w, p, s, facts, mine || his),
     waiting: !closed && mine && !answer ? `It is with ${first(t)}. He will answer in his own time.` : !closed && !mine && !his ? `It is between ${first(a)} and ${first(t)}.` : undefined,
-    actions: closed ? [] : [...moves, ...(other ? [{ a: `talk:${other.id}`, label: `Go and see ${first(other)}`, hint: mine ? 'Take it up with him face to face.' : 'Hear him out.' }] : [])],
+    actions: closed ? [] : [...(other ? [{ a: mine ? `talkm:${other.id}|${s.id}` : `talk:${other.id}`, label: `Go and see ${first(other)}`, hint: mine ? 'Take it up with him face to face.' : 'Hear him out.' }] : []), ...moves],
   };
 }
 

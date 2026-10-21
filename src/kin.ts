@@ -2,6 +2,7 @@
 // family: men who carry the same name are brothers or cousins, and they look out for each other (or resent each other).
 // Nothing is stored: ties are read from names (and, for the player, from his own kin record), the same way for a new game and for
 // a save made long before V89, so no relatives are ever added to an existing game and the save does not grow.
+import { FEMALE } from './names';
 import type { Character, Id, World } from './types';
 
 export type KinRole = 'brother' | 'cousin' | 'mother' | 'sister' | 'son' | 'daughter' | 'father' | 'kin';
@@ -44,7 +45,7 @@ export function kinOf(w: World, c: Character): Tie[] {
       const line = (id: string) => hash(surname(c) + '#' + id) % lines;
       for (const id of same) {
         if (id === c.id) continue;
-        if (line(id) === line(c.id)) out.push({ id, role: 'brother' });
+        if (line(id) === line(c.id)) out.push({ id, role: FEMALE.includes((w.chars[id]?.name ?? '').split(' ')[0]) ? 'sister' : 'brother' }); // (V90: a woman of the same line is a sister)
         else if (hash([c.id, id].sort().join(':')) % 100 < 7) out.push({ id, role: 'cousin' });
       }
     }

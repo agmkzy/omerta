@@ -2,6 +2,7 @@ import { hasPerk } from './specs';
 // Opportunities: work that turns up because of what is going on around you, not because a list says it's time.
 // Each one is tied to real people and real places (a shop owner, a truck going to a real address, a bookie's actual bag),
 // and what you do about it changes how those people feel and what the families make of you.
+import { temper } from './temper';
 import { bizMove } from './econ';
 import { addFact, clamp, earn, money, notifyProtector, ownerBiz, rel, witnessesAt } from './core';
 import { addFavour } from './encounters';
@@ -287,7 +288,7 @@ export function gigResolve(w: World, j: Job, doer: Character, code: string): Res
       lines.push(`The bag gets where it’s going. ${bk.name} pays you ${money(gained)}.`);
       if (dip) {
         earn(doer, dip, 'side');
-        const caught = rng.chance(0.45 + bk.traits.caution * 0.35);
+        const caught = rng.chance(0.45 + temper(bk).caution * 0.35);
         lines.push(`You keep ${money(dip)}.`);
         if (caught) {
           rel(bk, doer.id).trust = clamp(rel(bk, doer.id).trust - 0.3); rel(bk, doer.id).grudge = clamp(rel(bk, doer.id).grudge + 0.2); rel(bk, doer.id).respect = clamp(rel(bk, doer.id).respect - 0.15);

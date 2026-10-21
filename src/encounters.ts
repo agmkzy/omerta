@@ -8,7 +8,7 @@ import { bizMove, clearArrears, evidence, giveTime, owedOf, takeFromBiz } from '
 import { sitdownChoose, callSitdown } from './disputes';
 import { investChoose } from './reports';
 import { addFact, clamp, createDebt, earn, factText, learn, money, newId, ownerBiz, payDebt, rel, shortTime } from './core';
-import { DAY, Character, Enc, EncOpt, Fact, Favour, Id, LifeEvent, World } from './types';
+import { DAY, Character, Enc, EncOpt, Fact, Favour, Id, LifeEvent, ProblemKind, World } from './types';
 import { Arch, arch, hash, pick } from './voice';
 
 const PL = (w: World) => w.chars[w.playerId!];
@@ -58,17 +58,23 @@ function loanAsk(w: World, p: Character): Cand[] {
   }
   return out;
 }
+// what the money is really for, as he would admit it
+const ADMIT: Record<ProblemKind, string> = {
+  gambling: 'It’s the cards. I can’t leave them alone', debt: 'I owe the wrong people', family: 'It’s trouble at home', drink: 'It’s the drink',
+  house: 'I’m putting money by to get out', resentment: 'I’m tired of carrying other people. I’m owed more than I get', woman: 'There’s a woman. She costs',
+};
 export function makeLoan(w: World, p: Character, c: Character) {
   const amt = Math.round((c.rank === 'civilian' ? w.rng.int(200, 700) : w.rng.int(250, 900)) / 50) * 50;
   const pr = c.problem?.kind;
+  // (each a whole sentence in his own mouth, so it reads however it is put)
   const stated: Record<string, string[]> = {
-    gambling: ['my brother-in-law got into something and I said I would cover it', 'the car is finished and I need it for work', 'a hospital bill, my wife\'s sister'],
-    debt: ['I’m behind on something I shouldn’t be behind on', 'a man I owe is getting impatient'],
-    family: ['my mother needs looking after and it costs more than I make', 'my kid needs something I can’t say no to'],
-    drink: ['rent, and I don’t want to talk about how it got this far', 'I got behind. It happens'],
-    house: ['the roof, the landlord, the whole building is coming down on us', 'we lost the lease and I have to put money down somewhere new'],
-    woman: ['a family matter, I would rather not say', 'there’s someone I have to look after, and I’ll leave it there'],
-    resentment: ['an opportunity, a thing that needs front money', 'I have a way to turn it over, I just need the stake'],
+    gambling: ['My brother-in-law got into something and I said I would cover it', 'The car is finished and I need it for work', 'It’s a hospital bill. My wife’s sister'],
+    debt: ['I’m behind on something I shouldn’t be behind on', 'A man I owe is getting impatient'],
+    family: ['My mother needs looking after, and it costs more than I make', 'My kid needs something I can’t say no to'],
+    drink: ['It’s rent, and I don’t want to talk about how it got this far', 'I got behind. It happens'],
+    house: ['The roof, the landlord, the whole building is coming down on us', 'We lost the lease and I have to put money down somewhere new'],
+    woman: ['It’s a family matter. I would rather not say', 'There’s someone I have to look after, and I’ll leave it there'],
+    resentment: ['There’s an opportunity, a thing that needs front money', 'I have a way to turn it over. I just need the stake'],
   };
   const reason = pick(stated[pr ?? 'resentment'] ?? stated.resentment, c.id + w.now);
   const lead = by(c, 'loan' + w.now, {
@@ -83,7 +89,7 @@ export function makeLoan(w: World, p: Character, c: Character) {
   });
   addEnc(w, {
     kind: 'loan', from: c.id, title: `${first(c)} needs money`,
-    lines: [`${c.name} catches you alone.`, `"${lead} It’s ${reason}. ${money(amt)}, and I’ll make it right."`],
+    lines: [`${c.name} catches you alone.`, `“${lead} ${reason}. ${money(amt)}, and I’ll make it right.”`],
     opts: [
       { code: 'lend', label: `Lend him ${money(amt)}`, hint: 'On the book, with the usual weekly. He owes you, and so does his word.' },
       { code: 'give', label: 'Give it to him. Call it nothing.', hint: 'No book, no vig. Worth more than money, if he’s the type to remember.' },
@@ -609,17 +615,18 @@ function loan(w: World, p: Character, e: Enc, c: Character, code: string, lines:
     const pr = clamp(0.3 + r.trust * 0.4 + (['earnest', 'frightened'].includes(arch(c)) ? 0.2 : arch(c) === 'proud' ? -0.15 : 0), 0.1, 0.9);
     if (real && w.rng.chance(pr) && c.problem) {
       c.problem.revealed = true;
+      const said = ADMIT[c.problem.kind];
       lines.push(`${c.name} looks at the floor. ${by(c, 'real' + e.id, {
-        proud: [`"It’s ${PROBLEM_LABEL[c.problem.kind]}. I should have come sooner."`],
-        frightened: [`"${PROBLEM_LABEL[c.problem.kind]}. I didn’t want you to know. Please don’t think less of me."`],
-        earnest: [`"It’s ${PROBLEM_LABEL[c.problem.kind]}. I didn’t want to say."`],
-        _: [`"It’s ${PROBLEM_LABEL[c.problem.kind]}. Now you know."`],
+        proud: [`“${said}. I should have come sooner.”`],
+        frightened: [`“${said}. I didn’t want you to know. Please don’t think less of me.”`],
+        earnest: [`“${said}. I didn’t want to say.”`],
+        _: [`“${said}. Now you know.”`],
       })}`);
       e.opts = e.opts.filter((o) => o.code !== 'ask');
       return keep(15);
     }
     r.trust = clamp(r.trust - 0.04);
-    lines.push(`${c.name} stiffens. "I told you what it’s for." You’re not sure whether that was the truth or just his pride.`);
+    lines.push(`${c.name} stiffens. “I told you what it’s for.” You’re not sure whether that was the truth or just his pride.`);
     e.opts = e.opts.filter((o) => o.code !== 'ask');
     return keep(15);
   }

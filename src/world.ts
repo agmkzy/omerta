@@ -1,4 +1,5 @@
 import { ensureOrgs } from './orgs';
+import { FEMALE } from './names';
 import { ensureClubs } from './clubdata';
 import { ambitionInit } from './ambition';
 import { BASE_RATE, emptyBooks } from './books';
@@ -131,7 +132,7 @@ function mk(
 }
 
 const LADY_USED = new Set<string>();
-export const FEMALE = ['Rosa', 'Maria', 'Angela', 'Connie', 'Gina', 'Theresa', 'Lucia', 'Donna', 'Carla', 'Paula', 'Francesca', 'Josephine', 'Marie', 'Lena', 'Carmela', 'Dolores', 'Nina', 'Antonia', 'Bernadette', 'Sophia'];
+export { FEMALE }; // (V90: the list lives in names.ts, so modules that only need the names don't load the world generator)
 export function spawnCivilian(w: World, name: string, district: string, cash = 120): Character {
   const used = new Set(Object.values(w.chars).map((c) => c.name));
   let n = name;

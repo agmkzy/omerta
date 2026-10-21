@@ -1,6 +1,7 @@
 // A situation is something going on in the world that has consequences whether or not the player is involved.
 // It emerges from real state (a business losing money, a man in trouble), the people involved respond on their own,
 // and it reaches the player through a believable channel: a conversation, a request for help, or a report.
+import { temper } from './temper';
 import { addFact, clamp, createDebt, money, ownerBiz, rel } from './core';
 import { bizMove } from './econ';
 import { addEnc, addFavour, makeLoan } from './encounters';
@@ -67,7 +68,7 @@ export function situationTick(w: World) {
     // He tries on his own first. Proud and capable men take longer to ask.
     if (s.stage === 'handling' && !s.asked) {
       const t = rel(c, p.id).trust;
-      const proud = c.traits.ambition * 0.5 + c.traits.courage * 0.3;
+      const proud = temper(c).pride * 0.5 + temper(c).courage * 0.3;
       const patience = 1 + Math.round(proud * 2);
       if (s.weeks >= patience && t >= (c.bossId === p.id || c.familyId === p.familyId ? 0.12 : 0.25) && w.enc.filter((e) => e.kind === 'loan' && e.status === 'open').length < 2) {
         s.asked = w.now; s.stage = 'asking'; s.knows = true;
@@ -120,7 +121,7 @@ export function askAbout(w: World, p: Character, c: Character): string[] {
   const s = sitOf(w, c.id);
   if (!s) return [`${c.name}: "Business is business."`];
   const r = rel(c, p.id);
-  const open = r.trust >= 0.4 || s.stage === 'asking' || c.traits.caution < 0.3;
+  const open = r.trust >= 0.4 || s.stage === 'asking' || temper(c).caution < 0.3;
   if (!open) { p.cooldown[`sitask:${c.id}`] = w.now + 3 * DAY; return [`${c.name} shrugs. "Fine. Slow, but fine."`, 'He isn’t telling you everything. Give it time, or ask someone who knows him.']; }
   s.told = true; s.knows = true;
   return [`${c.name} lets out a breath. "Since you ask. ${s.cause.replace(/^./, (m) => m.toUpperCase())}."`, 'He doesn’t ask you for anything. He wants you to see it.'];

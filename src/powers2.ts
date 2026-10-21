@@ -1,5 +1,6 @@
 // What each rank can do, cumulatively. Promotions never take an ability away; they widen what the ones before can reach.
 // Also: the ledger of who made whom, the way a man of rank lives, the underboss's agenda and the Commission.
+import { temper } from './temper';
 import { noteDeal } from './orgs';
 import { addStake, bizMove, stakesOf } from './econ';
 import { orgRecord, treasuryMove } from './orgs';
@@ -557,7 +558,7 @@ export function propose(w: World, p: Character, code: string, fid?: Id): string[
   for (const f of others) {
     const b = w.chars[f.bossId];
     let s = supportOf(w, p, f.id);
-    if (b) { if (code === 'peace' && b.traits.violence > 0.7) s -= 0.2; if (code === 'invest' && b.traits.greed > 0.7) s += 0.1; if (code === 'recognise' && b.traits.ambition > 0.7) s -= 0.15; }
+    if (b) { if (code === 'peace' && temper(b).volatility > 0.7) s -= 0.2; if (code === 'peace' && temper(b).agreeable > 0.65) s += 0.1; if (code === 'invest' && b.traits.greed > 0.7) s += 0.1; if (code === 'recognise' && b.traits.ambition > 0.7) s -= 0.15; }
     const ok = w.rng.chance(clamp(s, 0.05, 0.95));
     if (ok) yes++;
     lines.push(`${b?.name ?? f.name}: ${ok ? 'for' : 'against'}.`);

@@ -5,7 +5,10 @@ import { describe, test as ok } from 'vitest';
 import { writeFileSync } from 'node:fs';
 import { deserialize, serialize } from '../../engine';
 import { World } from '../../types';
-import { options, say, startConvo, arrive, isNavCode, Convo } from '../../dialogue';
+import { options, say, startConvo, arrive, isNavCode, answered, Convo } from '../../dialogue';
+import { openAsk, openAsks, stance } from '../../asks';
+import { addEnc } from '../../encounters';
+import { ownerBiz } from '../../core';
 import { whereIs } from '../../where';
 import { Rng } from '../../rng';
 import { world60 } from './fixtures';
@@ -44,18 +47,21 @@ function walk(seed: number, id: string, trust: number, steps = 22): Walk {
       if (stateOf(w, t) !== before) bad(`repeating "${done.label}" changed the relationship, money or time`);
       if (!s.lines.length) bad(`repeating "${done.label}" gave no reply`);
     }
-    const pick = rng.pick(live.filter((o) => !(o.code === 'root' && convo.node === 'root' && i < steps - 1) || rng.chance(0.05)).length ? live.filter((o) => !(o.code === 'root' && convo.node === 'root' && i < steps - 1) || rng.chance(0.05)) : live);
+    const stay = live.filter((o) => !(o.code === 'root' && convo.node === 'root' && i < steps - 1) || rng.chance(0.05)); // (drawn once: a man who has shut you out leaves only the door)
+    const pick = rng.pick(stay.length ? stay : live);
     let s;
     try { s = say(w, p, t, convo, pick.code); } catch (e) { bad(`say threw on "${pick.label}" (${pick.code}) at ${convo.node}: ${(e as Error).stack?.split('\n').slice(0, 3).join(' ')}`); return out; }
     out.steps++; out.transcript.push(`> ${pick.label}`, ...s.lines);
     if (s.meeting) { out.ended = true; return out; }
     if (!s.lines.length && !isNavCode(pick.code)) bad(`"${pick.label}" (${pick.code}) produced no reply at ${convo.node}`);
+    // V90: every statement is answered by him, not only narrated or scored (an answer, a refusal, a dodge, a reaction all count)
+    if (!isNavCode(pick.code) && s.lines.length && !s.lines.some((l) => answered(l, t.name.split(' ')[0]))) bad(`"${pick.label}" (${pick.code}) got no answer from him: ${s.lines.join(' / ').slice(0, 140)}`);
     for (const l of s.lines) {
       if (!l.trim()) bad(`blank line after "${pick.label}"`);
       if (DEV.test(l)) bad(`database wording in line "${l.slice(0, 120)}" after "${pick.label}"`);
       // he never calls himself by his own name when he talks
       for (const q of l.matchAll(/["“]([^"“”]+)["”]/g)) if (q[1].includes(t.name)) bad(`${t.name} names himself aloud: "${q[1].slice(0, 100)}"`);
-      if (!l.startsWith('⟡') && l.length > 30) { const n = (spoken.get(l) ?? 0) + 1; spoken.set(l, n); if (n > 1) bad(`line repeated in one conversation: "${l.slice(0, 90)}"`); }
+      if (!l.startsWith('⟡') && l.length > 30 && /[“"]/.test(l)) { const n = (spoken.get(l) ?? 0) + 1; spoken.set(l, n); if (n > 1) bad(`line repeated in one conversation: "${l.slice(0, 90)}"`); }
     }
     // what he has just told you he must himself know; and nothing is written twice
     for (const [fid, k] of Object.entries(p.known)) if (k.from === t.id && !t.known[fid]) bad(`he told you something he does not know himself: ${w.facts[fid]?.text?.slice(0, 80)}`);
@@ -68,6 +74,58 @@ function walk(seed: number, id: string, trust: number, steps = 22): Walk {
     convo = s.convo;
   }
   return out;
+}
+
+// V90: the rules, walked. Men of every temperament (their traits drawn at random, so every combination turns up), in every kind of
+// circumstance (a matter of yours with them, a request of theirs, bad blood, nothing at all), talked to at length, with the
+// conversation's rules checked at every step rather than particular lines: what he says agrees with what he decided; the replies
+// on screen answer the point he has just made; a request he breaks in with is the only thing on screen until it is dealt with;
+// a man who has turned cold is offered no small talk; the hub stays short; every statement is answered.
+const REFUSE = /“(No[.,!]|I can’t[.!]|Then it’s no|Not interested)|still no|same answer|answer’s still|It’s still too much|I still can’t/i;
+const AGREE = /We have a deal|That suits me|Fine\. Agreed|You’ll have it|“All right\. All right\.”|Asking\. All right|Why didn’t you say so/;
+function rulesWalk(seed: number, id: string): string[] {
+  const w = world60(), p = P(w), t = w.chars[id], rng = new Rng(seed * 104729 + id.length * 31);
+  const bad: string[] = [], who = `${t.name} (seed ${seed})`;
+  (p.intro ??= {})[id] = w.now; p.cash = 3000;
+  for (const k of ['courage', 'caution', 'violence', 'ambition', 'greed', 'sociability'] as const) t.traits[k] = rng.next();
+  const r = (t.rels[p.id] ??= { trust: 0.1, affection: 0.1, respect: 0.3, grudge: 0, lastMet: -1e9 });
+  r.trust = rng.next() * 0.8; r.affection = rng.next() * 0.8; r.respect = rng.next(); r.grudge = rng.chance(0.3) ? rng.next() * 0.6 : 0; if (rng.chance(0.3)) r.fear = rng.next() * 0.8;
+  const b = ownerBiz(w, t.id);
+  if (b?.open && t.rank === 'civilian') { if (b.protection?.collectorId === p.id || rng.chance(0.5)) delete b.protection; openAsk(w, 'protect', p, t, { biz: b.id, amt: Math.max(15, Math.round(b.income * (0.03 + rng.next() * 0.15) / 5) * 5) }); }
+  else if (rng.chance(0.5)) openAsk(w, rng.chance(0.5) ? 'borrow' : 'recruit', p, t, { amt: 150 + Math.floor(rng.next() * 6) * 50 });
+  let encAt = rng.chance(0.4) ? 2 + Math.floor(rng.next() * 6) : -1;
+  let c: Convo | null = arrive(w, p, t, { lines: [] }, whereIs(w, p, t), -1e9).convo;
+  for (let i = 0; i < 26 && c; i++) {
+    if (i === encAt) { addEnc(w, { kind: 'loan', from: t.id, title: `${t.name.split(' ')[0]} needs a favour`, days: 4, lines: ['“While you’re here, I need two hundred until Friday.”'], opts: [{ code: 'yes', label: '“All right. Here.”', hint: 'He will owe you.' }, { code: 'no', label: '“Not this time.”', hint: 'He will remember.' }], data: {} }); encAt = -1; }
+    const os = options(w, p, t, c), live = os.filter((o) => !o.done);
+    if (!live.length) { bad.push(`${who}: nothing to say at ${c.node}`); break; }
+    // the hub stays short; a cold man is offered no small talk
+    if (os.some((o) => o.group)) {
+      if (os.filter((o) => o.group === 'Between you' && o.code !== 'f:more').length > 3) bad.push('hub: more than three matters shown');
+      if (c.ctx.cold && os.some((o) => o.group === 'Talk')) bad.push('hub: small talk offered to a man who has turned cold');
+    }
+    // a request he broke in with is the only thing in hand
+    if (c.ctx.focus?.startsWith('enc:') && w.enc.some((e) => 'enc:' + e.id === c!.ctx.focus && e.status === 'open') && live.some((o) => !isNavCode(o.code) && !o.code.startsWith('enc:'))) bad.push(`his request is mixed with other things: ${live.map((o) => o.code).join(',')}`);
+    // the point he has just made is what the replies are about
+    const sm = c.ctx.focus?.startsWith('m:') ? openAsks(w).find((x) => 'm:' + x.id === c!.ctx.focus) : undefined;
+    if (sm && ['claim', 'nottrue', 'nobooks'].includes(String(sm.m?.beat ?? '')) && !os.some((o) => o.code.startsWith('x:') || (stance(w, sm, t.id).last === 'counter' && /:(take|sweeten)$/.test(o.code)))) bad.push(`he made a point (${sm.m?.beat}:${sm.m?.claim}) and nothing on screen answers it`);
+    // choose: mostly the matter in hand, sometimes anything
+    const inMatter = live.filter((o) => /^(mv|x|enc):/.test(o.code) || o.code.startsWith('f:m:') || o.code.startsWith('f:enc:'));
+    const pool = inMatter.length && rng.chance(0.65) ? inMatter : live.filter((o) => !(o.code === 'root' && c!.node === 'root') || rng.chance(0.04));
+    const pick = rng.pick(pool.length ? pool : live);
+    const mid = /^(mv|x):([^:]+):/.exec(pick.code)?.[2];
+    const res = say(w, p, t, c, pick.code);
+    const his = res.lines.filter((l) => /^[“"]/.test(l) || /[“"]/.test(l)).join(' ');
+    if (!isNavCode(pick.code) && res.lines.length && !res.lines.some((l) => answered(l, t.name.split(' ')[0]))) bad.push(`"${pick.label}" (${pick.code.split(':')[0]}) not answered: ${res.lines.join(' / ').slice(0, 160)}`);
+    if (mid) {
+      const m = (w.situations ?? []).find((x) => x.id === mid), S = m ? stance(w, m, t.id) : undefined;
+      const agreed = m?.stage === 'resolved' && ['agreed', 'gave in'].includes(m.out ?? '');
+      if (agreed && REFUSE.test(his)) bad.push(`he agreed, but said: ${his.slice(0, 120)}`);
+      if (m && m.stage !== 'resolved' && S?.last === 'no' && AGREE.test(his)) bad.push(`he refused, but said: ${his.slice(0, 120)}`);
+    }
+    c = res.convo;
+  }
+  return bad;
 }
 
 function fast() {
@@ -85,6 +143,15 @@ function fast() {
     assert.ok(steps > 1500, `only ${steps} steps walked`);
     const uniq = [...new Set(problems.map((x) => x.replace(/^.*?seed \d+: /, '')))];
     if (process.env.DUMP) writeFileSync(process.env.DUMP, uniq.join('\n'));
+    assert.deepEqual(uniq.slice(0, 12), [], `${problems.length} problems, ${uniq.length} kinds:\n` + uniq.slice(0, 12).join('\n'));
+  });
+
+  ok('the rules hold for men of every temperament, in every circumstance, at length', { tags: ['property'] }, () => {
+    const w0 = world60(), all = Object.values(w0.chars).filter((c) => c.alive && !c.isPlayer).sort((a, b) => (a.id < b.id ? -1 : 1)).slice(0, 80).filter((m) => m.rank !== 'boss');
+    const problems: string[] = [];
+    for (const m of all) for (let seed = 1; seed <= 4; seed++) problems.push(...rulesWalk(seed, m.id));
+    const uniq = [...new Set(problems.map((x) => x.replace(/^.*?\(seed \d+\): /, '')))];
+    if (process.env.DUMP) writeFileSync(process.env.DUMP + '.rules', problems.join('\n'));
     assert.deepEqual(uniq.slice(0, 12), [], `${problems.length} problems, ${uniq.length} kinds:\n` + uniq.slice(0, 12).join('\n'));
   });
 

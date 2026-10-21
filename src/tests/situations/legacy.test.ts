@@ -18,6 +18,14 @@ describe('legacy situations', () => {
   ok('8. existing encounters, meetings and legacy situations still work beside the new ones', { tags: ['sim'] }, () => {
     const w = createWorld(4, 'Tony Marino'); advance(w, w.now + 120 * DAY);
     assert.deepEqual(audit(w), []);
+    // (whether a man near the player happens to fall into money trouble in one seeded run is chance (V90 changed that run's
+    // history); the check is that the old loop still starts one when he does)
+    if (!(w.situations ?? []).some((s) => !s.key)) {
+      const p = w.chars[w.playerId!];
+      const c = Object.values(w.chars).find((x) => x.alive && !x.isPlayer && x.familyId === p.familyId && x.rank === 'associate' && !(w.situations ?? []).some((s) => s.who === x.id))!;
+      c.problem = { kind: 'gambling', sev: 0.6 } as typeof c.problem;
+      situationTick(w);
+    }
     const legacy = (w.situations ?? []).filter((s) => !s.key);
     assert.ok(legacy.length > 0, 'legacy situations still start');
     assert.ok((w.disputes?.length ?? 0) + w.grievances.length > 0, 'disputes and grievances still run');

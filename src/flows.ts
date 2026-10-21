@@ -1,6 +1,7 @@
 // Conversations about standing, pressure and the crew: being backed, being promoted, leaning on a man, a rival's ear, taking a man on,
 // orders that meet resistance, and the lead-up to a sit-down. Each one is a short negotiation: he answers from his own position, you
 // choose how to respond, and the result goes through the records that already exist (favours, memos, facts, relationships, tension).
+import { temper, viewOf } from './temper';
 import type { Convo, FollowOpt, Said } from './dialogue';
 import { readiness } from './career';
 import { addFact, clamp, learn, money, rel } from './core';
@@ -51,7 +52,7 @@ export function flow(w: World, p: Character, t: Character, c: Convo, code: strin
   const st = stanceOf(w, p, t);
   const lines: string[] = [];
   const tweak = (trust: number, aff = 0, resp = 0) => { r.trust = clamp(r.trust + trust); r.affection = clamp(r.affection + aff); r.respect = clamp(r.respect + resp); };
-  const drop: FollowOpt = { code: 'fl:drop', label: 'Leave it there' };
+  const drop: FollowOpt = { code: 'fl:drop', label: '“Let’s leave it there.”' };
 
   // ------------------------------------------------------------------ a promise you did not keep
   if (c0 === 'word_make') {
@@ -87,8 +88,8 @@ export function flow(w: World, p: Character, t: Character, c: Convo, code: strin
     if (owedFav && r.respect >= 0.3) {
       lines.push(pick(w, t, { proud: ['“You got Nicky out when you didn’t have to. I keep my debts. My name is yours, once.”'], hothead: ['“You did right by me. I don’t forget. Fine. I’ll say your name.”'], _: ['“I owe you. This is a fair way to square it. I’ll speak for you.”'] }));
       return said(lines, c, [
-        { code: 'fl:back_call', label: 'Call in the favour he owes you', hint: 'He speaks for you and the debt is cleared. You can only spend it once.', big: true },
-        ...(trustOk && respectOk ? [{ code: 'fl:back_take', label: 'Keep the favour; agree to owe him one instead', hint: 'He speaks for you. You owe him, and he still owes you.' } as FollowOpt] : []),
+        { code: 'fl:back_call', label: '“You owe me one. I’m calling it in.”', hint: 'He speaks for you and the debt is cleared. You can only spend it once.', big: true },
+        ...(trustOk && respectOk ? [{ code: 'fl:back_take', label: '“Keep it. I’ll owe you one instead.”', hint: 'He speaks for you. You owe him, and he still owes you.' } as FollowOpt] : []),
         drop,
       ], 15);
     }
@@ -97,7 +98,7 @@ export function flow(w: World, p: Character, t: Character, c: Convo, code: strin
         ? pick(w, t, { cold: ['“I don’t put my name on men I haven’t watched. I haven’t watched you.”'], proud: ['“My name is worth something. I don’t spend it on a man I barely know.”'], frightened: ['“If it goes wrong, it goes wrong on me. I can’t. Not yet.”'], _: ['“I don’t know you well enough to put my name on you. Come back when I do.”'] })
         : pick(w, t, { cold: ['“I like you fine. But nobody I’d say your name to would take it seriously yet.”'], _: ['“It isn’t that I don’t trust you. It’s that you haven’t been seen doing much yet.”', '“People don’t know what you’re worth. Make them know, then ask me.”'] }));
       stamp(t, 'rk_back_no', w);
-      return said(lines, c, [{ code: 'fl:back_what', label: 'Ask what he would need to see' }, drop], 15);
+      return said(lines, c, [{ code: 'fl:back_what', label: '“What would you need to see from me?”' }, drop], 15);
     }
     lines.push(pick(w, t, {
       proud: ['“I’ll say your name when it matters. A man who speaks for another is owed for it, though. You’ll understand that.”'],
@@ -106,8 +107,8 @@ export function flow(w: World, p: Character, t: Character, c: Convo, code: strin
       _: ['“I’ll speak for you. But if I put my name on you, you owe me. Fair?”'],
     }));
     return said(lines, c, [
-      { code: 'fl:back_take', label: 'Agree: you’ll owe him one', hint: 'He speaks for you. You owe him a favour, and he can call it in.', big: true },
-      { code: 'fl:back_press', label: 'Say you’d rather not owe anybody', hint: 'He may do it for less. He may not like being haggled with.' },
+      { code: 'fl:back_take', label: '“All right. I’ll owe you one.”', hint: 'He speaks for you. You owe him a favour, and he can call it in.', big: true },
+      { code: 'fl:back_press', label: '“I’d rather not owe anybody.”', hint: 'He may do it for less. He may not like being haggled with.' },
       drop,
     ], 20);
   }
@@ -147,7 +148,7 @@ export function flow(w: World, p: Character, t: Character, c: Convo, code: strin
     tweak(-0.04, -0.02, -0.03);
     lines.push('“Then we’re done. I don’t haggle over my name.” He is not angry, only closed to it.');
     stamp(t, 'rk_back_no', w);
-    return said(lines, c, [{ code: 'fl:back_take', label: 'Take his terms after all', hint: 'He may still do it, with a worse taste in his mouth.' }, drop], 10);
+    return said(lines, c, [{ code: 'fl:back_take', label: '“All right. Your terms.”', hint: 'He may still do it, with a worse taste in his mouth.' }, drop], 10);
   }
 
   // ------------------------------------------------------------------ promotion
@@ -183,23 +184,23 @@ export function flow(w: World, p: Character, t: Character, c: Convo, code: strin
     stamp(t, 'thin', w);
     const a = arch(t);
     const over = st === 'over';
-    const fear = clamp(0.5 + (0.5 - t.traits.courage) * 0.7 + (over ? 0.15 : -0.15) - r.grudge * 0.3, 0.05, 0.95);
+    const fear = clamp(0.4 + (0.5 - temper(t).courage) * 0.7 + viewOf(w, t, p).fear * 0.3 + (over ? 0.15 : -0.15) - r.grudge * 0.3 * temper(t).pride * 2, 0.05, 0.95);
     const mood = a === 'hothead' ? 'defy' : a === 'frightened' || w.rng.chance(fear) ? (a === 'frightened' || a === 'earnest' ? 'plead' : 'submit') : 'defy';
     memoOnce(t, p, w, 'threat', 'You told him he’s on thin ice.');
     if (mood === 'submit') {
       lines.push(pick(w, t, { cold: ['He holds your eye a second too long, then nods. “Understood.”'], proud: ['“I hear you.” He says it flatly, like a man swallowing something.'], _: ['“All right. I know where I stand.”'] }));
       tweak(-0.04, -0.04, 0.02); t.cooldown.restraint = Math.max(t.cooldown.restraint ?? 0, w.now);
-      return said(lines, c, [{ code: 'fl:th_ease', label: 'Tell him you’d sooner this was settled with a good week', hint: 'Takes the edge off. He’ll try to earn it back.' }, drop], 10);
+      return said(lines, c, [{ code: 'fl:th_ease', label: '“I’d sooner settle this with a good week.”', hint: 'Takes the edge off. He’ll try to earn it back.' }, drop], 10);
     }
     if (mood === 'plead') {
       const why = t.problem ? PROBLEM_LABEL[t.problem.kind] : t.hustle?.cause ?? 'a bad stretch';
       lines.push(`He goes pale and keeps his voice low. “It isn’t what you think. It’s ${why}. Give me a little time and I’ll put it right.”`);
       tweak(-0.02, -0.02, -0.01);
-      return said(lines, c, [{ code: 'fl:th_hear', label: 'Hear him out', hint: 'He may tell you what is really wrong.' }, { code: 'fl:th_hold', label: 'Hold the line', hint: 'Fear works, for a while.' }], 15);
+      return said(lines, c, [{ code: 'fl:th_hear', label: '“Go on. I’m listening.”', hint: 'He may tell you what is really wrong.' }, { code: 'fl:th_hold', label: '“It stands. I’m not changing it.”', hint: 'Fear works, for a while.' }], 15);
     }
     lines.push(pick(w, t, { hothead: ['“Thin ice? You come to me with that?” He doesn’t step back. “Say it plain, or don’t say it.”'], _: ['He gives a short, humourless laugh. “You’re threatening me? I’ve been in this longer than you think.”'] }));
     tweak(-0.1, -0.06, -0.05); r.grudge = clamp(r.grudge + 0.12);
-    return said(lines, c, [{ code: 'fl:th_back', label: 'Back down and calm it', hint: 'You lose face. You lose less than a fight.' }, { code: 'fl:th_push', label: 'Push harder', hint: 'He may break, or the two of you may. Others will hear.', big: true }], 15);
+    return said(lines, c, [{ code: 'fl:th_back', label: '“All right. Let’s calm down.”', hint: 'You lose face. You lose less than a fight.' }, { code: 'fl:th_push', label: '“Don’t make me say it twice.”', hint: 'He may break, or the two of you may. Others will hear.', big: true }], 15);
   }
   if (c0 === 'fl' && arg === 'th_ease') { tweak(0.03, 0.02, 0); lines.push('“Then I’ll give you one.” He means it, mostly.'); return said(lines, c, undefined, 5); }
   if (c0 === 'fl' && arg === 'th_hear') {
@@ -210,7 +211,7 @@ export function flow(w: World, p: Character, t: Character, c: Convo, code: strin
   if (c0 === 'fl' && arg === 'th_hold') { tweak(-0.05, -0.03, 0.01); lines.push('He looks at the floor. “You’ll have it.” Nothing more.'); return said(lines, c, undefined, 5); }
   if (c0 === 'fl' && arg === 'th_back') { tweak(0.0, 0, -0.03); lines.push('“Good,” he says, as if he’d decided it. You both let it go. It will not be forgotten.'); return said(lines, c, undefined, 5); }
   if (c0 === 'fl' && arg === 'th_push') {
-    const breaks = t.traits.courage < 0.55 && w.rng.chance(0.55);
+    const breaks = temper(t).courage < 0.55 && w.rng.chance(0.55);
     if (breaks) { tweak(-0.05, -0.04, 0.04); lines.push('Something in his face gives. “All right. All right. Whatever you want.”'); }
     else { tweak(-0.1, -0.08, -0.04); r.grudge = clamp(r.grudge + 0.2); lines.push('“Then do it,” he says quietly. Nobody moves. You have made an enemy without winning anything.'); }
     addFact(w, { kind: 'threat', actor: p.id, victim: t.id, minor: true, text: `${p.name} had hard words with ${t.name}.`, district: t.district }, { witnesses: [] });
@@ -227,7 +228,7 @@ export function flow(w: World, p: Character, t: Character, c: Convo, code: strin
     if (r.trust < 0.4 && swap.length) {
       lines.push(pick(w, t, { schemer: ['“You want what I hear? Everyone does. What do you have for me?”'], cold: ['“I don’t give. I trade. Bring me something.”'], _: ['“A fair swap, then. Something I haven’t heard, and I’ll find you something.”'] }));
       c.ctx.deal = { kind: 'ears', ask: 0 };
-      return said(lines, c, [{ code: 'fl:rv_trade', label: 'Give him a piece of news in return', hint: 'He hears it, and so may his people.', big: true }, { code: 'fl:rv_pass', label: 'Say it isn’t worth it' }], 15);
+      return said(lines, c, [{ code: 'fl:rv_trade', label: '“Here’s something you didn’t hear from me.”', hint: 'He hears it, and so may his people.', big: true }, { code: 'fl:rv_pass', label: '“It isn’t worth it.”' }], 15);
     }
     if (w.rng.chance(clamp(0.25 + r.trust * 0.5, 0.15, 0.8))) {
       const f = w.rng.pick(give); learn(w, p.id, f, t.id, false);
@@ -254,7 +255,7 @@ export function flow(w: World, p: Character, t: Character, c: Convo, code: strin
     const bump = (d: number) => { if (p.familyId && t.familyId) { const A = w.fam[p.familyId], B = w.fam[t.familyId]; A.tension[t.familyId] = (A.tension[t.familyId] ?? 0) + d; B.tension[p.familyId] = (B.tension[p.familyId] ?? 0) + d; } };
     const higher = rk(t) > rk(p);
     const a = arch(t);
-    if (a === 'frightened' || (!higher && t.traits.courage < 0.45)) {
+    if (a === 'frightened' || (!higher && temper(t).courage < 0.45)) {
       lines.push('He holds up both hands. “I’m not looking for trouble. I’ll pass it on.” He does not like it, and he will say so only to his own.');
       tweak(-0.03, -0.02, 0.02); bump(0.15);
     } else if (higher || a === 'hothead' || a === 'proud') {
@@ -262,7 +263,7 @@ export function flow(w: World, p: Character, t: Character, c: Convo, code: strin
       tweak(-0.08, -0.05, -0.03); r.grudge = clamp(r.grudge + 0.1); bump(0.6);
     } else { lines.push('“Message received. Pass mine to your boss.” He smiles with no warmth.'); tweak(-0.06, -0.04, 0.03); bump(0.4); }
     addFact(w, { kind: 'threat', actor: p.id, victim: t.id, minor: true, text: `${p.name} warned ${t.name} off.`, district: t.district }, { witnesses: [] });
-    return said(lines, c, [{ code: 'fl:rv_ease', label: 'Say you meant no insult by it', hint: 'Takes some heat out. It also reads as weakness.' }, drop], 10);
+    return said(lines, c, [{ code: 'fl:rv_ease', label: '“I meant no insult by it.”', hint: 'Takes some heat out. It also reads as weakness.' }, drop], 10);
   }
   if (c0 === 'fl' && arg === 'rv_ease') {
     if (p.familyId && t.familyId) { const A = w.fam[p.familyId], B = w.fam[t.familyId]; A.tension[t.familyId] = Math.max(0, (A.tension[t.familyId] ?? 0) - 0.2); B.tension[p.familyId] = Math.max(0, (B.tension[p.familyId] ?? 0) - 0.2); }
@@ -281,9 +282,12 @@ export function flow(w: World, p: Character, t: Character, c: Convo, code: strin
     const s = open ?? openAsk(w, 'recruit', p, t, { amt: RECRUIT_COST, why: `${p.name} offered ${t.name} a place` });
     if (!s) { lines.push('“I gave you my answer. Ask when something’s different.”'); return said(lines, c, undefined, 3); }
     const bold = t.traits.ambition > 0.6;
-    if (!open) lines.push(bold ? '“I’ve been waiting for somebody to ask. I want to know what I’m getting, and who I answer to.”' : '“It’s a big thing, to put my name to yours. I want to know what you expect.”');
-    lines.push(...playerMove(w, p, s.id, 'ask').lines);
-    return said(lines, c, movesOf(w, p, s), 20);
+    // (V90: his answer is decided first; a man who is interested says so before he names his terms, a man who isn't doesn't. What
+    // follows is the matter itself, in the conversation, with its own answers to whatever he said.)
+    const r = playerMove(w, p, s.id, 'ask'), last = s.st?.[t.id]?.last;
+    if (!open && (last === 'counter' || last === 'yes' || last === 'stall')) lines.push(bold ? '“I’ve been waiting for somebody to ask. I want to know what I’m getting, and who I answer to.”' : '“It’s a big thing, to put my name to yours. I want to know what you expect.”');
+    lines.push(...r.lines);
+    return said(lines, c, undefined, 20);
   }
   // (the V85 follow-ups, kept so an old conversation still answers: they are the same matter now)
   if (c0 === 'fl' && (arg === 'rc_std' || arg === 'rc_more' || arg === 'rc_wait')) {
@@ -299,15 +303,15 @@ export function flow(w: World, p: Character, t: Character, c: Convo, code: strin
     const low = c0 === 'assign_low';
     const a = arch(t);
     const owesMe = t.books.arrears > 0;
-    const resists = low ? (owesMe || t.cash < 150) && w.rng.chance(0.6) : (a === 'frightened' || t.traits.caution > 0.65) && w.rng.chance(0.65);
+    const resists = low ? (owesMe || t.cash < 150) && w.rng.chance(0.6) : (a === 'frightened' || temper(t).caution > 0.65) && w.rng.chance(0.65);
     if (resists && st === 'over' && !recent(t, 'ord:' + c0, w, 1)) {
       stamp(t, 'ord:' + c0, w);
       lines.push(low
         ? '“Keep my head down? That’s money I need. I’m behind as it is, and you know it.”'
         : '“Another angle? I’d be drawing eyes. If it goes bad it goes bad on both of us.”');
       return said(lines, c, [
-        { code: 'fl:ord_insist:' + c0, label: 'Tell him it isn’t a request', hint: 'He does it. He remembers being told.', big: true },
-        { code: 'fl:ord_ok:' + c0, label: 'Let it go', hint: 'No change. He sees you listen.' },
+        { code: 'fl:ord_insist:' + c0, label: '“It isn’t a request.”', hint: 'He does it. He remembers being told.', big: true },
+        { code: 'fl:ord_ok:' + c0, label: '“Forget it.”', hint: 'No change. He sees you listen.' },
       ], 10);
     }
     return doOrder(w, p, t, c, c0, false);
@@ -357,9 +361,9 @@ export function brokenWord(w: World, p: Character, t: Character) {
 function promoGaps(w: World, p: Character): FollowOpt[] {
   const rd = readiness(w, p); const gaps: FollowOpt[] = [];
   if (!rd) return gaps;
-  if (rd.earn < 1) gaps.push({ code: 'fl:promo_earn', label: 'Ask how much more he expects from you' });
-  if (!rd.sponsor) gaps.push({ code: 'fl:promo_sponsor', label: 'Ask who has to speak for you' });
-  if (!rd.openSeat) gaps.push({ code: 'fl:promo_seat', label: 'Ask when there will be room' });
-  if (p.standing < 45) gaps.push({ code: 'fl:promo_talk', label: 'Ask what people are saying' });
+  if (rd.earn < 1) gaps.push({ code: 'fl:promo_earn', label: '“How much more do you expect from me?”' });
+  if (!rd.sponsor) gaps.push({ code: 'fl:promo_sponsor', label: '“Who has to speak for me?”' });
+  if (!rd.openSeat) gaps.push({ code: 'fl:promo_seat', label: '“When will there be room?”' });
+  if (p.standing < 45) gaps.push({ code: 'fl:promo_talk', label: '“What are people saying about me?”' });
   return gaps;
 }

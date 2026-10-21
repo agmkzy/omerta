@@ -1,4 +1,5 @@
 import { menace } from './danger';
+import { temper } from './temper';
 import { noteGrievance } from './orgs';
 import { sanctioned } from './politics';
 import { pass, salience, versionOf } from './rumour';
@@ -124,12 +125,13 @@ export function generate(w: World, c: Character, kind: Kind): Action[] {
     }
     case 'retaliate': {
       if (!made || c.hurtUntil > now) break;
+      const tp = temper(c); // V90: a proud man feels a grudge more, a volatile one acts on it, a careful one and a frightened one hold back
       for (const x of alive()) {
         const r = c.rels[x.id];
         if (!r || r.grudge < 0.5 || (x.familyId && x.familyId === c.familyId) || x.jailedUntil > now) continue; // (V89: 0.45 → 0.5, docs/V89_HEALTH.md)
         if (c.isPlayer && !sanctioned(w, c, x)) continue;
         const hi = x.rank === 'boss' || x.rank === 'underboss' ? 0.4 : 0;
-        const base = r.grudge * 0.7 + T.violence * 0.35 - T.caution * 0.45 + T.ambition * 0.05 - hi - crime - 0.08;
+        const base = r.grudge * (0.6 + tp.pride * 0.2) + T.violence * 0.2 + tp.volatility * 0.15 - T.caution * 0.25 - tp.caution * 0.2 - (r.fear ?? 0) * 0.4 * (1 - tp.courage) + T.ambition * 0.05 - hi - crime - 0.08;
         const tag = `${grudgeWord(r.grudge)} grudge`;
         // Someone already laid up in bed isn't beaten again; each kind of revenge has its own cooldown.
         if (x.hurtUntil <= now && !cd(`ret:beat:${x.id}`)) push({ kind: 'retaliate', mode: 'beat', target: x.id, label: `Beat up ${x.name} (${tag})`, score: base });

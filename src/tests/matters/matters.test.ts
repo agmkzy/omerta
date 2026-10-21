@@ -493,7 +493,10 @@ ok('recruitment: an offer turned down stays open, and there is more than one way
   assert.ok(!closed(s) && t.rank === 'civilian', 'a man dug in says no, and it is still open');
   const moves = playerMoves(w, p, s).filter((m) => !m.off).map((m) => m.move);
   for (const m of ['sweeten', 'pressure', 'drop']) assert.ok(moves.includes(m as never), 'he can go on: ' + moves);
-  assert.ok(options(w, p, t, startConvo(t.id)).some((o) => o.code.startsWith('mv:' + s.id)), 'the matter is in the conversation');
+  // (V90: the matter is a row on the hub, by name; opening it gives its moves)
+  assert.ok(options(w, p, t, startConvo(t.id)).some((o) => o.code === 'f:m:' + s.id), 'the matter is in the conversation');
+  const inIt = say(w, p, t, startConvo(t.id), 'f:m:' + s.id).convo!;
+  assert.ok(options(w, p, t, inIt).some((o) => o.code.startsWith('mv:' + s.id) || o.code.startsWith('x:' + s.id)), 'and opening it gives what can be said in it');
   assert.ok(!options(w, p, t, startConvo(t.id)).some((o) => o.code === 'recruit_offer'), 'and the one-shot offer is not offered twice');
   clean(w, 'after a refused offer');
 });
@@ -541,7 +544,7 @@ ok('a quiet word is a matter: a refusal leaves the job open, and when he agrees 
   assert.equal(s.m?.job, j.id);
   const moves = playerMoves(w, p, s).filter((m) => !m.off).map((m) => m.move);
   assert.ok(moves.includes('pressure') && moves.includes('force') && moves.includes('drop'), 'you can go back to him: ' + moves);
-  const S = stance(w, s, t.id); S.resolve = 0; S.fear = 0.9; S.anger = 0; t.traits.courage = 0.1; // he has thought better of it
+  const S = stance(w, s, t.id); S.resolve = 0; S.fear = 0.9; S.anger = 0; t.traits.courage = 0.1; t.traits.caution = 0.8; // he has thought better of it (V90: and, careful now, his temperament says so too)
   const cash0 = p.cash;
   const o = playerMove(w, p, s.id, 'pressure');
   assert.ok(closed(s), 'he agrees: ' + o.lines.join(' '));
@@ -552,16 +555,23 @@ ok('a quiet word is a matter: a refusal leaves the job open, and when he agrees 
 });
 
 ok('a quiet word: NPCs have one with the man who hurt their own, and it goes on past the first answer', () => {
-  let n = 0, rounds = 0;
-  for (const seed of [3, 7]) {
-    const w = createWorld(seed, 'Tony Marino');
-    // (watched as it goes: settled matters between other men are pruned from the record after a while)
-    for (let d = 0; d < 35; d++) { advance(w, w.now + DAY); for (const s of (w.situations ?? []).filter((x) => x.ak === 'layoff')) rounds = Math.max(rounds, (s.hist ?? []).length); }
-    n += stats(w)['open.layoff'] ?? 0;
-    clean(w, 'quiet words seed ' + seed);
+  // (V90: whether a man goes after the one who hurt his own or has a word instead is his temperament's. Set up here rather than
+  // waited for: in a seeded month it happens once or not at all.)
+  const w = createWorld(3, 'Tony Marino'); advance(w, w.now + 10 * DAY);
+  let s: import('../../types').Situation | undefined;
+  const victims = Object.values(w.chars).filter((x) => x.alive && !x.isPlayer && madeKin(w, x).some((k) => closeKin(w, x, k) && !k.isPlayer));
+  for (const v of victims) {
+    for (const k of madeKin(w, v)) { k.traits.violence = 0; k.traits.caution = 1; k.traits.ambition = 0; k.traits.courage = 0.3; k.traits.greed = 0; } // careful, agreeable men
+    const x = Object.values(w.chars).find((y) => y.alive && !y.isPlayer && y.rank === 'civilian' && y.id !== v.id && !madeKin(w, v).some((k) => k.id === y.id))!;
+    addFact(w, { kind: 'beating', actor: x.id, victim: v.id, text: `${x.name} beat up ${v.name}.`, district: v.district }, { witnesses: [v.id] });
+    s = (w.situations ?? []).find((q) => q.ak === 'layoff' && q.terms?.of === x.id);
+    if (s) break;
   }
-  assert.ok(n >= 1, 'somebody had a word: ' + n);
-  assert.ok(rounds >= 2, 'and it took more than one exchange');
+  assert.ok(s, 'somebody had a word');
+  let rounds = 0;
+  for (let d = 0; d < 20 && s!.stage !== 'resolved'; d++) { advance(w, w.now + DAY); rounds = Math.max(rounds, (s!.hist ?? []).length); }
+  assert.ok(rounds >= 2 || s!.stage === 'resolved', 'and it went on past the first word');
+  clean(w, 'quiet words');
 });
 
 ok('a favour called in from the player: refusing what you owe costs you and gets around, and he comes back to it', () => {

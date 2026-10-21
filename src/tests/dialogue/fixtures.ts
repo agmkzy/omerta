@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { advance, deserialize, serialize } from '../../engine';
 import { createWorld } from '../../world';
 import { DAY, World } from '../../types';
-import { options, say, startConvo, arrive, isNavCode, INTENTS, Convo } from '../../dialogue';
+import { options, say, startConvo, arrive, isNavCode, QUESTIONS, Convo } from '../../dialogue';
 import { generate, perform } from '../../actions';
 import { whereIs } from '../../where';
 import { P } from '../helpers';
@@ -21,26 +21,23 @@ export const men = (w: World, n = 40) => Object.values(w.chars).filter((c) => c.
 
 export const ARCHS = ['proud', 'bitter', 'schemer', 'earnest', 'hothead', 'cold', 'jovial', 'frightened'];
 
-export const CATS = INTENTS;
 
 export const introAll = (w: World) => { for (const m of men(w)) (P(w).intro ??= {})[m.id] = w.now; };
 
 export const reach = (w: World, id: string) => {
   const p = P(w), t = w.chars[id], codes = new Set<string>();
-  const get = (more?: string[]) => { const c = startConvo(id); if (more) (c.ctx as { more?: string[] }).more = more; return options(w, p, t, c); };
-  for (const o of get()) codes.add(o.code);
-  for (const k of CATS) for (const o of get(['all', k])) codes.add(o.code);
-  // and everything one or two steps further in through the menus of the conversation itself
+  // V90: everything reachable from the hub through its subjects (and after each everyday question, what talk leads on to)
   const dig = (c: Convo, depth: number, seen: Set<string>) => {
     for (const o of options(w, p, t, c)) {
       codes.add(o.code);
-      if (depth > 0 && isNavCode(o.code) && o.code !== 'root' && !o.code.startsWith('more:back') && !o.code.startsWith('more:up') && !seen.has(c.node + o.code)) {
-        seen.add(c.node + o.code);
+      const step = isNavCode(o.code) || QUESTIONS.includes(o.label);
+      if (depth > 0 && step && !(o.code === 'root' && c.node === 'root') && o.code !== 'f:' && !seen.has(c.node + (c.ctx.focus ?? '') + o.code)) {
+        seen.add(c.node + (c.ctx.focus ?? '') + o.code);
         try { const r = say(w, p, t, c, o.code); if (r.convo) dig(r.convo, depth - 1, seen); } catch { /* not every code applies */ }
       }
     }
   };
-  dig(startConvo(id), 3, new Set());
+  dig(startConvo(id), 4, new Set());
   return codes;
 };
 
