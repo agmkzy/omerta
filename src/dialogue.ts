@@ -23,7 +23,7 @@ import { choose as encChoose } from './encounters';
 import { recall } from './memory';
 import { flow, sitdownTalk, brokenWord } from './flows';
 import { feePosition, loanPosition, goodFaith, r5 } from './negotiate';
-import { WANT_LINE, wantFor, knows, learnAbout, repLines } from './crewlife';
+import { WANT_LINE, wantFor, knows, learnAbout, repLines, crewEnvelopesWaiting } from './crewlife';
 import { hustleLine } from './hustle';
 import { pathInfo } from './path';
 import { amends, playerActed, touchDispute } from './disputes';
@@ -756,7 +756,7 @@ export function optionsRaw(w: World, p: Character, t: Character, c: Convo): DOpt
         const his = dts.filter((d) => d.creditor === t.id).reduce((a, d) => a + d.balance, 0);
         add('n:debt', mine ? 'The money he owes you' : 'The money you owe him', mine ? `${money(mine)} outstanding${dts.some((d) => d.missed) ? ', and he’s behind' : ''}.` : `${money(his)} outstanding.`);
       }
-      if (t.id === p.bossId) { const due = envelopeDue(w, p); if (kickWindow(w, p) && due >= 20 && p.cash >= 20 && !c.ctx.asked.includes('b_envelope')) add('b_envelope', `Hand him your envelope (${money(due)})`, 'Last week’s share, in person.'); add('n:myboss', 'Where you stand with him', 'Ask, report, or ask for more.'); }
+      if (t.id === p.bossId) { const due = envelopeDue(w, p); if (kickWindow(w, p) && !crewEnvelopesWaiting(w, p) && due >= 20 && p.cash >= 20 && !c.ctx.asked.includes('b_envelope')) add('b_envelope', `Hand him your envelope (${money(due)})`, 'Last week’s share, in person.'); add('n:myboss', 'Where you stand with him', 'Ask, report, or ask for more.'); }
       if (rel(t, p.id).grudge >= 0.25) add('n:amends', 'Clear the air', 'There’s bad blood between you.');
       back();
       break;
@@ -1008,7 +1008,7 @@ export function optionsRaw(w: World, p: Character, t: Character, c: Convo): DOpt
     }
     case 'myboss': {
       const a = c.ctx.asked;
-      { const due = envelopeDue(w, p); if (kickWindow(w, p) && due >= 20 && !a.includes('b_envelope') && p.cash >= 20) add('b_envelope', `Hand him your envelope (about ${money(due)})`, envelopeText(w, p)); }
+      { const due = envelopeDue(w, p); if (kickWindow(w, p) && !crewEnvelopesWaiting(w, p) && due >= 20 && !a.includes('b_envelope') && p.cash >= 20) add('b_envelope', `Hand him your envelope (about ${money(due)})`, envelopeText(w, p)); }
       if (a.includes('b_envelope') && !a.includes('b_extra') && p.cash >= 250) add('b_extra', 'Add $250 for him personally', 'Over and above what’s owed. It counts.');
       if (a.includes('b_envelope') && !a.includes('b_extra2') && p.cash >= 1000) add('b_extra2', 'Add $1,000 for him personally', 'A real gesture. He’ll owe you one.');
       if (!a.includes('b_stand')) add('b_stand', 'Ask where you stand', 'He’ll tell you what he thinks, in his way.');

@@ -14,6 +14,9 @@ type Want = NonNullable<Character['want']>['kind'];
 const PL = (w: World) => w.chars[w.playerId!];
 const first = (c: Character) => c.name.split(' ')[0];
 export const crewOf = (w: World, p: Character) => Object.values(w.chars).filter((c) => c.alive && c.bossId === p.id && c.id !== p.id);
+// Sunday comes in order: a man with a crew takes his men's envelopes at the club first, and only then hands his own up. Until he has
+// sat down with them this week, his own envelope waits (it is recorded in the world, so it holds across a reload).
+export const crewEnvelopesWaiting = (w: World, p: Character) => !!w.sunday && !w.sunday.seen && crewOf(w, p).length > 0;
 
 export const WANT_LINE: Record<Want, (c: Character) => string> = {
   made: (c) => `${first(c)} wants to be made. Everything he does is aimed at it.`,

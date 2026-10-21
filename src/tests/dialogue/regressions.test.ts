@@ -10,6 +10,7 @@ import { replies } from '../../exchange';
 import { whereIs } from '../../where';
 import { kinOf } from '../../kin';
 import { makeLoan } from '../../encounters';
+import { openSunday } from '../../crewlife';
 import { FEMALE } from '../../names';
 import { world60 } from './fixtures';
 import { deserialize, serialize } from '../../engine';
@@ -142,5 +143,19 @@ describe('V90 audit regressions', { timeout: 60_000 }, () => {
     };
     assert.ok(pressedOpts(false).some((c) => c.endsWith(':mine')), 'offered when he could be asked');
     assert.ok(!pressedOpts(true).some((c) => c.endsWith(':mine')), 'not offered while he would refuse to hear it');
+  });
+  ok('Sunday comes in order: a man with a crew takes his men’s envelopes before his boss will take his', { tags: ['scenario'] }, () => {
+    const w = world60(), p = P(w), boss = w.chars[p.bossId!];
+    const sunday = (x: World) => { const px = P(x); x.sunday = { t: x.now, tells: [] }; px.cooldown.handed = 0; px.books.arrears = 120; px.cash = 3000; };
+    const offered = (x: World) => { const c = meet(x, x.chars[boss.id]); const os = [...options(x, P(x), x.chars[boss.id], c)]; const r = say(x, P(x), x.chars[boss.id], c, 'n:myboss'); if (r.convo) os.push(...options(x, P(x), x.chars[boss.id], r.convo)); return os.some((o) => o.code === 'b_envelope'); };
+    const alone = deserialize(serialize(w)); sunday(alone);
+    assert.ok(offered(alone), 'a man with no crew hands his envelope straight up');
+    const withCrew = deserialize(serialize(w)); sunday(withCrew);
+    const man = Object.values(withCrew.chars).find((c) => c.alive && !c.isPlayer && c.rank === 'associate' && c.familyId === P(withCrew).familyId && c.id !== boss.id)!;
+    man.bossId = P(withCrew).id;
+    assert.ok(!offered(withCrew), 'with his men’s envelopes still to come in, his boss does not take his');
+    const later = deserialize(serialize(withCrew)); // (and it holds across a save)
+    openSunday(later, P(later));
+    assert.ok(offered(deserialize(serialize(later))), 'once he has sat down with his men, his own goes up');
   });
 });

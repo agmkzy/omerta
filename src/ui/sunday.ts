@@ -12,7 +12,7 @@ import { esc, lk, P, pl, S, W } from './links';
 export function sundayDue(): boolean {
   const w = W();
   const p = P();
-  return !!w.sunday && (S.sundaySeen ?? 0) < w.sunday.t && crewOf(w, p).length > 0;
+  return !!w.sunday && !w.sunday.seen && (S.sundaySeen ?? 0) < w.sunday.t && crewOf(w, p).length > 0; // (seen is the world's: it survives a reload)
 }
 
 export const sKey = (id: string) => `${W().sunday?.t}:${id}`;
