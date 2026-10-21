@@ -44,7 +44,11 @@ export function generate(w: World, c: Character, kind: Kind): Action[] {
   const now = w.now;
   const made = c.rank !== 'civilian';
   const cd = (k: string) => (c.cooldown[k] ?? 0) > now;
-  const alive = aliveList(w).filter((x) => x.id !== c.id);
+  // Every living man but him. aliveList is called here on every generate, as it always was, because its per-minute cache
+  // decides who counts as alive for everyone else who acts that minute; only the copy without him waits until a kind needs it.
+  const living = aliveList(w);
+  let others: Character[] | undefined;
+  const alive = () => (others ??= living.filter((x) => x.id !== c.id));
   const crime = c.heat * 0.3;
   const push = (a: Omit<Action, 'actor'>) => out.push({ ...a, actor: c.id });
 
@@ -55,7 +59,7 @@ export function generate(w: World, c: Character, kind: Kind): Action[] {
       break;
     }
     case 'socialise': {
-      for (const x of alive) {
+      for (const x of alive()) {
         if (x.jailedUntil > now) continue;
         const r = c.rels[x.id];
         const near = x.district === c.district;
@@ -69,7 +73,7 @@ export function generate(w: World, c: Character, kind: Kind): Action[] {
     }
     case 'lend': {
       if (!made || c.cash < 700 || c.rank === 'boss') break;
-      for (const o of alive) {
+      for (const o of alive()) {
         const b = ownerBiz(w, o.id);
         if (!b || o.rank !== 'civilian' || cd('lend:' + o.id)) continue;
         if (w.debts.some((d) => d.status === 'active' && d.debtor === o.id)) continue;
@@ -120,7 +124,7 @@ export function generate(w: World, c: Character, kind: Kind): Action[] {
     }
     case 'retaliate': {
       if (!made || c.hurtUntil > now) break;
-      for (const x of alive) {
+      for (const x of alive()) {
         const r = c.rels[x.id];
         if (!r || r.grudge < 0.5 || (x.familyId && x.familyId === c.familyId) || x.jailedUntil > now) continue; // (V89: 0.45 → 0.5, docs/V89_HEALTH.md)
         if (c.isPlayer && !sanctioned(w, c, x)) continue;

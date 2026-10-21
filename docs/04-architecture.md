@@ -115,14 +115,14 @@ Honestly: **partly**. Some guard-rails are enforced by tests, some only by conve
 
 | Guard-rail | Test |
 | --- | --- |
-| One door for rank changes (`applyRank`) | `v72`: source scan for `.rank =` |
+| One door for rank changes (`applyRank`) | [architecture.test.ts](../src/tests/architecture.test.ts): source scan for `.rank =` |
 | One door for business cash (`bizMove`, `readonly cash`) | Type system plus `economyIssues` in `audit()` |
-| The ledger agrees with balances | `ledgerCheck()`, v73 |
-| No hardcoded family ids or family count | `v76`: source scan |
+| The ledger agrees with balances | `ledgerCheck()`, [economy/ledger.test.ts](../src/tests/economy/ledger.test.ts) |
+| No hardcoded family ids or family count | [architecture.test.ts](../src/tests/architecture.test.ts): source scan |
 | Cross-record consistency (hierarchy, organisations, agency, situations, economy) | `audit()` asserted empty after simulations in most suites |
-| Determinism, and saves continuing identically | `test.ts`, `v76 det`, the round-trip checks |
-| Information restrictions (no leaks) | `v75` test 6, `v78`, `v79` |
-| Old saves load | `oldsave.test.ts` |
+| Determinism, and saves continuing identically | [determinism.test.ts](../src/tests/determinism.test.ts) and every test tagged `determinism` (`npx vitest run --tagsFilter determinism`) |
+| Information restrictions (no leaks) | [situations/information.test.ts](../src/tests/situations/information.test.ts), the [dialogue tests](../src/tests/dialogue) |
+| Old saves load | [saves/oldsave.test.ts](../src/tests/saves/oldsave.test.ts) and every test tagged `compat` |
 
 **Convention only:** engine/UI layering and no DOM in the engine; no `Math.random`; `addFact`/`learn` as the only way to create or spread knowledge; bounded collections; UI handlers calling engine functions instead of mutating.
 
@@ -163,7 +163,7 @@ How easy each system is to swap today:
 
 1. Write down its contract: the exports in use, the World fields, the ticks and the invariants. The engine/ documents are the starting point.
 2. Put a façade module in front of it (for example `economy.ts` re-exporting `bizMove`, `businessWeek`, …). Point every importer at the façade. This changes no behaviour.
-3. Characterise the current behaviour: run `econ_measure.ts` / `agency_measure.ts` / `sit_measure.ts` for several seeds and keep the output as a baseline.
+3. Characterise the current behaviour: run `tools/econ_measure.ts` / `tools/agency_measure.ts` / `tools/sit_measure.ts` for several seeds and keep the output as a baseline.
 4. Build the new implementation behind the façade, with a switch (as `AGENCY.on` and `SIT.on` already do for goals and situations).
 5. Run `test:all`, `audit()` and the measurements under both implementations. Compare them, then flip the switch, then delete the old one.
 6. If the World fields change, bump `SCHEMA`, migrate, and add a fixture from the old build.

@@ -6,7 +6,7 @@ This document assesses whether moving to a standard framework (Vue 3) with a dep
 
 | Change | Viable? | Effort | Risk | Recommendation |
 | --- | --- | --- | --- | --- |
-| **Vitest** for the existing tests | Yes, almost mechanical | 1–2 days | Low: no game code changes | **Do it first** |
+| **Vitest** for the existing tests | Yes, almost mechanical | 1–2 days | Low: no game code changes | **Done** (section 1) |
 | **Vite** as the bundler (with `vite-plugin-singlefile`) | Yes | ½ day | Low | **Done** (section 2) |
 | **Vue 3** for the UI layer (`web.ts` + `src/ui/*`, about 4,000 lines) | Yes, incrementally | Several weeks, part-time | Medium: there are no UI tests today | Do it when the UI needs component state, partial updates or richer screens. Port incrementally |
 | **Pinia** for UI state (`S`) | Yes | Part of the Vue work | Low if the world is kept raw | Use it for `S` only. The world stays a raw object inside it |
@@ -14,50 +14,18 @@ This document assesses whether moving to a standard framework (Vue 3) with a dep
 
 The simulation (about 21,000 lines) has no DOM access, no UI imports and no framework assumptions, and no part of this migration requires changing it. That separation is the main reason the migration is viable.
 
-## 1. Vitest
+## 1. Vitest: done
 
-### Why
-The current suites are plain scripts (`node:assert` plus a local `ok(name, fn)` helper), run serially by a shell loop in `package.json`. `test:all` takes about 7.5 minutes and stops at the first failing suite. Vitest would add:
+The suites run under Vitest 5, configured in [vitest.config.ts](../vitest.config.ts). How to run and write them is in [05-testing.md](05-testing.md). In short:
 
-- per-test reporting, filtering (`-t "ledger"`) and watch mode;
-- parallel execution across files in worker threads. Most of the 7.5 minutes is a handful of long simulations, which would then overlap;
-- coverage (`@vitest/coverage-v8`) with thresholds;
-- CI-readable reporters (JUnit, GitHub Actions annotations);
-- `describe.skipIf`/tags for slow suites instead of hand-parsed `process.argv` modes.
-
-### How hard
-It's easy, because the tests already throw `AssertionError` on failure, and Vitest treats any throw as a failure. `node:assert` works unchanged inside `test()`.
-
-```ts
-// before (src/tests/v77.test.ts)
-let failed = 0;
-const ok = (name: string, f: () => void) => { try { f(); console.log('ok   ' + name); } catch (e) { failed++; … } };
-function fast() { ok('every temperament has lines …', () => { … }); … }
-const arg = process.argv[2] ?? 'fast'; if (arg === 'fast') fast();
-setTimeout(() => process.exit(failed ? 1 : 0), 50);
-
-// after (src/tests/v77.test.ts)
-import { describe, test as ok } from 'vitest';
-describe('v77 fast', () => { ok('every temperament has lines …', () => { … }); … });
-```
-
-Steps:
-
-1. `npm i -D vitest @vitest/coverage-v8`, then add `vitest.config.ts` with `test: { include: ['src/tests/**/*.test.ts'], testTimeout: 600_000, pool: 'threads' }`.
-2. In each suite, delete the local `ok`, the `failed` counter and the `setTimeout(process.exit)`. Wrap `fast()` in `describe('…fast')`. Alias `test` as `ok` to keep the diff small.
-3. Turn the slow modes (`sim:<seed>`, `growth:<seed>`, `compat`, `det`) into `describe.skipIf(!process.env.SLOW)` blocks, or move them to `*.slow.test.ts` files, parameterised with `test.each` over seeds.
-4. Move expensive shared fixtures (`fresh()` builds a 60-day world) into `beforeAll` or keep them module-scoped. Each test file runs in its own worker, so each file pays for its own fixture once.
-5. `oldsave.test.ts`, `storage.test.ts` and `test.ts` become one `describe` each.
-6. Point `npm test` at `vitest run`, and add `test:watch` and `test:cov`.
-7. Keep the measurement and trace scripts (`*_measure.ts`, `sit_trace.ts`, `stress.ts`, `bot.ts`) as `tsx` scripts. They are tools, not tests.
-
-Watch out for:
-
-- Two tests scan the source tree with `process.cwd() + '/src/'` (`v72`) or a path relative to `import.meta.url` (`v76`). Vitest's default root is the project root, so both work, but prefer `import.meta.url` everywhere.
-- Some suites flip exported tuning objects (`AGENCY.on`, `SIT.on`). Vitest isolates modules per file by default, so this is safe across files. Within one file, reset them in `afterEach`.
-- The determinism tests compare serialised worlds. Keep them as `assert.equal` on strings. Don't use Vitest snapshots for megabyte-sized worlds.
-
-**Coverage target suggestion.** First measure, then set the threshold just below the measured figure so it can only go up. Aim for 80% line coverage of `src/*.ts`, excluding `web.ts`, `ui/`, `cli.ts`, `bot.ts` and `stress.ts`. The simulation is heavily exercised by the long runs, so this should already be close.
+- **The conversion was mechanical.** Each suite imports `test as ok` from Vitest and wraps its `fast()` in a `describe`. The local `ok` helper, the `failed` counter and `process.exit` are gone. The assertions are still `node:assert`. No game code, save format or tuning changed. Every check that ran before still runs, with the same count per suite (208), plus the 7 of the V88 portrait suite.
+- **Suites are found by name** (`src/tests/**/*.test.ts`). The hand-kept lists in `package.json`, the Makefile and the CI matrix had drifted: `v86`, `v87` and V88's `portrait` suite ran nowhere. All three now run in `test:all` and CI. `src/test.ts` became `src/tests/determinism.test.ts`.
+- **The `process.argv` modes became tags and environment parameters.** The opt-in long runs are tagged `slow` and run only with `SLOW=1`; they take `SEED`/`DAYS` from [src/tests/modes.ts](../src/tests/modes.ts) and are parameterised with `test.each`. The synthetic schema migrations are tagged `compat` and run by default.
+- **The tests are organised by game system, not by release** (`src/tests/economy/`, `situations/`, `dialogue/` …), each tagged with its kind (`unit`, `scenario`, `sim`, `determinism`, `compat`, `architecture`, `property`), with named fixtures instead of per-file `fresh()` helpers. See [05-testing.md](05-testing.md#where-the-tests-are-by-game-system). Every check was moved verbatim; the 226 test names are the same before and after.
+- **Files run in parallel.** `test:all` went from 5 min 29 s (the old serial scripts, without compat, v86, v87 and portrait) to 3 min 13 s under Vitest, to about 72 s once the release files were split by system (v75 alone had taken over three minutes), and to about 47 s once two hotspots in the simulation were fixed without changing any history ([05-testing.md](05-testing.md#how-long-it-takes-and-why)).
+- **The determinism suite still builds its ten worlds in child processes** ([determinism.job.ts](../src/tests/determinism.job.ts)). They take 20 s that way; built serially in one worker they would take about three minutes, nearly as long as v75.
+- **Coverage** (`npm run test:cov`) uses `@vitest/coverage-v8`, with thresholds set just below the measured figures (see [05-testing.md](05-testing.md#are-there-coverage-targets)). It isn't run in CI for now: coverage slows every test by about a quarter. CI runs the tests in three parallel jobs of roughly equal work (situations, determinism, the rest).
+- **The watch-outs from the plan were handled.** The source scans use `import.meta.url` instead of `process.cwd()`. `agency/goals.test.ts` restores `AGENCY.audit` in `afterEach`. The determinism checks stay `assert.equal` on serialised strings, with no snapshots.
 
 ## 2. Vite (bundler): done
 
@@ -86,7 +54,7 @@ About 45 `View` variants ([ui/state.ts](../src/ui/state.ts)), each rendered by a
 - `portrait.ts` must not change (CLAUDE.md). Render its SVG string output with `v-html` inside an `<Avatar>` component, and leave the module untouched.
 
 ### Migration plan (strangler pattern)
-1. **Vite and Vitest first** (above; Vite is done). Nothing visible changes.
+1. **Vite and Vitest first** (above; both are done). Nothing visible changes.
 2. **Mount Vue around the existing renderer.** Create one root component with a `<div v-html="html">` where `html` is a `computed` that calls today's `body()` and `tabs()`, keyed on a `version` counter bumped after every `handle()`. Keep the delegated `data-a` listener as-is. At this point Vue is in place and nothing else has changed.
 3. **Introduce the Pinia store** for `S` (section 4). `handle()` becomes a store action. The `data-a` listener calls it.
 4. **Port views one at a time,** leaves first: `brief`, `sunday`, `blackjack`, `family`, then the tabs, then `talk`/`meeting`. Each ported view replaces its `case` in `body()` with a component. Buttons call store actions directly (`@click="act('ent', c.id)"`), so `data-a` codes can be retired gradually.
@@ -159,7 +127,7 @@ If the simulation moves into a Web Worker later (recommended once long waits fee
 
 ## 5. Suggested order and checkpoints
 
-1. Vitest plus CI (green on today's tests, with coverage measured).
+1. ~~Vitest plus CI (green on today's tests, with coverage measured).~~ Done.
 2. ~~Vite build with `vite-plugin-singlefile`. Diff-test that the produced HTML runs, and load an existing save in it.~~ Done.
 3. A Playwright smoke test of the core loop.
 4. Wrap the existing renderer in Vue and the store. Ship it, which proves the plumbing.

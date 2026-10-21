@@ -5,7 +5,7 @@ Single-player sandbox mafia RPG set in 1970 New York. A deterministic, seeded si
 Current version: **V85**.
 
 ## Requirements
-- Node.js 22.12 or newer (Vite's minimum) and npm.
+- Node.js 26 or newer and npm (`.nvmrc` pins 26: `nvm install` picks it up).
 
 ## Quick start
 ```
@@ -31,10 +31,11 @@ While working on the UI, `make dev` (or `npm run dev`) serves the game at http:/
 ## Type-check and test
 ```
 npm run typecheck                         # tsc --noEmit
-npm run test:all                          # storage, v72–v79, old-save compatibility, legacy test
-npx tsx src/tests/v77.test.ts fast        # a single suite
+npm run test:all                          # every test except the opt-in long runs, in parallel (Vitest)
+npm run test:unit                         # only the unit tests, in seconds
+npx vitest run economy                    # one system; add -t "<name>" for a single check
 ```
-Suites: `storage` (save/load safety), `v72`–`v76` (simulation, economy ledger, NPC autonomy, careers, clubs), `v77`–`v79` (conversation overhaul: crawler, no repeated lines, no internal-data leaks, memory across save/load), `oldsave` (loads genuine older saves from `src/tests/fixtures/`). `v74` and `v75` are slow.
+Tests are organised by game system under `src/tests/` (`architecture`, `saves/`, `hierarchy/`, `economy/`, `agency/`, `situations/`, `organisations/`, `dialogue/`, `creation/`, `determinism`) and tagged by kind (`unit`, `scenario`, `sim`, `determinism`, `compat`, `architecture`, `property`). Long simulations are opt-in: `npm run test:slow`. See [docs/05-testing.md](docs/05-testing.md).
 
 ## Other commands
 ```

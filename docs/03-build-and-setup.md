@@ -41,7 +41,7 @@ web/index.html ── <script type="module" src="./main.ts"> ── import '../s
 - **No type checking during the build.** Vite strips types without checking them. `npm run typecheck` is a separate step, and the Makefile's default target runs both.
 - **No source maps, no hashing, no code splitting.** These would contradict the single-file goal.
 
-Nothing else is built. Tests, the CLI and the playtest harness run straight from TypeScript with `tsx`.
+Nothing else is built. The tests run under Vitest, which compiles TypeScript itself and reads [vitest.config.ts](../vitest.config.ts), not `vite.config.ts` (see [05-testing.md](05-testing.md)). The CLI, the measurement scripts and the playtest harness run straight from TypeScript with `tsx`.
 
 ### The dev server
 
@@ -57,13 +57,15 @@ This (or `npm run dev`) serves the game at http://localhost:5173 and reloads the
 
 | Tool | Version (lockfile) | Used for |
 | --- | --- | --- |
-| Node.js | 22.12 or newer ([.nvmrc](../.nvmrc)); Vite 8 needs `^20.19 \|\| >=22.12`. Verified on 25.8 | Running `tsx`, `tsc`, `vite` |
-| npm | Ships with Node | Installing from `package-lock.json` |
+| Node.js | 26 ([.nvmrc](../.nvmrc), the newest line, LTS from late October 2026; `engines` in package.json says `>=26`, and `make check-node` refuses anything older). Vite 8 needs `^20.19 \|\| >=22.12`, Vitest 5 `^22.12 \|\| ^24 \|\| >=26` | Running `tsx`, `tsc`, `vite`, `vitest` |
+| npm | 11, shipped with Node 26 | Installing from `package-lock.json`. It skips dependency install scripts unless `allowScripts` in package.json approves them (see below) |
 | TypeScript | ^5.6 | `tsc --noEmit` |
-| tsx | ^4.19 | Running `.ts` directly (tests, CLI, playtest) |
+| tsx | ^4.19 | Running `.ts` directly (CLI, measurement scripts, playtest) |
 | Vite | ^8.3 | Bundling (Rolldown, Oxc minifier) and the dev server |
 | vite-plugin-singlefile | ^2.3 | Inlining the bundle into one HTML file |
-| @types/node | ^22 | Types for tests/CLI (`node:assert`, `node:fs`) |
+| Vitest | ^5.0 | The test runner ([vitest.config.ts](../vitest.config.ts)) |
+| @vitest/coverage-v8 | ^5.0 | Coverage for `npm run test:cov` |
+| @types/node | ^26 | Types for tests/CLI (`node:assert`, `node:fs`), matching the Node version |
 | make | Any POSIX make (macOS/Linux built-in) | Optional convenience wrapper |
 
 ## Setting up from scratch on a new machine
@@ -112,7 +114,7 @@ git clone https://github.com/agmkzy/omerta.git && cd omerta && nvm install && ma
 
 ### Windows
 
-Use WSL2 (Ubuntu) and follow the Linux steps. The build no longer needs a POSIX shell, so native Windows should be able to run `npm ci`, `npm run typecheck`, `npm run build`, `npm run dev` and single suites with `npx tsx` (not tested). `npm run test:all` is a shell `for` loop, and `make` needs a POSIX environment, so those still need Git Bash or WSL.
+Use WSL2 (Ubuntu) and follow the Linux steps. The build no longer needs a POSIX shell, so native Windows should be able to run `npm ci`, `npm run typecheck`, `npm run build`, `npm run dev` and `npm test` (not tested). Only `npm run test:slow` sets an environment variable the POSIX way (`SLOW=1 vitest run`), and `make` needs a POSIX environment, so those still need Git Bash or WSL (or set `SLOW=1` first and run `npx vitest run`).
 
 ### Without make
 
@@ -126,7 +128,7 @@ npm ci && npm run typecheck && npm run build
 make test
 ```
 
-`make test` runs the minimum pre-ship check from CLAUDE.md: a typecheck plus the v77–v79 conversation suites, in about a minute. Use `make test-all` for the full suite, which takes several minutes.
+`make test` runs the minimum pre-ship check from CLAUDE.md: a typecheck plus the conversation tests (`src/tests/dialogue/`), in about ten seconds on a recent laptop. Use `make test-all` for everything, which takes under a minute.
 
 ## The Makefile
 
@@ -135,17 +137,20 @@ make test
 | Target | Does |
 | --- | --- |
 | `make` / `make all` | `install` (only if `package.json`/`package-lock.json` changed), then `typecheck`, then `build` |
-| `make check-node` | Fails with a clear message unless Node ≥ 22.12 (Vite's minimum) and npm are on the PATH |
+| `make check-node` | Fails with a clear message unless Node ≥ 26.0 (`.nvmrc`) and npm are on the PATH |
 | `make install` | `npm ci`. It uses `node_modules/.package-lock.json` as a stamp, so it is a no-op when nothing changed |
 | `make typecheck` | `npm run typecheck` |
 | `make build` | `npm run build`. It only rebuilds when a source `.ts` file, `web/index.html`, `web/main.ts` or `vite.config.ts` is newer than `dist/omerta.html` |
 | `make dev` | `npm run dev`: the Vite dev server with live reload on http://localhost:5173. Extra Vite flags go in `ARGS`, for example `make dev ARGS=--host` to open the game from a phone on the same network |
 | `make preview` | Build if needed, then `npm run preview`: serves `dist/omerta.html` over HTTP and opens it in the browser |
-| `make test` | Typecheck plus v77, v78 and v79 (fast) |
-| `make test-all` | Typecheck plus `npm run test:all` (storage, v72–v79, oldsave, determinism) |
-| `make test-compat` | The synthetic migration checks in v73/v74/v75 (`compat` mode), which `test:all` does not run |
-| `make test-sim SEED=3 DAYS=180` | Long v74/v75 simulations for one seed |
-| `make ci` | `all` + `test-all` + `test-compat`. This is what CI runs |
+| `make test` | Typecheck plus the conversation tests (`npm test -- src/tests/dialogue`) |
+| `make test-unit` | Only the tests tagged `unit` (about 6 s) |
+| `make test-all` | Typecheck plus `npm run test:all`: every test in `src/tests/` except the opt-in long runs, in parallel |
+| `make test-compat` | Only the save-compatibility tests, every test tagged `compat` (also part of `test-all`) |
+| `make test-sim SEED=3 DAYS=180` | The long simulations, every test tagged `sim` and `slow`, for one seed (or a list: `SEED=3,7`) |
+| `make test-slow SEED=3` | Every long run (tagged `slow`): stability, sims, round trips, save growth, the trace of the player's road to boss, the full seed set for backgrounds |
+| `make test-cov` | `test-all` with coverage. It fails below the thresholds in `vitest.config.ts`, and writes an HTML report to `coverage/`. CI doesn't run it |
+| `make ci` | `all` + `test-all`: typecheck, build and every test except the opt-in long runs. This is what CI checks |
 | `make pages` | Build, then copy `dist/omerta.html` to `index.html` for GitHub Pages |
 | `make play` / `make sim` | The terminal interface and the unattended simulation ([cli.ts](../src/cli.ts)) |
 | `make bot SEED=3 DAYS=120` | The random-policy player smoke test ([bot.ts](../src/bot.ts)) |
@@ -156,6 +161,7 @@ make test
 Design notes:
 
 - **`npm ci`, not `npm install`.** A fresh setup gets exactly the locked versions and never rewrites `package-lock.json`.
+- **Dependency install scripts are reviewed, not run blindly.** npm 11 blocks them unless `allowScripts` in package.json lists the package. Two dependencies have one, and neither needs it: `esbuild`'s `postinstall` only double-checks its native binary, which arrives as its own package (`@esbuild/darwin-arm64` and the like), and `fsevents` ships a prebuilt `fsevents.node`. Both are recorded as denied (`"esbuild": false`, `"fsevents": false`). If an update brings a new one, `npm ci` names it: read the script, then `npm install-scripts approve <pkg>` or `npm install-scripts deny <pkg>`.
 - **Real file targets** (`$(STAMP)`, `$(DIST)`) mean a second `make` does almost nothing. Only `typecheck` re-runs, because type errors can come from any file.
 - `check-node` is an order-only prerequisite of the install stamp, so it runs before the first install without forcing reinstalls.
 
@@ -167,9 +173,13 @@ Design notes:
 | `dev` | `vite`: dev server with live reload (see [The dev server](#the-dev-server)) |
 | `build` | `vite build` → `dist/omerta.html` |
 | `preview` | `vite preview`: serves `dist/omerta.html` at http://localhost:4173 and opens it |
-| `test` | `tsx src/test.ts`: determinism, save round trip, multi-seed sanity |
-| `test:all` | `storage`, `v72` … `v79` (each `fast`), then `oldsave`, then `test.ts`. It stops at the first failing suite |
-| `test:v72` / `test:v73` / `test:v74` | Single version suites. v73/v74 include `compat` mode |
+| `test` | `vitest run`: every test in `src/tests/` except the opt-in long runs (tagged `slow`). All files run in parallel, and a failure doesn't stop the others. Extra arguments filter, for example `npm test -- economy -t ledger` |
+| `test:all` | The same as `test` (kept because the docs and habits use it) |
+| `test:unit` | `vitest run --tagsFilter unit`: only the unit tests |
+| `test:compat` | `vitest run --tagsFilter compat`: only the save-compatibility tests |
+| `test:slow` | `SLOW=1 vitest run`: everything, including the long simulations (`SEED`, `DAYS`) |
+| `test:watch` | `vitest`: re-runs the affected suites on every change |
+| `test:cov` | `vitest run --coverage`: `test:all` with coverage and thresholds |
 | `sim` | `tsx src/cli.ts sim`, for example `npm run sim -- --seed 4 --days 180` |
 | `play` | `tsx src/cli.ts play`, for example `npm run play -- --new --seed 4` (legacy text UI, saves to `omerta-save.json`) |
 | `bot` | `tsx src/bot.ts <seed> <days>`: a random-policy player used as a smoke test |

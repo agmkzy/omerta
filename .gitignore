@@ -2,3 +2,4 @@ node_modules/
 omerta-save.json
 *.log.tmp
 .claude/
+coverage/

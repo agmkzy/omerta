@@ -121,15 +121,19 @@ export function earn(c: Character, amt: number, src = 'odd') {
   record(c, amt, src);
 }
 
-const ownerCache = new WeakMap<World, { t: number; n: number; map: Map<Id, Business> }>();
+// Which business each owner has, cached and rebuilt once it is more than 30 minutes of game time old. ownerBiz is called millions of times a run,
+// so the check must be cheap: it no longer counts w.biz on every call. Instead, whatever adds a business (world.ts) or
+// moves one between owners (econ.ts) calls ownersChanged, and the next call rebuilds the map. Businesses are never removed
+// (a closed one stays, with open = false), and every new one gets a new id, so this rebuilds at exactly the moments the
+// old count check did.
+const ownerCache = new WeakMap<World, { t: number; map: Map<Id, Business> }>();
 export function ownersChanged(w: World) { ownerCache.delete(w); }
 export function ownerBiz(w: World, id: Id): Business | undefined {
   let c = ownerCache.get(w);
-  const n = Object.keys(w.biz).length;
-  if (!c || w.now - c.t > 30 || c.n !== n || w.now < c.t) {
+  if (!c || w.now - c.t > 30 || w.now < c.t) {
     const map = new Map<Id, Business>();
     for (const b of Object.values(w.biz)) if (b.open && !map.has(b.ownerId)) map.set(b.ownerId, b);
-    c = { t: w.now, n, map };
+    c = { t: w.now, map };
     ownerCache.set(w, c);
   }
   const b = c.map.get(id);

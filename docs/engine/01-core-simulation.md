@@ -276,7 +276,7 @@ Internal: `think(w, id)` ([engine.ts:78](../../src/engine.ts)), `weekly(w)` ([en
 - `World.facts` (sole creator), `World.pending` (adds `reveal` items), `World.queue` and `World.seq` (via `schedule`), `World.nextId` (via `newId`), `World.debts` (creates; `payDebt` updates).
 - `Character.known` (main writer, via `learn`), `Character.rels` (lazily created by `rel`; updated by `learn`, `suspect`, `link`, `onDebtCleared`), `Character.struggling` (set by `learn` on `business_struggling` facts), `Character.weekIncome`, `books.gross`, `lifetimeGross` (via `record`/`earn`), `Character.career` (via `recordCareer`, ring of 12), `alive`/`diedAt` (via `handleDeath`).
 - On death: `Business.open`, deletes `Business.protection` where the dead man collected, `Debt.status = 'void'`, `Dispute.status = 'dropped'`, `Family.heir`/`consigliere`/`acting`, subordinates' `bossId`.
-- A module-level cache `ownerCache: WeakMap<World, { t, n, map }>` ([core.ts:88](../../src/core.ts)), not saved.
+- A module-level cache `ownerCache: WeakMap<World, { t, map }>` ([core.ts](../../src/core.ts)), not saved. `ownersChanged(w)` drops it; anything that adds a business or moves one between owners must call it.
 
 **Public API.**
 
@@ -312,7 +312,7 @@ Money bookkeeping:
 |---|---|---|
 | `record(c, amt, src)` | void | If `amt > 0`: adds to `weekIncome`, `books.gross[src]`, and (player) `lifetimeGross`. Does not move cash. |
 | `earn(c, amt, src = 'odd')` | void | `c.cash += amt` then `record`. Money appears from outside unless the caller removed it elsewhere. |
-| `ownerBiz(w, id)` | `Business \| undefined` | The first open business the character owns, from a cache rebuilt when 30 minutes have passed, the business count changed or time went backwards. |
+| `ownerBiz(w, id)` | `Business \| undefined` | The first open business the character owns, from a cache rebuilt when 30 minutes have passed, time went backwards, or `ownersChanged` dropped it (a business was added or changed hands). |
 | `ownersChanged(w)` | void | Invalidates that cache; `econ.transferBusiness` calls it. |
 | `concealedGap(w, c)` | number | What he should have passed up over the last four settled weeks and did not: `sum(max(0, gross - declared)) * (kickRate + active levy)`. Used by jobs.ts. |
 

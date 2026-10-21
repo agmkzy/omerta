@@ -3,7 +3,7 @@ import { ensureClubs } from './clubdata';
 import { ambitionInit } from './ambition';
 import { BASE_RATE, emptyBooks } from './books';
 import { rollProblem, rollSkills } from './people';
-import { addFact, createDebt, link, money, schedule } from './core';
+import { addFact, createDebt, link, money, ownersChanged, schedule } from './core';
 import { DISTRICTS } from './core';
 import { Rng } from './rng';
 import { lifeInit } from './life';
@@ -196,7 +196,7 @@ export function createWorld(seed: number, playerName = 'Tony Marino', opts: { or
       income: 2200, expense: 1900, cash: 3000, distress: 0, open: true, damaged: 0,
       protection: { collectorId: owner.id, familyId: fid, fee: 0 },
     };
-    w.biz[b.id] = b;
+    w.biz[b.id] = b; ownersChanged(w);
     void i;
   });
 
@@ -239,7 +239,7 @@ export function createWorld(seed: number, playerName = 'Tony Marino', opts: { or
       id: 'b' + w.nextId++, name: `${last}'s ${k.label}`, kind: k.kind, ownerId: owner.id, district,
       income: k.income, expense: Math.round((k.income * 0.88) / 5) * 5, cash: 300, distress: 0, open: true, damaged: 0,
     };
-    w.biz[b.id] = b;
+    w.biz[b.id] = b; ownersChanged(w);
   }
   for (let i = 0; i < 14; i++) mk(w, used, { rank: 'civilian', familyId: null, bossId: null, district: rng.pick(DISTRICTS), cash: cash(100, 500) });
   for (let i = 0; i < 12; i++) {
@@ -336,7 +336,7 @@ export function addShops(w: World, n: number): Id[] {
     delete owner.problem;
     const last = owner.name.split(' ')[1];
     const b: Business = { id: 'b' + w.nextId++, name: `${last}'s ${k.label}`, kind: k.kind, ownerId: owner.id, district, income: k.income, expense: Math.round((k.income * 0.88) / 5) * 5, cash: 300, distress: 0, open: true, damaged: 0 };
-    w.biz[b.id] = b;
+    w.biz[b.id] = b; ownersChanged(w);
     for (const x of Object.values(w.chars).filter((c) => c.alive && c.district === district && c.id !== owner.id).slice(0, 4)) link(owner, x, 0.2);
     schedule(w, w.now + rng.int(0, 180), 'think', owner.id);
     ids.push(owner.id);

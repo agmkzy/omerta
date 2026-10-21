@@ -1,7 +1,7 @@
 # Typecheck, build and run every regression suite on each push and pull request.
-# Free for public repositories on GitHub-hosted runners. Suites run as parallel jobs, so the
-# wall-clock time is roughly that of the slowest suite instead of the ~7.5 minute serial `test:all`.
-# See docs/05-testing.md.
+# Free for public repositories on GitHub-hosted runners. The tests (Vitest) run in three parallel jobs of roughly equal work,
+# so the wall-clock time is that of one job; failures are annotated on the pull request. Coverage is not measured here (it
+# slows every test by about a quarter); run `make test-cov` locally to check the thresholds. See docs/05-testing.md.
 name: CI
 
 on:
@@ -53,18 +53,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: storage, run: 'npx tsx src/tests/storage.test.ts' }
-          - { name: v72 simulation and saves, run: 'npx tsx src/tests/v72.test.ts fast' }
-          - { name: v73 economy, run: 'npx tsx src/tests/v73.test.ts fast' }
-          - { name: v74 NPC agency, run: 'npx tsx src/tests/v74.test.ts fast' }
-          - { name: v75 situations, run: 'npx tsx src/tests/v75.test.ts fast' }
-          - { name: v76 organisations, run: 'npx tsx src/tests/v76.test.ts fast' }
-          - { name: v77 voices and memory, run: 'npx tsx src/tests/v77.test.ts fast' }
-          - { name: v78 conversation layers, run: 'npx tsx src/tests/v78.test.ts fast' }
-          - { name: v79 conversation crawler, run: 'npx tsx src/tests/v79.test.ts fast' }
-          - { name: old saves, run: 'npx tsx src/tests/oldsave.test.ts' }
-          - { name: determinism, run: 'npx tsx src/test.ts' }
-          - { name: schema migrations, run: 'make test-compat' }
+          # Split by work, not by meaning: situations/ is the most simulation, and the determinism suite builds ten worlds in
+          # child processes. Everything else runs in the third job, including any new test file: Vitest finds the files,
+          # nothing here lists them.
+          - { name: situations, files: src/tests/situations }
+          - { name: determinism, files: src/tests/determinism.test.ts }
+          - { name: other tests, files: "--exclude 'src/tests/situations/**' --exclude src/tests/determinism.test.ts" }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -72,4 +66,5 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: ${{ matrix.run }}
+      # --maxWorkers=100%: Vitest leaves one core idle by default, a quarter of a 4-core runner.
+      - run: npx vitest run ${{ matrix.files }} --maxWorkers=100%
