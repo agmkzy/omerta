@@ -1,7 +1,7 @@
 import { huntDue } from './violence';
 // Delayed consequences. Violence and secrets do not resolve when they happen: witnesses come forward,
 // the police take an interest, a client calls in a favour, a false accusation comes apart.
-import { addFact, bear, clamp, DEED, ease, handleDeath, learn, ownerBiz, rel, repute } from './core';
+import { addFact, bear, clamp, DEED, ease, feel, handleDeath, learn, ownerBiz, rel, repute } from './core';
 import { mkJob } from './jobs';
 import { Character, DAY, Fact, Id, World } from './types';
 import { money } from './core';
@@ -104,7 +104,7 @@ export function pendingTick(w: World) {
         if (!accuser?.alive || !victim) break;
         const kin = Object.values(w.chars).filter((c) => c.alive && c.familyId === victim.familyId && (c.rels[victim.id]?.trust ?? 0) >= 0.4);
         for (const m of kin) {
-          rel(m, accuser.id).respect = clamp(rel(m, accuser.id).respect - 0.25);
+          feel(w, m, accuser.id, 'respect', -0.25);
           bear(w, m, accuser.id, 0.2, `${accuser.name} told lies about ${victim.name}`);
           if (killer && killer.id !== accuser.id) bear(w, m, killer.id, 0.25, `${killer.name} killed ${victim.name} on a lie`);
         }
@@ -173,7 +173,7 @@ function disputeStep(w: World, q: import('./types').Pending) {
     settleDispute(w, p.id, x.id, `${mid.name} brokered an end to it${comp ? '; ' + money(comp) + ' paid' : ''}.`, { text: `${x.name} leaves it alone`, by: w.now + 60 * DAY, barred: x.familyId ?? undefined, biz: (w.disputes ?? []).find((d) => d.a === p.id && d.b === x.id)?.biz });
     ease(x, p.id, 0.6 + 0.05);
     ease(p, x.id, 0.3);
-    rel(mid, x.id).respect = clamp(rel(mid, x.id).respect - 0.03);
+    feel(w, mid, x.id, 'respect', -0.03);
     if (cross && mid.familyId) { const A = w.fam[mid.familyId], B = w.fam[x.familyId!]; A.tension[x.familyId!] = Math.max(0, (A.tension[x.familyId!] ?? 0) - 0.5); B.tension[mid.familyId] = Math.max(0, (B.tension[mid.familyId] ?? 0) - 0.5); }
     say(cross
       ? `${mid.name} and ${counter.name} have spoken. ${x.name} is to leave you alone${comp ? ` and make good ${money(comp)}` : ''}. Neither family wants a war over this, and that’s all it took.`
@@ -182,7 +182,7 @@ function disputeStep(w: World, q: import('./types').Pending) {
     bear(w, x, p.id, 0.05, `${p.name} went over his head`);
     say(`${mid.name} raised it with ${cross ? counter.name : x.name} and got a shrug. "Nothing was agreed," he tells you. Whatever ${x.name} wants, he hasn’t been told to stop wanting it.`);
   } else {
-    rel(mid, p.id).respect = clamp(rel(mid, p.id).respect - 0.05);
+    feel(w, mid, p.id, 'respect', -0.05);
     bear(w, x, p.id, 0.12, `${p.name} went over his head`);
     if (cross && mid.familyId) { w.fam[mid.familyId].tension[x.familyId!] = (w.fam[mid.familyId].tension[x.familyId!] ?? 0) + 0.4; w.fam[x.familyId!].tension[mid.familyId] = (w.fam[x.familyId!].tension[mid.familyId] ?? 0) + 0.4; }
     say(`${mid.name} tried and was brushed off. ${cross ? counter.name + ' told him' : x.name + ' told him'} the matter is closed. ${mid.name} doesn’t like being told that, and nobody on the other side enjoyed being asked.`);
@@ -207,6 +207,6 @@ function seatDecision(w: World, q: import('./types').Pending) {
   } else {
     fam.seatNo = { ...(fam.seatNo ?? {}), [rank]: w.now + 40 * DAY };
     say(`${boss.name} turned down the idea of another ${rank}. "The family’s the right size," is what reached you. He won’t hear it again for a while.`);
-    rel(boss, p.id).respect = clamp(rel(boss, p.id).respect - 0.02);
+    feel(w, boss, p.id, 'respect', -0.02);
   }
 }

@@ -28,6 +28,9 @@ export interface Problem {
 export type Rank = 'civilian' | 'associate' | 'soldier' | 'capo' | 'underboss' | 'boss';
 
 // How `a` feels about `b` (directional).
+// The save format's version (engine.serialize/deserialize): bump it when a change needs old saves repaired.
+export const SCHEMA = 7;
+
 export interface Rel {
   trust: number;
   respect: number;
@@ -36,6 +39,8 @@ export interface Rel {
   lastMet: number;
   fear?: number; // V90: how much he fears the other man, kept apart from respect (temper.ts); absent means none
   why?: Why; // what his grudge is about: the event that did most to raise it (core.bear), gone when the grudge is
+  known?: number; // familiarity, 0..1: how well he knows the other man (time together, things lived through), apart from trust (core.feel)
+  bond?: Why; // what his regard rests on: the turn or the time that did most to raise his trust or liking (core.feel)
 }
 // The reason behind a grudge: the event when there is one (it may later be pruned from the record, so its words are kept), or
 // a plain reason where nothing was recorded as an event. a: how much it raised the grudge, so a slight does not overwrite a beating.

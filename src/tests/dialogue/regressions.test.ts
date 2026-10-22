@@ -147,7 +147,8 @@ describe('V90 audit regressions', { timeout: 60_000 }, () => {
   ok('Sunday comes in order: a man with a crew takes his men’s envelopes before his boss will take his', { tags: ['scenario'] }, () => {
     const w = world60(), p = P(w), boss = w.chars[p.bossId!];
     const sunday = (x: World) => { const px = P(x); x.sunday = { t: x.now, tells: [] }; px.cooldown.handed = 0; px.books.arrears = 120; px.cash = 3000; };
-    const offered = (x: World) => { const c = meet(x, x.chars[boss.id]); const os = [...options(x, P(x), x.chars[boss.id], c)]; const r = say(x, P(x), x.chars[boss.id], c, 'n:myboss'); if (r.convo) os.push(...options(x, P(x), x.chars[boss.id], r.convo)); return os.some((o) => o.code === 'b_envelope'); };
+    // (if he opens with something of his own, the player turns to other business first, as he would at the table)
+    const offered = (x: World) => { let c = meet(x, x.chars[boss.id]); if (c.ctx.focus) c = say(x, P(x), x.chars[boss.id], c, 'f:').convo ?? c; const os = [...options(x, P(x), x.chars[boss.id], c)]; const r = say(x, P(x), x.chars[boss.id], c, 'n:myboss'); if (r.convo) os.push(...options(x, P(x), x.chars[boss.id], r.convo)); return os.some((o) => o.code === 'b_envelope'); };
     const alone = deserialize(serialize(w)); sunday(alone);
     assert.ok(offered(alone), 'a man with no crew hands his envelope straight up');
     const withCrew = deserialize(serialize(w)); sunday(withCrew);

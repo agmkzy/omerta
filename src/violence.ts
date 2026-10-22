@@ -1,6 +1,6 @@
 // What it costs to put hands on a man. Rank, family and permission decide who answers for it, and how hard.
 import { temper } from './temper';
-import { addFact, bear, bearAtLeast, bearAtLeastOn, clamp, famName, rel, repute } from './core';
+import { addFact, bear, bearAtLeast, bearAtLeastOn, clamp, famName, feel, feelOn, feelTo, feelToOn, rel, repute } from './core';
 import { LADDER, members } from './career';
 import { isMade, sanctioned } from './politics';
 import { threatOf } from './danger';
@@ -37,8 +37,8 @@ export function startHunt(w: World, famId: Id, p: Character, sev: number, why: s
   hunters.forEach((h, i) => {
     const r = rel(h, p.id);
     bearAtLeastOn(w, r, 0.85, `${p.name} has to answer for what he did`);
-    r.trust = 0;
-    r.respect = Math.min(r.respect, 0.05);
+    feelToOn(r, 'trust', 0);
+    feelToOn(r, 'respect', Math.min(r.respect, 0.05));
     const t = threatOf(w, h);
     t.level = Math.max(t.level, i === 0 && sev >= 3 ? 2 : 1);
     t.truce = 0;
@@ -75,7 +75,7 @@ export function aftermath(w: World, p: Character, x: Character, mode: 'beat' | '
     (w.pending ??= []).push({ id: 'p' + w.nextId++, due: w.now + w.rng.int(3, 20) * DAY, kind: 'hunt', a: p.id, b: x.id, c: famId, amount: s, note: why });
   };
   const everyone = (famId: Id, trust: number, respect: number) => {
-    for (const c of members(w, famId)) { if (c.id === p.id) continue; const r = rel(c, p.id); r.trust = clamp(r.trust + trust); r.respect = clamp(r.respect + respect); }
+    for (const c of members(w, famId)) { if (c.id === p.id) continue; const r = rel(c, p.id); feelOn(w, r, 'trust', trust); feelOn(w, r, 'respect', respect); }
   };
 
   if (same && (up || made)) {
@@ -88,7 +88,7 @@ export function aftermath(w: World, p: Character, x: Character, mode: 'beat' | '
     } else {
       standingLoss(w, p, 10 + sev * 5);
       everyone(fid, -0.15, -0.15);
-      bearAtLeast(w, x, p.id, 0.9, `${p.name} put hands on him`); rel(x, p.id).trust = 0;
+      bearAtLeast(w, x, p.id, 0.9, `${p.name} put hands on him`); feelTo(x, p.id, 'trust', 0);
       if (xBoss?.alive && xBoss.id !== p.id) bear(w, xBoss, p.id, 0.3, `${p.name} put hands on one of his`);
       if (up) {
         const t = threatOf(w, x); t.level = Math.max(t.level, 1); t.truce = 0; t.last = w.now - 6 * DAY;
@@ -100,8 +100,8 @@ export function aftermath(w: World, p: Character, x: Character, mode: 'beat' | '
   }
   if (same) {
     // a man of your own who isn't made: your boss and his crew will want an answer
-    if (boss) { const r = rel(boss, p.id); r.trust = clamp(r.trust - (kill ? 0.3 : 0.1)); r.respect = clamp(r.respect - (kill ? 0.2 : 0.05)); }
-    for (const c of Object.values(w.chars)) if (c.alive && c.bossId === p.id && c.id !== x.id) { const r = rel(c, p.id); r.trust = clamp(r.trust - (kill ? 0.3 : 0.1)); r.respect = clamp(r.respect - (kill ? 0.1 : 0)); }
+    if (boss) { const r = rel(boss, p.id); feelOn(w, r, 'trust', -((kill ? 0.3 : 0.1))); feelOn(w, r, 'respect', -((kill ? 0.2 : 0.05))); }
+    for (const c of Object.values(w.chars)) if (c.alive && c.bossId === p.id && c.id !== x.id) { const r = rel(c, p.id); feelOn(w, r, 'trust', -((kill ? 0.3 : 0.1))); feelOn(w, r, 'respect', -((kill ? 0.1 : 0))); }
     standingLoss(w, p, kill ? 25 : 6);
     if (kill) hunt(p.familyId!, 1, `${x.name} went missing and you were the last to see him.`, false);
     lines.push(kill ? `Your own man. Your crew will not forget how easily you did it.` : `He was one of yours. The men who work for you saw how you handle your own.`);
@@ -110,7 +110,7 @@ export function aftermath(w: World, p: Character, x: Character, mode: 'beat' | '
   if (x.familyId && made) {
     const fid = x.familyId;
     if (!sanc) {
-      if (boss) { const r = rel(boss, p.id); r.trust = clamp(r.trust - (kill ? 0.3 : 0.12)); }
+      if (boss) { const r = rel(boss, p.id); feelOn(w, r, 'trust', -((kill ? 0.3 : 0.12))); }
       standingLoss(w, p, kill ? 15 + sev * 5 : 6);
       lines.push(`Nobody gave you leave to touch a made man. ${boss ? first(boss) + ' will hear before you can tell him.' : 'It will get back.'}`);
       if (kill) {
@@ -125,7 +125,7 @@ export function aftermath(w: World, p: Character, x: Character, mode: 'beat' | '
         if (xBoss?.alive) bear(w, xBoss, p.id, 0.25, `${p.name} put hands on one of his`);
         if (sev >= 3) hunt(fid, 1, `You put ${x.name} in the hospital.`, false);
       }
-    } else if (boss) { rel(boss, p.id).trust = clamp(rel(boss, p.id).trust + 0.04); }
+    } else if (boss) { feel(w, boss, p.id, 'trust', 0.04); }
     return lines;
   }
   // everyone else: associates and civilians. The kin and the boss, if he had one, will want it paid back.

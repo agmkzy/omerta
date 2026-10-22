@@ -9,7 +9,7 @@ import { DISTRICTS } from './core';
 import { Rng } from './rng';
 import { lifeInit } from './life';
 import { applyBackground } from './background';
-import { Business, Character, DAY, Family, HOUR, Id, Rank, Traits, WEEK, World } from './types';
+import { Business, Character, DAY, Family, HOUR, Id, Rank, SCHEMA, Traits, WEEK, World } from './types';
 
 const FIRST = [
   'Vincent', 'Sal', 'Carmine', 'Tony', 'Frankie', 'Paulie', 'Nicky', 'Joey', 'Richie', 'Sonny',
@@ -146,8 +146,10 @@ export function spawnCivilian(w: World, name: string, district: string, cash = 1
 export function createWorld(seed: number, playerName = 'Tony Marino', opts: { orgs?: OrgDef[]; bg?: string } = {}): World {
   const ORGS = opts.orgs ?? STANDARD_ORGS;
   const rng = new Rng(seed);
+  // (the version is recorded from the start, where a loaded world keeps it, so a world that never stopped and one saved and loaded
+  // put whatever they create later in the same place, and serialise alike)
   const w: World = {
-    seed, rng, now: 8 * HOUR, seq: 0, queue: [], chars: {}, biz: {}, fam: {}, debts: [], facts: {}, nextId: 1, playerId: null, jobs: [], ventures: [], grievances: [], pending: [], enc: [], favours: [], threats: {}, events: [], ops: [], goals: { done: {} },
+    seed, schema: SCHEMA, rng, now: 8 * HOUR, seq: 0, queue: [], chars: {}, biz: {}, fam: {}, debts: [], facts: {}, nextId: 1, playerId: null, jobs: [], ventures: [], grievances: [], pending: [], enc: [], favours: [], threats: {}, events: [], ops: [], goals: { done: {} },
   };
   // nobody else in the city carries the player's surname unless he gives it to them, so no stranger reads as kin
   const used = new Set<string>([playerName, 'last:' + playerName.trim().split(/\s+/).slice(1).join(' ').toLowerCase()]);

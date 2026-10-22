@@ -4,7 +4,7 @@
 import { temper, viewOf } from './temper';
 import type { Convo, FollowOpt, Said } from './dialogue';
 import { readiness } from './career';
-import { addFact, bearOn, clamp, learn, money, rel } from './core';
+import { addFact, bearOn, clamp, feelOn, learn, money, rel } from './core';
 import { addFavour } from './encounters';
 import { RECRUIT_COST } from './orders';
 import { amendsAsk, askBetween, openAsk, playerMove, playerMoves, type AskMove } from './asks';
@@ -51,7 +51,7 @@ export function flow(w: World, p: Character, t: Character, c: Convo, code: strin
   const r = rel(t, p.id);
   const st = stanceOf(w, p, t);
   const lines: string[] = [];
-  const tweak = (trust: number, aff = 0, resp = 0) => { r.trust = clamp(r.trust + trust); r.affection = clamp(r.affection + aff); r.respect = clamp(r.respect + resp); };
+  const tweak = (trust: number, aff = 0, resp = 0) => { feelOn(w, r, 'trust', trust); feelOn(w, r, 'affection', aff); feelOn(w, r, 'respect', resp); };
   const drop: FollowOpt = { code: 'fl:drop', label: '“Let’s leave it there.”' };
 
   // ------------------------------------------------------------------ a promise you did not keep
@@ -327,7 +327,7 @@ export function flow(w: World, p: Character, t: Character, c: Convo, code: strin
 function doOrder(w: World, p: Character, t: Character, c: Convo, code: string, forced: boolean): Said {
   const r = rel(t, p.id);
   const lines: string[] = [];
-  if (forced) { r.trust = clamp(r.trust - 0.04); r.respect = clamp(r.respect + 0.02); bearOn(w, r, 0.05, `${p.name} gave him an order he did not like`); }
+  if (forced) { feelOn(w, r, 'trust', -0.04); feelOn(w, r, 'respect', 0.02); bearOn(w, r, 0.05, `${p.name} gave him an order he did not like`); }
   if (code === 'assign_low') {
     t.heat = Math.max(0, t.heat - 0.2);
     lines.push(forced ? 'He nods once and says nothing more. He will stay out of sight, and he will not forget how it was put.' : '“All right. I’ll be quiet a while.”');

@@ -1,6 +1,6 @@
 // V75: the player's side of situations. What he can see (only what he has been told or witnessed), and what he can do about it.
 // Availability depends on rank, on who trusts him, and on what he knows; nothing here reads a situation's hidden `truth`.
-import { clamp, learn, rel, repute } from './core';
+import { clamp, feel, feelOn, learn, rel, repute } from './core';
 import { LADDER } from './rank';
 import * as situ from './situ';
 import { attendees, chairPick, claim, closeSit, hold, isOpen, kitOf, know, stanceOf, tell, titleOf } from './situ';
@@ -74,7 +74,7 @@ export function doMove(w: World, p: Character, sid: Id, code: string, who?: Id):
     const sources = [...friends, ...attendees(s).map((id) => w.chars[id]).filter((c) => c?.alive && c.id !== p.id && rel(c, p.id).trust >= 0.45)];
     const src = sources.sort((a, b) => rel(b, p.id).trust - rel(a, p.id).trust)[0];
     // Asking is noticed by the people it is about.
-    for (const id of attendees(s)) if (id !== p.id && w.rng.chance(0.3)) { const r = rel(w.chars[id], p.id); r.respect = clamp(r.respect - 0.01); if (id === src?.id) continue; }
+    for (const id of attendees(s)) if (id !== p.id && w.rng.chance(0.3)) { const r = rel(w.chars[id], p.id); feelOn(w, r, 'respect', -0.01); if (id === src?.id) continue; }
     if (!src) return { lines: ['Nobody who knows is willing to talk to you about it.'], minutes: 45 };
     const unknown = Object.keys(src.known).map((id) => w.facts[id]).filter((f) => f && f.story === 'sit:' + s.id && !p.known[f.id]).sort((a, b) => b.t - a.t);
     if (!unknown.length) return { lines: [`${src.name} tells you what you already have.`], minutes: 45 };
@@ -98,8 +98,8 @@ export function doMove(w: World, p: Character, sid: Id, code: string, who?: Id):
   if (code === 'support' && who) {
     mset('sup', 14);
     s.m = { ...(s.m ?? {}), ['sup:' + who]: Number(s.m?.['sup:' + who] ?? 0) + 0.35 };
-    rel(w.chars[who], p.id).trust = clamp(rel(w.chars[who], p.id).trust + 0.08);
-    for (const id of attendees(s)) if (id !== who && id !== p.id && w.chars[id]) rel(w.chars[id], p.id).respect = clamp(rel(w.chars[id], p.id).respect - 0.04);
+    feel(w, w.chars[who], p.id, 'trust', 0.08);
+    for (const id of attendees(s)) if (id !== who && id !== p.id && w.chars[id]) feel(w, w.chars[id], p.id, 'respect', -0.04);
     tell(w, s, `${p.name} spoke up for ${w.chars[who].name}.`, { actor: p.id, minor: true, witnesses: attendees(s) });
     return { lines: [`You put your weight behind ${w.chars[who].name}. Everybody will hear about it.`], minutes: 30 };
   }

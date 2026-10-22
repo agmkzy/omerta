@@ -5,7 +5,7 @@ import { temper } from './temper';
 import { noteDeal } from './orgs';
 import { inductPlayer, sponsorOf, turnedDown } from './career';
 import { RULINGS, effectiveRate, influence, react, rule, subordinates } from './books';
-import { addFact, bear, bearOn, clamp, createDebt, ease, famName, isAwake, learn, money, recordCareer, rel, repute, shortTime } from './core';
+import { addFact, bear, bearOn, clamp, createDebt, ease, famName, feel, feelOn, isAwake, learn, money, recordCareer, rel, repute, shortTime } from './core';
 import { mkJob, tipFrom, traitWords } from './jobs';
 import { share } from './actions';
 import { HUSTLES } from './hustle';
@@ -151,8 +151,8 @@ function ruleGrievance(w: World, p: Character, g: Grievance, code: string, lines
     case 'r_from': {
       g.status = 'ruled';
       const a = g.claim > 0 ? pay(y, x, g.claim) : 0;
-      rx.trust = clamp(rx.trust + 0.08);
-      ry.trust = clamp(ry.trust - 0.06);
+      feelOn(w, rx, 'trust', 0.08);
+      feelOn(w, ry, 'trust', -0.06);
       if (T) {
         repute(w, p, 1, 'ruling');
         lines.push(`${y.name} takes it badly but knows it’s fair.${a ? ` He pays ${x.name} ${money(a)}.` : ''}`);
@@ -168,8 +168,8 @@ function ruleGrievance(w: World, p: Character, g: Grievance, code: string, lines
     }
     case 'r_about': {
       g.status = 'ruled';
-      ry.trust = clamp(ry.trust + 0.08);
-      rx.trust = clamp(rx.trust - 0.06);
+      feelOn(w, ry, 'trust', 0.08);
+      feelOn(w, rx, 'trust', -0.06);
       if (!T) {
         repute(w, p, 1, 'ruling');
         lines.push(`${x.name} backs down, a little embarrassed.`);
@@ -185,8 +185,8 @@ function ruleGrievance(w: World, p: Character, g: Grievance, code: string, lines
     case 'r_split': {
       g.status = 'ruled';
       const a = g.claim > 0 ? pay(y, x, g.claim / 2) : 0;
-      rx.trust = clamp(rx.trust - 0.02);
-      ry.trust = clamp(ry.trust - 0.02);
+      feelOn(w, rx, 'trust', -0.02);
+      feelOn(w, ry, 'trust', -0.02);
       ease(x, y.id, 0.5);
       ease(y, x.id, 0.5);
       lines.push(`You split it down the middle.${a ? ` ${y.name} pays ${x.name} ${money(a)}.` : ''} Nobody’s delighted, nobody walks out angry.`);
@@ -195,7 +195,7 @@ function ruleGrievance(w: World, p: Character, g: Grievance, code: string, lines
     }
     case 'r_post':
       g.postponed++;
-      rx.trust = clamp(rx.trust - 0.03);
+      feelOn(w, rx, 'trust', -0.03);
       lines.push(`You tell them it will wait. ${x.name} doesn’t like that.`);
       if (g.postponed >= 2) {
         bear(w, x, y.id, 0.15, `${y.name} still has not answered for it`);
@@ -204,7 +204,7 @@ function ruleGrievance(w: World, p: Character, g: Grievance, code: string, lines
       break;
     case 'r_dismiss':
       g.status = 'dropped';
-      rx.trust = clamp(rx.trust - 0.1);
+      feelOn(w, rx, 'trust', -0.1);
       bear(w, x, y.id, 0.15, `${y.name} got away with it`);
       lines.push(`You send them both away. The matter isn’t settled; it’s just no longer your problem, until it is.`);
       break;
@@ -217,7 +217,7 @@ function ruleGrievance(w: World, p: Character, g: Grievance, code: string, lines
   if (seen.length && ['r_from', 'r_about', 'r_split', 'r_dismiss'].includes(code)) {
     for (const c of seen) {
       const r = rel(c, p.id);
-      r.respect = clamp(r.respect + (fair ? 0.05 : code === 'r_dismiss' ? -0.03 : -0.05));
+      feelOn(w, r, 'respect', (fair ? 0.05 : code === 'r_dismiss' ? -0.03 : -0.05));
       const res = Object.values(w.facts).filter((q) => q.kind === 'ruling' && q.actor === p.id).sort((a, b) => b.t - a.t)[0];
       if (res) learn(w, c.id, res, p.id, true);
     }
@@ -355,7 +355,7 @@ export function openSitdown(w: World, p: Character, g: Grievance): Meeting | str
     const inf = influence(w, p) / 100;
     const pr = clamp(0.3 + inf * 0.6 + rel(y, p.id).respect * 0.3 - y.traits.ambition * 0.2, 0.1, 0.95);
     if (!w.rng.chance(pr)) {
-      rel(y, p.id).respect = clamp(rel(y, p.id).respect - 0.05);
+      feel(w, y, p.id, 'respect', -0.05);
       addFact(w, { kind: 'sitdown', actor: p.id, victim: y.id, minor: true, text: `${y.name} refused to sit down with ${x.name} when ${p.name} asked.`, district: p.district }, { witnesses: [x.id] });
       return `${y.name} sends word that he won’t be sitting down with anybody. That will get around.`;
     }
@@ -383,10 +383,10 @@ export function openGathering(w: World, p: Character, guestIds: Id[], what: 'din
       const b = all[j];
       const ra = rel(a, b.id);
       const rb = rel(b, a.id);
-      ra.trust = clamp(ra.trust + 0.03);
-      rb.trust = clamp(rb.trust + 0.03);
-      ra.affection = clamp(ra.affection + 0.03);
-      rb.affection = clamp(rb.affection + 0.03);
+      feelOn(w, ra, 'trust', 0.03);
+      feelOn(w, rb, 'trust', 0.03);
+      feelOn(w, ra, 'affection', 0.03);
+      feelOn(w, rb, 'affection', 0.03);
       ra.lastMet = rb.lastMet = w.now;
       if (w.rng.chance(0.5)) {
         share(w, a, b, lines);
@@ -538,17 +538,17 @@ export function choose(w: World, p: Character, m: Meeting, code: string): string
       if (c0 === 'praise') {
         const crew = m.attendees.map((id) => w.chars[id]);
         const top = crew.slice().sort((a, b) => (b.books.history.at(-1)?.paid ?? 0) - (a.books.history.at(-1)?.paid ?? 0))[0];
-        rel(top, p.id).trust = clamp(rel(top, p.id).trust + 0.06);
-        rel(top, p.id).affection = clamp(rel(top, p.id).affection + 0.04);
+        feel(w, top, p.id, 'trust', 0.06);
+        feel(w, top, p.id, 'affection', 0.04);
         for (const c of crew) if (c.id !== top.id) bear(w, c, top.id, (c.traits.ambition > 0.6 ? 0.04 : 0), `${top.name} got the praise`);
         lines.push(`You single out ${top.name} in front of the others. He stands a little straighter.`);
       } else if (c0 === 'press') {
         const c = w.chars[arg];
         const r = rule(w, p, c, 'demand');
         lines.push(`You put it to ${c.name} in front of the others. ${r.lines.join(' ')}`);
-        rel(c, p.id).respect = clamp(rel(c, p.id).respect - 0.03);
+        feel(w, c, p.id, 'respect', -0.03);
       } else if (c0 === 'warn') {
-        for (const id of m.attendees) rel(w.chars[id], p.id).trust = clamp(rel(w.chars[id], p.id).trust - 0.01);
+        for (const id of m.attendees) feel(w, w.chars[id], p.id, 'trust', -0.01);
         lines.push('You make it clear that you can count.');
       }
       done();
@@ -558,7 +558,7 @@ export function choose(w: World, p: Character, m: Meeting, code: string): string
       if (c0 === 'hurry') {
         for (const j of w.jobs.filter((q) => q.status === 'active' && m.attendees.includes(q.assignee) && q.due)) {
           j.due = Math.max(w.now + 60, j.due! - DAY);
-          rel(w.chars[j.assignee], p.id).trust = clamp(rel(w.chars[j.assignee], p.id).trust - 0.01);
+          feel(w, w.chars[j.assignee], p.id, 'trust', -0.01);
         }
         lines.push('You tell them to get on with it. Reports will come sooner.');
       }
@@ -613,20 +613,20 @@ export function choose(w: World, p: Character, m: Meeting, code: string): string
       const r = rel(who, p.id);
       const t = it.data.type as string;
       if (t === 'struggling') {
-        if (c0 === 'lend') { if (p.cash < 200) { lines.push('You haven’t got it on you.'); return lines; } p.cash -= 200; who.cash += 200; r.trust = clamp(r.trust + 0.1); r.affection = clamp(r.affection + 0.06); addFavour(w, p.id, who.id, 1, 'put $200 in his hand when he was short'); lines.push(`${who.name} takes it like it weighs a ton. "I won’t forget this."`); }
-        else if (c0 === 'ease') { who.kickRate = Math.max(0.05, who.kickRate - 0.05); r.trust = clamp(r.trust + 0.05); lines.push(`You cut ${who.name}’s share for the month. It’s not much and he treats it as if it were.`); }
-        else { r.trust = clamp(r.trust - 0.05); r.affection = clamp(r.affection - 0.03); lines.push(`${who.name} nods slowly. "Right." He doesn’t ask again, and he won’t forget that he did.`); }
+        if (c0 === 'lend') { if (p.cash < 200) { lines.push('You haven’t got it on you.'); return lines; } p.cash -= 200; who.cash += 200; feelOn(w, r, 'trust', 0.1); feelOn(w, r, 'affection', 0.06); addFavour(w, p.id, who.id, 1, 'put $200 in his hand when he was short'); lines.push(`${who.name} takes it like it weighs a ton. "I won’t forget this."`); }
+        else if (c0 === 'ease') { who.kickRate = Math.max(0.05, who.kickRate - 0.05); feelOn(w, r, 'trust', 0.05); lines.push(`You cut ${who.name}’s share for the month. It’s not much and he treats it as if it were.`); }
+        else { feelOn(w, r, 'trust', -0.05); feelOn(w, r, 'affection', -0.03); lines.push(`${who.name} nods slowly. "Right." He doesn’t ask again, and he won’t forget that he did.`); }
       } else if (t === 'earner') {
-        if (c0 === 'trust') { who.kickRate = Math.max(0.05, who.kickRate - 0.03); r.trust = clamp(r.trust + 0.06); r.respect = clamp(r.respect + 0.04); lines.push(`${who.name} straightens in his chair. "You won’t regret it." The others notice, and some of them start thinking about what they could build.`); for (const o of m.attendees) if (o !== who.id) w.chars[o].traits.ambition = clamp(w.chars[o].traits.ambition + 0.01); }
-        else { who.traits.ambition = clamp(who.traits.ambition + 0.02); r.trust = clamp(r.trust - 0.01); lines.push(`"Not yet," you tell ${who.name}. He says he understands, in the voice of a man doing sums.`); }
+        if (c0 === 'trust') { who.kickRate = Math.max(0.05, who.kickRate - 0.03); feelOn(w, r, 'trust', 0.06); feelOn(w, r, 'respect', 0.04); lines.push(`${who.name} straightens in his chair. "You won’t regret it." The others notice, and some of them start thinking about what they could build.`); for (const o of m.attendees) if (o !== who.id) w.chars[o].traits.ambition = clamp(w.chars[o].traits.ambition + 0.01); }
+        else { who.traits.ambition = clamp(who.traits.ambition + 0.02); feelOn(w, r, 'trust', -0.01); lines.push(`"Not yet," you tell ${who.name}. He says he understands, in the voice of a man doing sums.`); }
       } else if (t === 'heat') {
-        if (c0 === 'lie') { who.heat = clamp(who.heat - 0.25, 0, 1.5); if (who.hustle) who.hustle.lull = w.now + 7 * DAY; r.trust = clamp(r.trust + 0.03); lines.push(`${who.name} will keep clear of his business for a week. It costs him money and keeps him out of a cell, maybe.`); }
-        else { r.trust = clamp(r.trust - 0.01); lines.push(`${who.name} shrugs. "Your call." He’ll carry on, and keep checking the mirror.`); }
+        if (c0 === 'lie') { who.heat = clamp(who.heat - 0.25, 0, 1.5); if (who.hustle) who.hustle.lull = w.now + 7 * DAY; feelOn(w, r, 'trust', 0.03); lines.push(`${who.name} will keep clear of his business for a week. It costs him money and keeps him out of a cell, maybe.`); }
+        else { feelOn(w, r, 'trust', -0.01); lines.push(`${who.name} shrugs. "Your call." He’ll carry on, and keep checking the mirror.`); }
       } else {
         const d = (w.disputes ?? []).find((x) => x.id === it.data.dispute);
-        if (c0 === 'back' && d) { lines.push(...callSitdown(w, p, d)); r.trust = clamp(r.trust + 0.05); }
-        else if (c0 === 'handle') { r.respect = clamp(r.respect + 0.02); lines.push(`${who.name} nods. "I’ll sort it." He’s a man who might sort it quietly or loudly.`); if (d) d.next = w.now + DAY; }
-        else { r.trust = clamp(r.trust - 0.02); lines.push(`${who.name} says nothing, which isn’t agreement.`); }
+        if (c0 === 'back' && d) { lines.push(...callSitdown(w, p, d)); feelOn(w, r, 'trust', 0.05); }
+        else if (c0 === 'handle') { feelOn(w, r, 'respect', 0.02); lines.push(`${who.name} nods. "I’ll sort it." He’s a man who might sort it quietly or loudly.`); if (d) d.next = w.now + DAY; }
+        else { feelOn(w, r, 'trust', -0.02); lines.push(`${who.name} says nothing, which isn’t agreement.`); }
       }
       done();
       return lines;
@@ -639,12 +639,12 @@ export function choose(w: World, p: Character, m: Meeting, code: string): string
         const job = mkJob(w, { kind, title: `${who.name}'s idea: ${kind === 'boost' ? 'cars' : kind === 'burgle' ? 'burgle ' + (it.data.biz ? w.biz[it.data.biz].name : 'a shop') : 'a con'}`, brief: it.text[0], giver: null, via: 'scheme', assignee: who.id, biz: it.data.biz, target: it.data.target, pay: 0, status: 'active', days: 5 });
         job.orders = temper(who).volatility > 0.6 ? 'hard' : 'quiet';
         job.due = w.now + w.rng.int(1, 3) * DAY;
-        r.trust = clamp(r.trust + 0.04);
+        feelOn(w, r, 'trust', 0.04);
         lines.push(`${who.name} nods. He’ll see to it and report back.`);
       } else if (c0 === 'wait') {
         lines.push(`${who.name} shrugs. "Your call."`);
       } else {
-        r.trust = clamp(r.trust - 0.02);
+        feelOn(w, r, 'trust', -0.02);
         who.traits.ambition = clamp(who.traits.ambition + 0.01);
         lines.push(`${who.name} doesn’t argue, but he doesn’t look like he has dropped the idea.`);
       }
@@ -666,14 +666,14 @@ export function choose(w: World, p: Character, m: Meeting, code: string): string
         p.books.arrears = 0;
         p.books.missed = 0;
         clear();
-        rb.trust = clamp(rb.trust + 0.04);
+        feelOn(w, rb, 'trust', 0.04);
         repute(w, p, 1, 'meeting');
         lines.push(`You count it out on his desk. ${boss.name} puts it away without a word. That’s as warm as he gets.`);
       } else if (c0 === 'promise') {
         p.books.arrears = Math.max(p.books.arrears, amt);
         boss.memos.push({ id: 'm' + w.nextId++, t: w.now, other: p.id, kind: 'promise', text: `${p.name} promised to make good ${money(amt)}.`, due: w.now + 7 * DAY });
         clear();
-        rb.trust = clamp(rb.trust - 0.02);
+        feelOn(w, rb, 'trust', -0.02);
         lines.push(`"One week," ${boss.name} says. "Not a day more."`);
       } else if (c0 === 'deny') {
         const pr = clamp(0.5 - temper(boss).caution * 0.4 - fl.n * 0.1 + p.traits.sociability * 0.3, 0.1, 0.8);
@@ -681,7 +681,7 @@ export function choose(w: World, p: Character, m: Meeting, code: string): string
           clear();
           lines.push(`${boss.name} studies you for a long time. "Fine. I’ll look again."`);
         } else {
-          rb.trust = clamp(rb.trust - 0.15);
+          feelOn(w, rb, 'trust', -0.15);
           repute(w, p, -3, 'meeting');
           p.books.arrears += amt * 2;
           clear();
@@ -693,11 +693,11 @@ export function choose(w: World, p: Character, m: Meeting, code: string): string
         if (w.rng.chance(pr)) {
           clear();
           sub.books.arrears += amt;
-          rel(sub, p.id).trust = clamp(rel(sub, p.id).trust - 0.2);
+          feel(w, sub, p.id, 'trust', -0.2);
           bear(w, sub, p.id, 0.2, `${p.name} made him make up what he was short`);
           lines.push(`${boss.name} nods slowly. "I’ll talk to ${sub.name}." You don’t feel good about it.`);
         } else {
-          rb.trust = clamp(rb.trust - 0.12);
+          feelOn(w, rb, 'trust', -0.12);
           repute(w, p, -3, 'meeting');
           p.books.arrears += amt;
           lines.push(`"${sub.name}?" ${boss.name} says. "A man who blames his own people doesn’t last." He doesn’t believe you.`);
@@ -707,7 +707,7 @@ export function choose(w: World, p: Character, m: Meeting, code: string): string
           lines.push(`${boss.name} lets it ride a week. "I’m not asking again."`);
           clear();
         } else {
-          rb.trust = clamp(rb.trust - 0.04);
+          feelOn(w, rb, 'trust', -0.04);
           lines.push(`"No," says ${boss.name}. "You have had your time."`);
         }
       }
@@ -720,8 +720,8 @@ export function choose(w: World, p: Character, m: Meeting, code: string): string
       const boss = w.chars[it.data.boss];
       const inf = influence(w, p) / 100;
       if (c0 === 'support') {
-        rel(boss, p.id).trust = clamp(rel(boss, p.id).trust + 0.04);
-        rel(boss, p.id).respect = clamp(rel(boss, p.id).respect + 0.03);
+        feel(w, boss, p.id, 'trust', 0.04);
+        feel(w, boss, p.id, 'respect', 0.03);
         lines.push(`You say what everyone was thinking and put it on ${boss.name}'s side. He gives you a short nod.`);
       } else if (c0 === 'concern') {
         const sub = w.chars[arg];
@@ -762,7 +762,7 @@ export function choose(w: World, p: Character, m: Meeting, code: string): string
           repute(w, p, 1, 'meeting');
           lines.push(`You put a hand on the table and say two words. They both sit back. It’s not over, but it’s quieter.`);
         } else {
-          rel(a, p.id).respect = clamp(rel(a, p.id).respect - 0.03);
+          feel(w, a, p.id, 'respect', -0.03);
           lines.push(`They talk right over you. ${a.name} storms out first.`);
           bear(w, a, b.id, 0.05, `${b.name} would not hear him`);
         }
@@ -781,10 +781,10 @@ export function choose(w: World, p: Character, m: Meeting, code: string): string
         p.cash -= 300;
         c.cash += 300;
         createDebt(w, p.id, c.id, 300, 0.05, 'a favour at dinner');
-        rel(c, p.id).trust = clamp(rel(c, p.id).trust + 0.08);
+        feel(w, c, p.id, 'trust', 0.08);
         lines.push(`${c.name} takes it with both hands. "I won’t forget this."`);
       } else {
-        rel(c, p.id).trust = clamp(rel(c, p.id).trust - 0.02);
+        feel(w, c, p.id, 'trust', -0.02);
         lines.push(`${c.name} says he understands. He doesn’t look like he does.`);
       }
       done();
@@ -813,7 +813,7 @@ export function closeMeeting(w: World, p: Character, m: Meeting): { minutes: num
       share(w, c, p, lines);
       share(w, p, c, []);
       const r = rel(c, p.id);
-      r.trust = clamp(r.trust + 0.02);
+      feelOn(w, r, 'trust', 0.02);
       r.lastMet = w.now;
     }
   }

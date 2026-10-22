@@ -25,6 +25,16 @@ describe('architecture', { tags: ['architecture'] }, () => {
     }
     assert.deepEqual(bad, []);
   });
+  ok('regard has one door: no source line sets .trust, .affection, .respect or .fear outside core.ts', () => {
+    // (core.feel/feelOn and their kin, which shrink a gain near the limit, weigh trust and liking by familiarity and keep the bond;
+    // a negotiation's own stance, S.fear, is not a relationship)
+    const bad: string[] = [];
+    const dir = fileURLToPath(new URL('../', import.meta.url));
+    for (const f of readdirSync(dir).filter((x) => x.endsWith('.ts') && !['core.ts', 'world.ts', 'cli.ts'].includes(x))) {
+      readFileSync(dir + f, 'utf8').split('\n').forEach((l, i) => { if (/(?<!\bS|\])\.(trust|affection|respect|fear)\s*[-+*]?=[^=]/.test(l)) bad.push(`${f}:${i + 1}`); }); // (S. and m[id]. are stances)
+    }
+    assert.deepEqual(bad, []);
+  });
   ok('grudges and reputation have one door each: no source line sets .grudge or .standing outside core.ts', () => {
     // (core.bear/ease for grudges, which keep the reason with them; core.repute for anyone's standing. world.ts sets the first value.)
     const bad: string[] = [];

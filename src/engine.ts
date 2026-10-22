@@ -1,5 +1,4 @@
 import { mattersWeek } from './matters';
-import { fearWeek } from './temper'; // V89: registers the matter kinds (and, through it, asks) with situ.ts
 import { pulseWeek } from './pulse';
 import { careerTick, openSeatFor, promoTick } from './career';
 import { agencyDay, agencyWeek, goalAsks } from './goals';
@@ -11,7 +10,7 @@ import { rankWeek } from './powers2';
 import { situationTick } from './situations';
 import { peopleWeek, rollSkills } from './people';
 import { chooseAction, perform } from './actions';
-import { addFact, clamp, earn, easeOn, famName, isAwake, learn, money, nextWake, notifyProtector, ownerBiz, payDebt, schedule, shortTime, witnessesAt } from './core';
+import { addFact, clamp, earn, easeOn, famName, feelingsWeek, isAwake, learn, money, nextWake, notifyProtector, ownerBiz, payDebt, schedule, shortTime, witnessesAt } from './core';
 import { BASE_RATE, emptyBooks, settleWeek } from './books';
 import { addStake, bizMove, businessWeek, seizeShare } from './econ';
 import { daily, ventureWeek } from './jobs';
@@ -33,7 +32,7 @@ import { Rng } from './rng';
 import { addShops } from './world';
 import { paperTick } from './news';
 import { crewTick, lapsedAsks } from './crewlife';
-import { DAY, Fact, Id, WEEK, World } from './types';
+import { DAY, Fact, Id, WEEK, World, SCHEMA } from './types';
 
 // ------------------------------------------------------------------ the loop
 
@@ -159,7 +158,6 @@ function weekly(w: World) {
   situationTick(w);
   sitWeek(w);
   mattersWeek(w);
-  fearWeek(w); // V90
   // V89: bad feeling between families cools when nothing feeds it (it used to only ever rise; docs/V89_HEALTH.md). A tenth a week
   // above a floor of quiet suspicion, so old wars are remembered but a quiet month is felt.
   for (const f of Object.values(w.fam)) for (const k of Object.keys(f.tension)) if (f.tension[k] > 1) f.tension[k] = Math.round((1 + (f.tension[k] - 1) * 0.9) * 100) / 100;
@@ -218,15 +216,7 @@ function weekly(w: World) {
   // police heat, arrests, promotions
   for (const c of Object.values(w.chars)) {
     if (!c.alive) continue;
-    // Grudges cool: half-life of roughly two months unless something new happens.
-    for (const r of Object.values(c.rels)) {
-      easeOn(r, r.grudge < 0.05 ? 0 : 0.92); // (and the reason goes with it, core.easeOn)
-      // Friendships need feeding: people you have not seen in two weeks drift apart.
-      if (w.now - r.lastMet > 14 * DAY) {
-        r.trust = Math.max(0.1, r.trust * 0.94);
-        r.affection = Math.max(0.1, r.affection * 0.94);
-      }
-    }
+    feelingsWeek(w, c);
     if (c.heat > 0.45 && rng.chance(c.heat * 0.5)) {
       c.jailedUntil = w.now + rng.int(5, 40) * DAY;
       c.heat = 0.1;
@@ -242,7 +232,7 @@ function weekly(w: World) {
 export function serialize(w: World): string {
   return JSON.stringify({ ...w, schema: SCHEMA, rng: w.rng.state });
 }
-export const SCHEMA = 7;
+export { SCHEMA };
 import { ensureClubs } from './clubdata';
 import { sweep } from './retain';
 import { repairAll } from './rank';

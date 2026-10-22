@@ -10,7 +10,7 @@
 import { FEMALE } from './names';
 import { noteConduct, temper } from './temper';
 import { askBetween, mayAsk, openAsk, openAsks, stance } from './asks';
-import { addFact, bear, clamp, createDebt, learn, link, money, ownerBiz, peek, regard, rel } from './core';
+import { addFact, bear, clamp, createDebt, feel, feelAtLeast, learn, link, money, ownerBiz, peek, regard, rel } from './core';
 import { addFavour } from './encounters';
 import { agencyOf } from './goals';
 import { mkJob } from './jobs';
@@ -99,7 +99,7 @@ function trouble(x: X): Subject | undefined {
     reply: (x, code) => {
       if (code === 'press') {
         const ok = p.skills.charm * 0.5 + trust(x) * 0.6 + (arch(t) === 'earnest' || arch(t) === 'frightened' ? 0.15 : 0) - (arch(t) === 'proud' || arch(t) === 'cold' ? 0.2 : 0) > 0.42;
-        if (!ok) { rel(t, p.id).respect = clamp(peek(t, p.id).respect - 0.02); return { lines: [q(t, by(t, { proud: 'I said it’s nothing. Leave it.', hothead: 'You deaf? Drop it.', _: 'Another time, maybe.' }))], choices: [] }; }
+        if (!ok) { feel(w, t, p.id, 'respect', -0.02); return { lines: [q(t, by(t, { proud: 'I said it’s nothing. Leave it.', hothead: 'You deaf? Drop it.', _: 'Another time, maybe.' }))], choices: [] }; }
         return reveal(x);
       }
       const amt = T.need?.(x) ?? 0;
@@ -121,7 +121,7 @@ function trouble(x: X): Subject | undefined {
       if (code === 'straighten') {
         said(w, t, key, 'straighten');
         const takes = arch(t) === 'earnest' || arch(t) === 'frightened' || t.traits.caution > 0.6;
-        if (takes) { pr.sev = clamp(pr.sev - 0.1); rel(t, p.id).respect = clamp(peek(t, p.id).respect + 0.03); return { lines: [q(t, 'You’re right. I know you’re right.')], choices: [] }; }
+        if (takes) { pr.sev = clamp(pr.sev - 0.1); feel(w, t, p.id, 'respect', 0.03); return { lines: [q(t, 'You’re right. I know you’re right.')], choices: [] }; }
         bear(w, t, p.id, 0.04, `${p.name} told him to straighten himself out`);
         return { lines: [q(t, by(t, { proud: 'I didn’t ask for a sermon.', hothead: 'Who are you to tell me?', _: 'Easy for you to say.' }))], choices: [] };
       }
@@ -345,7 +345,7 @@ function wants(x: X): Subject | undefined {
       said(w, t, key, code);
       if (code === 'forward') { t.backer = p.id; warm(x, 0.08, 'sponsor'); regard(w, t, p, 'trust', 0.06, 'sponsor'); return { lines: [q(t, 'From you, that means something. I won’t make you sorry.'), 'Your name is behind his now.'], choices: [] }; }
       if (code === 'word' && boss) {
-        rel(boss, t.id).trust = clamp(peek(boss, t.id).trust + 0.02 + p.standing / 2000);
+        feel(w, boss, t.id, 'trust', 0.02 + p.standing / 2000);
         addFavour(w, p.id, t.id, 1, `you spoke up for him to ${boss.name}`);
         addFact(w, { kind: 'favour', actor: p.id, victim: t.id, minor: true, text: `${p.name} spoke up for ${t.name} to ${boss.name}.`, district: p.district }, { witnesses: [t.id, boss.id] });
         warm(x, 0.05, 'spoke-up');
@@ -366,7 +366,7 @@ function wants(x: X): Subject | undefined {
       }
       if (code === 'doubt') {
         if (arch(t) === 'hothead' || arch(t) === 'proud') { bear(w, t, p.id, 0.08, `${p.name} said he was not ready`); return { lines: [q(t, 'Funny. I was going to say the same about you.')], choices: [] }; }
-        rel(t, p.id).respect = clamp(peek(t, p.id).respect + 0.02); return { lines: [q(t, 'Maybe. Maybe not yet.')], choices: [] };
+        feel(w, t, p.id, 'respect', 0.02); return { lines: [q(t, 'Maybe. Maybe not yet.')], choices: [] };
       }
       return { lines: [], choices: [] };
     },
@@ -410,7 +410,7 @@ function opinion(x: X): Subject | undefined {
       said(w, t, key, code);
       if (code === 'intro') {
         if (trust(x) < 0.4) return { lines: [q(t, 'I don’t make introductions lightly.')], choices: [] };
-        (p.intro ??= {})[o.id] = w.now; link(p, o, 0.3); rel(o, p.id).trust = Math.max(peek(o, p.id).trust, 0.25 + peek(o, t.id).trust * 0.15);
+        (p.intro ??= {})[o.id] = w.now; link(p, o, 0.3); feelAtLeast(w, o, p.id, 'trust', 0.25 + peek(o, t.id).trust * 0.15);
         addFact(w, { kind: 'favour', actor: t.id, victim: p.id, minor: true, text: `${t.name} introduced ${p.name} to ${o.name}.`, district: t.district }, { witnesses: [p.id, o.id] });
         return { lines: [q(t, `I’ll tell ${first(o)} you’re all right. After that it’s up to you.`), `You can go and see ${first(o)} as a friend of ${first(t)}’s.`], choices: [] };
       }
@@ -424,8 +424,8 @@ function opinion(x: X): Subject | undefined {
         return { lines: [q(t, 'I knew you had sense.')], choices: [] };
       }
       if (code === 'defend') {
-        if (arch(t) === 'hothead' || arch(t) === 'bitter' || arch(t) === 'proud') { bear(w, t, p.id, 0.05, `${p.name} ran down a man he likes`); rel(t, p.id).respect = clamp(peek(t, p.id).respect + 0.01); return { lines: [q(t, 'Then you don’t know him like I do.')], choices: [] }; }
-        rel(t, p.id).respect = clamp(peek(t, p.id).respect + 0.03); bear(w, t, o.id, -(0.04), 'spoke for him');
+        if (arch(t) === 'hothead' || arch(t) === 'bitter' || arch(t) === 'proud') { bear(w, t, p.id, 0.05, `${p.name} ran down a man he likes`); feel(w, t, p.id, 'respect', 0.01); return { lines: [q(t, 'Then you don’t know him like I do.')], choices: [] }; }
+        feel(w, t, p.id, 'respect', 0.03); bear(w, t, o.id, -(0.04), 'spoke for him');
         return { lines: [q(t, 'Maybe. Maybe I’ve been hard on him.')], choices: [] };
       }
       if (code === 'more') {
@@ -499,8 +499,8 @@ function hisBoss(x: X): Subject | undefined {
       said(w, t, key, code);
       if (code === 'same') { warm(x, 0.04, 'grumble'); regard(w, t, p, 'trust', 0.05, 'grumble'); if (t.want?.kind === 'independent') (p.insight ??= {})[t.id] = [...new Set([...(p.insight[t.id] ?? []), 'leaving'])]; return { lines: [q(t, 'I thought you might.')], choices: [] }; }
       if (code === 'loyal') {
-        rel(t, p.id).trust = clamp(peek(t, p.id).trust - 0.04);
-        if (w.rng.chance(0.25 + t.traits.sociability * 0.2)) rel(b, p.id).respect = clamp(peek(b, p.id).respect + 0.02); // it may get back to him, in a good way
+        feel(w, t, p.id, 'trust', -0.04);
+        if (w.rng.chance(0.25 + t.traits.sociability * 0.2)) feel(w, b, p.id, 'respect', 0.02); // it may get back to him, in a good way
         return { lines: [q(t, 'Sure. Sure he does.')], choices: [] };
       }
       return { lines: [], choices: [] };
@@ -524,7 +524,7 @@ function tellOn(x: X): Subject | undefined {
     reply: (x, code) => {
       if (code !== 'tell') return { lines: [], choices: [] };
       (t.talk ??= {})['told:' + c.id] = { d: day(w), sig: 'x', n: 1 };
-      rel(t, c.id).trust = clamp(peek(t, c.id).trust - 0.15); regard(w, t, p, 'trust', 0.05, 'told-on');
+      feel(w, t, c.id, 'trust', -0.15); regard(w, t, p, 'trust', 0.05, 'told-on');
       const f = addFact(w, { kind: 'rumour', actor: p.id, victim: c.id, minor: true, text: `${p.name} told ${t.name} that ${c.name} is looking for a way out.`, district: t.district }, { witnesses: [t.id] });
       if (w.rng.chance(0.3)) { c.known[f.id] = { t: w.now, from: t.id, knowsActor: true }; bear(w, c, p.id, 0.3, f); }
       return { lines: [q(t, `Is he. Thank you for telling me.`), `${first(t)} doesn’t say what he’ll do. He doesn’t have to.`], choices: [] };

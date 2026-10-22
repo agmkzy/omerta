@@ -1,6 +1,6 @@
 // The part of the man that is not the job: a mother who wants Sundays, a woman who wants an answer, a sister who needs a favour.
 // None of it is a score. It is what you are choosing between when you are always choosing money.
-import { addFact, clamp, learn, money, rel, repute } from './core';
+import { addFact, clamp, feel, feelAtLeast, feelTo, learn, money, rel, repute } from './core';
 import { addEnc } from './encounters';
 import { Character, DAY, Enc, Id, Kin, Life, Partner, World } from './types';
 import { FEMALE, spawnCivilian } from './world';
@@ -23,10 +23,10 @@ export function lifeInit(w: World, p: Character, brother?: Character) {
   ];
   for (const k of kin) {
     const c = w.chars[k.id];
-    rel(c, p.id).trust = 0.7;
-    rel(c, p.id).affection = 0.8;
-    rel(p, c.id).trust = 0.7;
-    rel(p, c.id).affection = 0.8;
+    feelTo(c, p.id, 'trust', 0.7);
+    feelTo(c, p.id, 'affection', 0.8);
+    feelTo(p, c.id, 'trust', 0.7);
+    feelTo(p, c.id, 'affection', 0.8);
   }
   // A made brother loves you and is still waiting to see what you are. His trust is earned like anyone's.
   if (brother) {
@@ -171,8 +171,8 @@ export function lifeChoose(w: World, p: Character, e: Enc, code: string): { line
     if (code === 'no') return { lines: [`"Your loss," ${first(c!)} says, and means it kindly.`], minutes: 5 };
     const g = w.chars[String(e.data?.g)];
     L.partner = { id: g.id, stage: 'seeing', warmth: 0.45, dates: 1, since: w.now, lastSeen: w.now };
-    rel(g, p.id).trust = 0.3;
-    rel(p, g.id).trust = 0.3;
+    feelTo(g, p.id, 'trust', 0.3);
+    feelTo(p, g.id, 'trust', 0.3);
     lines.push(`${g.name} isn’t what you expected. She laughs at the right moments and not at the wrong ones, and she asks what you do and then lets you not answer. The evening goes on three hours longer than dinner should.`);
     p.cash -= 70;
     return { lines, minutes: 240 };
@@ -228,9 +228,9 @@ export function lifeChoose(w: World, p: Character, e: Enc, code: string): { line
     if (e.data?.what === 'christening') {
       const ev = w.events.find((x) => x.id === e.data?.ev); if (ev) ev.done = true;
       const guests = Object.values(w.chars).filter((g) => g.alive && g.id !== p.id && g.familyId && g.familyId === p.familyId && g.rank !== 'associate' && (g.rels[p.id]?.trust ?? 0) > 0.2).slice(0, 14);
-      if (code === 'grand' && p.cash >= 900) { p.cash -= 900; for (const g of guests) rel(g, p.id).respect = clamp(rel(g, p.id).respect + 0.05); repute(w, p, 2, 'wedding'); k.warmth = clamp(k.warmth + 0.05); lines.push(`Our Lady of Pity is full to the doors. Your boss holds the baby for the photograph. Every man in the room remembers who paid for the wine.`); }
-      else if (code === 'modest' && p.cash >= 250) { p.cash -= 250; for (const g of guests) rel(g, p.id).respect = clamp(rel(g, p.id).respect + 0.01); repute(w, p, 0.5, 'wedding'); lines.push(`A small room, a good cake, and your mother crying in the second row. Nobody can say you didn’t do it right.`); }
-      else { for (const g of guests) rel(g, p.id).respect = clamp(rel(g, p.id).respect - 0.03); k.warmth = clamp(k.warmth - 0.03); lines.push(`The priest, your wife, and an empty church. It’s noticed, and not said out loud.`); }
+      if (code === 'grand' && p.cash >= 900) { p.cash -= 900; for (const g of guests) feel(w, g, p.id, 'respect', 0.05); repute(w, p, 2, 'wedding'); k.warmth = clamp(k.warmth + 0.05); lines.push(`Our Lady of Pity is full to the doors. Your boss holds the baby for the photograph. Every man in the room remembers who paid for the wine.`); }
+      else if (code === 'modest' && p.cash >= 250) { p.cash -= 250; for (const g of guests) feel(w, g, p.id, 'respect', 0.01); repute(w, p, 0.5, 'wedding'); lines.push(`A small room, a good cake, and your mother crying in the second row. Nobody can say you didn’t do it right.`); }
+      else { for (const g of guests) feel(w, g, p.id, 'respect', -0.03); k.warmth = clamp(k.warmth - 0.03); lines.push(`The priest, your wife, and an empty church. It’s noticed, and not said out loud.`); }
       return { lines, minutes: 240 };
     }
     if (e.data?.what === 'birth') { k.warmth = clamp(k.warmth + 0.05); k.lastSeen = w.now; return { lines: [`You hold ${first(c)} until your arms ache. Nobody calls. For one afternoon the world is exactly the size of this room.`], minutes: 120 }; }
@@ -270,7 +270,7 @@ export function seePartner(w: World, p: Character): string[] {
   const hot = p.heat > 0.45;
   pr.warmth = clamp(pr.warmth + (hot ? 0.03 : 0.07));
   p.heat = clamp(p.heat - 0.05, 0, 1.5);
-  rel(g, p.id).trust = clamp(rel(g, p.id).trust + 0.02);
+  feel(w, g, p.id, 'trust', 0.02);
   return [hot ? `Dinner at a place on Mulberry. You spend half of it watching the windows. ${first(g)} notices, and says nothing, and that’s worse.` : pick([`A movie, a late dinner, a walk back that takes twice as long as it needs to. ${first(g)} laughs at something you didn’t know was funny.`, `You take ${first(g)} dancing. You’re bad at it. She’s kind about it.`, `Dinner, a bottle of wine you can’t afford. ${first(g)} tells you about her week. You realise you haven’t talked about anything but business in a month.`], g.id + pr.dates)];
 }
 export function visitKin(w: World, p: Character, k: Kin): string[] {
@@ -321,8 +321,8 @@ export function askOut(w: World, p: Character, g: Character): { lines: string[];
   if (w.rng.chance(chance)) {
     L.partner = { id: g.id, stage: 'seeing', warmth: 0.4, dates: 1, since: w.now, lastSeen: w.now };
     delete L.pool;
-    rel(g, p.id).trust = Math.max(rel(g, p.id).trust, 0.3);
-    rel(p, g.id).trust = Math.max(rel(p, g.id).trust, 0.3);
+    feelAtLeast(w, g, p.id, 'trust', 0.3);
+    feelAtLeast(w, p, g.id, 'trust', 0.3);
     return { lines: [`You say it badly, and ${f} laughs, and then says yes. A coffee turns into a walk and the walk goes on longer than it should. She doesn’t ask what you do. You don’t say.`], minutes: 150, ok: true };
   }
   p.cooldown[`askout:${g.id}`] = w.now + 20 * DAY;
@@ -351,7 +351,7 @@ export function datePlan(w: World, p: Character, code: string): string[] {
   pr.dates++;
   pr.warmth = clamp(pr.warmth + (hot ? d.gain * 0.5 : d.gain));
   p.heat = clamp(p.heat - 0.04, 0, 1.5);
-  rel(g, p.id).trust = clamp(rel(g, p.id).trust + 0.02);
+  feel(w, g, p.id, 'trust', 0.02);
   if (hot) return [`You spend half of it watching the windows. ${first(g)} notices, and says nothing, and that’s worse.`];
   const line = {
     walk: [`You walk the length of the avenue and back. ${first(g)} tells you what she wants, one small thing at a time.`, `A bench, a paper bag of roasted chestnuts, nothing to prove. She leans on your arm without seeming to notice.`],
@@ -394,7 +394,7 @@ export function wedding(w: World, p: Character): string[] {
   pr.since = w.now;
   repute(w, p, 3, 'married');
   const guests = Object.values(w.chars).filter((c) => c.alive && c.familyId && c.familyId === p.familyId && (c.rels[p.id]?.trust ?? 0) > 0.25).slice(0, 12);
-  for (const c of guests) { rel(c, p.id).respect = clamp(rel(c, p.id).respect + 0.03); }
+  for (const c of guests) { feel(w, c, p.id, 'respect', 0.03); }
   addFact(w, { kind: 'event', actor: p.id, text: `${p.name} married ${g.name}. The whole family came.`, district: p.district }, { broadcast: guests.map((c) => c.id) });
   return [`St. Anthony’s, a hall with a band, an envelope of cash from nearly every man in your family. ${g.name} is married to you by the end of the afternoon, and you don’t remember most of it. You remember her.`];
 }
@@ -422,7 +422,7 @@ function birth(w: World, p: Character, pr: Partner) {
   const given = boy ? w.rng.pick(['Anthony', 'Vincent', 'Salvatore', 'Michael', 'Joseph', 'Dominic', 'Frank', 'Paul']) : w.rng.pick(['Angela', 'Rosa', 'Maria', 'Gina', 'Lucia', 'Sophia', 'Theresa', 'Carmela']);
   const kid = spawnCivilian(w, `${given} ${last}`, p.district, 0);
   kid.wake = 7; kid.sleep = 20;
-  rel(kid, p.id).trust = 0.9; rel(kid, p.id).affection = 1; rel(p, kid.id).affection = 1; rel(p, kid.id).trust = 0.9;
+  feelTo(kid, p.id, 'trust', 0.9); feelTo(kid, p.id, 'affection', 1); feelTo(p, kid.id, 'affection', 1); feelTo(p, kid.id, 'trust', 0.9);
   L.kin.push({ id: kid.id, role: boy ? 'son' : 'daughter', warmth: 0.9, lastSeen: w.now });
   pr.warmth = clamp(pr.warmth + 0.1);
   repute(w, p, 1, 'family');

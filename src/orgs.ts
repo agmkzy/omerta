@@ -11,7 +11,7 @@
 //   * relations: cooperation / competition / grievance between organisations as persistent state that the world reads back
 // Nothing in here knows how many organisations there are or what any of them is called.
 import { temper } from './temper';
-import { addFact, bear, clamp, recordCareer, rel, repute } from './core';
+import { addFact, bear, clamp, feel, feelOn, feelTo, recordCareer, rel, repute } from './core';
 import { applyRank, rankIdx, repairHierarchy, WAGE } from './rank';
 import { ensureClubs, clubOf } from './clubdata';
 import { Character, DAY, Family, Id, OrgRel, Rank, WEEK, World } from './types';
@@ -106,13 +106,13 @@ export function treasuryWeek(w: World) {
       else short++;
     }
     if (short && lead) {
-      for (const c of ms) if (c.id !== lead.id && !c.isPlayer && c.rank !== 'associate') rel(c, lead.id).trust = clamp(rel(c, lead.id).trust - 0.004 * short);
+      for (const c of ms) if (c.id !== lead.id && !c.isPlayer && c.rank !== 'associate') feel(w, c, lead.id, 'trust', -(0.004 * short));
       if (!(f.hist ?? []).some((h) => h.kind === 'fund' && w.now - h.t < 8 * WEEK)) logOrg(w, f.id, 'fund', `The fund could not cover the men inside. Their families noticed.`);
     }
     // a greedy NPC leader helps himself when the fund runs fat
     if (lead && !lead.isPlayer && lead.traits.greed > 0.65 && (f.treasury ?? 0) > 15000) {
       const take = Math.round(((f.treasury ?? 0) - 15000) * 0.3);
-      if (treasuryMove(w, f.id, lead, -take, `${lead.name} draws`)) for (const c of ms) if (c.rank === 'capo' || c.rank === 'underboss') if (c.id !== lead.id) rel(c, lead.id).trust = clamp(rel(c, lead.id).trust - 0.01);
+      if (treasuryMove(w, f.id, lead, -take, `${lead.name} draws`)) for (const c of ms) if (c.rank === 'capo' || c.rank === 'underboss') if (c.id !== lead.id) feel(w, c, lead.id, 'trust', -0.01);
     }
   }
 }
@@ -190,13 +190,13 @@ export function leaderChanged(w: World, fid: Id, winner: Character, oldId: Id | 
   for (const v of ms) {
     if (v.id === winner.id || v.isPlayer || v.rank === 'associate') continue;
     const r = rel(v, winner.id);
-    if (r.trust >= 0.55) { backers++; r.trust = clamp(r.trust + 0.06); rel(winner, v.id).trust = clamp(rel(winner, v.id).trust + 0.08); }
+    if (r.trust >= 0.55) { backers++; feelOn(w, r, 'trust', 0.06); feel(w, winner, v.id, 'trust', 0.08); }
     else if (r.grudge >= 0.4) bear(w, winner, v.id, 0.12, `${v.name} would not back him`);
   }
   let note = '';
   for (const r of rivals) {
     bear(w, r.c, winner.id, 0.25, `${winner.name} took the chair over him`);
-    rel(r.c, winner.id).trust = clamp(rel(r.c, winner.id).trust - 0.15);
+    feel(w, r.c, winner.id, 'trust', -0.15);
     repute(w, r.c, -2, 'lost the chair');
     note = ` ${first(r.c)} was passed over and has not forgotten it.`;
   }
@@ -277,7 +277,7 @@ export function defect(w: World, c: Character, to: Id, why: string) {
   if (next !== c.rank) applyRank(w, c, next, { fact: false, repair: false, career: `Came over to the ${T.name} family as a ${next}`, wage: WAGE[next] });
   else recordCareer(w, c, `Came over to the ${T.name} family`);
   for (const b of Object.values(w.biz)) if (b.protection?.collectorId === c.id) b.protection.familyId = to;
-  if (lead) { bear(w, lead, c.id, 0.5, `${c.name} went over to the ${T.name} family`); rel(lead, c.id).trust = 0; }
+  if (lead) { bear(w, lead, c.id, 0.5, `${c.name} went over to the ${T.name} family`); feelTo(lead, c.id, 'trust', 0); }
   addFact(w, { kind: 'promotion', actor: c.id, text: `${c.name} has gone over to the ${T.name} family. ${why}`, district: c.district }, { broadcast: [...membersOf(w, from), ...membersOf(w, to)].map((x) => x.id) });
   logOrg(w, from, 'defect', `${c.name} left for the ${T.name}. ${why}`, c.id);
   logOrg(w, to, 'defect', `${c.name} came over from the ${F.name}.`, c.id);
@@ -306,7 +306,7 @@ export function foundOrg(w: World, leader: Character, name: string, why: string)
   applyRank(w, leader, 'boss', { fact: false, repair: false, career: `Founded the ${name} family`, wage: WAGE.boss });
   for (const x of followers) x.familyId = id;
   for (const b of Object.values(w.biz)) if (b.protection && (b.protection.collectorId === leader.id || followers.some((x) => x.id === b.protection!.collectorId))) b.protection.familyId = id;
-  if (lead0) { bear(w, lead0, leader.id, 0.6, `${leader.name} broke away and took men with him`); rel(lead0, leader.id).trust = 0; }
+  if (lead0) { bear(w, lead0, leader.id, 0.6, `${leader.name} broke away and took men with him`); feelTo(lead0, leader.id, 'trust', 0); }
   parent.tension[id] = 3; fam.tension[parent.id] = 3;
   noteGrievance(w, parent.id, id, `${leader.name} took his men and left`, 0.6);
   logOrg(w, id, 'founded', fam.history!, leader.id);

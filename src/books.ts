@@ -8,7 +8,7 @@ import { say as vsay } from './voicesheet';
 // refuse; the superior compares what he got with what he can see, and may warn, demand, punish or ignore.
 import { setCollector } from './econ';
 import { perform } from './actions';
-import { addFact, bear, bearOn, clamp, money, rel, repute, travelTime } from './core';
+import { addFact, bear, bearOn, clamp, feel, feelOn, money, rel, repute, travelTime } from './core';
 import { mkJob } from './jobs';
 import { post, refreshHistory, statement, wkOf } from './ledger';
 import { Books, Character, Id, Rank, Tone, WEEK, World } from './types';
@@ -90,8 +90,8 @@ export function handOver(w: World, p: Character, boss: Character, amt: number): 
   p.lifetimeKick += amt;
   p.books.prepaid = (p.books.prepaid ?? 0) + amt;
   const r = rel(boss, p.id);
-  r.trust = clamp(r.trust + 0.02 + (owedBefore > 0 ? 0.03 : 0));
-  r.respect = clamp(r.respect + 0.01);
+  feelOn(w, r, 'trust', 0.02 + (owedBefore > 0 ? 0.03 : 0));
+  feelOn(w, r, 'respect', 0.01);
   if (owedBefore > 0) p.books.arrears = Math.max(0, owedBefore - amt);
   return [`You put an envelope on the table. ${boss.name} doesn’t count it in front of you. He weighs it in his hand. "${owedBefore > 0 ? 'That’s what I wanted to see.' : 'Good. That’s how it’s done.'}"`, `${money(amt)} handed up. Last week is settled.`];
 }
@@ -267,7 +267,7 @@ export function settleOne(w: World, c: Character) {
     const f = addFact(w, { kind: 'shortfall', actor: c.id, victim: boss.id, amount: owed - pay, minor: b.missed < 2, text: refuse ? `${c.name} refused to pass up his share to ${boss.name}.` : stall ? `${c.name} held back what he owed ${boss.name}.` : `${c.name} came up ${money(owed - pay)} short on what he owes ${boss.name}.`, district: c.district }, { witnesses: [] });
     // A boss does not punish a man whose trade has visibly collapsed, or who is laid up, the way he punishes one whose trade is fine.
     // He is also slower to lose patience with a man he trusts.
-    rel(boss, c.id).trust = clamp(rel(boss, c.id).trust - (understood ? 0.005 : 0.03));
+    feel(w, boss, c.id, 'trust', -((understood ? 0.005 : 0.03)));
     // A boss who can see a man's trade has collapsed, and who trusts him, eases the load rather than waiting to punish him.
     if (understood && !boss.isPlayer && !c.isPlayer && b.missed >= 3 && rel(boss, c.id).trust > 0.3 && (c.cooldown.forbear ?? 0) <= w.now) {
       c.cooldown.forbear = w.now + 8 * WEEK;
@@ -308,9 +308,9 @@ export function settleOne(w: World, c: Character) {
   // A man who is asked for too much, or kept on a short leash, resents it.
   const r = rel(c, boss.id);
   if (rate > 0.25) {
-    r.trust = clamp(r.trust - (rate - 0.25) * 0.5);
-    r.respect = clamp(r.respect - (rate - 0.25) * 0.3);
-  } else if (rate < BASE_RATE[c.rank] - 0.01) r.trust = clamp(r.trust + 0.02);
+    feelOn(w, r, 'trust', -((rate - 0.25) * 0.5));
+    feelOn(w, r, 'respect', -((rate - 0.25) * 0.3));
+  } else if (rate < BASE_RATE[c.rank] - 0.01) feelOn(w, r, 'trust', 0.02);
 
   // Superiors sometimes go through a man's books and find the side business.
   if (b.side && !b.sideKnown && rng.chance(0.06 * (temper(boss).caution + 0.5))) discoverSide(w, boss, c);
@@ -345,7 +345,7 @@ export function askRate(w: World, c: Character, boss: Character, byPlayer = fals
   const p = clamp(score, 0.05, 0.85);
   if (roll < p) {
     c.kickRate = Math.max(floor, c.kickRate - 0.03);
-    r.trust = clamp(r.trust + 0.04);
+    feelOn(w, r, 'trust', 0.04);
     addFact(w, { kind: 'terms', actor: boss.id, victim: c.id, minor: true, text: `${boss.name} agreed to take less from ${c.name}.`, district: c.district }, { witnesses: [] });
     return { outcome: 'agree', lines: byPlayer ? [vsay(w, boss, c, 'rate_agree'), `You pass up ${Math.round(c.kickRate * 100)}% from now on, down from ${now}%.`] : [] };
   }
@@ -353,7 +353,7 @@ export function askRate(w: World, c: Character, boss: Character, byPlayer = fals
     c.kickRate = Math.max(floor, c.kickRate - 0.015);
     return { outcome: 'counter', lines: byPlayer ? [vsay(w, boss, c, 'rate_counter'), `You pass up ${Math.round(c.kickRate * 100)}%, down from ${now}%.`] : [] };
   }
-  r.trust = clamp(r.trust - 0.03);
+  feelOn(w, r, 'trust', -0.03);
   return { outcome: 'refuse', lines: byPlayer ? [vsay(w, boss, c, steady ? 'rate_no_steady' : h.length < 4 ? 'rate_no_new' : 'rate_no_short')] : [] };
 }
 
@@ -398,13 +398,13 @@ function discoverSide(w: World, boss: Character, c: Character) {
 // An NPC superior's response to repeated shortfalls: a warning, then a demand, then punishment.
 export function react(w: World, boss: Character, c: Character, fl: { amt: number; n: number; last: number }, cause: Id) {
   if (fl.n <= 1) {
-    rel(c, boss.id).trust = clamp(rel(c, boss.id).trust - 0.03);
+    feel(w, c, boss.id, 'trust', -0.03);
     addFact(w, { kind: 'discipline', actor: boss.id, victim: c.id, cause, minor: true, text: `${boss.name} warned ${c.name} that his numbers don't add up.`, district: c.district }, { witnesses: [] });
     return;
   }
   if (fl.n === 2) {
     c.books.arrears += Math.round(fl.amt);
-    rel(c, boss.id).trust = clamp(rel(c, boss.id).trust - 0.06);
+    feel(w, c, boss.id, 'trust', -0.06);
     bear(w, c, boss.id, 0.05, `${boss.name} made him make up what he was short`);
     addFact(w, { kind: 'discipline', actor: boss.id, victim: c.id, cause, text: `${boss.name} told ${c.name} to make up ${money(Math.round(fl.amt))}.`, district: c.district }, { witnesses: [] });
     return;
@@ -424,12 +424,12 @@ export function discipline(w: World, boss: Character, c: Character, cause: Id, a
   } else if (protectedShops.length) {
     const s = protectedShops[0];
     setCollector(w, s, boss.id, boss.familyId!, { keepOwed: true }); // the arrangement, and anything owed under it, goes up a level
-    rel(c, boss.id).trust = clamp(rel(c, boss.id).trust - 0.15);
+    feel(w, c, boss.id, 'trust', -0.15);
     addFact(w, { kind: 'discipline', actor: boss.id, victim: c.id, cause, text: `${boss.name} took ${s.name} away from ${c.name} over the missing money.`, district: s.district }, { witnesses: [], broadcast: subordinates(w, boss).map((x) => x.id) });
   } else {
     c.books.arrears += amt;
     c.kickRate = Math.min(0.3, c.kickRate + 0.05);
-    rel(c, boss.id).trust = clamp(rel(c, boss.id).trust - 0.12);
+    feel(w, c, boss.id, 'trust', -0.12);
     addFact(w, { kind: 'discipline', actor: boss.id, victim: c.id, cause, text: `${boss.name} doubled ${c.name}'s debt and raised his share.`, district: c.district }, { witnesses: [] });
   }
 }
@@ -488,7 +488,7 @@ export function auditMember(w: World, p: Character, sub: Character): { minutes: 
   const r = rel(sub, p.id);
   const pr = clamp(0.5 + p.traits.caution * 0.25 - temper(sub).caution * 0.35 + r.trust * 0.2, 0.15, 0.9);
   if (!w.rng.chance(pr)) {
-    r.trust = clamp(r.trust - 0.05);
+    feelOn(w, r, 'trust', -0.05);
     lines.push(`${sub.name} is vague and keeps changing the subject. You leave knowing nothing you could prove, and he knows you were checking.`);
     return { minutes, lines };
   }
@@ -538,12 +538,12 @@ export function rule(w: World, p: Character, sub: Character, code: string): { mi
   const r = rel(sub, p.id);
   switch (code) {
     case 'warn':
-      r.trust = clamp(r.trust - 0.03);
+      feelOn(w, r, 'trust', -0.03);
       lines.push(`You tell ${sub.name} his numbers need to be better. He nods.`);
       break;
     case 'demand':
       sub.books.arrears += Math.round(fl.amt);
-      r.trust = clamp(r.trust - 0.06);
+      feelOn(w, r, 'trust', -0.06);
       bearOn(w, r, 0.05, `${p.name} made him make up what he was short`);
       lines.push(`${sub.name} owes you an extra ${money(Math.round(fl.amt))}, to be paid as he can.`);
       fl.amt = 0;
@@ -559,20 +559,20 @@ export function rule(w: World, p: Character, sub: Character, code: string): { mi
     }
     case 'raise':
       sub.kickRate = Math.min(0.35, sub.kickRate + 0.05);
-      r.trust = clamp(r.trust - 0.08);
-      r.respect = clamp(r.respect - 0.04);
+      feelOn(w, r, 'trust', -0.08);
+      feelOn(w, r, 'respect', -0.04);
       lines.push(`${sub.name} will now pass up ${Math.round(sub.kickRate * 100)}%. He doesn’t look happy.`);
       break;
     case 'lower':
       sub.kickRate = Math.max(0.05, sub.kickRate - 0.05);
-      r.trust = clamp(r.trust + 0.08);
-      r.affection = clamp(r.affection + 0.05);
+      feelOn(w, r, 'trust', 0.08);
+      feelOn(w, r, 'affection', 0.05);
       lines.push(`${sub.name} will now pass up ${Math.round(sub.kickRate * 100)}%. He’s grateful.`);
       break;
     case 'forgive':
       fl.amt = 0;
       fl.n = 0;
-      r.trust = clamp(r.trust + 0.03);
+      feelOn(w, r, 'trust', 0.03);
       lines.push(`You let it go. ${sub.name} will remember that.`);
       break;
   }
@@ -586,7 +586,7 @@ export function checkBooks(w: World, p: Character, sub: Character): string[] {
   const s = statement(w, sub);
   const r = rel(sub, p.id);
   const pr = clamp(0.62 + p.traits.caution * 0.2 - temper(sub).caution * 0.3 + r.trust * 0.15, 0.2, 0.92);
-  if (!w.rng.chance(pr)) { r.trust = clamp(r.trust - 0.02); return [`${sub.name.split(' ')[0]} is vague about his numbers and watches you read them. You learn nothing you could prove.`]; }
+  if (!w.rng.chance(pr)) { feelOn(w, r, 'trust', -0.02); return [`${sub.name.split(' ')[0]} is vague about his numbers and watches you read them. You learn nothing you could prove.`]; }
   const lines: string[] = [];
   lines.push(`He passed up ${money(s.handed)} of ${money(s.due)} due${s.carry ? ` (${money(s.carry)} of that was left over from before)` : ''}.`);
   const gap = Math.max(0, s.expected - s.weekDue);

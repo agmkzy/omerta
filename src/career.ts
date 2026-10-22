@@ -2,7 +2,7 @@ import { promotedOver } from './situ';
 import { ledgerAdd } from './powers2';
 // Career: associate -> soldier -> capo -> underboss -> boss. Nobody is promoted because a number ticked over.
 // Someone with standing has to speak for you, there has to be a vacancy, and the man at the top has to agree.
-import { addFact, bear, clamp, famName, money, peek, recordCareer, rel, repute } from './core';
+import { addFact, bear, clamp, famName, feel, feelOn, money, peek, recordCareer, rel, repute } from './core';
 import { influence } from './books';
 import { mkJob } from './jobs';
 import { addEnc } from './encounters';
@@ -131,7 +131,7 @@ export function promote(w: World, c: Character, to: Rank, by?: Character) {
   if (c.isPlayer && was === 'associate') {
     // the men who ran for an associate become associates of the family once he is made
     const crew = Object.values(w.chars).filter((x) => x.alive && x.bossId === c.id && x.rank === 'associate');
-    for (const x of crew) { x.familyId = fid; x.wage = Math.max(x.wage ?? 0, 100); rel(x, c.id).respect = clamp(rel(x, c.id).respect + 0.1); }
+    for (const x of crew) { x.familyId = fid; x.wage = Math.max(x.wage ?? 0, 100); feel(w, x, c.id, 'respect', 0.1); }
     if (crew.length) addFact(w, { kind: 'promotion', actor: c.id, text: `${crew.map((x) => x.name).join(', ')} ${crew.length > 1 ? 'are' : 'is'} now recognised as ${crew.length > 1 ? 'associates' : 'an associate'} of the ${famName(w, c)} family, under ${c.name}.`, district: c.district }, { broadcast: [c.id, ...crew.map((x) => x.id)] });
   }
   if (c.isPlayer) {
@@ -143,13 +143,13 @@ export function promote(w: World, c: Character, to: Rank, by?: Character) {
     if (to === 'capo') {
       // a new captain is handed a crew: the best unattached associates in the family
       const pool = members(w, fid).filter((x) => x.rank === 'associate' && !x.isPlayer && !isRunner(w, x) && !x.prospect && (!x.bossId || w.chars[x.bossId]?.rank === 'soldier')).sort((a, b) => b.lifetimeKick - a.lifetimeKick).slice(0, 3);
-      for (const x of pool) { x.bossId = c.id; rel(x, c.id).trust = clamp(rel(x, c.id).trust + 0.1); }
+      for (const x of pool) { x.bossId = c.id; feel(w, x, c.id, 'trust', 0.1); }
       if (pool.length) addFact(w, { kind: 'promotion', actor: c.id, minor: true, text: `${pool.map((x) => x.name).join(', ')} now answer to ${c.name}.`, district: c.district }, { broadcast: pool.map((x) => x.id) });
       // You don't get a blank crew. One of them is glad of you, and one isn't.
       if (pool.length >= 2) {
         const [glad, sour] = [pool[0], pool[pool.length - 1]];
-        rel(glad, c.id).trust = clamp(rel(glad, c.id).trust + 0.15);
-        rel(sour, c.id).trust = clamp(rel(sour, c.id).trust - 0.12);
+        feel(w, glad, c.id, 'trust', 0.15);
+        feel(w, sour, c.id, 'trust', -0.12);
         bear(w, sour, c.id, 0.15, `${c.name} was put over him`);
         sour.problem = { kind: 'resentment', sev: 0.6, since: w.now };
         addFact(w, { kind: 'rumour', actor: sour.id, minor: true, text: `${sour.name} didn’t take it well that ${c.name} was put over him. ${glad.name} was pleased.`, district: c.district }, { witnesses: [c.id] });
@@ -192,7 +192,7 @@ export function careerTick(w: World) {
         // the player was passed over
         const p = w.chars[w.playerId!];
         if (p?.alive && p.familyId === fam.id && p.rank === from && p.lifetimeKick >= (KICK_NEEDED[to] ?? 1e9) * 0.8) {
-          rel(p, boss.id).respect = clamp(rel(p, boss.id).respect - 0.03);
+          feel(w, p, boss.id, 'respect', -0.03);
           p.memos.push({ id: 'm' + w.nextId++, kind: 'question', other: top.c.id, text: `${top.c.name} was made ${to} ahead of you.`, t: w.now, done: true });
         }
         break;
@@ -212,7 +212,7 @@ export function inductPlayer(w: World, p: Character, to: Rank, shown: number) {
 
 export function turnedDown(w: World, p: Character) {
   const boss = w.chars[w.fam[p.familyId!].bossId];
-  if (boss) rel(boss, p.id).respect = clamp(rel(boss, p.id).respect - 0.2);
+  if (boss) feel(w, boss, p.id, 'respect', -0.2);
   repute(w, p, -8, 'turned down');
   p.cooldown['induct'] = w.now + 70 * DAY;
 }
@@ -225,8 +225,8 @@ export function recommendable(w: World, p: Character): Character[] {
 export function recommend(w: World, p: Character, c: Character): string[] {
   const boss = w.chars[w.fam[p.familyId!].bossId];
   c.backer = p.id;
-  rel(c, p.id).trust = clamp(rel(c, p.id).trust + 0.15);
-  rel(c, p.id).affection = clamp(rel(c, p.id).affection + 0.1);
+  feel(w, c, p.id, 'trust', 0.15);
+  feel(w, c, p.id, 'affection', 0.1);
   const r = readiness(w, c);
   const lines = [`You tell ${boss?.name ?? 'the boss'} that ${c.name} has earned it. Your name is on him now.`];
   if (r && r.earn < 1) lines.push(`${c.name} has only passed up ${money(c.lifetimeKick)} so far. It will count for less until that changes.`);
@@ -241,7 +241,7 @@ export function recruitable(w: World, p: Character): Character[] {
 export function recruit(w: World, p: Character, c: Character): string[] {
   applyRank(w, c, 'associate', { fact: false, place: (x) => { x.familyId = p.familyId; x.bossId = p.id; } });
   addFact(w, { kind: 'promotion', actor: c.id, minor: true, text: `${c.name} has started running with ${p.name}.`, district: c.district }, { witnesses: [p.id] });
-  rel(c, p.id).trust = clamp(rel(c, p.id).trust + 0.1);
+  feel(w, c, p.id, 'trust', 0.1);
   return [`${c.name} shakes your hand. He works for you now, and you answer for him.`];
 }
 
@@ -416,7 +416,7 @@ export function promoTick(w: World) {
     pc.result = 'passed';
     p.cooldown['induct'] = w.now + 10 * DAY;
     if (w.path) delete w.path.hold;
-    rel(p, boss.id).respect = clamp(rel(p, boss.id).respect - 0.02);
+    feel(w, p, boss.id, 'respect', -0.02);
     p.memos.push({ id: 'm' + w.nextId++, kind: 'question', other: sp.id, text: 'You had done everything asked, and then said the wrong things at the table. They want to see you try again in a week or two. It is not the end.', t: w.now, done: true });
   }
 }
@@ -430,13 +430,13 @@ export function promoChoose(w: World, p: Character, e: Enc, code: string): strin
   const c = e.from ? w.chars[e.from] : undefined;
   if (stage === 0 && c) {
     const a = arch(c);
-    if (code === 'humble') { pc.points += 1; rel(c, p.id).trust = clamp(rel(c, p.id).trust + 0.04); lines.push(`${c.name} nods. "Good. That’s the right answer. Remember you gave it."`); }
-    else if (code === 'earn') { pc.points += 0.7; rel(c, p.id).respect = clamp(rel(c, p.id).respect + 0.04); lines.push(`"Humble. I like that." ${c.name} almost smiles.`); }
+    if (code === 'humble') { pc.points += 1; feel(w, c, p.id, 'trust', 0.04); lines.push(`${c.name} nods. "Good. That’s the right answer. Remember you gave it."`); }
+    else if (code === 'earn') { pc.points += 0.7; feel(w, c, p.id, 'respect', 0.04); lines.push(`"Humble. I like that." ${c.name} almost smiles.`); }
     else if (code === 'envelope') {
       if (p.cash < 300) { lines.push('You reach for it and have nothing to reach for.'); }
       else {
         p.cash -= 300; c.cash += 300;
-        if (['proud', 'earnest'].includes(a)) { pc.points -= 1.2; rel(c, p.id).respect = clamp(rel(c, p.id).respect - 0.1); lines.push(`${c.name} looks at the envelope, and then at you. "I didn’t ask for that." He doesn’t give it back, and he doesn’t forget it.`); }
+        if (['proud', 'earnest'].includes(a)) { pc.points -= 1.2; feel(w, c, p.id, 'respect', -0.1); lines.push(`${c.name} looks at the envelope, and then at you. "I didn’t ask for that." He doesn’t give it back, and he doesn’t forget it.`); }
         else { pc.points += 1.2; lines.push(`${c.name} makes the envelope disappear. "Thoughtful." That’s all.`); }
       }
     } else {
@@ -455,7 +455,7 @@ export function promoChoose(w: World, p: Character, e: Enc, code: string): strin
       else { p.cash -= 500; pc.points += 1.2; repute(w, p, 1, 'lobbying'); lines.push(`Five hundred goes round the room in the form of a round of drinks, a donation to the church and an envelope for a widow. People are very aware of it.`); }
     } else if (code === 'ally' && rv) {
       pc.points += 0.4;
-      rel(rv, p.id).trust = clamp(rel(rv, p.id).trust + 0.15);
+      feel(w, rv, p.id, 'trust', 0.15);
       addFavour(w, p.id, rv.id, 2, `the way you agreed to back him for the seat`);
       lines.push(`${rv.name} studies you, and shakes your hand. Whichever of you gets it, the other won’t be a problem. That’s worth something.`);
     } else lines.push('You say nothing. Some men would call that confidence.');
@@ -494,7 +494,7 @@ function noticeTick(w: World, fam: import('./types').Family, boss: Character, to
   if (n === 3) say(`${boss.name} has started to hear the name ${c.name}. Results, mostly.`, `${boss.name} has started to hear your name. Results, mostly. Keep it up.`);
   else if (n === 7) {
     say(`${sp.name} told ${boss.name} the family is short of ${to}s, and that ${c.name} is the reason he knows it.`, `${sp.name} told ${boss.name} the family is short of ${to}s, and named you as the reason he knows it.`);
-    rel(boss, c.id).respect = clamp(rel(boss, c.id).respect + 0.04);
+    feel(w, boss, c.id, 'respect', 0.04);
     if (c.isPlayer && p) p.memos.push({ id: 'm' + w.nextId++, kind: 'question', other: boss.id, text: `${boss.name} is weighing another ${to}’s chair. ${sp.name} says to keep the numbers up, and to stay out of trouble.`, t: w.now, done: false });
   } else if (n >= 12) {
     const old = familyStyle(w, fam.id) === 'old';
@@ -535,8 +535,8 @@ export function reward(w: World, p: Character, c: Character, code: string): stri
   if (code === 'praise') {
     if ((p.cooldown[`rw:praise:${c.id}`] ?? 0) > w.now) return [`${f} has had his share of praise this week.`];
     p.cooldown[`rw:praise:${c.id}`] = w.now + 10 * DAY;
-    r.trust = clamp(r.trust + (good ? 0.08 : 0.02)); r.respect = clamp(r.respect + (good ? 0.1 : 0.0)); r.affection = clamp(r.affection + 0.03);
-    for (const x of Object.values(w.chars)) if (x.alive && x.bossId === p.id && x.id !== c.id) { const q = rel(x, p.id); q.respect = clamp(q.respect + 0.01); q.trust = clamp(q.trust + (good ? 0.01 : -0.02)); }
+    feelOn(w, r, 'trust', (good ? 0.08 : 0.02)); feelOn(w, r, 'respect', (good ? 0.1 : 0.0)); feelOn(w, r, 'affection', 0.03);
+    for (const x of Object.values(w.chars)) if (x.alive && x.bossId === p.id && x.id !== c.id) { const q = rel(x, p.id); feelOn(w, q, 'respect', 0.01); feelOn(w, q, 'trust', (good ? 0.01 : -0.02)); }
     return [good ? `You make a point of saying what ${f} did, with the others listening. He stands a little straighter. The others notice what gets noticed.` : `${f} hasn’t done much to be praised for, and everyone in the room knows it. It rings a little hollow.`];
   }
   const amt = code === 'bonus2' ? 800 : 250;
@@ -545,7 +545,7 @@ export function reward(w: World, p: Character, c: Character, code: string): stri
   p.cash -= amt; c.cash += amt;
   p.cooldown[`rw:bonus:${c.id}`] = w.now + 14 * DAY;
   const k = (good ? 1 : 0.4) * (amt >= 800 ? 2 : 1);
-  r.trust = clamp(r.trust + 0.05 * k); r.affection = clamp(r.affection + 0.05 * k); r.respect = clamp(r.respect + 0.03 * k);
+  feelOn(w, r, 'trust', 0.05 * k); feelOn(w, r, 'affection', 0.05 * k); feelOn(w, r, 'respect', 0.03 * k);
   c.books.missed = Math.max(0, c.books.missed - 1);
   if (c.problem && c.problem.sev > 0.2) c.problem.sev = Math.max(0, c.problem.sev - 0.1 * k);
   return [good ? `${f} counts it without seeming to. "I won’t forget this." It’s the kind of thing a man repeats to his friends.` : `${f} takes it. Whether it buys anything beyond today, you’ll find out.`];

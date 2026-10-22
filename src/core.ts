@@ -4,6 +4,7 @@ import { applyRank, repairHierarchy } from './rank';
 import { succeed } from './orgs';
 import { Business, Character, DAY, Debt, Fact, FactKind, Id, Rel, World } from './types';
 import { goalsOnDeath } from './goals';
+import { temper } from './temper';
 
 export const DISTRICTS = ['Little Italy', 'Bensonhurst', 'Red Hook', "Hell's Kitchen", 'The Bronx', 'Staten Island', 'Astoria'];
 
@@ -65,27 +66,99 @@ export function easeOn(r: Rel, factor: number) {
   r.grudge = clamp(r.grudge * factor);
   if (r.grudge < 0.05) delete r.why;
 }
-function noteWhy(w: World, r: Rel, a: number, why: Fact | string) {
-  const cur = r.why;
-  if (cur && a < cur.a * 0.5 && w.now - cur.t < 30 * DAY) return;
-  r.why = typeof why === 'string' ? { t: w.now, text: why, a: Math.round(a * 100) / 100 } : { t: w.now, text: why.text, f: why.id, a: Math.round(a * 100) / 100 };
+function noteWhy(w: World, r: Rel, a: number, why: Fact | string) { r.why = pickWhy(w, r.why, a, why); }
+// the reason kept is the one that did most lately: a small thing does not overwrite a big one, a month-old one gives way
+function pickWhy(w: World, cur: Rel['why'], a: number, why: Fact | string): Rel['why'] {
+  if (cur && a < cur.a * 0.5 && w.now - cur.t < 30 * DAY) return cur;
+  return typeof why === 'string' ? { t: w.now, text: why, a: Math.round(a * 100) / 100 } : { t: w.now, text: why.text, f: why.id, a: Math.round(a * 100) / 100 };
+}
+
+// Foundation step 3 (Oct 2026): one door for how one man regards another (trust, respect, affection, fear), the same for everyone.
+// A gain shrinks as the feeling nears its limit (the last stretch is the hardest: V89's rule for the player, now everyone's); trust
+// and liking also grow with familiarity (you can't come to trust or like a man you barely know, however well he treats you); losses
+// are not damped. What a man's regard rests on, the turn or the time that did most to raise it, is kept with it (bond), as a
+// grudge keeps its reason. Familiarity itself (known) grows with time spent and things lived through together (knowMore).
+export type Feeling = 'trust' | 'respect' | 'affection' | 'fear';
+export const feel = (w: World, c: Character, other: Id, f: Feeling, amount: number, why?: Fact | string) => feelOn(w, rel(c, other), f, amount, why);
+export function feelOn(w: World, r: Rel, f: Feeling, amount: number, why?: Fact | string): number {
+  const v = r[f] ?? 0;
+  let d = amount;
+  if (amount > 0) {
+    d = amount * Math.max(0.15, 1 - v);
+    if (f === 'trust' || f === 'affection') d *= 0.4 + 0.6 * (r.known ?? 0);
+  }
+  const nv = clamp(v + d);
+  r[f] = nv;
+  if (nv !== v + d) d = nv - v; // (the change actually made, where the limit cut it short; otherwise exactly what was asked)
+  if (d > 0 && why && (f === 'trust' || f === 'affection')) r.bond = pickWhy(w, r.bond, d, why);
+  if (f === 'fear' && (r.fear ?? 0) < 0.02) delete r.fear;
+  return d;
+}
+// Weekly, every man's feelings for others fade when nothing feeds them, by the same rules for every feeling: a grudge cools (a proud
+// man nurses one longer: a few months against a few weeks), fear fades, liking and trust drift back towards nothing between men who
+// no longer see each other, and so, slowly, does how well they know each other. Respect is a man's name as another knows it: between
+// men who know each other it settles towards the other's standing (earned by deeds, core.DEED and repute), with something for the
+// man above, the closer as they know each other better. Replaces the old grudge-only cooling and the separate fear pass.
+const LIFE_RANK = ['associate', 'soldier', 'capo', 'underboss', 'boss'];
+export function feelingsWeek(w: World, c: Character) {
+  const hold = 0.88 + temper(c).pride * 0.08, mine = LIFE_RANK.indexOf(c.rank);
+  for (const [id, r] of Object.entries(c.rels)) {
+    const o = w.chars[id];
+    if (o?.alive && (r.known ?? 0) >= 0.2) {
+      const above = Math.max(0, LIFE_RANK.indexOf(o.rank) - Math.max(0, mine)) * 0.05;
+      r.respect = clamp(r.respect + (clamp(o.standing / 100 + above) - r.respect) * 0.05 * (r.known ?? 0));
+    }
+    easeOn(r, r.grudge < 0.05 ? 0 : hold);
+    if (r.fear !== undefined) { r.fear *= 0.9; if (r.fear < 0.02) delete r.fear; }
+    const apart = w.now - r.lastMet;
+    if (apart > 14 * DAY) {
+      r.trust = Math.max(0.1, r.trust * 0.94);
+      r.affection = Math.max(0.1, r.affection * 0.94);
+    }
+    if (apart > 28 * DAY && r.known) r.known = Math.round(r.known * 0.99 * 1000) / 1000;
+  }
+}
+// a feeling raised to at least a level, or set outright (a betrayal that leaves no trust at all)
+export const feelAtLeast = (w: World, c: Character, other: Id, f: Feeling, level: number, why?: Fact | string) => { const r = rel(c, other); if ((r[f] ?? 0) < level) feelOn(w, r, f, level - (r[f] ?? 0), why); };
+export const feelTo = (c: Character, other: Id, f: Feeling, value: number) => feelToOn(rel(c, other), f, value);
+export function feelToOn(r: Rel, f: Feeling, value: number) { r[f] = clamp(value); if (f === 'fear' && value < 0.02) delete r.fear; }
+export const feelAtLeastOn = (w: World, r: Rel, f: Feeling, level: number, why?: Fact | string) => { if ((r[f] ?? 0) < level) feelOn(w, r, f, level - (r[f] ?? 0), why); };
+// what a man's regard rests on, when the gesture itself is recorded elsewhere (a favour owed: encounters.addFavour)
+export function bondFor(w: World, c: Character, other: Id, size: number, why: Fact | string) { const r = rel(c, other); r.bond = pickWhy(w, r.bond, size, why); }
+// familiarity: time together and things lived through together; both men come to know each other
+export function knowMore(a: Character, b: Character, amount: number) {
+  if (a.id === b.id) return;
+  const ra = rel(a, b.id), rb = rel(b, a.id);
+  ra.known = Math.round(clamp((ra.known ?? 0) + amount * (1 - (ra.known ?? 0))) * 1000) / 1000;
+  rb.known = Math.round(clamp((rb.known ?? 0) + amount * (1 - (rb.known ?? 0))) * 1000) / 1000;
+}
+// How well two men get on, from who they are and where they stand: the agreeable and the sociable get on with most people; two
+// proud men chafe, and a hot man and a cool one rub; wanting the same seat, an old grudge, or another family's colours get in the way.
+// Between about -0.5 (they can't stand each other) and 0.6 (natural friends). Read whenever they spend time together (actions.ts).
+export function compat(w: World, a: Character, b: Character): number {
+  const ta = temper(a), tb = temper(b);
+  let k = (ta.agreeable + tb.agreeable) * 0.3 + (a.traits.sociability + b.traits.sociability) * 0.12 - ta.pride * tb.pride * 0.55 - Math.abs(ta.volatility - tb.volatility) * 0.25 - 0.12;
+  if (a.familyId && b.familyId && a.familyId !== b.familyId) k -= 0.1;
+  if (a.familyId && a.familyId === b.familyId && a.rank === b.rank && a.rank !== 'civilian' && w.agency?.goals.some((g) => g.kind === 'advance' && g.who === a.id) && w.agency?.goals.some((g) => g.kind === 'advance' && g.who === b.id)) k -= 0.25; // after the same seat
+  k -= Math.max(peek(a, b.id).grudge, peek(b, a.id).grudge) * 0.6;
+  return clamp(k, -1, 1);
 }
 
 // V89: what a man thinks of the player is earned, not accumulated. Every gain in an NPC's regard for the player goes through
 // here: it shrinks as the regard rises (the last stretch to complete trust is the hardest) and halves each time the same kind of
 // gesture is repeated with the same man within a week (a third drink in a week buys almost nothing). Losses are not damped.
-// Only the player's relationships are tracked this way, so the per-man bookkeeping stays small.
+// Foundation step 3: the shrinking and the familiarity are everyone's now (feelOn); only the weekly repetition rule is the player's,
+// so the per-man bookkeeping stays small.
 export function regard(w: World, npc: Character, player: Character, field: 'trust' | 'respect' | 'affection', amount: number, kind: string): number {
   const r = rel(npc, player.id);
-  if (amount <= 0) { r[field] = clamp(r[field] + amount); return amount; }
+  if (amount <= 0) return feelOn(w, r, field, amount);
   const week = Math.floor(w.now / (7 * 1440));
   const key = `rg:${npc.id}:${kind}`;
   const seen = player.cooldown[key] ?? 0; // encoded as week * 100 + times this week
   const times = Math.floor(seen / 100) === week ? seen % 100 : 0;
   player.cooldown[key] = week * 100 + Math.min(99, times + 1);
-  const gain = amount * Math.pow(0.5, times) * Math.max(0.15, 1 - r[field]);
-  r[field] = clamp(r[field] + gain);
-  return gain;
+  // (on top of the rules everyone's regard follows, core.feelOn: the same gesture repeated with the same man within a week counts for less)
+  return feelOn(w, r, field, amount * Math.pow(0.5, times));
 }
 
 // Standing (reputation) is earned the same way: each gain shrinks as reputation climbs and as the same kind of deed repeats
@@ -111,6 +184,7 @@ export function link(a: Character, b: Character, trust: number) {
     [b, a],
   ] as [Character, Character][]) {
     const r = rel(x, y.id);
+    r.known = Math.max(r.known ?? 0, Math.round((0.3 + trust * 0.6) * 100) / 100); // (men who work together know each other better than neighbours do)
     r.trust = Math.max(r.trust, trust);
     r.affection = Math.max(r.affection, trust * 0.6);
     r.respect = Math.max(r.respect, 0.4);
@@ -223,6 +297,8 @@ export const DEED: Partial<Record<FactKind, readonly [actor: number, victim: num
 };
 // and those who come to know of it think a little more, or less, of the men in it: respect follows deeds both ways
 const HEARD = 0.01;
+// violence: how much a man who hears of it comes to fear the man who did it, before his own courage (learn)
+const VIOLENT: Partial<Record<FactKind, number>> = { beating: 0.04, vandalism: 0.02, robbery: 0.02, murder: 0.12, attempt: 0.06 };
 
 const GRUDGE: Partial<Record<FactKind, number>> = {
   beating: 0.5,
@@ -242,16 +318,21 @@ export function learn(w: World, cid: Id, fact: Fact, from: string, knowsActor: b
   if (fact.kind === 'business_struggling' && fact.business) c.struggling[fact.business] = fact.t;
   if (!c.alive || !knowsActor || !fact.actor || fact.actor === cid) return;
   const d = DEED[fact.kind];
+  const brave = temper(c).courage;
   if (d && !fact.minor && fact.victim !== cid) {
-    if (d[0]) { const r = rel(c, fact.actor); r.respect = clamp(r.respect + d[0] * HEARD); }
-    if (d[1] && fact.victim && fact.victim !== fact.actor) { const r = rel(c, fact.victim); r.respect = clamp(r.respect + d[1] * HEARD); }
+    if (d[0]) feel(w, c, fact.actor, 'respect', d[0] * HEARD);
+    if (d[1] && fact.victim && fact.victim !== fact.actor) feel(w, c, fact.victim, 'respect', d[1] * HEARD);
+    // Foundation step 3: and a man who hears what another can do learns to be wary of him, the more so the less brave he is
+    if (VIOLENT[fact.kind]) feel(w, c, fact.actor, 'fear', VIOLENT[fact.kind]! * (1 - brave), fact);
   }
   const g = GRUDGE[fact.kind];
   if (!g) return;
   if (fact.victim === cid) {
-    bear(w, c, fact.actor, g, fact);
-    const r = rel(c, fact.actor);
-    r.trust = clamp(r.trust - g * 0.5);
+    // done to him: a brave man answers it with a grudge, a timid one with fear (temper), and either way he trusts the man less
+    const v = VIOLENT[fact.kind] !== undefined;
+    bear(w, c, fact.actor, v ? g * (0.4 + 0.6 * brave) : g, fact);
+    if (v) feel(w, c, fact.actor, 'fear', g * (1 - brave) * 0.8, fact);
+    feel(w, c, fact.actor, 'trust', -g * 0.5);
   } else if (fact.victim) {
     const v = w.chars[fact.victim];
     const close = (c.rels[fact.victim]?.affection ?? 0) > 0.5 || (!!v?.familyId && v.familyId === c.familyId);
@@ -300,6 +381,8 @@ export function addFact(
     district: f.district ?? actor?.district ?? victim?.district ?? DISTRICTS[0],
   };
   w.facts[fact.id] = fact;
+  // two men who were in it together, either side of it, now know each other better (core.knowMore)
+  if (actor && victim && actor.id !== victim.id && !fact.hiddenActor && !fact.minor) knowMore(actor, victim, 0.03);
   const d = DEED[fact.kind];
   if (d && !fact.minor) {
     if (d[0] && actor && !fact.hiddenActor) repute(w, actor, d[0], 'deed:' + fact.kind);

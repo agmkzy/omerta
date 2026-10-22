@@ -39,7 +39,8 @@ describe('the player becomes boss', { tags: ['scenario'] }, () => {
     // the men look to him: they wait at the club
     const cl = clubOf(w, fam.id)!; w.now = Math.floor(w.now / DAY) * DAY + 20 * 60;
     const seatCount = () => { let n = 0; for (let s = 0; s < 40; s++) { w.now += 180; n += clubPresent(w, cl).filter((h) => h.c.rank === 'capo').length; } return n; };
-    const withSeat = seatCount(); cl.hostId = undefined; const without = seatCount(); cl.hostId = p.id;
+    // (the same evenings both ways: who is about depends on the day and the hour, so two different spans of days prove nothing)
+    const ts = w.now; const withSeat = seatCount(); w.now = ts; cl.hostId = undefined; const without = seatCount(); cl.hostId = p.id;
     assert.ok(withSeat > without, `captains come to the boss's club more (${withSeat} vs ${without})`);
     const opened = openFamilyMeeting(w, p); assert.ok(typeof opened !== 'string' || opened.length > 0);
     // and it goes on: sixty more days under him, with the audit watching

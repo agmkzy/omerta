@@ -2,7 +2,7 @@
 // (createWorld), and never again: after that every piece of it belongs to the ordinary simulation. The skills grow like anyone's,
 // the share is paid out of a real till, the debt is a real debt, the job pays from a real business, the car sells like any car,
 // and the brother is a soldier who lives his own life. Nothing here runs each day, and nothing here is checked again later.
-import { addFact, createDebt, money, ownerBiz, rel } from './core';
+import { addFact, createDebt, feelAtLeastOn, money, ownerBiz, rel } from './core';
 import { FEMALE } from './world';
 import { addStake } from './econ';
 import { SKILLS } from './people';
@@ -145,8 +145,8 @@ function meet(w: World, p: Character, o: Character, trust: number) {
   (p.intro ??= {})[o.id] = w.now;
   for (const [x, y] of [[p, o], [o, p]] as [Character, Character][]) {
     const r = rel(x, y.id);
-    r.trust = Math.max(r.trust, trust);
-    r.respect = Math.max(r.respect, 0.3);
+    feelAtLeastOn(w, r, 'trust', trust);
+    feelAtLeastOn(w, r, 'respect', 0.3);
     r.lastMet = w.now - 10 * DAY;
   }
 }

@@ -5,7 +5,7 @@ import { sitChoose } from './situations';
 import { pulseChoose } from './pulse';
 // The crew as people: what each man wants, who he likes and who he doesn't, and what he asks of you.
 // None of it is shown until you work it out. Most of it comes out on a Sunday.
-import { addFact, bear, bearOn, clamp, createDebt, money, rel } from './core';
+import { addFact, bear, bearOn, clamp, compat, createDebt, feel, feelAtLeast, feelOn, money, rel } from './core';
 import { addEnc, addFavour } from './encounters';
 import { Character, DAY, Enc, Id, World } from './types';
 import { arch, pick } from './voice';
@@ -77,11 +77,13 @@ export function crewTick(w: World) {
       p.cooldown.crewTie = w.now + 18 * DAY;
       a.cooldown[`pair:${b.id}`] = w.now + 70 * DAY;
       const ra = rel(a, b.id), rb = rel(b, a.id);
-      const sa = a.traits.sociability + b.traits.sociability, vi = a.traits.violence + b.traits.violence, gr = a.traits.greed + b.traits.greed;
+      const gr = a.traits.greed + b.traits.greed;
       const roll = rng.next();
-      const bad = vi > 0.9 || gr > 1.1 || (a.want?.kind === 'made' && b.want?.kind === 'made');
-      if (roll < 0.45 && sa > 0.8) {
-        ra.trust = clamp(ra.trust + 0.2); rb.trust = clamp(rb.trust + 0.2);
+      // (who becomes friends and who falls out is how they get on, core.compat, not a throw of the dice)
+      const k = compat(w, a, b);
+      const bad = k < -0.05;
+      if (roll < 0.45 && k > 0.25) {
+        feelOn(w, ra, 'trust', 0.2, `getting on with ${b.name}`); feelOn(w, rb, 'trust', 0.2, `getting on with ${a.name}`);
         tells.push({ who: a.id, text: pick([`${first(a)} says he and ${first(b)} have been spending more time together. Good. A man should have a friend.`, `${first(a)} and ${first(b)} were seen at the same table twice this week, and neither looked like he was being made to.`, `${first(b)} has started sending ${first(a)} the work he can’t get to. They seem to like each other.`], a.id + w.now), learn: `tie:${b.id}` });
       } else if (roll < 0.62 && bad) {
         bearOn(w, ra, 0.25, `${b.name} rubs him the wrong way`); bearOn(w, rb, 0.25, `${a.name} rubs him the wrong way`);
@@ -108,7 +110,7 @@ export function crewTick(w: World) {
       tells.push({ who: c.id, text: `${first(c)} keeps asking for the dangerous work. He says he’s bored. He isn’t bored.`, learn: 'want' });
     }
     if (k === 'lieutenant' && p.rep?.favoured && p.rep.favoured !== c.id && rng.chance(0.2)) {
-      rel(c, p.id).trust = clamp(rel(c, p.id).trust - 0.04);
+      feel(w, c, p.id, 'trust', -0.04);
       tells.push({ who: c.id, text: `${first(c)} says nothing about the way you’ve been treating ${first(w.chars[p.rep.favoured])}. He says it very quietly.`, learn: 'want' });
     }
     if (k === 'gamble' && rng.chance(0.05) && !w.enc.some((e) => e.kind === 'crew' && e.status === 'open')) askInvest(w, p, c);
@@ -119,7 +121,7 @@ export function crewTick(w: World) {
       if (c.cooldown.restless >= 3 && c.cooldown.restless < 9 && rng.chance(0.35)) tells.push({ who: c.id, text: `${first(c)} has been asking what a man in your position gets for himself. He’s starting to ask it more pointedly.`, learn: 'leaving' });
       if (c.cooldown.restless >= 12) { // he goes over your head
         const up = p.bossId ? w.chars[p.bossId] : undefined;
-        if (up?.alive) { c.bossId = up.id; c.cooldown.restless = 0; rel(c, p.id).trust = clamp(rel(c, p.id).trust - 0.2); addFact(w, { kind: 'report', actor: c.id, victim: p.id, minor: false, text: `${c.name} has gone to ${up.name} and asked to answer to him directly instead of ${p.name}.`, district: c.district }, { witnesses: [p.id, up.id] }); }
+        if (up?.alive) { c.bossId = up.id; c.cooldown.restless = 0; feel(w, c, p.id, 'trust', -0.2); addFact(w, { kind: 'report', actor: c.id, victim: p.id, minor: false, text: `${c.name} has gone to ${up.name} and asked to answer to him directly instead of ${p.name}.`, district: c.district }, { witnesses: [p.id, up.id] }); }
       }
     }
     if (k === 'rich' && c.traits.greed > 0.7) c.traits.greed = clamp(c.traits.greed + 0.002);
@@ -193,37 +195,37 @@ export function crewChoose(w: World, p: Character, e: Enc, code: string): string
   const f = first(c);
   r.asked++;
   const what = String(e.data?.what);
-  if (code === 'think') { e.data = { ...(e.data ?? {}), delayed: 1 }; e.status = 'open'; e.expires = Math.max(e.expires, w.now + 5 * DAY); rel(c, p.id).respect = clamp(rel(c, p.id).respect - 0.01); return [`${f} nods. "Sure. Take your time." He doesn’t sound like he’s got much.`]; }
+  if (code === 'think') { e.data = { ...(e.data ?? {}), delayed: 1 }; e.status = 'open'; e.expires = Math.max(e.expires, w.now + 5 * DAY); feel(w, c, p.id, 'respect', -0.01); return [`${f} nods. "Sure. Take your time." He doesn’t sound like he’s got much.`]; }
   const rc = rel(c, p.id);
   if (what === 'invest') {
     const amt = Number(e.data?.amt);
-    if (code === 'no') { rc.respect = clamp(rc.respect - 0.04); rc.trust = clamp(rc.trust - 0.03); r.broken += 0; lines.push(`${f} nods slowly. "All right." You’ve told him what you think of his idea. You’ve told him what you think of him too.`); }
+    if (code === 'no') { feelOn(w, rc, 'respect', -0.04); feelOn(w, rc, 'trust', -0.03); r.broken += 0; lines.push(`${f} nods slowly. "All right." You’ve told him what you think of his idea. You’ve told him what you think of him too.`); }
     else {
       const put = code === 'half' ? amt / 2 : amt;
       if (p.cash < put) return ['You haven’t got it to give.'];
       p.cash -= put; c.cash += put; c.books.side = (c.books.side ?? 0) + Math.round(put / 6);
       addFavour(w, p.id, c.id, put >= 600 ? 3 : 2, 'the money to start his own book');
-      rc.trust = clamp(rc.trust + 0.12); rc.affection = clamp(rc.affection + 0.05); r.kept++;
+      feelOn(w, rc, 'trust', 0.12); feelOn(w, rc, 'affection', 0.05); r.kept++;
       learnAbout(p, c.id, 'want');
       lines.push(`${f} grips your hand. "I won’t forget this." He means it. He also means to be your equal one day.`);
     }
   } else if (what === 'money') {
     const amt = Number(e.data?.amt);
-    if (code === 'no') { rc.respect = clamp(rc.respect - 0.03); rc.trust = clamp(rc.trust - 0.04); lines.push(`${f} says he understands. He’ll remember that you did.`); r.broken += 0; }
-    else if (code === 'lend') { if (p.cash < amt) return ['You haven’t got it.']; p.cash -= amt; c.cash += amt; createDebt(w, p.id, c.id, amt, 0.02, 'a favour, with terms'); rc.trust = clamp(rc.trust + 0.07); r.kept++; lines.push(`${f} takes it, grateful and slightly insulted that there are terms. It’s fair. He knows it.`); }
-    else { if (p.cash < amt) return ['You haven’t got it.']; p.cash -= amt; c.cash += amt; addFavour(w, p.id, c.id, amt >= 800 ? 3 : 2, `${money(amt)} when he needed it`); rc.trust = clamp(rc.trust + 0.14); rc.affection = clamp(rc.affection + 0.08); r.kept++; lines.push(`${f} doesn’t say anything for a second. "I owe you for this." Those aren’t words he says to many men.`); }
+    if (code === 'no') { feelOn(w, rc, 'respect', -0.03); feelOn(w, rc, 'trust', -0.04); lines.push(`${f} says he understands. He’ll remember that you did.`); r.broken += 0; }
+    else if (code === 'lend') { if (p.cash < amt) return ['You haven’t got it.']; p.cash -= amt; c.cash += amt; createDebt(w, p.id, c.id, amt, 0.02, 'a favour, with terms'); feelOn(w, rc, 'trust', 0.07); r.kept++; lines.push(`${f} takes it, grateful and slightly insulted that there are terms. It’s fair. He knows it.`); }
+    else { if (p.cash < amt) return ['You haven’t got it.']; p.cash -= amt; c.cash += amt; addFavour(w, p.id, c.id, amt >= 800 ? 3 : 2, `${money(amt)} when he needed it`); feelOn(w, rc, 'trust', 0.14); feelOn(w, rc, 'affection', 0.08); r.kept++; lines.push(`${f} doesn’t say anything for a second. "I owe you for this." Those aren’t words he says to many men.`); }
   } else if (what === 'intro') {
     const t = e.about ? w.chars[e.about] : undefined;
-    if (code === 'intro' && t) { rel(c, t.id).trust = Math.max(rel(c, t.id).trust, 0.25); rel(t, c.id).trust = Math.max(rel(t, c.id).trust, 0.25); (c.intro ??= {})[t.id] = w.now; addFavour(w, c.id, p.id, 1, `the introduction to ${t.name}`); rel(t, p.id).respect = clamp(rel(t, p.id).respect - (c.traits.violence > 0.7 ? 0.02 : 0)); rc.trust = clamp(rc.trust + 0.08); r.kept++; lines.push(`You walk ${f} over and say his name to ${t.name}. Nothing else is needed. ${f} won’t forget who opened the door.`); }
-    else { rc.respect = clamp(rc.respect - 0.02); lines.push(`${f} thanks you for being honest. He’ll find another door.`); }
+    if (code === 'intro' && t) { feelAtLeast(w, c, t.id, 'trust', 0.25); feelAtLeast(w, t, c.id, 'trust', 0.25); (c.intro ??= {})[t.id] = w.now; addFavour(w, c.id, p.id, 1, `the introduction to ${t.name}`); feel(w, t, p.id, 'respect', -((c.traits.violence > 0.7 ? 0.02 : 0))); feelOn(w, rc, 'trust', 0.08); r.kept++; lines.push(`You walk ${f} over and say his name to ${t.name}. Nothing else is needed. ${f} won’t forget who opened the door.`); }
+    else { feelOn(w, rc, 'respect', -0.02); lines.push(`${f} thanks you for being honest. He’ll find another door.`); }
   } else if (what === 'recommend') {
-    if (code === 'yes') { c.backer = p.id; rc.trust = clamp(rc.trust + 0.15); rc.affection = clamp(rc.affection + 0.1); r.kept++; learnAbout(p, c.id, 'want'); lines.push(`"You won’t regret it," ${f} says. You might. Your name is on him now.`); }
-    else if (code === 'later') { rc.trust = clamp(rc.trust + 0.01); lines.push(`${f} nods. "Then I’ll earn it." He sounds like he means it.`); }
-    else { rc.respect = clamp(rc.respect - 0.06); rc.trust = clamp(rc.trust - 0.06); if (c.traits.ambition > 0.6) c.cooldown.restless = (c.cooldown.restless ?? 0) + 2; lines.push(`${f}’s face doesn’t move. He thanks you for your time, and goes. Ambitious men don’t forget a no.`); }
+    if (code === 'yes') { c.backer = p.id; feelOn(w, rc, 'trust', 0.15); feelOn(w, rc, 'affection', 0.1); r.kept++; learnAbout(p, c.id, 'want'); lines.push(`"You won’t regret it," ${f} says. You might. Your name is on him now.`); }
+    else if (code === 'later') { feelOn(w, rc, 'trust', 0.01); lines.push(`${f} nods. "Then I’ll earn it." He sounds like he means it.`); }
+    else { feelOn(w, rc, 'respect', -0.06); feelOn(w, rc, 'trust', -0.06); if (c.traits.ambition > 0.6) c.cooldown.restless = (c.cooldown.restless ?? 0) + 2; lines.push(`${f}’s face doesn’t move. He thanks you for your time, and goes. Ambitious men don’t forget a no.`); }
   } else if (what === 'goodword') {
     const cap = e.about ? w.chars[e.about] : undefined;
-    if (code === 'yes' && cap) { rel(cap, c.id).respect = clamp(rel(cap, c.id).respect + 0.07); rel(cap, p.id).respect = clamp(rel(cap, p.id).respect - 0.01); rc.trust = clamp(rc.trust + 0.1); addFavour(w, c.id, p.id, 1, `a good word with ${cap.name}`); r.kept++; lines.push(`You mention ${f} to ${cap.name}, casually, the way it works. ${cap.name} files it away. So does ${f}.`); }
-    else { rc.respect = clamp(rc.respect - 0.02); lines.push(`${f} nods. "Sure. I understand." He doesn’t.`); }
+    if (code === 'yes' && cap) { feel(w, cap, c.id, 'respect', 0.07); feel(w, cap, p.id, 'respect', -0.01); feelOn(w, rc, 'trust', 0.1); addFavour(w, c.id, p.id, 1, `a good word with ${cap.name}`); r.kept++; lines.push(`You mention ${f} to ${cap.name}, casually, the way it works. ${cap.name} files it away. So does ${f}.`); }
+    else { feelOn(w, rc, 'respect', -0.02); lines.push(`${f} nods. "Sure. I understand." He doesn’t.`); }
   }
   p.rep!.favoured = code === 'no' || code === 'later' ? r.favoured : c.id;
   e.status = 'done';
@@ -241,8 +243,8 @@ export function lapsedAsks(w: World) {
     const c = w.chars[e.from];
     if (!c?.alive) continue;
     r.ignored++; r.broken++;
-    rel(c, p.id).trust = clamp(rel(c, p.id).trust - 0.07);
-    rel(c, p.id).respect = clamp(rel(c, p.id).respect - 0.06);
+    feel(w, c, p.id, 'trust', -0.07);
+    feel(w, c, p.id, 'respect', -0.06);
     if (arch(c) === 'proud') bear(w, c, p.id, 0.08, `${p.name} broke his word to him`);
   }
 }

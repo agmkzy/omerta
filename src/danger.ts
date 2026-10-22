@@ -1,7 +1,7 @@
 // The player can die, but never without a ladder: rumour, warning, menace, an attempt he survives, and only then the real thing.
 // Every rung offers a way out, and every way out costs something.
 import { addEnc } from './encounters';
-import { addFact, bear, clamp, handleDeath, money, rel } from './core';
+import { addFact, bear, clamp, feel, handleDeath, money, rel } from './core';
 import { tension } from './actions';
 import { Arch, arch, pick } from './voice';
 import { DAY, Character, Enc, Threat, World } from './types';
@@ -147,11 +147,11 @@ export function threatChoose(w: World, p: Character, e: Enc, code: string): stri
       t.truce = w.now + 30 * DAY;
       t.level = Math.max(0, t.level - 2);
       tension(w, p, enemy, 1);
-      rel(boss, p.id).respect = clamp(rel(boss, p.id).respect - 0.03);
+      feel(w, boss, p.id, 'respect', -0.03);
       lines.push(`${boss.name} listens without interrupting. "I’ll make a call." Two days later you’re told it’s settled. Nobody tells you what it cost, and you know that you owe ${first(boss)} for it.`);
       lines.push(`The word is that ${enemy.name} will keep away from you for a good while.`);
     } else {
-      rel(boss, p.id).respect = clamp(rel(boss, p.id).respect - 0.06);
+      feel(w, boss, p.id, 'respect', -0.06);
       lines.push(`${boss.name} waves it away. "Handle your own business. I don’t want a war over you." He’s not wrong, and it still lands badly.`);
     }
   } else if (code === 'sitdown') {
@@ -177,7 +177,7 @@ export function threatChoose(w: World, p: Character, e: Enc, code: string): stri
       t.level = Math.max(0, t.level - 2);
       lines.push(`The money is taken. It’s not said what for. ${enemy.name} goes quiet, which is the nearest thing to an answer you’ll get.`);
     } else {
-      rel(enemy, p.id).respect = clamp(rel(enemy, p.id).respect - 0.1);
+      feel(w, enemy, p.id, 'respect', -0.1);
       lines.push(`The money comes back the next day in the same envelope. That’s a message too.`);
     }
   } else if (code === 'strike') {

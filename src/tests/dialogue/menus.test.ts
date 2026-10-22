@@ -60,6 +60,8 @@ describe('menus', () => {
     for (const m of ms) (p.intro ??= {})[m.id] = w.now;
     let n = 0;
     const RANKS = ['associate', 'soldier', 'capo', 'underboss', 'boss', 'civilian'];
+    // (hints that say how things stand between the families: how hot it already is decides which one shows, dialogue.ts rv_warn)
+    const TENSION = ['It raises the temperature.', 'The air is already thick.'];
     for (const m of ms) for (const node of ['personal', 'business', 'family', 'disputes', 'orders', 'memos', 'amends', 'shop', 'crew', 'debt', 'myboss', 'rival', 'pick_member', 'pick_concern']) {
       const c = startConvo(m.id); c.node = node;
       // The world the snapshot was taken in has moved on (V78 tells you one thing at a time; V89 changes how regard is earned), so
@@ -68,8 +70,8 @@ describe('menus', () => {
         const code = o.code, hint = o.hint ?? '', kind = code.split(':')[0];
         assert.ok(known.has(kind), `${m.name} ${node}: unknown option ${code}`);
         // (where the hint is the man's rank, it is the world's state, and men are promoted)
-        if (HINT.has(code) && !(RANKS.includes(hint) && RANKS.includes(HINT.get(code)!))) assert.equal(hint, HINT.get(code), `${m.name} ${node}: ${code} hint changed`);
-        else if (KHINT.has(kind)) assert.ok(KHINT.get(kind)!.has(hint), `${m.name} ${node}: ${code} has a hint V76 never gave that kind of option: "${hint}"`);
+        if (HINT.has(code) && !(RANKS.includes(hint) && RANKS.includes(HINT.get(code)!)) && !(TENSION.includes(hint) && TENSION.includes(HINT.get(code)!))) assert.equal(hint, HINT.get(code), `${m.name} ${node}: ${code} hint changed`);
+        else if (KHINT.has(kind)) assert.ok(KHINT.get(kind)!.has(hint) || (TENSION.includes(hint) && [...KHINT.get(kind)!].some((x) => TENSION.includes(x))), `${m.name} ${node}: ${code} has a hint V76 never gave that kind of option: "${hint}"`);
         n++;
       }
     }

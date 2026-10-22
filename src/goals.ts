@@ -7,7 +7,7 @@
 // (his boss, his crew, his family), so it travels by gossip like anything else. A plan that needs another man goes through the
 // shared asks engine (asks.ts: borrow, lend, join), so men negotiate instead of rolling once; and when the player is plausibly the
 // man to ask (his boss, his creditor, kin, a trusted friend, someone who knows the owner), the man comes to the player, rarely.
-import { addFact, bear, bearOn, clamp, createDebt, learn, money, ownerBiz, payDebt, rel, repute } from './core';
+import { addFact, bear, bearOn, clamp, createDebt, feel, feelAtLeast, feelAtLeastOn, feelOn, learn, money, ownerBiz, payDebt, rel, repute } from './core';
 import { INVEST_CAP, addStake, bizMove, transferBusiness, trade } from './econ';
 import { LADDER, leaveCrew } from './rank';
 import { isRunner, members, readiness, recommend } from './career';
@@ -82,7 +82,7 @@ function refund(w: World, g: Goal) {
   if (c && by?.alive) {
     const back = Math.min(c.cash, g.fin.amt);
     give(c, by, back);
-    if (back < g.fin.amt) { bear(w, by, c.id, 0.25, `${c.name} did not pay back what he was lent`); rel(by, c.id).trust = clamp(rel(by, c.id).trust - 0.2); }
+    if (back < g.fin.amt) { bear(w, by, c.id, 0.25, `${c.name} did not pay back what he was lent`); feel(w, by, c.id, 'trust', -0.2); }
   }
   delete g.fin;
 }
@@ -469,8 +469,8 @@ function businessStep(w: World, g: Goal, c: Character) {
     if (!reach(w, c, o)) {
       const br = bridge(w, c, o);
       if (br) { // an introduction through someone both of them trust: a real change in how they stand
-        rel(c, o.id).trust = Math.max(rel(c, o.id).trust, 0.2); rel(o, c.id).trust = Math.max(rel(o, c.id).trust, 0.2);
-        rel(c, br.id).trust = clamp(rel(c, br.id).trust - 0.02); bump(w, 'inter.intro');
+        feelAtLeast(w, c, o.id, 'trust', 0.2); feelAtLeast(w, o, c.id, 'trust', 0.2);
+        feel(w, c, br.id, 'trust', -0.02); bump(w, 'inter.intro');
         g.next = `talk to ${first(o)}`; return later(w, g, 1);
       }
       // the player knows the man: he asks the player to put him in front of him
@@ -489,7 +489,7 @@ function businessStep(w: World, g: Goal, c: Character) {
     const thr = willing(w, b, o, g.mode ?? 'buy');
     const open = b.distress >= 1 || debtsOf(w, o.id).length > 0 || o.jailedUntil > w.now || w.rng.chance(0.2 + o.traits.greed * 0.25 - rel(o, c.id).grudge * 0.3);
     if (!open && thr > 0.9) {
-      g.tries++; rel(c, o.id).respect = clamp(rel(c, o.id).respect - 0.01);
+      g.tries++; feel(w, c, o.id, 'respect', -0.01);
       bump(w, 'refused.sound');
       g.no = [...(g.no ?? []), b.id].slice(-4);
       delete g.target; g.stage = 'scout'; g.next = 'look at something else';
@@ -558,7 +558,7 @@ function businessStep(w: World, g: Goal, c: Character) {
     if (!lender) { g.tries++; if (g.tries >= 4) return endGoal(w, g, 'failed', 'could not raise the rest'); g.obstacle = 'nobody to back him'; return later(w, g, 2); }
     bump(w, 'inter.finance');
     const chance = 0.2 + rel(lender, c.id).trust * 0.45 + lender.traits.greed * 0.15 + (lender.rank === 'capo' || lender.rank === 'underboss' ? 0.1 : 0);
-    if (!w.rng.chance(chance)) { g.tries++; bump(w, 'refused.finance'); rel(c, lender.id).respect = clamp(rel(c, lender.id).respect - 0.01); if (g.tries >= 4) return endGoal(w, g, 'failed', 'nobody would back him'); return later(w, g, 1); }
+    if (!w.rng.chance(chance)) { g.tries++; bump(w, 'refused.finance'); feel(w, c, lender.id, 'respect', -0.01); if (g.tries >= 4) return endGoal(w, g, 'failed', 'nobody would back him'); return later(w, g, 1); }
     if (need < 6000 && w.rng.chance(0.5)) { // a loan instead of a partner: he owes it back, nobody gets a share
       const amt = Math.round(need / 10) * 10;
       if (give(lender, c, amt)) { createDebt(w, lender.id, c.id, amt, 0.015, `to buy ${b.name}`); bump(w, 'loans'); bump(w, 'investments'); g.stage = 'close'; g.next = 'settle up'; }
@@ -580,7 +580,7 @@ function businessStep(w: World, g: Goal, c: Character) {
       if (g.fin) addStake(w, b, g.fin.by, Math.min(0.4, Math.max(0.1, Math.round(g.fin.amt / Math.max(1, offer) * 20) / 20)), 'financed');
       bump(w, 'acq');
     }
-    rel(c, o.id).respect = clamp(rel(c, o.id).respect + 0.03);
+    feel(w, c, o.id, 'respect', 0.03);
     delete g.fin; // paid for; the partner's interest is on the business now
     g.progress = 1;
     return endGoal(w, g, 'done', g.mode === 'stake' ? 'bought in' : 'bought it');
@@ -592,7 +592,7 @@ function fund(w: World, g: Goal, c: Character, by: Character, amt: number) {
   amt = Math.round(amt / 10) * 10;
   if (!give(by, c, amt)) return later(w, g, 1);
   g.fin = { by: by.id, amt: (g.fin?.amt ?? 0) + amt };
-  rel(c, by.id).trust = clamp(rel(c, by.id).trust + 0.03);
+  feel(w, c, by.id, 'trust', 0.03);
   g.stage = 'close'; g.next = 'settle up';
   bump(w, 'investments');
   return later(w, g, 0.3);
@@ -765,18 +765,18 @@ function advanceStep(w: World, g: Goal, c: Character) {
     bump(w, 'inter.ask');
     const rb = rel(boss, c.id);
     const chance = 0.1 + rb.trust * 0.45 + rb.respect * 0.25 + clamp(c.lifetimeKick / 4000, 0, 0.2) - rb.grudge * 0.4 + (LADDER.indexOf(boss.rank) >= 1 ? 0 : -1);
-    if (w.rng.chance(chance)) { c.backer = boss.id; rb.trust = clamp(rb.trust + 0.04); g.next = 'wait for the nod'; bump(w, 'backed'); emit(w, g, c, 'backed'); return later(w, g, 2); }
-    g.tries++; bump(w, 'refused.ask'); rb.respect = clamp(rb.respect - 0.01); emit(w, g, c, 'refused');
+    if (w.rng.chance(chance)) { c.backer = boss.id; feelOn(w, rb, 'trust', 0.04); g.next = 'wait for the nod'; bump(w, 'backed'); emit(w, g, c, 'backed'); return later(w, g, 2); }
+    g.tries++; bump(w, 'refused.ask'); feelOn(w, rb, 'respect', -0.01); emit(w, g, c, 'refused');
     if (g.tries >= 3) {
       // told no three times: he takes it to heart, and it shows in how he deals with that man from now on
-      const rc = rel(c, boss.id); bearOn(w, rc, 0.12, `${boss.name} would not put his name forward`); rc.trust = clamp(rc.trust - 0.06);
+      const rc = rel(c, boss.id); bearOn(w, rc, 0.12, `${boss.name} would not put his name forward`); feelOn(w, rc, 'trust', -0.06);
       return endGoal(w, g, 'failed', 'his superior would not back him');
     }
     return later(w, g, 2.5);
   }
   if (pick === 'gift' && boss) {
     const amt = Math.round(Math.min(c.cash * 0.15, 250) / 10) * 10;
-    if (amt >= 50 && give(c, boss, amt)) { rel(boss, c.id).trust = clamp(rel(boss, c.id).trust + 0.04); rel(boss, c.id).respect = clamp(rel(boss, c.id).respect + 0.02); repute(w, c, 0.8, 'gift'); bump(w, 'inter.gift'); g.next = 'keep his name in front of them'; emit(w, g, c, 'gift', { amt }); }
+    if (amt >= 50 && give(c, boss, amt)) { feel(w, boss, c.id, 'trust', 0.04); feel(w, boss, c.id, 'respect', 0.02); repute(w, c, 0.8, 'gift'); bump(w, 'inter.gift'); g.next = 'keep his name in front of them'; emit(w, g, c, 'gift', { amt }); }
     return later(w, g, 3);
   }
   if (pick === 'undermine') {
@@ -785,11 +785,11 @@ function advanceStep(w: World, g: Goal, c: Character) {
     if (!rv || (readiness(w, rv)?.score ?? 0) < g.progress * 0.8) return later(w, g, 2);
     bump(w, 'inter.undermine');
     repute(w, rv, -2, 'run down');
-    if (boss?.alive) rel(boss, rv.id).trust = clamp(rel(boss, rv.id).trust - 0.03);
+    if (boss?.alive) feel(w, boss, rv.id, 'trust', -0.03);
     const seen = w.rng.chance(0.15 + (1 - t.caution) * 0.2);
     if (seen) { // he was seen doing it
-      bear(w, rv, c.id, 0.25, `${c.name} talked him down to get ahead`); rel(rv, c.id).trust = clamp(rel(rv, c.id).trust - 0.2);
-      if (boss?.alive) rel(boss, c.id).respect = clamp(rel(boss, c.id).respect - 0.04);
+      bear(w, rv, c.id, 0.25, `${c.name} talked him down to get ahead`); feel(w, rv, c.id, 'trust', -0.2);
+      if (boss?.alive) feel(w, boss, c.id, 'respect', -0.04);
       bump(w, 'caught');
     }
     emit(w, g, c, 'undermine', { rival: rv.id, seen });
@@ -845,8 +845,8 @@ function debtStep(w: World, g: Goal, c: Character) {
     }
     bump(w, 'inter.time');
     const chance = 0.2 + rel(cr, c.id).trust * 0.4 + (cr.traits.greed < 0.5 ? 0.15 : -0.05) - rel(cr, c.id).grudge * 0.3 + (d.missed === 0 ? 0.1 : 0);
-    if (w.rng.chance(chance)) { d.nextDue += 14 * DAY; d.missed = Math.max(0, d.missed - 1); bump(w, 'extension'); g.next = 'use the time'; rel(c, cr.id).trust = clamp(rel(c, cr.id).trust + 0.02); return later(w, g, 2); }
-    g.tries++; bump(w, 'refused.time'); rel(cr, c.id).trust = clamp(rel(cr, c.id).trust - 0.02);
+    if (w.rng.chance(chance)) { d.nextDue += 14 * DAY; d.missed = Math.max(0, d.missed - 1); bump(w, 'extension'); g.next = 'use the time'; feel(w, c, cr.id, 'trust', 0.02); return later(w, g, 2); }
+    g.tries++; bump(w, 'refused.time'); feel(w, cr, c.id, 'trust', -0.02);
     return later(w, g, 1.5);
   }
   if (pick === 'terms' && cr) {
@@ -867,7 +867,7 @@ function debtStep(w: World, g: Goal, c: Character) {
   if (pick === 'lean' && cr) {
     bump(w, 'inter.lean');
     if (w.rng.chance(0.2 + t.violence * 0.15 - rel(cr, c.id).trust * 0.1)) { d.status = 'void'; bump(w, 'leaned'); bear(w, cr, c.id, 0.4, `${c.name} leaned on him to forget a debt`); addFact(w, { kind: 'rumour', actor: c.id, victim: cr.id, minor: true, text: `${cr.name} let ${c.name}'s debt go after a talk. Nobody believes it was generosity.`, district: c.district }, { witnesses: [cr.id] }); return endGoal(w, g, 'done', 'frightened the debt away'); }
-    bear(w, cr, c.id, 0.3, `${c.name} leaned on him to forget a debt`); rel(cr, c.id).respect = clamp(rel(cr, c.id).respect - 0.1); g.tries++;
+    bear(w, cr, c.id, 0.3, `${c.name} leaned on him to forget a debt`); feel(w, cr, c.id, 'respect', -0.1); g.tries++;
     return later(w, g, 2);
   }
   if (pick === 'borrow' && lender) {
@@ -876,7 +876,7 @@ function debtStep(w: World, g: Goal, c: Character) {
     if (putAsk(w, g, c, 'borrow', lender, { amt, why: `${c.name} needs money to pay ${cr?.name ?? 'a debt'}`, line })) return;
     g.tries++; return later(w, g, 1);
   }
-  if (pick === 'stall' && cr) { rel(cr, c.id).trust = clamp(rel(cr, c.id).trust - 0.05); bump(w, 'stalled'); g.tries++; return later(w, g, 2); }
+  if (pick === 'stall' && cr) { feel(w, cr, c.id, 'trust', -0.05); bump(w, 'stalled'); g.tries++; return later(w, g, 2); }
   return later(w, g, 2);
 }
 
@@ -902,7 +902,7 @@ function independenceStep(w: World, g: Goal, c: Character) {
     const out = Object.values(w.chars).filter((x) => x.alive && !x.isPlayer && x.id !== c.id && x.id !== boss.id && x.familyId !== c.familyId && (x.rank !== 'civilian' || ownerBiz(w, x.id)) && (c.rels[x.id]?.trust ?? 0) < 0.4);
     const x = out[Math.floor(w.rng.next() * out.length)];
     bump(w, 'inter.tie');
-    if (x && w.rng.chance(0.3 + t.sociability * 0.4)) { const r1 = rel(c, x.id), r2 = rel(x, c.id); r1.trust = clamp(r1.trust + 0.15); r2.trust = clamp(r2.trust + 0.12); r1.lastMet = w.now; r2.lastMet = w.now; g.n = (g.n ?? 0) + 1; }
+    if (x && w.rng.chance(0.3 + t.sociability * 0.4)) { const r1 = rel(c, x.id), r2 = rel(x, c.id); feelOn(w, r1, 'trust', 0.15); feelOn(w, r2, 'trust', 0.12); r1.lastMet = w.now; r2.lastMet = w.now; g.n = (g.n ?? 0) + 1; }
     g.progress = 0.2 + 0.2 * Math.min(3, g.n ?? 0) / 3;
     if ((g.n ?? 0) >= 3) { g.stage = 'terms'; g.next = 'ask for better terms'; g.tries = 0; }
     else { g.tries++; if (g.tries >= 6) return endGoal(w, g, 'dropped', 'could not make the contacts'); }
@@ -926,7 +926,7 @@ function independenceStep(w: World, g: Goal, c: Character) {
     bump(w, 'inter.terms');
     const chance = 0.1 + rb.trust * 0.35 + rb.respect * 0.25 + (b ? 0.1 : 0) - rb.grudge * 0.3;
     if (!boss.isPlayer && w.rng.chance(chance)) { c.kickRate = Math.max(floor, c.kickRate - 0.03); bump(w, 'renegotiated'); return endGoal(w, g, 'done', 'got better terms'); }
-    g.tries++; bump(w, 'refused.terms'); rb.respect = clamp(rb.respect - 0.01);
+    g.tries++; bump(w, 'refused.terms'); feelOn(w, rb, 'respect', -0.01);
     if (g.tries >= 3 && t.ambition > 0.7 && (b || c.cash >= 1500) && w.rng.chance(0.3)) {
       return walkAway(w, g, c, boss);
     }
@@ -975,9 +975,9 @@ function answered(w: World, g: Goal, code: string): string[] {
   if (!yes) g.asked = [...(g.asked ?? []), p.id].slice(-6); // he does not come back to the player on this plan
   if (g.stage === 'finance' && g.with === p.id) {
     const amt = g.share ?? 0;
-    if (yes && p.cash >= amt && amt > 0) { p.cash -= amt; c.cash += amt; post(w, { from: p.id, to: c.id, amt, flow: 'stake', note: `backing for ${c.name}'s purchase` }); g.fin = { by: p.id, amt }; g.stage = 'close'; g.next = 'settle up'; bump(w, 'investments'); r.trust = clamp(r.trust + 0.1); lines.push(`${first(c)} shakes your hand. "You won't regret it."`); }
+    if (yes && p.cash >= amt && amt > 0) { p.cash -= amt; c.cash += amt; post(w, { from: p.id, to: c.id, amt, flow: 'stake', note: `backing for ${c.name}'s purchase` }); g.fin = { by: p.id, amt }; g.stage = 'close'; g.next = 'settle up'; bump(w, 'investments'); feelOn(w, r, 'trust', 0.1); lines.push(`${first(c)} shakes your hand. "You won't regret it."`); }
     else if (yes) lines.push('You haven’t got it to give.');
-    else { g.tries++; r.trust = clamp(r.trust - 0.02); lines.push(`${first(c)} nods. "I'll find it somewhere else."`); }
+    else { g.tries++; feelOn(w, r, 'trust', -0.02); lines.push(`${first(c)} nods. "I'll find it somewhere else."`); }
     delete g.with;
     later(w, g, 0.5);
     return lines;
@@ -986,25 +986,25 @@ function answered(w: World, g: Goal, code: string): string[] {
     const b = g.target ? w.biz[g.target] : undefined, o = g.owner ? w.chars[g.owner] : undefined;
     delete g.with;
     if (yes && o?.alive) {
-      const ro = rel(o, c.id); ro.trust = Math.max(ro.trust, 0.25); ro.lastMet = w.now; rel(c, o.id).trust = Math.max(rel(c, o.id).trust, 0.25);
-      rel(o, p.id).trust = clamp(rel(o, p.id).trust - 0.02); // a little of what he thinks of you went into it
+      const ro = rel(o, c.id); feelAtLeastOn(w, ro, 'trust', 0.25); ro.lastMet = w.now; feelAtLeast(w, c, o.id, 'trust', 0.25);
+      feel(w, o, p.id, 'trust', -0.02); // a little of what he thinks of you went into it
       addFavour(w, p.id, c.id, 1, `introduced him to ${o.name}`);
-      r.trust = clamp(r.trust + 0.06);
+      feelOn(w, r, 'trust', 0.06);
       addFact(w, { kind: 'rumour', actor: p.id, victim: c.id, minor: true, text: `${p.name} introduced ${c.name} to ${o.name}${b ? ` about ${b.name}` : ''}.`, district: o.district }, { witnesses: [c.id, o.id] });
       g.next = `talk to ${first(o)}`;
       lines.push(`You take ${first(c)} round and make the introduction. ${first(o)} hears him out. ${first(c)} owes you for it, and he knows it.`);
       later(w, g, 0.3);
       return lines;
     }
-    g.tries++; r.trust = clamp(r.trust - 0.02);
+    g.tries++; feelOn(w, r, 'trust', -0.02);
     lines.push(`${first(c)} shrugs. "I'll find another way in."`);
     later(w, g, 1);
     return lines;
   }
   if (g.kind === 'debt') {
     const d = w.debts.find((x) => x.id === g.target);
-    if (yes && d) { d.nextDue += 14 * DAY; d.missed = Math.max(0, d.missed - 1); r.trust = clamp(r.trust + 0.08); bump(w, 'extension'); addFavour(w, p.id, c.id, 1, 'gave him time on what he owed'); lines.push(`${first(c)} lets out a breath. "Two weeks. I won't forget it."`); }
-    else { r.trust = clamp(r.trust - 0.03); g.tries++; lines.push(`${first(c)} takes it without a word. He's still on the hook.`); }
+    if (yes && d) { d.nextDue += 14 * DAY; d.missed = Math.max(0, d.missed - 1); feelOn(w, r, 'trust', 0.08); bump(w, 'extension'); addFavour(w, p.id, c.id, 1, 'gave him time on what he owed'); lines.push(`${first(c)} lets out a breath. "Two weeks. I won't forget it."`); }
+    else { feelOn(w, r, 'trust', -0.03); g.tries++; lines.push(`${first(c)} takes it without a word. He's still on the hook.`); }
     later(w, g, 2);
     return lines;
   }
@@ -1012,12 +1012,12 @@ function answered(w: World, g: Goal, code: string): string[] {
     if (yes) {
       bump(w, 'backed');
       if (c.bossId === p.id && LADDER.indexOf(p.rank) >= 1) lines.push(...recommend(w, p, c));
-      else { c.backer = p.id; r.trust = clamp(r.trust + 0.1); r.affection = clamp(r.affection + 0.05); }
-      rel(p, c.id).trust = Math.max(rel(p, c.id).trust, 0.35); // you have put your name on him: the rule reads that as your trust
+      else { c.backer = p.id; feelOn(w, r, 'trust', 0.1); feelOn(w, r, 'affection', 0.05); }
+      feelAtLeast(w, p, c.id, 'trust', 0.35); // you have put your name on him: the rule reads that as your trust
       lines.push(`"You won't regret it," ${first(c)} says.`);
       later(w, g, 1);
     } else {
-      g.tries++; r.respect = clamp(r.respect - 0.03); bearOn(w, r, 0.06, `${p.name} would not put his name forward`);
+      g.tries++; feelOn(w, r, 'respect', -0.03); bearOn(w, r, 0.06, `${p.name} would not put his name forward`);
       lines.push(code === 'lapse' ? `${first(c)} waited for an answer that didn't come. He has stopped waiting.` : `${first(c)} nods slowly. "I'll keep earning it."`);
       // turned down by the man above him: an ambitious man starts thinking about the terms he works under
       if (c.traits.ambition > 0.6) (agencyOf(w).cool[c.id + ':advance'] = w.now + 10 * WEEK);
@@ -1029,12 +1029,12 @@ function answered(w: World, g: Goal, code: string): string[] {
     if (yes) {
       const floor = 0.1, was = c.kickRate;
       c.kickRate = Math.max(floor, Math.round((c.kickRate - 0.03) * 1000) / 1000);
-      r.trust = clamp(r.trust + 0.08); r.affection = clamp(r.affection + 0.04);
+      feelOn(w, r, 'trust', 0.08); feelOn(w, r, 'affection', 0.04);
       bump(w, 'renegotiated');
       lines.push(was > c.kickRate ? `${first(c)} nods. "That's fair. You'll see it was worth it." Less of what he makes will come up to you from now on.` : `${first(c)} nods. He was already passing up as little as a man can.`);
       endGoal(w, g, 'done', 'got better terms');
     } else {
-      g.tries++; bearOn(w, r, 0.06, `${p.name} would not give him better terms`); r.trust = clamp(r.trust - 0.03);
+      g.tries++; bearOn(w, r, 0.06, `${p.name} would not give him better terms`); feelOn(w, r, 'trust', -0.03);
       lines.push(`${first(c)} hears it. "Sure. The cut stays." He doesn't look at you when he says it.`);
       later(w, g, 2);
     }

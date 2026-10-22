@@ -2,7 +2,7 @@
 // It emerges from real state (a business losing money, a man in trouble), the people involved respond on their own,
 // and it reaches the player through a believable channel: a conversation, a request for help, or a report.
 import { temper } from './temper';
-import { addFact, bear, clamp, createDebt, money, ownerBiz, rel } from './core';
+import { addFact, bear, clamp, createDebt, feel, feelOn, money, ownerBiz, rel } from './core';
 import { bizMove } from './econ';
 import { addEnc, addFavour, makeLoan } from './encounters';
 import { Character, DAY, Enc, Id, Situation, WEEK, World } from './types';
@@ -77,7 +77,7 @@ export function situationTick(w: World) {
         // He goes to someone he trusts more. The situation moves on without you.
         const friend = Object.values(w.chars).filter((x) => x.alive && x.id !== c.id && x.id !== p.id && x.cash > 800 && (c.rels[x.id]?.trust ?? 0) > 0.3).sort((a, b) => b.cash - a.cash)[0];
         // (a friend who already has money out to him does not lend again on top of it)
-        if (friend && !w.debts.some((d) => d.status === 'active' && d.creditor === friend.id && d.debtor === c.id)) { const g = Math.min(500, Math.round(friend.cash * 0.2)); friend.cash -= g; const b = s.biz ? w.biz[s.biz] : undefined; if (b) { bizMove(w, b, g, 'aid', friend.id); b.distress = 0; } else c.cash += g; createDebt(w, friend.id, c.id, g, 0.05, 'a loan'); rel(c, friend.id).trust = clamp(rel(c, friend.id).trust + 0.1); s.weeks = 0; }
+        if (friend && !w.debts.some((d) => d.status === 'active' && d.creditor === friend.id && d.debtor === c.id)) { const g = Math.min(500, Math.round(friend.cash * 0.2)); friend.cash -= g; const b = s.biz ? w.biz[s.biz] : undefined; if (b) { bizMove(w, b, g, 'aid', friend.id); b.distress = 0; } else c.cash += g; createDebt(w, friend.id, c.id, g, 0.05, 'a loan'); feel(w, c, friend.id, 'trust', 0.1); s.weeks = 0; }
       }
     }
     // Left to rot, a business gives out (the economy engine closes it); the situation records it.
@@ -110,9 +110,9 @@ export function sitChoose(w: World, p: Character, e: Enc, code: string): string[
   if (!c || !s) return ['It has gone quiet.'];
   const r = rel(c, p.id);
   s.stage = 'resolved'; s.resolvedAt = w.now; s.helped = code !== 'wait'; s.how = code === 'wait' ? 'alone' : 'helped';
-  if (code === 'back') { r.trust = clamp(r.trust + 0.12); r.respect = clamp(r.respect + 0.05); addFavour(w, p.id, c.id, 2, 'the promise you made about his future'); if (c.want) c.want.since = w.now; return [`${c.name} nods slowly. "I’ll remember you said that." He means it as a compliment and a warning.`]; }
-  if (code === 'pay') { if (p.cash < 300) return ['You haven’t got it on you.']; p.cash -= 300; c.cash += 300; r.trust = clamp(r.trust + 0.04); return [`${c.name} takes it. "It’s a start." He’s still wanting what he wanted.`]; }
-  r.trust = clamp(r.trust - 0.06); r.respect = clamp(r.respect - 0.02); c.traits.ambition = clamp(c.traits.ambition + 0.04);
+  if (code === 'back') { feelOn(w, r, 'trust', 0.12); feelOn(w, r, 'respect', 0.05); addFavour(w, p.id, c.id, 2, 'the promise you made about his future'); if (c.want) c.want.since = w.now; return [`${c.name} nods slowly. "I’ll remember you said that." He means it as a compliment and a warning.`]; }
+  if (code === 'pay') { if (p.cash < 300) return ['You haven’t got it on you.']; p.cash -= 300; c.cash += 300; feelOn(w, r, 'trust', 0.04); return [`${c.name} takes it. "It’s a start." He’s still wanting what he wanted.`]; }
+  feelOn(w, r, 'trust', -0.06); feelOn(w, r, 'respect', -0.02); c.traits.ambition = clamp(c.traits.ambition + 0.04);
   return [`${c.name} keeps his face still. "Understood." It will come back, and it will be less polite.`];
 }
 
@@ -137,17 +137,17 @@ export function helpWith(w: World, p: Character, c: Character, how: 'cover' | 'l
     if (!rb) return ['There’s nobody to lean on.'];
     const ro = w.chars[rb.ownerId];
     rb.distress += 1; if (b) b.distress = Math.max(0, b.distress - 1);
-    p.heat = Math.min(1, p.heat + 0.04); r.trust = clamp(r.trust + 0.08); s.helped = true; s.knows = true;
+    p.heat = Math.min(1, p.heat + 0.04); feelOn(w, r, 'trust', 0.08); s.helped = true; s.knows = true;
     if (ro) bear(w, ro, p.id, 0.15, `${p.name} helped take his trade`);
     return [`A word goes to ${ro?.name ?? 'the owner of ' + rb.name}. Nothing violent. By the end of the week ${rb.name} is quieter and ${c.name}’s door is busier.`, `${ro ? first(ro) : 'He'} knows who sent it.`];
   }
-  if (how === 'leave') { s.knows = true; r.respect = clamp(r.respect + 0.02); r.trust = clamp(r.trust - 0.06); return [`"You’ll work it out." ${c.name} nods once. He hears what you’re saying about what he’s worth to you.`]; }
+  if (how === 'leave') { s.knows = true; feelOn(w, r, 'respect', 0.02); feelOn(w, r, 'trust', -0.06); return [`"You’ll work it out." ${c.name} nods once. He hears what you’re saying about what he’s worth to you.`]; }
   if (p.cash < amt) return [`You can’t put your hand on ${money(amt)} right now.`];
   p.cash -= amt; if (b) { bizMove(w, b, amt, 'aid', p.id); b.distress = Math.max(0, b.distress - 1); } else c.cash += amt;
   if (c.problem) c.problem.sev = clamp(c.problem.sev - 0.25);
   s.helped = true;
-  if (how === 'cover') { addFavour(w, p.id, c.id, 2, `covering ${money(amt)} when things were bad`); r.trust = clamp(r.trust + 0.12); r.affection = clamp(r.affection + 0.1); return [`You cover ${money(amt)}. ${c.name} doesn’t say much. He doesn’t need to.`]; }
-  createDebt(w, p.id, c.id, amt, 0.05, 'a loan from you'); r.trust = clamp(r.trust + 0.05);
+  if (how === 'cover') { addFavour(w, p.id, c.id, 2, `covering ${money(amt)} when things were bad`); feelOn(w, r, 'trust', 0.12); feelOn(w, r, 'affection', 0.1); return [`You cover ${money(amt)}. ${c.name} doesn’t say much. He doesn’t need to.`]; }
+  createDebt(w, p.id, c.id, amt, 0.05, 'a loan from you'); feelOn(w, r, 'trust', 0.05);
   return [`You lend ${c.name} ${money(amt)} on the book. He signs the way a man does who means to pay.`];
 }
 void addEnc;

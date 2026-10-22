@@ -2,7 +2,7 @@
 // the injured side asks its superiors, the other side presses or backs off, someone plans a reply, a sit-down gets called, terms are agreed and sometimes broken.
 import { temper, viewOf } from './temper';
 import { addEnc } from './encounters';
-import { addFact, bear, bearOn, clamp, famName, money, ownerBiz, rel, repute, witnessesAt } from './core';
+import { addFact, bear, bearOn, clamp, famName, feel, feelOn, money, ownerBiz, rel, repute, witnessesAt } from './core';
 import { Character, DAY, Dispute, Fact, Id, World } from './types';
 
 const KINDS: Record<string, Dispute['kind']> = { poach: 'territory', beating: 'violence', vandalism: 'violence', robbery: 'theft' };
@@ -55,9 +55,9 @@ export function disputeScan(w: World) {
       bound.next = w.now + DAY;
       log(w, bound, `${b.name} (${famName(w, b)}) broke the agreement: ${f.text}`);
       const mid = w.chars[w.fam[bound.a === a.id ? a.familyId : b.familyId].bossId];
-      if (mid) rel(mid, b.id).respect = clamp(rel(mid, b.id).respect - 0.05);
+      if (mid) feel(w, mid, b.id, 'respect', -0.05);
       const mine = w.chars[w.playerId!];
-      if (mine && b.bossId === mine.id) { repute(w, mine, -2, 'crew trouble'); if (mine.bossId) rel(w.chars[mine.bossId], mine.id).trust = clamp(rel(w.chars[mine.bossId], mine.id).trust - 0.05); }
+      if (mine && b.bossId === mine.id) { repute(w, mine, -2, 'crew trouble'); if (mine.bossId) feel(w, w.chars[mine.bossId], mine.id, 'trust', -0.05); }
       continue;
     }
     // One quarrel per pair of men, whichever of them struck last: what happens next is added to the same record.
@@ -225,7 +225,7 @@ export function sitdownChoose(w: World, p: Character, e: import('./types').Enc, 
   const bId = d.a === p.id || (biz?.protection?.collectorId === p.id) ? d.b : d.a;
   const barredFam = o.familyId ?? undefined;
   if (code === 'walk') {
-    rr.respect = clamp(rr.respect - 0.1);
+    feelOn(w, rr, 'respect', -0.1);
     bear(w, o, p.id, 0.1, `${p.name} put him off the place`);
     log(w, d, `${p.name} walked out of the sit-down.`);
     lines.push(`You push back your chair and go. Nobody says a word until you’re out the door, and after that nobody says anything else. It won’t be forgotten.`);
@@ -234,7 +234,7 @@ export function sitdownChoose(w: World, p: Character, e: import('./types').Enc, 
   if (code === 'hold') {
     if (w.rng.chance(willing * (d.older && d.found ? 0.5 : 0.8))) {
       settleDispute(w, p.id, bId, `At the sit-down ${o.name} agreed to keep off ${biz?.name ?? 'the ground'}.`, { text: `${o.name}'s side stays off ${biz?.name ?? 'it'}`, by: w.now + 90 * DAY, barred: barredFam, biz: d.biz });
-      rr.respect = clamp(rr.respect + 0.04);
+      feelOn(w, rr, 'respect', 0.04);
       lines.push(`You say it plainly: it’s yours and it stays yours. ${o.name} looks at you a while, then nods. "All right. We’ll keep off." He won’t pretend to like it. The agreement is good for three months, if everyone keeps it.`);
     } else {
       bearOn(w, rr, 0.1, `${p.name} kept him off what he wanted`);
@@ -247,7 +247,7 @@ export function sitdownChoose(w: World, p: Character, e: import('./types').Enc, 
     if (p.cash < 400) return ['You haven’t got it on you. You’re left looking like a man who offers what he doesn’t have.'];
     p.cash -= 400; o.cash += 400;
     settleDispute(w, p.id, bId, `${p.name} paid ${o.name} $400 at the sit-down to end it.`, { text: `${o.name}'s side stays off ${biz?.name ?? 'it'}, for $400`, by: w.now + 120 * DAY, barred: barredFam, biz: d.biz });
-    rr.respect = clamp(rr.respect - 0.02); rr.trust = clamp(rr.trust + 0.04);
+    feelOn(w, rr, 'respect', -0.02); feelOn(w, rr, 'trust', 0.04);
     lines.push(`You slide an envelope across without being asked twice. ${o.name} doesn’t count it in front of you. "That’ll do," he says. It buys peace and some quiet gossip about how easily you paid.`);
     return lines;
   }
@@ -255,7 +255,7 @@ export function sitdownChoose(w: World, p: Character, e: import('./types').Enc, 
     if (w.rng.chance(willing + 0.15)) {
       const fee = biz?.protection?.fee ?? 100;
       settleDispute(w, p.id, bId, `${p.name} and ${o.name} agreed to share ${biz?.name ?? 'the take'}; a small cut goes his way each week.`, { text: `${o.name} gets a cut of ${biz?.name ?? 'it'} (about ${money(Math.round(fee * 0.25))} a week) and keeps off`, by: w.now + 120 * DAY, barred: barredFam, biz: d.biz, cut: 0.25, to: o.id });
-      rr.trust = clamp(rr.trust + 0.08);
+      feelOn(w, rr, 'trust', 0.08);
       lines.push(`"A quarter of the weekly," you say. He thinks it over and laughs, not unkindly. "You’re a practical man." Hands are shaken. It costs you money and removes an enemy, and that’s often a fair trade.`);
     } else {
       lines.push(`${o.name} doesn’t want a share. He wants the whole thing, and says so. The meeting ends without terms.`);

@@ -5,10 +5,7 @@ import { sanctioned } from './politics';
 import { pass, salience, versionOf } from './rumour';
 import { fp } from './voice';
 import { askBetween, collectAsk, move as askMove, openAsk, shopInPlay } from './asks';
-import {
-  addFact, clamp, createDebt, factText, famName, handleDeath, learn, money, notifyProtector,
-  ownerBiz, payDebt, regard, rel, travelTime, witnessesAt,
-} from './core';
+import { addFact, bearOn, clamp, compat, createDebt, factText, famName, feelOn, handleDeath, knowMore, learn, money, notifyProtector, ownerBiz, payDebt, regard, rel, travelTime, witnessesAt } from './core';
 import { afterKilling } from './consequences';
 import { Action, Character, DAY, Fact, Id, Kind, World } from './types';
 import { say as vsay } from './voicesheet';
@@ -252,12 +249,17 @@ export function perform(w: World, a: Action): { minutes: number; lines: string[]
       const r1 = rel(c, t.id);
       const r2 = rel(t, c.id);
       r1.lastMet = r2.lastMet = w.now;
-      // V89: what any man thinks of the player is earned at a believable pace (core.regard); between NPCs nothing changes.
+      // Foundation step 3: time together makes two men know each other better (core.knowMore), and whether it warms or chafes is how
+      // they get on (core.compat): natural friends grow close, men who can't stand each other grow sore (core.bear, with the reason).
+      // Drinking together buys no respect: that is earned by deeds (core.DEED). The same for the player, at the pace the player's
+      // regard is earned (core.regard).
+      const k = compat(w, c, t);
+      knowMore(c, t, 0.06);
       const warm = (a: Character, b: Character, r: typeof r1) => {
-        if (b.isPlayer) { regard(w, a, b, 'trust', 0.025, 'visit'); regard(w, a, b, 'affection', 0.025 + 0.03 * b.traits.sociability, 'visit'); regard(w, a, b, 'respect', 0.01, 'visit'); return; }
-        r.trust = clamp(r.trust + 0.025);
-        r.affection = clamp(r.affection + 0.025 + 0.03 * (a === c ? t : c).traits.sociability);
-        r.respect = clamp(r.respect + 0.01);
+        const dt = 0.03 * Math.max(0, k + 0.2), da = 0.06 * k;
+        if (b.isPlayer) { regard(w, a, b, 'trust', dt, 'visit'); regard(w, a, b, 'affection', da, 'visit'); }
+        else { feelOn(w, r, 'trust', dt, `time spent with ${b.name}`); feelOn(w, r, 'affection', da, `time spent with ${b.name}`); }
+        if (k < -0.15) bearOn(w, r, -k * 0.06, `${b.name} rubs him the wrong way`);
       };
       warm(c, t, r1);
       warm(t, c, r2);

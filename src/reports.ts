@@ -1,7 +1,7 @@
 // What reaches the player, and how. The world records everything; each man decides what to tell you, and the game decides how loudly to say it.
 import { temper } from './temper';
 import { addEnc } from './encounters';
-import { addFact, clamp, learn, money, rel } from './core';
+import { addFact, clamp, feelOn, learn, money, rel } from './core';
 import { Character, DAY, Enc, Fact, Id, World } from './types';
 
 export type Style = 'open' | 'alarmist' | 'solo' | 'hider' | 'cautious';
@@ -117,7 +117,7 @@ export function investChoose(w: World, p: Character, e: Enc, code: string): stri
   if (!c?.alive || !c.hustle) return ['It no longer matters.'];
   const r = rel(c, p.id);
   if (code === 'no') {
-    r.trust = clamp(r.trust - 0.02);
+    feelOn(w, r, 'trust', -0.02);
     c.hustle.bad = 0;
     return [`${c.name} nods. "Whatever you say." He doesn’t sound convinced.`];
   }
@@ -129,7 +129,7 @@ export function investChoose(w: World, p: Character, e: Enc, code: string): stri
   c.cash -= Math.min(c.cash, code === 'back' ? Math.round(cost / 2) : cost);
   c.hustle.level = Math.min(3, c.hustle.level + 1);
   c.hustle.stake += cost;
-  r.trust = clamp(r.trust + (code === 'back' ? 0.1 : 0.04));
-  r.affection = clamp(r.affection + (code === 'back' ? 0.05 : 0.01));
+  feelOn(w, r, 'trust', (code === 'back' ? 0.1 : 0.04));
+  feelOn(w, r, 'affection', (code === 'back' ? 0.05 : 0.01));
   return [code === 'back' ? `You put your own money in beside his. ${c.name} won’t forget that.` : `${c.name} thanks you and goes off to find a bigger room for it.`];
 }

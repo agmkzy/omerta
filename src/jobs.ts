@@ -7,7 +7,7 @@ import { aptitude, grow, lateOf } from './people';
 import { arch, bossWhy, dodge, injury, pitch, whyOf } from './voice';
 import { confide, perform, share, tension } from './actions';
 import { afterClient, afterKilling } from './consequences';
-import { addFact, bear, clamp, concealedGap, earn, factText, handleDeath, money, newId, notifyProtector, ownerBiz, recordCareer, regard, rel, repute, shortTime, travelTime, witnessesAt } from './core';
+import { addFact, bear, clamp, concealedGap, earn, factText, feel, feelOn, handleDeath, money, newId, notifyProtector, ownerBiz, recordCareer, regard, rel, repute, shortTime, travelTime, witnessesAt } from './core';
 import { askBetween, move as askMove, openAsk } from './asks';
 import { isOpen } from './situ';
 import { gigApproaches, gigTick, gigOffer, gigResolve, gigStale, GIG_HELP, GIG_LABEL } from './gigs';
@@ -350,11 +350,11 @@ export function declineJob(w: World, j: Job) {
   const p = PL(w);
   const g = j.giver ? w.chars[j.giver] : undefined;
   j.status = 'declined';
-  if (g) rel(g, p.id).respect = clamp(rel(g, p.id).respect - 0.03);
+  if (g) feel(w, g, p.id, 'respect', -0.03);
   if (j.via === 'boss') repute(w, p, -2, 'refused work');
   if (j.reason === 'blackmail' && g) {
     // He will tell the people who would want to know.
-    rel(g, p.id).trust = clamp(rel(g, p.id).trust - 0.2);
+    feel(w, g, p.id, 'trust', -0.2);
     bear(w, g, p.id, 0.3, `${p.name} tried to blackmail him`);
     const f = Object.values(w.facts).filter((q) => q.kind === 'murder' && (q.actor === p.id || q.actor === g.id)).sort((a, b) => b.t - a.t)[0];
     if (f) {
@@ -368,7 +368,7 @@ export function dropJob(w: World, j: Job) {
   j.status = 'declined';
   if (j.via === 'boss') repute(w, p, -4, 'refused work');
   const g = j.giver ? w.chars[j.giver] : undefined;
-  if (g) rel(g, p.id).trust = clamp(rel(g, p.id).trust - 0.05);
+  if (g) feel(w, g, p.id, 'trust', -0.05);
 }
 // One man, one time-consuming assignment. This is the only place that decides whether he's free.
 export function activityOf(w: World, c: Character): { why: string; until: number } | undefined {
@@ -848,7 +848,7 @@ export function daily(w: World) {
       const g = j.giver ? w.chars[j.giver] : undefined;
       if (j.via === 'boss' && g) {
         repute(w, p, -3, 'ignored summons');
-        rel(g, p.id).trust = clamp(rel(g, p.id).trust - 0.05);
+        feel(w, g, p.id, 'trust', -0.05);
         // Ignoring the man who runs your end twice in a month is asking for it.
         if (j.kind === 'summons' && w.jobs.filter((q) => q.kind === 'summons' && q.status === 'expired' && w.now - q.expires < 30 * DAY).length >= 2 && p.hurtUntil <= w.now) {
           if (temper(g).volatility > 0.5) {
@@ -860,7 +860,7 @@ export function daily(w: World) {
             addFact(w, { kind: 'discipline', actor: g.id, victim: p.id, text: `${g.name} raised ${p.name}'s share for ignoring him.`, district: p.district }, { witnesses: [] });
           }
         }
-      } else if (g) rel(g, p.id).trust = clamp(rel(g, p.id).trust - 0.03);
+      } else if (g) feel(w, g, p.id, 'trust', -0.03);
     }
   }
   for (const j of w.jobs) if (j.status === 'active' && j.due !== undefined && j.due <= w.now && j.assignee !== p.id) autoResolve(w, j);
@@ -1043,8 +1043,8 @@ export function performMove(w: World, m: Move): { minutes: number; lines: string
         }
         for (const [a, b] of [[c, p], [p, c]] as [Character, Character][]) {
           const r = rel(a, b.id);
-          r.trust = clamp(r.trust + 0.03);
-          r.respect = clamp(r.respect + 0.02);
+          feelOn(w, r, 'trust', 0.03);
+          feelOn(w, r, 'respect', 0.02);
         }
         const debt = w.debts.find((d) => d.status === 'active' && d.debtor === c.id);
         lines.push(`${c.name} (${traitWords(c)}), ${money(c.cash)}${c.heat > 0.4 ? ', running hot' : ''}${debt ? `, owes ${w.chars[debt.creditor].name} ${money(debt.balance)}` : ''}.`);
@@ -1063,8 +1063,8 @@ export function performMove(w: World, m: Move): { minutes: number; lines: string
       p.cash -= cost;
       for (const c of crew) {
         c.cash += 100;
-        rel(c, p.id).trust = clamp(rel(c, p.id).trust + 0.1);
-        rel(c, p.id).affection = clamp(rel(c, p.id).affection + 0.05);
+        feel(w, c, p.id, 'trust', 0.1);
+        feel(w, c, p.id, 'affection', 0.05);
       }
       lines.push(`You peel off ${money(100)} for each of them. They notice.`);
       return { minutes: 20, lines };
@@ -1108,7 +1108,7 @@ export function performMove(w: World, m: Move): { minutes: number; lines: string
           p.cash -= 40;
           regard(w, t, p, 'trust', 0.06, 'drink');
           regard(w, t, p, 'affection', 0.06, 'drink');
-          { const r = rel(p, t.id); r.trust = clamp(r.trust + 0.06); r.affection = clamp(r.affection + 0.06); }
+          { const r = rel(p, t.id); feelOn(w, r, 'trust', 0.06); feelOn(w, r, 'affection', 0.06); }
           lines.push(`You buy ${t.name} a drink. His shoulders drop an inch.`);
           return { minutes: 45, lines };
         }
@@ -1179,10 +1179,10 @@ export function pressJob(w: World, j: Job): { lines: string[]; minutes: number }
   if (w.rng.chance(pr)) {
     lines.push(`He’s quiet for a bit, then lowers his voice. "${j.why.deep}"`);
     if (j.why.hidden) j.disproved = false;
-    r.trust = clamp(r.trust + 0.03);
+    feelOn(w, r, 'trust', 0.03);
   } else {
     lines.push(`${g.name}: "${dodge(arch(g), j.id)}"`);
-    r.trust = clamp(r.trust - 0.04);
+    feelOn(w, r, 'trust', -0.04);
   }
   for (const l of lines) note(j, l);
   return { lines, minutes: 15 };
@@ -1269,7 +1269,7 @@ export function haggleJob(w: World, j: Job): { lines: string[]; minutes: number 
     j.pay = Math.round((j.pay * 1.3) / 50) * 50;
     return { lines: [note(j, `${g.name} grumbles and comes up. It’s now ${money(j.pay)}.`)], minutes: 15 };
   }
-  rel(g, p.id).trust = clamp(rel(g, p.id).trust - 0.05);
+  feel(w, g, p.id, 'trust', -0.05);
   return { lines: [note(j, `${g.name} doesn’t like being pushed. The price stays where it was.`)], minutes: 15 };
 }
 

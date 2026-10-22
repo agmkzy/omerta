@@ -1,7 +1,7 @@
 // Settling a score: the player picks the method. Each method has its own price and its own reply.
 import { bizMove } from './econ';
 import { perform, tension } from './actions';
-import { addFact, bear, bearAtLeast, clamp, easeOn, factText, famName, money, ownerBiz, rel, repute, witnessesAt } from './core';
+import { addFact, bear, bearAtLeast, clamp, easeOn, factText, famName, feel, feelTo, money, ownerBiz, rel, repute, witnessesAt } from './core';
 import { askPermission, isMade, sanctioned } from './politics';
 import { aftermath, warningFor, killMethods } from './violence';
 import { handleDeath } from './core';
@@ -80,7 +80,7 @@ export function settleDo(w: World, p: Character, x: Character, code: string): { 
       p.heat = clamp(p.heat + (worked ? (seen ? 0.6 : 0.25) : 0.15), 0, 1.5);
       const mins = rng.int(60, 180);
       if (!worked) {
-        bearAtLeast(w, x, p.id, 0.95, `${p.name} tried to have him killed`); rel(x, p.id).trust = 0;
+        bearAtLeast(w, x, p.id, 0.95, `${p.name} tried to have him killed`); feelTo(x, p.id, 'trust', 0);
         if (m.code === 'poison' || m.code === 'accident') {
           lines.push(rng.chance(0.5) ? `It doesn’t take. ${x.name} gets ill, or gets lucky, and walks away none the wiser.` : `It goes wrong, and ${x.name} works out why. He knows it was meant for him.`);
           if (!rng.chance(0.5)) bearAtLeast(w, x, p.id, 0.3, `${p.name} may have tried to have him killed`);
@@ -145,8 +145,8 @@ export function settleDo(w: World, p: Character, x: Character, code: string): { 
       const people = Object.values(w.chars).filter((y) => y.alive && y.id !== p.id && y.id !== x.id && (y.familyId === x.familyId || y.district === x.district)).slice(0, 8);
       for (const y of people) {
         if (!y.known[f.id]) y.known[f.id] = { t: w.now, from: p.id, knowsActor: true };
-        rel(y, x.id).respect = clamp(rel(y, x.id).respect - 0.1);
-        rel(y, x.id).trust = clamp(rel(y, x.id).trust - 0.08);
+        feel(w, y, x.id, 'respect', -0.1);
+        feel(w, y, x.id, 'trust', -0.08);
       }
       bear(w, x, p.id, 0.08, `${p.name} turned people against him`);
       easeOn(rp, 0.6);
@@ -160,12 +160,12 @@ export function settleDo(w: World, p: Character, x: Character, code: string): { 
       if (caught) {
         bear(w, x, p.id, 0.25, `${p.name} spread lies about him`);
         repute(w, p, -8, 'lies');
-        const b = w.chars[w.fam[p.familyId!].bossId]; if (b) rel(b, p.id).respect = clamp(rel(b, p.id).respect - 0.06);
+        const b = w.chars[w.fam[p.familyId!].bossId]; if (b) feel(w, b, p.id, 'respect', -0.06);
         L.push(`You drop a word in two ears. One of them is ${x.name.split(' ')[0]}’s cousin. It’s back to him by dinner, and to the boss by the weekend: you’re a man who talks behind backs.`);
       } else {
         repute(w, x, -8, 'lies');
-        if (boss) rel(boss, x.id).trust = clamp(rel(boss, x.id).trust - 0.07);
-        const b = w.chars[w.fam[p.familyId!].bossId]; if (b) rel(b, x.id).trust = clamp(rel(b, x.id).trust - 0.05);
+        if (boss) feel(w, boss, x.id, 'trust', -0.07);
+        const b = w.chars[w.fam[p.familyId!].bossId]; if (b) feel(w, b, x.id, 'trust', -0.05);
         L.push(`You say nothing you can’t take back. You say it to men who repeat it. By the end of the week people are quietly wondering about ${x.name.split(' ')[0]}.`);
       }
       return { minutes: 90, lines: L, done: true };
@@ -188,7 +188,7 @@ export function settleDo(w: World, p: Character, x: Character, code: string): { 
     case 'drop': {
       easeOn(rp, 0.4);
       L.push(`You let it go. ${x.name} will hear that you did, and may read it as either wisdom or weakness.`);
-      rel(x, p.id).respect = clamp(rel(x, p.id).respect + (rel(x, p.id).grudge > 0.5 ? -0.03 : 0.02));
+      feel(w, x, p.id, 'respect', (rel(x, p.id).grudge > 0.5 ? -0.03 : 0.02));
       return { minutes: 5, lines: L, done: true };
     }
   }

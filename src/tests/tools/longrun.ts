@@ -11,6 +11,9 @@ import { advance, serialize } from '../../engine';
 import { createWorld } from '../../world';
 import { audit } from '../../consistency';
 import { ledgerCheck } from '../../econ';
+import * as core from '../../core';
+// (how well two men get on is the game's own judgement, core.compat, where the game has one: earlier versions don't, and the harness runs on them too)
+const compat: (w: World, a: Character, b: Character) => number = (core as unknown as { compat?: (w: World, a: Character, b: Character) => number }).compat ?? (() => NaN);
 import { DAY, WEEK, type Character, type World } from '../../types';
 
 const RANKS = ['civilian', 'associate', 'soldier', 'capo', 'underboss', 'boss'] as const;
@@ -32,6 +35,7 @@ export interface WeekRow {
   standing: Record<string, number>; standing45: number; standingSpread: { sd: number; min: number; max: number; boss: number }; respectFalls: number;
   goals: Record<string, number>; wants: Record<string, number>; problems: number;
   rel: { pairs: number; trust5: number; aff5: number; friends: number; mutualFriends: number; grudge3: number; grudge6: number; enemies: number; mutualEnemies: number; fear3: number; respect5: number };
+  kin?: { known: number; known5: number; compatFriends: number; compatEnemies: number; compatAll: number; bossTrust: number; bossGrudge: number; friendsBond: number };
   sitsOpen: Record<string, number>;
   facts: number; factsCaused: number; factsStoried: number;
   audit: number; ledger: number; saveKB: number; ms: number;
@@ -62,7 +66,9 @@ export class Observer {
   goalWhy: Record<string, number> = {};
   rankChanges: { t: number; id: string; from: string; to: string; plan: boolean; active?: boolean; want?: string }[] = [];
   wantChanges: Record<string, number> = {};
-  crossings = { friend: 0, unfriend: 0, enemy: 0, forgive: 0, afraid: 0, enemyExplained: 0, enemyWhy: 0, enemyWhyEvent: 0 };
+  crossings = { friend: 0, unfriend: 0, enemy: 0, forgive: 0, afraid: 0, enemyExplained: 0, enemyWhy: 0, enemyWhyEvent: 0, friendBond: 0, friendTurned: 0 };
+  private everFriends = new Set<string>();
+  private kinNow?: WeekRow['kin'];
   private respectWas = new Map<string, number>();
   everPlan = new Set<string>(); // men who at some point had a plan to rise
   firstSnap = new Map<string, Snap>();
@@ -159,7 +165,7 @@ export class Observer {
         this.respectWas.set(rkey, r.respect);
         const key = a.id + '|' + bid, was = this.pair.get(key) ?? 0, is = (friend ? 1 : 0) | (enemy ? 2 : 0) | (afraid ? 4 : 0);
         if (is !== was) {
-          if (is & 1 && !(was & 1)) { this.crossings.friend++; this.log(a.id, 'friend', `counts ${b.name} a friend`); }
+          if (is & 1 && !(was & 1)) { this.crossings.friend++; this.everFriends.add(key); if (r.bond) this.crossings.friendBond++; this.log(a.id, 'friend', `counts ${b.name} a friend${r.bond ? ` (it rests on: ${r.bond.text})` : ''}`); }
           if (!(is & 1) && was & 1) { this.crossings.unfriend++; this.log(a.id, 'friend', `drifts apart from ${b.name}`); }
           if (is & 2 && !(was & 2)) {
             this.crossings.enemy++;
@@ -168,6 +174,7 @@ export class Observer {
             if (why) this.crossings.enemyExplained++;
             // what the world itself says the grudge is about (core.bear keeps the reason on the relationship), where it says anything
             if (r.why) { this.crossings.enemyWhy++; if (r.why.f) this.crossings.enemyWhyEvent++; }
+            if (this.everFriends.has(key)) { this.crossings.friendTurned++; this.log(a.id, 'grudge', `(he once counted ${b.name} a friend)`); }
             this.log(a.id, 'grudge', `turns against ${b.name}${r.why ? ` (because: ${r.why.text})` : why ? ` (after: ${why.text}; no reason recorded)` : ' (nothing on record between them)'}`);
           }
           if (!(is & 2) && was & 2) { this.crossings.forgive++; this.log(a.id, 'grudge', `lets go of his grudge against ${b.name}`); }
@@ -175,6 +182,21 @@ export class Observer {
           this.pair.set(key, is);
         }
       }
+    }
+    // ---- what the relationships rest on: familiarity, whether friends get on better than enemies, loyalty to one's own boss
+    {
+      let kn = 0, kn5 = 0, n = 0, cf = 0, nf = 0, ce = 0, ne = 0, ca = 0, na = 0, fb = 0;
+      const people = Object.values(w.chars).filter(npc);
+      for (const a of people) for (const [bid, r] of Object.entries(a.rels)) {
+        const b = w.chars[bid]; if (!npc(b)) continue;
+        n++; kn += r.known ?? 0; if ((r.known ?? 0) >= 0.5) kn5++;
+        const friend = r.trust >= 0.5 && r.affection >= 0.5, enemy = r.grudge >= 0.4;
+        if (friend) { cf += compat(w, a, b); nf++; if (r.bond) fb++; }
+        if (enemy) { ce += compat(w, a, b); ne++; }
+        if ((n % 17) === 0) { ca += compat(w, a, b); na++; }
+      }
+      const under = people.filter((c) => c.bossId && w.chars[c.bossId] && !w.chars[c.bossId].isPlayer && c.rank !== 'civilian');
+      this.kinNow = { known: r2(kn / Math.max(1, n)), known5: kn5, compatFriends: r2(cf / Math.max(1, nf)), compatEnemies: r2(ce / Math.max(1, ne)), compatAll: r2(ca / Math.max(1, na)), bossTrust: r2(under.reduce((x, c) => x + (c.rels[c.bossId!]?.trust ?? 0), 0) / Math.max(1, under.length)), bossGrudge: under.filter((c) => (c.rels[c.bossId!]?.grudge ?? 0) >= 0.3).length, friendsBond: nf ? Math.round((100 * fb) / nf) : 0 };
     }
     // ---- families
     for (const f of Object.values(w.fam)) {
@@ -213,7 +235,7 @@ export class Observer {
       kickPaid: by((c) => lastBook(c)?.paid ?? 0, sum), kickReceived: by((c) => lastBook(c)?.received ?? 0, sum),
       standing: by((c) => c.standing, mean), standing45: life.filter((c) => c.standing >= 45).length,
       standingSpread: (() => { const xs = life.map((c) => c.standing), m = mean(xs); return { sd: r2(Math.sqrt(mean(xs.map((x) => (x - m) ** 2)))), min: Math.round(Math.min(...xs)), max: Math.round(Math.max(...xs)), boss: mean(life.filter((c) => c.rank === 'boss').map((c) => c.standing)) }; })(), respectFalls,
-      goals, wants, problems: alive.filter((c) => c.problem).length, rel, sitsOpen,
+      goals, wants, problems: alive.filter((c) => c.problem).length, rel, sitsOpen, kin: this.kinNow,
       facts: major.length, factsCaused: major.filter((f) => f.cause).length, factsStoried: major.filter((f) => f.story).length,
       audit: audit(w).length, ledger: ledgerCheck(w).length, saveKB: Math.round(serialize(w).length / 1024), ms,
     });
@@ -274,6 +296,10 @@ export function report(o: Observer, seed: number): { md: string; json: unknown }
     row('Grudges ≥ .3 / ≥ .6', (r) => `${r.rel.grudge3} / ${r.rel.grudge6}`),
     row('Enemies (grudge ≥ .4) / mutual', (r) => `${r.rel.enemies} / ${r.rel.mutualEnemies}`),
     row('Fear ≥ .3 / respect ≥ .5', (r) => `${r.rel.fear3} / ${r.rel.respect5}`),
+    row('How well men know each other: average / pairs who know each other well', (r) => (r.kin ? `${r.kin.known} / ${r.kin.known5}` : '–')),
+    row('How well they get on: friends / enemies / everyone', (r) => (r.kin ? `${r.kin.compatFriends} / ${r.kin.compatEnemies} / ${r.kin.compatAll}` : '–')),
+    row('Friendships resting on something recorded', (r) => (r.kin ? `${r.kin.friendsBond}%` : '–')),
+    row('Men in the life: trust in their own boss / holding a grudge against him', (r) => (r.kin ? `${r.kin.bossTrust} / ${r.kin.bossGrudge}` : '–')),
     row('Open storylines', (r) => Object.values(r.sitsOpen).reduce((a, b) => a + b, 0)),
     row('Lasting events so far / with a cause / in a storyline', (r) => `${r.facts} / ${r.factsCaused} / ${r.factsStoried}`),
     row('Consistency / ledger problems', (r) => `${r.audit} / ${r.ledger}`),
@@ -296,7 +322,8 @@ export function report(o: Observer, seed: number): { md: string; json: unknown }
     `- Became friends ${cx.friend} times; drifted apart ${cx.unfriend} times.`,
     `- Turned against someone ${cx.enemy} times; **${cx.enemy ? Math.round((100 * cx.enemyExplained) / cx.enemy) : 0}% had anything on record between the two men** in the two months before. Let a grudge go ${cx.forgive} times.`,
     `- **The reason the world records for the grudge:** ${cx.enemy ? Math.round((100 * cx.enemyWhy) / cx.enemy) : 0}% of grudges carry one; ${cx.enemy ? Math.round((100 * cx.enemyWhyEvent) / cx.enemy) : 0}% name the event behind them.`,
-    `- Became afraid of someone ${cx.afraid} times.`, '');
+    `- Became afraid of someone ${cx.afraid} times.`,
+    `- **Friendships resting on something recorded when they formed:** ${cx.friend ? Math.round((100 * cx.friendBond) / cx.friend) : 0}%. **Former friends who turned against each other:** ${cx.friendTurned}.`, '');
   // ---- causality
   const major = o.facts.filter((f) => !f.minor), byId = new Map(o.facts.map((f) => [f.id, f]));
   const depth = (f: FactRec) => { let d = 0, x: FactRec | undefined = f; while (x?.cause && d < 30) { x = byId.get(x.cause); d++; } return d; };

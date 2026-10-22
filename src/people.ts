@@ -1,6 +1,6 @@
 // People: what they are good at, what is going wrong in their lives, and how that leaks into their work.
 // A man who is late with his envelope has a reason. The reason is usually not the one he gives.
-import { addFact, clamp, createDebt, money, ownerBiz, witnessesAt } from './core';
+import { addFact, clamp, createDebt, feelOn, money, ownerBiz, witnessesAt } from './core';
 import { spawnCivilian } from './world';
 import { FEMALE, rollFirst } from './names';
 import { interestsOf } from './orgs';
@@ -181,7 +181,7 @@ export function helpMan(w: World, p: Character, c: Character, how: 'cash' | 'dut
   const pr = c.problem;
   const r = (c.rels[p.id] ??= { trust: 0.3, respect: 0.3, affection: 0.3, grudge: 0, lastMet: w.now });
   if (how === 'leave') {
-    r.trust = clamp(r.trust - 0.04);
+    feelOn(w, r, 'trust', -0.04);
     return [`You tell ${c.name} it’s his to sort out. He nods and doesn’t argue, which tells you what he thinks.`];
   }
   if (how === 'cash') {
@@ -189,15 +189,15 @@ export function helpMan(w: World, p: Character, c: Character, how: 'cash' | 'dut
     if (p.cash < amt) return ['You can’t spare it right now.'];
     p.cash -= amt;
     c.cash += amt;
-    r.trust = clamp(r.trust + 0.12);
-    r.affection = clamp(r.affection + 0.1);
+    feelOn(w, r, 'trust', 0.12);
+    feelOn(w, r, 'affection', 0.1);
     if (pr) pr.sev = clamp(pr.sev - 0.25);
     noteHelp(w, p, c, `${p.name} put $${amt} in ${c.name}’s hand to ease his trouble.`);
     return [`You press ${money(amt)} into ${c.name}'s hand. He doesn’t say thank you. He says he won’t forget it, which is better.`];
   }
   c.kickRate = Math.max(0.05, c.kickRate - 0.05);
   if (pr) pr.sev = clamp(pr.sev - 0.1);
-  r.trust = clamp(r.trust + 0.06);
+  feelOn(w, r, 'trust', 0.06);
   noteHelp(w, p, c, `${p.name} took ${c.name} off the money for a while and lightened his share.`);
   return [`You take ${c.name} off the money-handling for a while and lighten his share. He’s grateful and a little ashamed.`];
 }

@@ -6,7 +6,7 @@
 // what the simulation knows to be true (`truth`) is never shown to anybody.
 import { temper } from './temper';
 import { discipline, influence } from './books';
-import { addFact, bear, clamp, createDebt, ease, ownerBiz, payDebt, rel, repute } from './core';
+import { addFact, bear, clamp, createDebt, ease, feel, feelOn, feelTo, ownerBiz, payDebt, rel, repute } from './core';
 import { addStake, clearArrears, evidence, giveTime, seizeShare, transferBusiness } from './econ';
 import { LADDER, leaveCrew } from './rank';
 import { begin as beginGoal, goalsOf, priceOf } from './goals';
@@ -183,8 +183,8 @@ export function hold(w: World, s: Situation, chair: Character, code: string): Ve
   for (const id of ids) {
     const c = w.chars[id], r = rel(c, chair.id);
     const got = kit.util(w, s, id, code) >= kit.util(w, s, id, stanceOf(w, s, id).want) - 0.02;
-    if (opposed.includes(id)) { r.respect = clamp(r.respect - 0.05); r.trust = clamp(r.trust - 0.03); for (const j of ids) if (j !== id && kit.util(w, s, j, code) > kit.util(w, s, j, stanceOf(w, s, j).want) - 0.05) bear(w, c, j, 0.06, `${w.chars[j].name} came out ahead of him at the table`); }
-    else { r.trust = clamp(r.trust + 0.02); if (got) r.respect = clamp(r.respect + 0.03); }
+    if (opposed.includes(id)) { feelOn(w, r, 'respect', -0.05); feelOn(w, r, 'trust', -0.03); for (const j of ids) if (j !== id && kit.util(w, s, j, code) > kit.util(w, s, j, stanceOf(w, s, j).want) - 0.05) bear(w, c, j, 0.06, `${w.chars[j].name} came out ahead of him at the table`); }
+    else { feelOn(w, r, 'trust', 0.02); if (got) feelOn(w, r, 'respect', 0.03); }
     if (opposed.includes(id) && r.respect < 0.35 && c.traits.ambition > 0.55) s.cons = [...(s.cons ?? []), `${first(c)} did not accept it`].slice(-SIT.cap.cons);
   }
   s.meet = { chair: chair.id, parts: ids, pos: Object.fromEntries(ids.map((id) => [id, stanceOf(w, s, id).want])), held: w.now };
@@ -318,11 +318,11 @@ KITS.skim = {
   apply: (w, s, code, chair) => {
     const c = w.chars[(s.parties ?? []).find((p) => p.role === 'accused')!.id];
     const boss = chair, amt = s.amt ?? 0, guilty = s.truth === 'guilty';
-    if (guilty && s.m?.vouched && P(w) && P(w).id !== boss.id) { repute(w, P(w), -3, 'vouched wrong'); rel(boss, P(w).id).trust = clamp(rel(boss, P(w).id).trust - 0.1); s.cons = [...(s.cons ?? []), 'the man you vouched for was guilty'].slice(-SIT.cap.cons); }
+    if (guilty && s.m?.vouched && P(w) && P(w).id !== boss.id) { repute(w, P(w), -3, 'vouched wrong'); feel(w, boss, P(w).id, 'trust', -0.1); s.cons = [...(s.cons ?? []), 'the man you vouched for was guilty'].slice(-SIT.cap.cons); }
     if (code === 'repay') {
       c.books.arrears += guilty ? amt : Math.round(amt * 0.5);
       c.kickRate = Math.min(0.3, c.kickRate + 0.02);
-      rel(c, boss.id).trust = clamp(rel(c, boss.id).trust - 0.05);
+      feel(w, c, boss.id, 'trust', -0.05);
       closeSit(w, s, 'repay', guilty ? [`${first(c)} made it up`] : [`${first(c)} paid for a gap that was not his doing`], 8);
       if (!guilty) bear(w, c, boss.id, 0.1, `${boss.name} made him pay for a gap that was not his doing`);
       return `${boss.name} settled it. ${c.name} makes up the difference and passes up a little more.`;
@@ -335,7 +335,7 @@ KITS.skim = {
     }
     if (code === 'expel') {
       leaveCrew(w, c);
-      rel(c, boss.id).trust = 0; bear(w, c, boss.id, 0.3, `${boss.name} put him out`);
+      feelTo(c, boss.id, 'trust', 0); bear(w, c, boss.id, 0.3, `${boss.name} put him out`);
       closeSit(w, s, 'expel', [`${first(c)} no longer answers to ${first(boss)}`], 16);
       return `${boss.name} cut ${c.name} loose.`;
     }
@@ -364,7 +364,7 @@ function skimStep(w: World, s: Situation) {
     const p = clamp(plaus * (0.5 + rel(boss, c.id).trust * 0.7) * (1 - temper(boss).caution * 0.35), 0.05, 0.85);
     if (w.rng.chance(p)) {
       closeSit(w, s, 'understood', guilty ? ['the gap was never explained'] : [`${first(boss)} accepted ${first(c)}’s word`], 8);
-      if (!guilty) rel(c, boss.id).trust = clamp(rel(c, boss.id).trust + 0.02);
+      if (!guilty) feel(w, c, boss.id, 'trust', 0.02);
       return;
     }
     m.cert = clamp(cert() + 15, 0, 100);
@@ -383,7 +383,7 @@ function skimStep(w: World, s: Situation) {
       if (loyalty > 0.1 && w.rng.chance(0.6)) { // goes to the boss
         const text = `${witness.name} told ${boss.name} he has seen ${c.name}’s money go missing.`;
         claim(w, s, witness.id, text, true); tell(w, s, text, { actor: witness.id, victim: boss.id, witnesses: [] });
-        m.cert = clamp(cert() + 40, 0, 100); rel(witness, c.id).trust = clamp(rel(witness, c.id).trust - 0.1);
+        m.cert = clamp(cert() + 40, 0, 100); feel(w, witness, c.id, 'trust', -0.1);
       } else if (t.greed + t.ambition > 1.0 && w.rng.chance(0.5)) { // keeps it, and sees what it is worth
         const it = spawn(w, 'intel', `intel:${witness.id}:${c.id}`, witness.id, { cause: `${witness.name} knows ${c.name} is stealing from ${boss.name}`, parties: [{ id: witness.id, role: 'knows' }, { id: c.id, role: 'exposed' }, { id: boss.id, role: 'above' }], sev: 0.3, phase: 'found', next: w.now + 2 * DAY, link: undefined, m: { skim: s.id } });
         if (it) { know(w, it, witness.id, 2, 'saw it'); it.stage = 'handling'; }
@@ -409,7 +409,7 @@ function skimStep(w: World, s: Situation) {
   if (s.phase === 'confront') {
     if (cert() < 30) { // not enough to act on
       tell(w, s, `${boss.name} decided there was nothing to it.`, { actor: boss.id, victim: c.id });
-      if (!guilty) rel(c, boss.id).trust = clamp(rel(c, boss.id).trust - 0.02);
+      if (!guilty) feel(w, c, boss.id, 'trust', -0.02);
       return closeSit(w, s, 'dropped', [], 6);
     }
     const r = convene(w, s, boss, undefined);
@@ -595,7 +595,7 @@ KITS.debt = {
     const d = w.debts.find((x) => x.id === s.link?.debt)!, cr = w.chars[d.creditor], db = w.chars[d.debtor];
     if (code === 'extend') { d.nextDue += 14 * DAY; d.missed = 0; closeSit(w, s, 'extended', [], 5); return `${chair.name} gave ${db.name} two more weeks.`; }
     if (code === 'restructure') { d.weeklyPayment = Math.max(10, Math.round(d.weeklyPayment * 0.5 / 5) * 5); d.weeklyRate = Math.max(0.005, Math.round(d.weeklyRate * 0.7 * 1000) / 1000); d.missed = 0; closeSit(w, s, 'restructured', [], 8); return `${chair.name} cut what ${db.name} pays each week and what it costs him.`; }
-    if (code === 'writedown') { d.balance = Math.round(d.balance * 0.6); d.missed = 0; closeSit(w, s, 'written down', [`${first(cr)} took a loss`], 10); rel(cr, chair.id).respect = clamp(rel(cr, chair.id).respect - 0.03); return `${chair.name} told ${cr.name} to take a loss. ${db.name} owes ${d.balance} now.`; }
+    if (code === 'writedown') { d.balance = Math.round(d.balance * 0.6); d.missed = 0; closeSit(w, s, 'written down', [`${first(cr)} took a loss`], 10); feel(w, cr, chair.id, 'respect', -0.03); return `${chair.name} told ${cr.name} to take a loss. ${db.name} owes ${d.balance} now.`; }
     if (code === 'share' && ownerBiz(w, db.id)) { seizeShare(w, d); d.missed = 0; closeSit(w, s, 'share', [`${first(cr)} has a piece of ${first(db)}’s business`], 12); return `${chair.name} let ${cr.name} take a piece of ${db.name}’s business against the debt.`; }
     const pay = Math.min(Math.round(db.cash * 0.6), d.balance);
     if (pay > 0) payDebt(w, d, pay);
@@ -661,7 +661,7 @@ KITS.partner = {
       const now = Math.min(Math.max(0, o.cash), Math.round(pay * 0.5)); o.cash -= now; h.cash += now; drop();
       closeSit(w, s, 'dissolved', [`${first(h)} took a loss and left`], 12); return `${chair.name} ended the partnership. ${h.name} gets ${now} and leaves.`;
     }
-    rel(h, o.id).trust = clamp(rel(h, o.id).trust - 0.1);
+    feel(w, h, o.id, 'trust', -0.1);
     closeSit(w, s, 'stay', [`${first(h)} is stuck in ${b.name}`], 10); return `${chair.name} told them both to carry on.`;
   },
 };
@@ -714,12 +714,12 @@ KITS.grudge = {
     if (code === 'placate') {
       const gift = Math.max(0, Math.min(Math.round(chair.cash * 0.1 / 10) * 10, 400));
       if (gift > 0) { chair.cash -= gift; y.cash += gift; }
-      y.backer = chair.id; rel(y, chair.id).trust = clamp(rel(y, chair.id).trust + 0.1);
+      y.backer = chair.id; feel(w, y, chair.id, 'trust', 0.1);
       closeSit(w, s, 'placated', [`${first(y)} was bought off`], 14); said = `${chair.name} gave ${y.name} ${gift > 0 ? '$' + gift + ' and ' : ''}his backing.`;
     } else if (code === 'dismiss') {
-      rel(y, chair.id).trust = clamp(rel(y, chair.id).trust - 0.05); closeSit(w, s, 'dismissed', [], 10); said = `${chair.name} told ${y.name} to wait his turn.`;
+      feel(w, y, chair.id, 'trust', -0.05); closeSit(w, s, 'dismissed', [], 10); said = `${chair.name} told ${y.name} to wait his turn.`;
     } else {
-      repute(w, y, -2, 'turned down'); rel(y, chair.id).trust = clamp(rel(y, chair.id).trust - 0.12); bear(w, y, chair.id, 0.1, `${chair.name} turned him down`);
+      repute(w, y, -2, 'turned down'); feel(w, y, chair.id, 'trust', -0.12); bear(w, y, chair.id, 0.1, `${chair.name} turned him down`);
       closeSit(w, s, 'reprimanded', [`${first(y)} was put in his place`], 14); said = `${chair.name} told ${y.name} to know his place.`;
     }
     // what a man does with a no: ambitious ones start looking at their own way up (V74 goals)

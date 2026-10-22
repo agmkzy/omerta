@@ -2,7 +2,7 @@ import { clubTalk, sceneLines } from './sitmoves';
 // Rooms where people actually are. Who is in is a pure function of the clock and the man, so it is stable between looks.
 import { forceEncounter } from './encounters';
 import { forceBossOffer } from './jobs';
-import { clamp, learn, money, rel } from './core';
+import { clamp, feelOn, learn, money, rel } from './core';
 import { hash, pick } from './voice';
 import { DAY, Character, World } from './types';
 import { clubOf, clubPresent } from './clubdata';
@@ -68,7 +68,7 @@ export function sitAtClub(w: World, p: Character): { lines: string[]; minutes: n
   lines.push(...sceneLines(w, p, here));
   lines.push(...clubTalk(w, p, here));
   // being seen at the club regularly is how a man becomes someone people talk in front of
-  { const mate = here.filter((c) => c.id !== p.id)[hash(String(w.now) + 'm') % Math.max(1, here.length - 1)]; if (mate) { const r = rel(mate, p.id); r.trust = clamp(r.trust + 0.015); r.lastMet = w.now; } }
+  { const mate = here.filter((c) => c.id !== p.id)[hash(String(w.now) + 'm') % Math.max(1, here.length - 1)]; if (mate) { const r = rel(mate, p.id); feelOn(w, r, 'trust', 0.015); r.lastMet = w.now; } }
   // the boss is in
   const top = here.find((c) => c.id === p.bossId || c.rank === 'boss' || c.rank === 'underboss');
   if (top && w.rng.chance(0.3) && forceBossOffer(w)) lines.push(`${top.name} beckons you to the back table without a word. You go.`);

@@ -4,7 +4,7 @@
 // deserves more time. When he comes back he tells you a story, and the story may not be the true one.
 import { temper } from './temper';
 import { applyRank } from './rank';
-import { addFact, bear, clamp, learn, money, ownerBiz, recordCareer, rel, repute, shortTime, travelTime, witnessesAt } from './core';
+import { addFact, bear, clamp, feel, feelOn, feelTo, learn, money, ownerBiz, recordCareer, rel, repute, shortTime, travelTime, witnessesAt } from './core';
 import { aptitude, grow, lateOf, PROBLEM_LABEL } from './people';
 import { bizMove, clearArrears, owedOf, takeFromBiz } from './econ';
 import { arch, admit, excuse, pick } from './voice';
@@ -126,7 +126,7 @@ export function runCrewJob(w: World, j: Job) {
     rep = { text: story(w, j, m, 'mercy', false), truth: 'mercy', lie: false, by: m.id };
     text = `${m.name} let the matter slide on "${j.title}".`;
     const t = j.target ? w.chars[j.target] : undefined;
-    if (t) rel(t, m.id).affection = clamp(rel(t, m.id).affection + 0.1);
+    if (t) feel(w, t, m.id, 'affection', 0.1);
   } else {
     const res = resolve(w, j, b === 'confront' ? codes[codes.length - 1] : code);
     let amt = res.money ?? 0;
@@ -179,7 +179,7 @@ export function runCrewJob(w: World, j: Job) {
   j.rep = rep;
   addFact(w, { kind: 'report', actor: m.id, text: text + extra, minor: true, district: m.district }, { witnesses: [p.id] });
   // a man who lied and was not caught gets bolder; one who was honest earns trust
-  if (rep && !rep.lie) rel(m, p.id).trust = clamp(rel(m, p.id).trust + 0.01);
+  if (rep && !rep.lie) feel(w, m, p.id, 'trust', 0.01);
 }
 
 // Question a man about his report. The more he trusts you, the more of the truth he lets slip.
@@ -197,7 +197,7 @@ export function questionReport(w: World, j: Job): string[] {
   }
   if (w.rng.chance(pr)) {
     rep.found = true;
-    r.trust = clamp(r.trust - 0.03);
+    feelOn(w, r, 'trust', -0.03);
     const a = arch(m);
     const lines: string[] = [];
     if (rep.truth === 'distracted' && m.problem) {
@@ -261,7 +261,7 @@ export function resolveErrand(w: World, j: Job, doer: Character, code: string): 
         return { lines, minutes, ok: true, money: j.pay };
       }
       lines.push(`Delivered. The man on the other end counted it twice and nodded.`);
-      if (t) rel(t, doer.id).trust = clamp(rel(t, doer.id).trust + 0.05);
+      if (t) feel(w, t, doer.id, 'trust', 0.05);
       return { lines, minutes, ok: true, money: j.pay };
     }
     case 'message': {
@@ -270,7 +270,7 @@ export function resolveErrand(w: World, j: Job, doer: Character, code: string): 
       doer.district = t.district;
       const reply = pick([`${t.name} listens, says nothing for a while, then: "Tell him I heard."`, `${t.name} smiles. "He always did know how to ask."`, `${t.name} reads you more than the message. "And what do you think of it?"`], t.id + j.id);
       lines.push(reply);
-      rel(t, doer.id).trust = clamp(rel(t, doer.id).trust + (caught(0.2) ? -0.03 : 0.05));
+      feel(w, t, doer.id, 'trust', (caught(0.2) ? -0.03 : 0.05));
       return { lines, minutes, ok: true, money: j.pay };
     }
     case 'guard': {
@@ -316,8 +316,8 @@ export function resolveErrand(w: World, j: Job, doer: Character, code: string): 
       if (rng.chance(pr)) {
         t.jailedUntil = Math.min(t.jailedUntil, w.now + 2 * DAY);
         lines.push(`A lawyer, a clerk and an envelope. ${t.name} walks out in two days instead of weeks.`);
-        rel(t, doer.id).trust = clamp(rel(t, doer.id).trust + 0.2);
-        rel(t, doer.id).affection = clamp(rel(t, doer.id).affection + 0.1);
+        feel(w, t, doer.id, 'trust', 0.2);
+        feel(w, t, doer.id, 'affection', 0.1);
         return { lines, minutes: 180, ok: true };
       }
       lines.push(`The clerk takes the envelope and nothing happens. ${t.name} stays where he is.`);
@@ -413,7 +413,7 @@ export function recruitProspect(w: World, p: Character, c: Character): string[] 
   applyRank(w, c, 'associate', { fact: false, career: false, place: (x) => { x.familyId = p.familyId; x.bossId = p.id; } });
   c.cash += 150;
   (c.rels[p.id] ??= { trust: 0.4, respect: 0.35, affection: 0.3, grudge: 0, lastMet: w.now });
-  c.rels[p.id].trust = 0.45;
+  feelTo(c, p.id, 'trust', 0.45);
   addFact(w, { kind: 'promotion', actor: c.id, minor: true, text: `${c.name} has started running with ${p.name}.`, district: c.district }, { witnesses: [p.id] });
   repute(w, p, 0.5, 'took a man on');
   return [`${c.name} shakes your hand. He’s yours now, and what he does will be put against your name.`];
@@ -481,8 +481,8 @@ export function workShift(w: World, p: Character): { minutes: number; lines: str
   const r = (boss.rels[p.id] ??= { trust: 0.3, respect: 0.3, affection: 0.3, grudge: 0, lastMet: w.now });
   const good = w.rng.chance(0.55 + p.traits.caution * 0.2);
   j.noticed = clamp(j.noticed + (good ? 0.07 : 0.02));
-  r.trust = clamp(r.trust + (good ? 0.02 : 0));
-  r.respect = clamp(r.respect + (good ? 0.015 : 0));
+  feelOn(w, r, 'trust', (good ? 0.02 : 0));
+  feelOn(w, r, 'respect', (good ? 0.015 : 0));
   r.lastMet = w.now;
   if (j.biz) p.district = w.biz[j.biz].district;
   else p.district = boss.district;

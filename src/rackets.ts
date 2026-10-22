@@ -2,7 +2,7 @@ import { hasPerk } from './specs';
 // Ongoing operations. Each one has a runner, a weekly take, and a way to go wrong. Money from these comes through the books
 // like everything else, so what your superiors can see is a choice with consequences.
 import { aptitude, grow } from './people';
-import { addFact, bearOn, clamp, earn, handleDeath, money, newId, rel } from './core';
+import { addFact, bearOn, clamp, earn, feel, feelOn, handleDeath, money, newId, rel } from './core';
 import { addEnc } from './encounters';
 import { Character, DAY, Id, Op, OpKind, World } from './types';
 import { arch, pick } from './voice';
@@ -62,7 +62,7 @@ export function startOp(w: World, p: Character, kind: Exclude<OpKind, 'hijack'>,
   const r = runner ? w.chars[runner] : undefined;
   if (kind === 'dock' || kind === 'union') {
     const capo = p.bossId ? w.chars[p.bossId] : undefined;
-    if (capo) rel(capo, p.id).respect = clamp(rel(capo, p.id).respect + 0.03);
+    if (capo) feel(w, capo, p.id, 'respect', 0.03);
   }
   return [`${d.label} in ${district}. ${r ? `${r.name} will run it.` : 'You’ll run it yourself.'} ${d.cost ? `It costs you ${money(d.cost)}.` : ''} The first money comes in a week.`];
 }
@@ -101,16 +101,16 @@ export function opRule(w: World, p: Character, op: Op, code: string, found: numb
     const amt = Math.min(r.cash, found);
     r.cash -= amt;
     p.cash += amt;
-    rr.trust = clamp(rr.trust - 0.08);
+    feelOn(w, rr, 'trust', -0.08);
     return [`${r.name} hands over ${money(amt)} without looking at you. Whatever he felt about you, he feels it a little differently now.`];
   }
   if (code === 'fire') {
     op.runner = null;
     bearOn(w, rr, 0.1, `${p.name} took him off the operation`);
-    rr.trust = clamp(rr.trust - 0.15);
+    feelOn(w, rr, 'trust', -0.15);
     return [`You take the operation away from ${r.name}. He takes it the way men take a public embarrassment.`];
   }
-  rr.trust = clamp(rr.trust - 0.02);
+  feelOn(w, rr, 'trust', -0.02);
   return [`You tell ${r.name} you know, and that it stops. He nods once.`];
 }
 

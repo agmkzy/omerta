@@ -4,7 +4,7 @@ import { hasPerk } from './specs';
 // and what you do about it changes how those people feel and what the families make of you.
 import { temper } from './temper';
 import { bizMove } from './econ';
-import { addFact, bear, clamp, earn, money, notifyProtector, ownerBiz, rel, repute, witnessesAt } from './core';
+import { addFact, bear, clamp, earn, feel, money, notifyProtector, ownerBiz, rel, repute, witnessesAt } from './core';
 import { addFavour } from './encounters';
 import { bump, jail, mkJob, paid } from './jobs';
 import { Approach, Result } from './jobs';
@@ -192,7 +192,7 @@ export function gigResolve(w: World, j: Job, doer: Character, code: string): Res
         ok = true;
         lines.push(lean ? `${t.name} sees who’s come with ${first(giver)} and finds ${money(settle)} in his pocket he’d forgotten about.` : `You don’t say a word. ${t.name} looks at you, looks at ${first(giver)}, and pays ${money(settle)} on the spot.`);
         lines.push(`${giver.name} pays you ${money(gained)}.`);
-        rel(giver, doer.id).trust = clamp(rel(giver, doer.id).trust + 0.08);
+        feel(w, giver, doer.id, 'trust', 0.08);
         if (lean && rng.chance(0.4 + violence * 0.3)) {
           addFact(w, { kind: 'beating', actor: doer.id, victim: t.id, hiddenActor: true, text: `${doer.name} roughed up ${t.name}.`, textHidden: `${t.name} was roughed up outside his own door.`, district: t.district }, { witnesses: witnessesAt(w, t.district, [doer.id, t.id], 2) });
           bump(doer, 0.08); bear(w, t, doer.id, 0.25, `${doer.name} roughed him up`);
@@ -201,7 +201,7 @@ export function gigResolve(w: World, j: Job, doer: Character, code: string): Res
       } else {
         bump(doer, 0.06);
         lines.push(`${t.name} refuses and says things about ${first(giver)}’s mother. ${lean ? 'You don’t take it further than you were paid to.' : 'You were told to say nothing, so you say nothing, and leave.'}`);
-        rel(giver, doer.id).trust = clamp(rel(giver, doer.id).trust - 0.04);
+        feel(w, giver, doer.id, 'trust', -0.04);
       }
       return res();
     }
@@ -216,9 +216,9 @@ export function gigResolve(w: World, j: Job, doer: Character, code: string): Res
         gained = paid(w, doer, Math.max(100, fee), who, 'handle');
         ok = true;
         addFavour(w, doer.id, who.id, 1, `warning about the truck headed for ${b.name}`);
-        rel(who, doer.id).trust = clamp(rel(who, doer.id).trust + 0.1); rel(o, doer.id).trust = clamp(rel(o, doer.id).trust + 0.06);
+        feel(w, who, doer.id, 'trust', 0.1); feel(w, o, doer.id, 'trust', 0.06);
         lines.push(`${who.name} listens without interrupting. "Nobody tells me anything for free. You did." He pays you ${money(gained)}.`);
-        if (j.giver && w.chars[j.giver]) rel(w.chars[j.giver]!, doer.id).trust = clamp(rel(w.chars[j.giver]!, doer.id).trust - 0.02);
+        if (j.giver && w.chars[j.giver]) feel(w, w.chars[j.giver]!, doer.id, 'trust', -0.02);
         note = `Sold the warning about the ${b.name} truck.`;
         return res();
       }
@@ -250,7 +250,7 @@ export function gigResolve(w: World, j: Job, doer: Character, code: string): Res
       if (!attacked) {
         gained = paid(w, doer, j.pay, col, 'handle'); ok = true;
         lines.push(`Nothing happens, which is how it’s supposed to go. The truck backs in, ${o.name} signs, and ${first(col)} pays you ${money(gained)}.`);
-        rel(col, doer.id).trust = clamp(rel(col, doer.id).trust + 0.05); rel(o, doer.id).trust = clamp(rel(o, doer.id).trust + 0.05);
+        feel(w, col, doer.id, 'trust', 0.05); feel(w, o, doer.id, 'trust', 0.05);
       } else {
         const win = rng.chance(clamp(0.55 + (violence - 0.5) * 0.3 + (courage - 0.5) * 0.3 + (code === 'ride' ? 0.1 : -0.05), 0.2, 0.9));
         bump(doer, 0.15);
@@ -262,7 +262,7 @@ export function gigResolve(w: World, j: Job, doer: Character, code: string): Res
         } else {
           doer.hurtUntil = w.now + 2 * DAY;
           lines.push('Two men and a car across the road. You hold them off long enough for the driver to get away, and not long enough to avoid a beating. The truck is safe. You’re laid up for a couple of days.');
-          rel(col, doer.id).respect = clamp(rel(col, doer.id).respect + 0.03);
+          feel(w, col, doer.id, 'respect', 0.03);
           gained = paid(w, doer, Math.round(j.pay * 0.5 / 10) * 10, col, 'handle');
           ok = true;
         }
@@ -291,11 +291,11 @@ export function gigResolve(w: World, j: Job, doer: Character, code: string): Res
         const caught = rng.chance(0.45 + temper(bk).caution * 0.35);
         lines.push(`You keep ${money(dip)}.`);
         if (caught) {
-          rel(bk, doer.id).trust = clamp(rel(bk, doer.id).trust - 0.3); bear(w, bk, doer.id, 0.2, `${doer.name} kept some of his money`); rel(bk, doer.id).respect = clamp(rel(bk, doer.id).respect - 0.15);
+          feel(w, bk, doer.id, 'trust', -0.3); bear(w, bk, doer.id, 0.2, `${doer.name} kept some of his money`); feel(w, bk, doer.id, 'respect', -0.15);
           addFact(w, { kind: 'theft', actor: doer.id, victim: bk.id, amount: dip, hiddenActor: false, text: `${doer.name} came up ${money(dip)} short on a bag he carried for ${bk.name}.`, district: bk.district }, { witnesses: [bk.id] });
           lines.push(`${first(bk)} counted twice. He knows exactly how much. He doesn’t say a word, which is worse.`);
         } else lines.push(`${first(bk)} counts it once and nods. You got away with it, this time.`);
-      } else rel(bk, doer.id).trust = clamp(rel(bk, doer.id).trust + 0.06);
+      } else feel(w, bk, doer.id, 'trust', 0.06);
       return res();
     }
     case 'inspector': {
@@ -307,20 +307,20 @@ export function gigResolve(w: World, j: Job, doer: Character, code: string): Res
         p.cash -= amt; ok = true;
         b.distress = Math.max(0, b.distress - 1);
         addFavour(w, doer.id, o.id, 2, `making the inspector at ${b.name} go away`);
-        rel(o, doer.id).trust = clamp(rel(o, doer.id).trust + 0.12); rel(o, doer.id).affection = clamp(rel(o, doer.id).affection + 0.06);
+        feel(w, o, doer.id, 'trust', 0.12); feel(w, o, doer.id, 'affection', 0.06);
         lines.push(`You put an envelope in the inspector’s coat on the way out of ${b.name}. His report is lost. ${o.name} stands a little straighter. "I won’t forget that."`);
         note = `Made the inspector at ${b.name} go away.`;
       } else {
         const pr = clamp(0.45 + (doer.traits.sociability - 0.5) * 0.4 + (violence - 0.5) * 0.2 + p.standing / 400, 0.2, 0.85);
         if (rng.chance(pr)) {
           ok = true; b.distress = Math.max(0, b.distress - 1);
-          rel(o, doer.id).trust = clamp(rel(o, doer.id).trust + 0.1);
+          feel(w, o, doer.id, 'trust', 0.1);
           lines.push(`You find the inspector at lunch and mention that ${o.name} is a friend of some friends. He remembers an urgent call. ${first(o)} owes you a good word.`);
           addFavour(w, doer.id, o.id, 1, `a word with the inspector at ${b.name}`);
         } else {
           bump(doer, 0.05); bizMove(w, b, -Math.min(200, Math.max(0, b.cash)), 'fine');
           lines.push(`The inspector writes down your name. ${b.name} gets fined ${money(200)} and ${first(o)} doesn’t look at you when he says thank you.`);
-          rel(o, doer.id).trust = clamp(rel(o, doer.id).trust - 0.03);
+          feel(w, o, doer.id, 'trust', -0.03);
         }
       }
       return res();

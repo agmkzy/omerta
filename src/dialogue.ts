@@ -8,7 +8,7 @@ import { askAbout, helpWith, sitOf } from './situations';
 import { readiness } from './career';
 import { share, confide } from './actions';
 import { react, envelopeDue, handOver, kickWindow, envelopeText, rateView } from './books';
-import { addFact, bear, bearOn, clamp, createDebt, earn, ease, factText, famName, flavour, isResolved, learn, money, ownerBiz, payDebt, rel, repute, shortTime } from './core';
+import { addFact, bear, bearOn, clamp, createDebt, earn, ease, factText, famName, feel, feelAtLeast, feelOn, feelToOn, flavour, isResolved, learn, money, ownerBiz, payDebt, rel, repute, shortTime } from './core';
 import { standingWord, mkJob, oppFrom, tipFrom, bossOffer, traitWords, jobSaid, takeJob, declineJob } from './jobs';
 import { openSitdown, Meeting } from './meetings';
 import { helpMan, lateOf, PROBLEM_LABEL } from './people';
@@ -1118,7 +1118,7 @@ function sayOne(w: World, p: Character, t: Character, c: Convo, code: string): S
     if (mem && mem.sig === pol.sig(w, p, t, arg0) && day0 - mem.d <= pol.window) {
       mem.n++;
       const ls = [vsay(w, t, p, pol.kind === 'round' ? 'round_enough' : mem.d === day0 ? 'already' : 'nochange')];
-      if (mem.n >= 4 && !pol.kind && base0 !== 'old_times') { const q = rel(t, p.id); q.trust = clamp(q.trust - 0.01); ls.push(vsay(w, t, p, 'chat_brush')); } // he is tired of being asked
+      if (mem.n >= 4 && !pol.kind && base0 !== 'old_times') { const q = rel(t, p.id); feelOn(w, q, 'trust', -0.01); ls.push(vsay(w, t, p, 'chat_brush')); } // he is tired of being asked
       const lt = lighten(t, !!c.named, ls);
       return { lines: lt.lines, minutes: 2, convo: { ...c, named: lt.named, used: [...(c.used ?? []), usedKey(c, code)] } };
     }
@@ -1235,14 +1235,14 @@ function sayOne(w: World, p: Character, t: Character, c: Convo, code: string): S
   }
   if (social && (c.ctx as { dull?: boolean }).dull) {
     const q = rel(t, p.id);
-    q.trust = before.tr + (q.trust - before.tr) * 0.2; q.affection = before.af + (q.affection - before.af) * 0.2; q.respect = before.rs + (q.respect - before.rs) * 0.2;
+    feelToOn(q, 'trust', before.tr + (q.trust - before.tr) * 0.2); feelToOn(q, 'affection', before.af + (q.affection - before.af) * 0.2); feelToOn(q, 'respect', before.rs + (q.respect - before.rs) * 0.2);
     r.lines.push((c.ctx as { dullWhy?: string }).dullWhy === 'week' ? 'You’ve been over this ground all week. He has nothing new to give you, and he knows you know it.' : 'You’ve covered this ground today. It doesn’t land the way it did.');
   }
   // Friendly talk alone has a ceiling: past "knows you well" trust comes from what you do for people, not how often you drink with them.
   if (social) {
     const q = rel(t, p.id); let capped = false;
-    if (q.trust > 0.6 && q.trust > before.tr) { q.trust = Math.max(before.tr, 0.6); capped = true; }
-    if (q.affection > 0.8 && q.affection > before.af) { q.affection = Math.max(before.af, 0.8); capped = true; }
+    if (q.trust > 0.6 && q.trust > before.tr) { feelToOn(q, 'trust', Math.max(before.tr, 0.6)); capped = true; }
+    if (q.affection > 0.8 && q.affection > before.af) { feelToOn(q, 'affection', Math.max(before.af, 0.8)); capped = true; }
     if (capped && before.tr >= 0.55) r.lines.push('There’s a point past which talk doesn’t move a man. The rest has to be earned.');
   }
   // The old submenus are only ever entered through the opening screen now, so whatever an action leaves behind, the conversation goes on
@@ -1282,9 +1282,9 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
   const [c0, arg] = code.split(':');
   touchDispute(w, p, t);
   const tweak = (trust: number, aff = 0, resp = 0) => {
-    r.trust = clamp(r.trust + trust);
-    r.affection = clamp(r.affection + aff);
-    r.respect = clamp(r.respect + resp);
+    feelOn(w, r, 'trust', trust);
+    feelOn(w, r, 'affection', aff);
+    feelOn(w, r, 'respect', resp);
   };
   if (c0 === 'sub') {
     c.ctx.sub = arg === 'back' ? undefined : arg;
@@ -1351,7 +1351,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
       const k = f ? t.known[f.id] : undefined;
       const src = k && k.from !== 'public' && k.from !== 'witness' ? w.chars[k.from] : undefined;
       lines.push(src && src.id !== p.id ? `${t.name}: “${src.name} said something. I couldn’t tell you if he had it right.”` : k?.from === 'witness' ? `${t.name}: “I was there. I saw some of it.”` : `${t.name}: “It was going round. Nobody owns a story like that.”`);
-      if (src && src.id !== p.id) rel(p, src.id).trust = Math.max(rel(p, src.id).trust, 0.1);
+      if (src && src.id !== p.id) feelAtLeast(w, p, src.id, 'trust', 0.1);
       return stay('root', 8);
     }
     case 'f_hurt': {
@@ -1412,7 +1412,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
       return stay('personal', 15);
     case 'old_times': {
       tweak(0.02, 0.04);
-      rp.affection = clamp(rp.affection + 0.03);
+      feelOn(w, rp, 'affection', 0.03);
       const told = share(w, t, p, lines);
       share(w, p, t, []);
       if (!lines.length) lines.push(vsay(w, t, p, 'old_quiet'));
@@ -1427,7 +1427,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
       }
       p.cash -= 40;
       tweak(0.06, 0.06);
-      rp.trust = clamp(rp.trust + 0.04);
+      feelOn(w, rp, 'trust', 0.04);
       lines.push(vsay(w, t, p, 'drink'));
       const toldD = share(w, t, p, lines);
       if (toldD.length) return { lines, minutes: 45, convo: { id: c.id, node: 'incident', ctx: { fact: toldD[0].id, asked: [] } } };
@@ -1716,7 +1716,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
     case 'recommend': {
       if (rng.chance(clamp(r.trust * 0.9, 0.1, 0.9))) {
         const boss = w.chars[w.fam[t.familyId!].bossId];
-        if (boss && boss.id !== t.id) rel(boss, p.id).respect = clamp(rel(boss, p.id).respect + 0.05);
+        if (boss && boss.id !== t.id) feel(w, boss, p.id, 'respect', 0.05);
         t.memos.push({ id: 'm' + w.nextId++, t: w.now, other: p.id, kind: 'favour', text: `He put in a word for you. You owe him one.` });
         lines.push(vsay(w, t, p, 'recommend_yes'));
       } else lines.push(vsay(w, t, p, 'recommend_no'));
@@ -1749,7 +1749,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
       (p.intro ??= {})[t.id] = w.now;
       rp.lastMet = r.lastMet = w.now;
       tweak(0.1, 0.03, 0.03);
-      rel(via, p.id).respect = clamp(rel(via, p.id).respect + 0.01);
+      feel(w, via, p.id, 'respect', 0.01);
       lines.push(`${via.name.split(' ')[0]} had a word with ${t.name} before you arrived.`, vsay(w, t, p, 'vouch', { V: via.name.split(' ')[0] }));
       return stay('root', 15);
     }
@@ -1797,7 +1797,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
       } else { lines.push(`${t.name} gives you a careful look. "We all get along." You can tell there’s more.`); return { ...stay('root', 20), skipMemory: true }; }
       return stay('root', 20);
     }
-    case 'ask_history': { lines.push(...historyLines(w, p, t)); rel(t, p.id).respect = clamp(rel(t, p.id).respect + 0.02); return stay('root', 5); }
+    case 'ask_history': { lines.push(...historyLines(w, p, t)); feel(w, t, p.id, 'respect', 0.02); return stay('root', 5); }
     case 'enc': {
       const [, eid, ecode] = code.split(':');
       const e = w.enc.find((x) => x.id === eid);
@@ -2075,7 +2075,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
       c.ctx.asked.push('source');
       const src = k && k.from !== 'public' && k.from !== 'witness' && k.from !== 'self' ? w.chars[k.from] : undefined;
       lines.push(src ? `${t.name} thinks. "${src.name}. He was closer to it than I was."` : `${t.name} spreads his hands. "It was going round. You know how it is. Nobody owns a story like that."`);
-      if (src && src.id !== p.id) rel(p, src.id).trust = Math.max(rel(p, src.id).trust, 0.1);
+      if (src && src.id !== p.id) feelAtLeast(w, p, src.id, 'trust', 0.1);
       return stay('incident', 10);
     }
     case 'rk_back': {
@@ -2479,7 +2479,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
       if (seen.length) {
         const names = seen.slice(0, 2);
         lines.push(`${t.name}: "${names.map((x) => x.name).join(' and ')} ${names.length > 1 ? 'were' : 'was'} there."`);
-        for (const x of names) rel(p, x.id).trust = Math.max(rel(p, x.id).trust, 0.1);
+        for (const x of names) feelAtLeast(w, p, x.id, 'trust', 0.1);
       } else lines.push(`${t.name}: "Nobody I know of."`);
       c.ctx.asked.push('witness');
       return stay('incident', 10);
@@ -2574,7 +2574,6 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
     case 'demand': {
       const f = w.facts[arg];
       const tough = t.traits.violence > 0.6 && t.rank !== 'associate';
-      rp.respect = clamp(rp.respect);
       if (isSuperior(w, p, t) || (!tough && rng.chance(0.5 + r.trust * 0.3))) {
         const amt = Math.min(f.amount ?? 0, Math.max(0, t.cash));
         if (amt > 0 && f.victim === p.id) {
@@ -2721,8 +2720,8 @@ export function memoTick(w: World) {
       else if (m.kind === 'question' && m.ref) kept = !!p.known[m.ref]?.knowsActor && !!c.known[m.ref]?.knowsActor;
       m.done = true;
       if (kept) continue;
-      rel(c, p.id).trust = clamp(rel(c, p.id).trust - 0.1);
-      rel(c, p.id).respect = clamp(rel(c, p.id).respect - 0.06);
+      feel(w, c, p.id, 'trust', -0.1);
+      feel(w, c, p.id, 'respect', -0.06);
       if (p.isPlayer) repute(w, p, -1, 'broke word');
       addFact(w, { kind: 'ruling', actor: p.id, victim: c.id, minor: true, text: `${p.name} didn’t keep his word to ${c.name}.`, district: c.district }, { witnesses: [c.id] });
     }

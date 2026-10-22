@@ -133,12 +133,3 @@ export function characterWords(p: Character): string[] {
   if (rep.broken > rep.kept && rep.broken >= 2) out.push('Your word has not been worth much.'); else if (rep.kept >= 4) out.push('You keep your word.');
   return out.length ? out : ['You are hard to read, which is not the worst thing to be.'];
 }
-// A man who now fears another more (a threat, a beating): fear is its own thing, and it fades slowly if nothing feeds it.
-export function frighten(w: World, me: Character, other: Id, amt: number) {
-  const r = me.rels[other] ?? (me.rels[other] = { trust: 0.1, respect: 0.3, affection: 0.1, grudge: 0, lastMet: w.now });
-  r.fear = clamp((r.fear ?? 0) + amt);
-}
-// Weekly: fear that nothing feeds fades (a tenth a week), and is forgotten once it is slight.
-export function fearWeek(w: World) {
-  for (const c of Object.values(w.chars)) for (const r of Object.values(c.rels)) if (r.fear !== undefined) { r.fear *= 0.9; if (r.fear < 0.02) delete r.fear; }
-}

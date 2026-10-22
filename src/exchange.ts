@@ -7,7 +7,7 @@
 // through the same stance the rest of the negotiation uses, and the decision is still the matter's own (asks.reconsider).
 //
 // The point in hand lives on the matter (s.m.beat, s.m.claim, s.m.claimT), so it is there when you come back days later.
-import { bear, clamp, money, ownerBiz, peek, rel } from './core';
+import { bear, clamp, feel, money, ownerBiz, peek, rel } from './core';
 import { askee, kindOf, reconsider, stance } from './asks';
 import { noteHard, temper, viewOf } from './temper';
 import type { Character, Situation, World } from './types';
@@ -223,7 +223,7 @@ export function reply(w: World, p: Character, s: Situation, k: string): string[]
       beat(undefined); return [soft ? '“There’s always a catch. I’m sorry.”' : '“There’s always a catch.”'];
     }
     case 'remind': {
-      S.fear = clamp(S.fear + 0.06); S.good = clamp(S.good + 0.05); S.anger = clamp(S.anger + tp.pride * 0.06); rel(t, p.id).affection = clamp(peek(t, p.id).affection - 0.02);
+      S.fear = clamp(S.fear + 0.06); S.good = clamp(S.good + 0.05); S.anger = clamp(S.anger + tp.pride * 0.06); feel(w, t, p.id, 'affection', -0.02);
       return settle('He looks away. “I remember. All right.”', tp.pride > 0.6 ? '“I remember. I don’t like being reminded.”' : '“I remember. I still can’t.”', '“I remember. I can’t do all of it.”');
     }
     case 'give': S.good = clamp(S.good + 0.05); s.next = w.now + 4 * 1440; s.phase = 'waiting'; beat(undefined); return [soft ? '“Thank you. I mean it.”' : '“Fine.”'];

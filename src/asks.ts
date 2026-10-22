@@ -6,7 +6,7 @@
 // about what their men are doing and have views. The player and the NPCs use exactly the same moves; NPCs choose theirs from who
 // they are. Each kind of ask only says what is being asked, what it is worth to the man asked, and what yes does in the real world.
 import { ASKS } from './askkinds'; // first: the registry must exist before anything below can reach matters.ts
-import { addFact, bear, bearOn, clamp, createDebt, ease, easeOn, famName, money, notifyProtector, ownerBiz, payDebt, peek, regard, rel, repute, witnessesAt } from './core';
+import { addFact, bear, bearOn, clamp, createDebt, ease, easeOn, famName, feel, feelOn, money, notifyProtector, ownerBiz, payDebt, peek, regard, rel, repute, witnessesAt } from './core';
 import { loanPosition } from './negotiate';
 import { say as vsay } from './voicesheet';
 import { bizMove, giveTime, setCollector } from './econ';
@@ -20,7 +20,7 @@ import { finishJob } from './jobs';
 import { rateView } from './books';
 import { quarrelsWith, settleBetween } from './disputes';
 import { arch } from './voice';
-import { frighten, noteConduct, noteHard, temper, viewOf } from './temper';
+import { noteConduct, noteHard, temper, viewOf } from './temper';
 import { speak, type Approach } from './react';
 import { classOf, giveReason } from './exchange';
 import { Business, Character, DAY, Enc, Favour, Id, Situation, Stance, World } from './types';
@@ -200,7 +200,7 @@ export function move(w: World, s: Situation, mv: AskMove): Outcome {
       S.fear = clamp(S.fear + f); S.anger = clamp(S.anger + 0.04 + tp.pride * 0.1 + tp.volatility * 0.06);
       // (a brave, proud man digs in; a timid, careful one's nerve goes: fear is what does it, so the more it lands the more it costs him)
       S.resolve = clamp(S.resolve + (tp.courage + tp.pride > 1.25 ? 0.06 : -0.04 - f * (0.6 + tp.caution * 0.8) * (1 - tp.courage)));
-      frighten(w, t, a.id, f * 0.5); noteHard(w, a, t, 'threats');
+      feel(w, t, a.id, 'fear', f * 0.5); noteHard(w, a, t, 'threats');
       tell(w, s, `${a.name} leaned on ${t.name}${s.biz ? ` at ${w.biz[s.biz]?.name}` : ''}.`, { actor: a.id, victim: t.id, witnesses: wit, minor: true });
       if (!a.isPlayer) lines.push(`${first(a)} makes it clear what saying no would cost.`);
       break;
@@ -209,7 +209,7 @@ export function move(w: World, s: Situation, mv: AskMove): Outcome {
       if (!K.force) return { lines: ['Force would settle nothing here.'] };
       lines.push(K.force(w, s, a, t));
       S.fear = clamp(S.fear + 0.25 + tp.caution * 0.15); S.anger = clamp(S.anger + 0.25 + tp.pride * 0.15); S.resolve = clamp(S.resolve + (tp.courage > 0.65 ? 0.05 : -0.12 - (1 - tp.courage) * tp.caution * 0.2));
-      frighten(w, t, a.id, 0.2); noteHard(w, a, t, 'force');
+      feel(w, t, a.id, 'fear', 0.2); noteHard(w, a, t, 'force');
       a.heat = clamp(a.heat + 0.08, 0, 1.5);
       break;
     }
@@ -318,7 +318,7 @@ function finish(w: World, s: Situation, a: Character, t: Character, K: AskKind, 
   // how he feels about it afterwards is part of the bargain: a frightened yes is resented, a willing one is not
   if (coerced) { bear(w, t, a.id, 0.12, `${a.name} forced his hand`); afterwards(w, s, a, t); }
   else if (a.isPlayer) regard(w, t, a, 'trust', 0.03, 'deal');
-  else rel(t, a.id).trust = clamp(peek(t, a.id).trust + 0.03);
+  else feel(w, t, a.id, 'trust', 0.03);
   closeSit(w, s, coerced ? 'gave in' : 'agreed', [coerced ? `${first(t)} agreed because he was afraid` : `${first(t)} agreed`], K.cool ?? 6);
   return { answer: 'yes', lines, closed: true };
 }
@@ -329,7 +329,7 @@ function finish(w: World, s: Situation, a: Character, t: Character, K: AskKind, 
 // himself (the grudge that retaliation reads). A frightened man also tells the player less from now on (trust gates what he shares).
 function afterwards(w: World, s: Situation, a: Character, t: Character) {
   const tp = temper(t), r = rel(t, a.id);
-  r.trust = clamp(r.trust - 0.04 - tp.caution * 0.04);
+  feelOn(w, r, 'trust', -(0.04 - tp.caution * 0.04));
   const friend = Object.entries(t.rels).map(([id, x]) => ({ c: live(w, id), x })).filter((y) => y.c && !y.c.isPlayer && y.c.id !== a.id && y.x.trust > 0.35).sort((p, q) => (q.x.trust + q.x.affection) - (p.x.trust + p.x.affection))[0]?.c;
   // (between other men the same, without the talk: a story told about every frightened yes in the city would swamp the record)
   if (friend && a.isPlayer && tp.agreeable + tp.empathy + (1 - tp.pride) > 1.2) {
@@ -508,7 +508,7 @@ function superiors(w: World, s: Situation, a: Character) {
       opts: [{ code: 'explain', label: 'Explain yourself', hint: 'Tell him how it is. He may or may not like it.' }, { code: 'sorry', label: 'Say it won’t happen again', hint: 'Swallow it. He’ll want you to mean it.' }], data: { sit: s.id } });
     void e;
   } else {
-    rel(boss, a.id).trust = clamp(peek(boss, a.id).trust - (messy ? 0.06 : 0.02));
+    feel(w, boss, a.id, 'trust', -((messy ? 0.06 : 0.02)));
     if (messy && boss.traits.caution > 0.5) { tell(w, s, `${boss.name} told ${a.name} to leave it alone.`, { actor: boss.id, victim: a.id, minor: true }); closeSit(w, s, 'called off', [`${first(boss)} called it off`], 6); }
   }
 }
@@ -649,7 +649,7 @@ ASKS.warn = {
   yes: (w, s, a, t) => {
     const o = sits(w).find((x) => x.id === String(s.m?.about));
     if (o && isOpen(o)) { tell(w, o, `${t.name} backed off after ${a.name} had a word.`, { actor: t.id, victim: a.id, minor: true }); closeSit(w, o, 'warned off', [`${first(a)} made ${first(t)} back off`], 8); }
-    if (t.isPlayer) regard(w, a, t, 'respect', 0.02, 'backoff'); else rel(a, t.id).respect = clamp(rel(a, t.id).respect + 0.02);
+    if (t.isPlayer) regard(w, a, t, 'respect', 0.02, 'backoff'); else feel(w, a, t.id, 'respect', 0.02);
     // the man he stood up for owes him for it (V89: a favour like any other, which can be called in)
     const helped = o ? askee(w, o) : undefined;
     if (helped && helped.id !== a.id && !a.isPlayer && !helped.isPlayer) npcFavour(w, a, helped, `making ${t.name} back off`);
@@ -719,7 +719,7 @@ ASKS.help = {
   onNo: (w, s, a, t) => {
     // a man who pays for protection and doesn't get it remembers, and stops being sure what he is paying for
     bear(w, a, t.id, 0.15, `${t.name} took his money and did not look after him`);
-    rel(a, t.id).trust = clamp(peek(a, t.id).trust - 0.15);
+    feel(w, a, t.id, 'trust', -0.15);
     const o = sits(w).find((x) => x.id === String(s.m?.about));
     if (o && isOpen(o)) { const S = stance(w, o, a.id); S.resolve = clamp(S.resolve - 0.2); S.fear = clamp(S.fear + 0.1); }
     const b = o?.biz ? w.biz[o.biz] : undefined;
@@ -942,19 +942,19 @@ ASKS.favour = {
       // the man he has bad blood with sees who stands with him now, and holds it against him too
       const foe = Object.entries(a.rels).filter(([id, r]) => r.grudge > 0.3 && live(w, id) && id !== t.id).sort((x, y) => y[1].grudge - x[1].grudge)[0];
       const fc = foe ? w.chars[foe[0]] : undefined;
-      if (fc) { bear(w, fc, t.id, 0.1, `${t.name} stood with ${a.name}`); rel(fc, a.id).respect = clamp(rel(fc, a.id).respect + 0.04); }
+      if (fc) { bear(w, fc, t.id, 0.1, `${t.name} stood with ${a.name}`); feel(w, fc, a.id, 'respect', 0.04); }
       tell(w, s, `${t.name} stood beside ${a.name}${fc ? ` when he went to see ${fc.name}` : ' when it counted'}.`, { actor: t.id, victim: fc?.id ?? a.id, witnesses: [...new Set([a.id, ...(fc ? [fc.id] : []), ...witnessesAt(w, t.district, [a.id, t.id], 2)])], minor: true });
     }
     else line = `${t.isPlayer ? 'You keep' : `${first(t)} keeps`} it to ${t.isPlayer ? 'yourself' : 'himself'}.`;
     if (f) f.settled = true; else addFavour(w, t.id, a.id, 1, `what ${t.name} did when ${a.name} asked`); // a fresh favour done is a favour owed
-    if (t.isPlayer) { regard(w, a, t, 'respect', 0.04, 'favour'); regard(w, a, t, 'trust', 0.04, 'favour'); } else { rel(a, t.id).respect = clamp(rel(a, t.id).respect + 0.04); rel(a, t.id).trust = clamp(rel(a, t.id).trust + 0.04); }
+    if (t.isPlayer) { regard(w, a, t, 'respect', 0.04, 'favour'); regard(w, a, t, 'trust', 0.04, 'favour'); } else { feel(w, a, t.id, 'respect', 0.04); feel(w, a, t.id, 'trust', 0.04); }
     return `${line} ${f ? (t.isPlayer ? '“We’re even. You’re a man who pays.”' : a.isPlayer ? 'You’re square now.' : 'They are square.') : ''}`.trim();
   },
   onNo: (w, s, a, t) => {
     const f = favOf(w, s);
     if (!f || s.m?.welsh) return undefined;
     s.m = { ...(s.m ?? {}), welsh: 1 };
-    const r = rel(a, t.id); r.respect = clamp(r.respect - 0.1); r.trust = clamp(r.trust - 0.08); bearOn(w, r, 0.1, `${t.name} would not honour the favour he owed`);
+    const r = rel(a, t.id); feelOn(w, r, 'respect', -0.1); feelOn(w, r, 'trust', -0.08); bearOn(w, r, 0.1, `${t.name} would not honour the favour he owed`);
     // not minor: a man who won't pay what he owes is talked about
     tell(w, s, `${t.name} refused ${a.name} a favour he owed him.`, { kind: 'favour', actor: t.id, victim: a.id, witnesses: [a.id], broadcast: witnessesAt(w, a.district, [a.id, t.id], 2) });
     if (t.isPlayer) { repute(w, t, -2, 'welsh'); return `${first(a)} doesn’t raise his voice. “I’ll remember you said that.” It will get around that you don’t pay what you owe.`; }
@@ -1051,7 +1051,7 @@ ASKS.amends = {
   yes: (w, s, a, t) => {
     const amt = Math.max(0, Math.min(s.terms?.amt ?? 0, a.cash));
     if (amt) { a.cash -= amt; t.cash += amt; }
-    const r = rel(t, a.id); easeOn(r, (amt ? 0.3 : 0.5)); r.trust = clamp(r.trust + 0.03);
+    const r = rel(t, a.id); easeOn(r, (amt ? 0.3 : 0.5)); feelOn(w, r, 'trust', 0.03);
     ease(a, t.id, 0.5);
     const wf = wordFact(w, s);
     if (wf) (t.talk ??= {})['word:' + wf.id] = { d: Math.floor(w.now / DAY), sig: 'x', n: 1 };
@@ -1138,7 +1138,7 @@ ASKS.jobpay = {
   },
   better: (w, s) => { const j = jobOf(w, s); if (!j) return undefined; const next = Math.round(((s.terms?.amt ?? j.pay) + j.pay) / 2 / 50) * 50; return next > j.pay && next < (s.terms?.amt ?? 0) ? next : undefined; },
   yes: (w, s, a, t) => { const j = jobOf(w, s)!; j.pay = s.terms?.amt ?? j.pay; return `${first(t)} grumbles and comes up. It’s ${money(j.pay)} now.`; },
-  onNo: (w, s, a, t) => { if (!s.m?.sore) { s.m = { ...(s.m ?? {}), sore: 1 }; rel(t, a.id).trust = clamp(rel(t, a.id).trust - 0.03); } return undefined; },
+  onNo: (w, s, a, t) => { if (!s.m?.sore) { s.m = { ...(s.m ?? {}), sore: 1 }; feel(w, t, a.id, 'trust', -0.03); } return undefined; },
   phrase: {
     ask: (w, s) => `${money(s.terms?.amt ?? 0)} for it, not ${money(jobOf(w, s)?.pay ?? 0)}.`,
     yes: 'He comes up.', no: '“The price is the price.”', counter: '“{amt}. {why}.”', stall: '“Do the work. We’ll talk after.”',

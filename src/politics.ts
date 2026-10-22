@@ -1,10 +1,10 @@
 // What happens above and around you: an informant in the ranks, an underboss who wants the chair,
 // the Commission settling what the families cannot, and the rule that a made man cannot be touched on your say-so.
 import { tension } from './actions';
-import { addFact, bear, clamp, handleDeath, money, rel, repute } from './core';
+import { addFact, bear, clamp, feel, handleDeath, money, rel, repute } from './core';
 import { addEnc, addFavour } from './encounters';
 import { threatOf } from './danger';
-import { logOrg } from './orgs';
+import { discontent, logOrg } from './orgs';
 import { Character, DAY, Enc, Id, World } from './types';
 import { arch, pick } from './voice';
 
@@ -34,7 +34,7 @@ export function askPermission(w: World, p: Character, target: Character): string
     p.cooldown[`sanction:${target.id}`] = w.now + 14 * DAY;
     return [`${boss.name} thinks about it. "${target.name} is a made man. Be sure of what you’re doing. You have two weeks, and I didn’t tell you anything."`];
   }
-  rel(boss, p.id).respect = clamp(rel(boss, p.id).respect - 0.03);
+  feel(w, boss, p.id, 'respect', -0.03);
   return [`${boss.name} shakes his head. "I’m not starting a thing with the ${target.familyId ? w.fam[target.familyId].name : ''} over this. Let it go, or let me handle it my own way."`];
 }
 
@@ -139,7 +139,7 @@ export function suspectChoose(w: World, p: Character, e: Enc, code: string): str
       sus.informant!.exposed = true;
       addFact(w, { kind: 'murder', actor: who.id, victim: sus.id, hiddenActor: true, text: `${who.name} had ${sus.name} killed.`, textHidden: `${sus.name} was found in the trunk of a car.`, district: sus.district }, {});
       repute(w, p, (confirmed ? 6 : 4), 'gave up an informant');
-      rel(who, p.id).respect = clamp(rel(who, p.id).respect + 0.1);
+      feel(w, who, p.id, 'respect', 0.1);
       addFavour(w, who.id, p.id, 3, `giving him ${sus.name} before it was too late`);
       lines.push(`${who.name} listens, and says nothing for a long time. Four days later ${sus.name} is gone, and so is whatever he was going to tell them. Nobody thanks you out loud. ${who.name} will remember it.`);
     } else if (confirmed || w.rng.chance(0.3)) {
@@ -148,7 +148,7 @@ export function suspectChoose(w: World, p: Character, e: Enc, code: string): str
       lines.push(`${who.name} doesn’t wait for proof. ${sus.name} is dead within the week. It turns out he was seeing a woman in Queens. You’ll think about that for a long time.`);
       addFact(w, { kind: 'murder', actor: who.id, victim: sus.id, hiddenActor: true, text: `${who.name} had ${sus.name} killed on a bad rumour.`, textHidden: `${sus.name} was found dead.`, district: sus.district }, {});
     } else {
-      rel(who, p.id).respect = clamp(rel(who, p.id).respect - 0.04);
+      feel(w, who, p.id, 'respect', -0.04);
       lines.push(`${who.name} listens. "I’ll keep an eye." That’s all you get. He looks at ${first(sus)} differently for a while.`);
     }
     return lines;
@@ -160,7 +160,7 @@ export function suspectChoose(w: World, p: Character, e: Enc, code: string): str
       e.data = { ...e.data, confirmed: 1 };
     } else lines.push(`${sus.name} laughs, offended, and swears on his mother. It’s a very good performance.`);
   } else {
-    rel(sus, p.id).trust = clamp(rel(sus, p.id).trust - 0.25);
+    feel(w, sus, p.id, 'trust', -0.25);
     bear(w, sus, p.id, 0.2, `${p.name} accused him of talking`);
     lines.push(`${sus.name} goes red, then white. "You think I'm a rat?" He doesn’t hit you. He walks out. That was an innocent man's anger, and now he’s an enemy.`);
   }
@@ -181,7 +181,10 @@ export function politicsCoup(w: World) {
     const u = Object.values(w.chars).find((c) => c.alive && c.familyId === fam.id && c.rank === 'underboss');
     if (!boss?.alive || !u) continue;
     const weak = boss.jailedUntil > w.now ? 0.07 : 0;
-    if (u.traits.ambition < 0.65 || rel(u, boss.id).respect > 0.55) continue;
+    // Foundation step 3: an underboss moves against his boss when he has reason to, not because he is ambitious and thinks little of
+    // him: his grievances, his want of trust, ambition with nowhere to go and an unsettled house (orgs.discontent, what defection
+    // reads), as well as how little he thinks of the man. A man the boss has just raised, with nothing against him, does not plot.
+    if (u.traits.ambition < 0.65 || rel(u, boss.id).respect > 0.55 || discontent(w, u, boss, fam.unrest && fam.unrest.until > w.now ? fam.unrest.level : 0) < 0.55) continue;
     if (!w.rng.chance((0.012 + weak) * (1 + (fam.unrest && fam.unrest.until > w.now ? fam.unrest.level * 2 : 0)))) continue;
     w.coup = { fam: fam.id, plotter: u.id, boss: boss.id, start: w.now, resolveAt: w.now + w.rng.int(28, 56) * DAY, back: { plotter: [], boss: [] } };
     addFact(w, { kind: 'rumour', actor: u.id, victim: boss.id, minor: true, text: `People are saying ${u.name} isn’t happy with how ${boss.name} runs things.`, district: u.district }, { broadcast: Object.values(w.chars).filter((c) => c.alive && c.familyId === fam.id && c.rank !== 'associate').map((c) => c.id) });
@@ -208,12 +211,12 @@ export function sideChoose(w: World, p: Character, e: Enc, code: string): string
   const b = w.chars[c.boss];
   if (code === 'plotter') {
     c.back.plotter.push(p.id);
-    rel(u, p.id).trust = clamp(rel(u, p.id).trust + 0.2);
+    feel(w, u, p.id, 'trust', 0.2);
     return [`You nod. ${u.name} clasps your hand. "I won’t forget who was there." You have just made yourself a hostage to his luck.`];
   }
   if (code === 'boss') {
     c.back.boss.push(p.id);
-    rel(b, p.id).trust = clamp(rel(b, p.id).trust + 0.25);
+    feel(w, b, p.id, 'trust', 0.25);
     bear(w, u, p.id, 0.2, `${p.name} stood with the boss against him`);
     c.resolveAt = Math.min(c.resolveAt, w.now + 10 * DAY);
     return [`${b.name} listens without moving, and then he says: "You did right." The look on his face isn’t gratitude. It’s calculation. Within a fortnight this will be settled one way or the other.`];
