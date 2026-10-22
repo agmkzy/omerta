@@ -55,7 +55,6 @@ function finish(w: World, p: Character, b: Biz) {
   else if (pt > dt) { pay(w, p, b, g.bet * 2); g.msg = [`${pt} beats ${dt}. You win ${money(g.bet)}.`]; }
   else if (pt < dt) { pay(w, p, b, 0); g.msg = [`${dt} beats your ${pt}. You lose ${money(g.bet)}.`]; }
   else { pay(w, p, b, g.bet); g.msg = [`Both on ${pt}. A push.`]; }
-  p.standing = clamp(p.standing, 0, 100);
 }
 export function act(w: World, p: Character, what: 'hit' | 'stand' | 'double'): string[] {
   const g = w.bj; const b = g ? w.biz[g.biz] : undefined;

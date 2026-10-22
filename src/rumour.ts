@@ -5,7 +5,7 @@
 //
 // And a man passes on what matters to the man he is talking to: what touched him, his family, his crew, his street, before what
 // some stranger lost at cards.
-import { clamp, factText, learn, money, peek, rel } from './core';
+import { bear, clamp, factText, learn, money, peek, rel } from './core';
 import { closeKin, kinTie } from './kin';
 import { tierOf } from './retain';
 import type { Character, Fact, Id, Knowledge, World } from './types';
@@ -69,7 +69,7 @@ export function pass(w: World, from: Character, to: Character, f: Fact, knowsIn:
     if (blame && !knows) {
       const hurt = f.victim === to.id || (f.victim && (kinTie(w, to, w.chars[f.victim]) || w.chars[f.victim]?.bossId === to.id));
       const b = w.chars[blame];
-      if (hurt && b) rel(to, b.id).grudge = clamp(rel(to, b.id).grudge + (f.kind === 'murder' ? 0.35 : 0.15));
+      if (hurt && b) bear(w, to, b.id, (f.kind === 'murder' ? 0.35 : 0.15), `he was told ${b.name} was behind it`);
     }
   }
   return knows;

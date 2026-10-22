@@ -35,7 +35,11 @@ export interface Rel {
   grudge: number;
   lastMet: number;
   fear?: number; // V90: how much he fears the other man, kept apart from respect (temper.ts); absent means none
+  why?: Why; // what his grudge is about: the event that did most to raise it (core.bear), gone when the grudge is
 }
+// The reason behind a grudge: the event when there is one (it may later be pruned from the record, so its words are kept), or
+// a plain reason where nothing was recorded as an event. a: how much it raised the grudge, so a slight does not overwrite a beating.
+export interface Why { t: number; text: string; f?: Id; a: number }
 
 // A character only knows a fact if it is in their `known` map.
 export interface Knowledge {

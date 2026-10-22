@@ -1,7 +1,7 @@
 import { mattersWeek } from './matters';
 import { fearWeek } from './temper'; // V89: registers the matter kinds (and, through it, asks) with situ.ts
 import { pulseWeek } from './pulse';
-import { careerTick, promoTick } from './career';
+import { careerTick, openSeatFor, promoTick } from './career';
 import { agencyDay, agencyWeek, goalAsks } from './goals';
 goalAsks(); // V89: the asks NPC plans make (join), registered once every module has loaded
 import { sitDay, sitWeek } from './situ';
@@ -11,10 +11,7 @@ import { rankWeek } from './powers2';
 import { situationTick } from './situations';
 import { peopleWeek, rollSkills } from './people';
 import { chooseAction, perform } from './actions';
-import {
-  addFact, clamp, earn, famName, isAwake, learn, money, nextWake, notifyProtector, ownerBiz, payDebt,
-  schedule, shortTime, witnessesAt,
-} from './core';
+import { addFact, clamp, earn, easeOn, famName, isAwake, learn, money, nextWake, notifyProtector, ownerBiz, payDebt, schedule, shortTime, witnessesAt } from './core';
 import { BASE_RATE, emptyBooks, settleWeek } from './books';
 import { addStake, bizMove, businessWeek, seizeShare } from './econ';
 import { daily, ventureWeek } from './jobs';
@@ -175,7 +172,7 @@ function weekly(w: World) {
     const tens = Object.values(fam.tension).reduce((a, x) => a + x, 0);
     if (rng.chance(0.004 + Math.min(0.02, tens * 0.003))) {
       const r = rng.chance(0.8) ? 'soldier' : 'capo';
-      fam.capBonus = { ...(fam.capBonus ?? {}), [r]: Math.min(3, (fam.capBonus?.[r] ?? 0) + 1) };
+      openSeatFor(w, fam.id, r);
     }
   }
 
@@ -223,7 +220,7 @@ function weekly(w: World) {
     if (!c.alive) continue;
     // Grudges cool: half-life of roughly two months unless something new happens.
     for (const r of Object.values(c.rels)) {
-      r.grudge = r.grudge < 0.05 ? 0 : r.grudge * 0.92;
+      easeOn(r, r.grudge < 0.05 ? 0 : 0.92); // (and the reason goes with it, core.easeOn)
       // Friendships need feeding: people you have not seen in two weeks drift apart.
       if (w.now - r.lastMet > 14 * DAY) {
         r.trust = Math.max(0.1, r.trust * 0.94);

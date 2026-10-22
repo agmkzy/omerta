@@ -7,7 +7,7 @@ import { generate, perform } from './actions';
 import { crewOf } from './crewlife';
 import { clubOf } from './clubdata';
 import { closeScene, sceneAct } from './club';
-import { addFact, clamp, factText, famName, fmtTime, money, rel } from './core';
+import { addFact, bearOn, clamp, factText, famName, fmtTime, money, rel } from './core';
 import { advance, deserialize, serialize } from './engine';
 import { pruneJobs, approaches, assign, declineJob, dropJob, performMove, resolve, startScheme, takeJob, askAroundJob, haggleJob, investigateJob, pressJob, questionJob } from './jobs';
 import { recommend, recruit, reward } from './career';
@@ -512,12 +512,12 @@ function handle(a: string, v: string) {
         r.trust = clamp(r.trust + 0.04); r.respect = clamp(r.respect + 0.02);
         lines = [`You tell ${first} he’s the kind of man this family needs. He walks out a little taller.`];
       } else if (code === 'shout') {
-        r.trust = clamp(r.trust - 0.1); r.respect = clamp(r.respect - 0.05); r.grudge = clamp(r.grudge + 0.06);
+        r.trust = clamp(r.trust - 0.1); r.respect = clamp(r.respect - 0.05); bearOn(w, r, 0.06, `${p.name} shouted at him in front of the others`);
         for (const m of crewOf(w, p)) if (m.id !== c.id) { const q = rel(m, p.id); q.respect = clamp(q.respect + (c.books.missed > 1 ? 0.02 : -0.01)); }
         lines = [`You raise your voice until the room goes quiet. ${first} stares at the table. The others pretend not to listen. He’ll pay next week, and he’ll remember how you made him.`];
         if (s.short > 0) c.books.arrears += Math.round(s.short);
       } else if (code === 'cut') {
-        r.grudge = clamp(r.grudge + 0.3); r.trust = clamp(r.trust - 0.3);
+        bearOn(w, r, 0.3, `${p.name} cut his share`); r.trust = clamp(r.trust - 0.3);
         leaveCrew(w, c);
         lines = [`"We’re done, ${first}." He puts his hat on and doesn’t say anything. He’s no longer one of yours, and he knows how your crew runs.`];
       } else {

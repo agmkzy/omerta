@@ -373,10 +373,11 @@ export function perform(w: World, a: Action): { minutes: number; lines: string[]
       c.cooldown[`ret:${a.mode}:${x.id}`] = w.now + { beat: 25, torch: 35, hit: 60 }[a.mode ?? 'beat'] * DAY;
       c.cooldown.restraint = w.now + { beat: 28, torch: 45, hit: 70 }[a.mode ?? 'beat'] * DAY;
       const wit = witnessesAt(w, x.district, [c.id, x.id], 3);
+      const cause = c.rels[x.id]?.why?.f; // what he is paying back: the event his grudge is about (core.bear), so the chain is on record
       if (a.mode === 'beat') {
         x.hurtUntil = w.now + 3 * DAY;
         c.heat = clamp(c.heat + 0.15, 0, 1.5);
-        addFact(w, { kind: 'beating', actor: c.id, victim: x.id, text: `${c.name} beat up ${x.name}.`, district: x.district }, { witnesses: wit });
+        addFact(w, { kind: 'beating', actor: c.id, cause, victim: x.id, text: `${c.name} beat up ${x.name}.`, district: x.district }, { witnesses: wit });
         tension(w, c, x, 1);
         lines.push(`You work ${x.name} over until he stops answering back. He knows who did it.`);
       } else if (a.mode === 'torch') {
@@ -388,7 +389,7 @@ export function perform(w: World, a: Action): { minutes: number; lines: string[]
         b.damaged = 3;
         bizMove(w, b, -200, 'damage');
         c.heat = clamp(c.heat + 0.1, 0, 1.5);
-        const f = addFact(w, { kind: 'vandalism', actor: c.id, victim: x.id, business: b.id, hiddenActor: true, text: `${c.name} torched ${b.name}.`, textHidden: `Someone torched ${b.name}.`, district: b.district }, { witnesses: wit.filter(() => rng.chance(0.4)) });
+        const f = addFact(w, { kind: 'vandalism', actor: c.id, cause, victim: x.id, business: b.id, hiddenActor: true, text: `${c.name} torched ${b.name}.`, textHidden: `Someone torched ${b.name}.`, district: b.district }, { witnesses: wit.filter(() => rng.chance(0.4)) });
         notifyProtector(w, b, f);
         tension(w, c, x, 1);
         lines.push(`${b.name} goes up in the night, orange against the sky. Nobody saw you. Probably.`);
@@ -402,7 +403,7 @@ export function perform(w: World, a: Action): { minutes: number; lines: string[]
           .filter((y) => y.alive && y.id !== x.id && ((x.familyId && y.familyId === x.familyId) || (y.rels[x.id]?.affection ?? 0) > 0.4))
           .map((y) => y.id);
         handleDeath(w, x.id);
-        const mf = addFact(w, { kind: 'murder', actor: c.id, victim: x.id, hiddenActor: true, text: `${c.name} had ${x.name} killed.`, textHidden: `${x.name} was found dead.`, district: x.district }, { witnesses: wit.filter(() => rng.chance(0.3)), broadcast: kin });
+        const mf = addFact(w, { kind: 'murder', actor: c.id, cause, victim: x.id, hiddenActor: true, text: `${c.name} had ${x.name} killed.`, textHidden: `${x.name} was found dead.`, district: x.district }, { witnesses: wit.filter(() => rng.chance(0.3)), broadcast: kin });
         afterKilling(w, c, x, mf);
         tension(w, c, x, 3);
         lines.push(`${x.name} is dead. This can't be undone.`);

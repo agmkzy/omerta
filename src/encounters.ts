@@ -7,7 +7,7 @@ import { helpMan, lateOf, PROBLEM_LABEL } from './people';
 import { bizMove, clearArrears, evidence, giveTime, owedOf, takeFromBiz } from './econ';
 import { sitdownChoose, callSitdown } from './disputes';
 import { investChoose } from './reports';
-import { addFact, clamp, createDebt, earn, factText, learn, money, newId, ownerBiz, payDebt, rel, shortTime } from './core';
+import { addFact, bear, bearOn, clamp, createDebt, earn, factText, learn, money, newId, ownerBiz, payDebt, rel, repute, shortTime } from './core';
 import { DAY, Character, Enc, EncOpt, Fact, Favour, Id, LifeEvent, ProblemKind, World } from './types';
 import { Arch, arch, hash, pick } from './voice';
 
@@ -484,15 +484,15 @@ function lapse(w: World, p: Character, e: Enc) {
     r.trust = clamp(r.trust - 0.03);
   } else if (e.kind === 'callin') {
     r.respect = clamp(r.respect - 0.1);
-    r.grudge = clamp(r.grudge + 0.08);
+    bearOn(w, r, 0.08, `${p.name} kept him waiting on a favour he was owed`);
     addFact(w, { kind: 'favour', actor: p.id, victim: c.id, minor: true, text: `${p.name} let ${c.name} wait on a favour he was owed.`, district: c.district }, { witnesses: [c.id] });
   } else if (e.kind === 'mediate' && e.about && w.chars[e.about]) {
-    rel(c, e.about).grudge = clamp(rel(c, e.about).grudge + 0.1);
+    bear(w, c, e.about, 0.1, `${p.name} would not settle it with ${w.chars[e.about].name}`);
   } else if (e.kind === 'invite') {
     const h = w.chars[e.from!];
     if (h) {
       rel(h, p.id).respect = clamp(rel(h, p.id).respect - 0.06);
-      p.standing = clamp(p.standing - 0.5, 0, 100);
+      repute(w, p, -0.5, 'let down');
     }
   } else if (e.kind === 'threat') {
     // an unanswered warning is still a warning
@@ -543,7 +543,7 @@ export function choose(w: World, p: Character, e: Enc, code: string): { lines: s
       if (boss && w.rng.chance(0.5 + rel(boss, p.id).trust * 0.3)) lines.push(`${boss.name} has a quiet word with the right man. Nothing more is heard. You owe ${boss.name.split(' ')[0]} something now.`);
       else { lines.push(`${boss?.name ?? 'Nobody'} won’t stand up for a ${op ? 'racket' : 'side thing'} this small. You’re on your own.`); }
     } else {
-      rel(c, p.id).grudge = clamp(rel(c, p.id).grudge + 0.2);
+      bear(w, c, p.id, 0.2, `${p.name} left him on his own`);
       // He may well send someone. Whether, and when, depends on how he feels and what else is going on.
       if (op) (w.pending ??= []).push({ id: 'p' + w.nextId++, due: w.now + w.rng.int(2, 7) * DAY, kind: 'intent', a: c.id, b: p.id, c: op.id, note: 'raidop' });
       lines.push(`The man leaves without a word. Whatever ${c.name} makes of it, you’ll find out in his own time.`);
@@ -704,7 +704,7 @@ function favourReply(w: World, p: Character, e: Enc, c: Character, code: string,
       addFavour(w, p.id, c.id, code === 'price' ? 3 : 2, `putting in a word with ${boss.name}`);
       lines.push(`${boss.name} listens, and says: "I’ll keep it in mind." That’s yes, from him. ${c.name} will hear it was you.`);
     } else {
-      p.standing = clamp(p.standing - 1.5, 0, 100);
+      repute(w, p, -1.5, 'let down');
       lines.push(`${boss?.name ?? 'He'} hears you out, and then says: "I have my own opinion of ${c.name}." You come away thinking you spent something and bought nothing.`);
       r.trust = clamp(r.trust + 0.02);
     }
@@ -746,29 +746,29 @@ function mediateReply(w: World, p: Character, e: Enc, a: Character, code: string
     ra.trust = clamp(ra.trust + 0.08);
     rb.trust = clamp(rb.trust - 0.07);
     rb.respect = clamp(rb.respect - 0.04);
-    rel(a, b.id).grudge = clamp(rel(a, b.id).grudge - 0.1);
+    bear(w, a, b.id, -(0.1), 'settled');
     addFavour(w, p.id, a.id, 1, `taking his side against ${b.name}`);
     lines.push(`You tell ${b.name} it’s over. He hears it as what it is. ${a.name} walks away lighter. ${b.name} walks away with a note he won’t forget.`);
   } else if (code === 'b') {
     rb.trust = clamp(rb.trust + 0.08);
     ra.trust = clamp(ra.trust - 0.07);
     ra.respect = clamp(ra.respect - 0.04);
-    rel(a, b.id).grudge = clamp(rel(a, b.id).grudge + 0.04);
+    bear(w, a, b.id, 0.04, `${p.name} sided with ${b.name}`);
     addFavour(w, p.id, b.id, 1, `siding with him against ${a.name}`);
     lines.push(`You tell ${a.name} to drop it. His jaw does something and he nods. He’ll do as he’s told, which isn’t the same as agreeing.`);
   } else if (code === 'split') {
-    rel(a, b.id).grudge = clamp(rel(a, b.id).grudge - 0.2);
-    rel(b, a.id).grudge = clamp(rel(b, a.id).grudge - 0.2);
+    bear(w, a, b.id, -(0.2), 'settled');
+    bear(w, b, a.id, -(0.2), 'settled');
     ra.respect = clamp(ra.respect + 0.03);
     rb.respect = clamp(rb.respect + 0.03);
-    p.standing = clamp(p.standing + 1, 0, 100);
+    repute(w, p, 1, 'mediated');
     lines.push(`You put them at one table with a bottle between them. It takes two hours. Neither of them gets what he came for, which is how you know it’s fair.`);
     return done(120);
   } else {
     if (w.rng.chance(0.35)) {
       b.hurtUntil = w.now + 2 * DAY;
       addFact(w, { kind: 'beating', actor: a.id, victim: b.id, text: `${a.name} beat up ${b.name} over something between them.`, district: a.district }, { witnesses: [p.id] });
-      p.standing = clamp(p.standing - 1, 0, 100);
+      repute(w, p, -1, 'let it come to blows');
       lines.push(`You leave it with them. Two days later ${b.name} is laid up. That one was on you.`);
     } else lines.push(`You tell them to sort it out like grown men. Maybe they do.`);
   }
@@ -787,11 +787,11 @@ function shopReply(w: World, p: Character, e: Enc, o: Character, code: string, l
   } else if (code === 'half') {
     { const half = Math.round(owedOf(b) / 2); const got = takeFromBiz(w, b, half, p.id); if (got > 0) earn(p, got, 'protection'); }
     r.trust = clamp(r.trust + 0.05);
-    p.standing = clamp(p.standing + 0.5, 0, 100);
+    repute(w, p, 0.5, 'patience');
     lines.push(`"Half, and Friday for the rest." ${o.name} nods. He doesn’t smile. A man doesn’t smile at that.`);
   } else {
     r.trust = clamp(r.trust - 0.1);
-    r.grudge = clamp(r.grudge + 0.1);
+    bearOn(w, r, 0.1, `${p.name} would not give him more time`);
     const amt = takeFromBiz(w, b, Math.max(b.protection.fee, owedOf(b)), p.id, true);
     if (amt > 0) earn(p, amt, 'protection');
     clearArrears(b);
@@ -874,7 +874,7 @@ function callReply(w: World, p: Character, e: Enc, c: Character, code: string, l
   } else if (ask === 'muscle') {
     p.heat = clamp(p.heat + (half ? 0.05 : 0.12), 0, 1.5);
   } else {
-    p.standing = clamp(p.standing - 0.5, 0, 100);
+    repute(w, p, -0.5, 'refused');
   }
   if (fav) fav.settled = true;
   r.trust = clamp(r.trust + 0.08);
@@ -942,7 +942,7 @@ function inviteReply(w: World, p: Character, e: Enc, code: string, lines: string
   if (!ev || !host) return done(5);
   if (code === 'no') {
     rel(host, p.id).respect = clamp(rel(host, p.id).respect - 0.08);
-    p.standing = clamp(p.standing - 0.8, 0, 100);
+    repute(w, p, -0.8, 'refused');
     lines.push(`You send your regrets. ${host.name} accepts them in the way people do when they’ll think about it later.`);
     return done(5);
   }
@@ -959,7 +959,7 @@ function inviteReply(w: World, p: Character, e: Enc, code: string, lines: string
   lines.push(ev.kind === 'funeral' ? `The church smells of wax and wet wool. Everyone is here, and everyone is watching who else is.` : ev.kind === 'wedding' ? `Wine, a band that has played this wedding forty times, and a table of men who aren’t dancing.` : `Babies, wine, and a priest who has the sense not to ask where the envelopes come from.`);
   if (code === 'big') {
     rh.respect = clamp(rh.respect + 0.06);
-    p.standing = clamp(p.standing + 1.2, 0, 100);
+    repute(w, p, 1.2, 'hosted');
     lines.push(`Your envelope is thick, and a man at the next table notices. By the end of the night so does everyone else.`);
   } else if (code === 'small') {
     rh.respect = clamp(rh.respect - 0.03);

@@ -4,10 +4,10 @@ import { powerOptions as powerOptions2, usePower2 } from './powers2';
 // The road up. A rank is not a lottery ticket: there is a list of things you do, you can see how far along each is,
 // there is a trial you choose how to attempt, and when you have done the lot the family makes room for you.
 // Above capo there is a different kind of road: you get there by being needed, and by taking the chair.
-import { addFact, clamp, earn, factText, famName, handleDeath, learn, money, rel } from './core';
+import { addFact, bear, bearAtLeast, clamp, earn, factText, famName, handleDeath, learn, money, rel, repute } from './core';
 import { addEnc } from './encounters';
 import { mkJob } from './jobs';
-import { capOf, isRunner, LADDER, members, promote, sponsorOf, vacancy, WAGE } from './career';
+import { capOf, isRunner, LADDER, members, openSeatFor, promote, sponsorOf, vacancy, WAGE } from './career';
 import { applyRank, repairHierarchy } from './rank';
 import { candidates, leaderChanged, noteDeal } from './orgs';
 import { Character, DAY, Enc, Id, PathState, Rank, World } from './types';
@@ -109,7 +109,7 @@ export function pathTick(w: World) {
       addFact(w, { kind: 'report', actor: c.id, minor: false, text: `${c.name} paid back what ${p.name} stood for, with something on top. ${p.name}’s word held.`, district: c.district }, { witnesses: [p.id] });
     } else {
       const pay = Math.min(p.cash, Math.round(g.amt * 0.6));
-      p.cash -= pay; p.standing = clamp(p.standing - 3, 0, 100);
+      p.cash -= pay; repute(w, p, -3, 'trial');
       addFact(w, { kind: 'report', actor: c.id, minor: false, text: `${c.name} couldn’t pay what ${p.name} stood for. ${p.name} covered ${money(pay)} out of his own pocket.`, district: c.district }, { witnesses: [p.id] });
     }
   }
@@ -136,7 +136,7 @@ export function pathTick(w: World) {
   if (to === 'soldier' && info.trial !== 'passed') {
     const open = w.enc.some((e) => e.kind === 'promo' && e.data?.stage === 'trial' && e.status === 'open');
     if (open) return;
-    if (st.trial[to] === 'open') { delete st.trial[to]; st.retry[to] = w.now + 3 * DAY; p.standing = clamp(p.standing - 1, 0, 100); }
+    if (st.trial[to] === 'open') { delete st.trial[to]; st.retry[to] = w.now + 3 * DAY; repute(w, p, -1, 'trial'); }
     if ((st.retry[to] ?? 0) > w.now) return;
     offerTrial(w, p, to);
     st.trial[to] = 'open';
@@ -150,9 +150,9 @@ export function pathTick(w: World) {
   w.promo = { to, stage: 0, since: w.now, next: w.now + 4 * 60, sponsor: sp.id, points: 1, log: [] };
 }
 
+// (the family makes room for a man whose road is done, as it would for anyone's: career.openSeatFor, within what the family can carry)
 function openSeat(w: World, fid: Id, to: Rank) {
-  const fam = w.fam[fid];
-  for (let i = 0; i < 8 && !vacancy(w, fid, to); i++) fam.capBonus = { ...(fam.capBonus ?? {}), [to]: (fam.capBonus?.[to] ?? 0) + 1 };
+  while (!vacancy(w, fid, to) && openSeatFor(w, fid, to));
 }
 
 // The family gives you a name, and a reason.
@@ -175,7 +175,7 @@ function makeRoom(w: World, p: Character, boss: Character, to: Rank) {
   if (to === 'underboss') {
     const u = members(w, fam.id).find((x) => x.rank === 'underboss' && !x.isPlayer);
     if (u) {
-      rel(u, p.id).grudge = clamp(rel(u, p.id).grudge + 0.25);
+      bear(w, u, p.id, 0.25, `${p.name} went for the seat above him`);
       applyRank(w, u, 'capo', { wage: 300, place: (x) => { x.bossId = boss.id; }, fact: { actor: boss.id, victim: u.id, story: 'seat:underboss', text: `${boss.name} has moved ${u.name} aside. He is a captain again, and the chair beside the boss is to go to ${p.name}.`, broadcast: members(w, fam.id).map((y) => y.id) } });
     }
     return;
@@ -248,7 +248,7 @@ export function trialChoose(w: World, p: Character, e: Enc, code: string): strin
   const ok = w.rng.chance(chanceOf(p, code as Way, bonusOf(w, to)));
   if (ok) {
     st.trial[to] = 'passed';
-    p.standing = clamp(p.standing + 3, 0, 100);
+    repute(w, p, 3, 'trial');
     if (sp) rel(sp, p.id).respect = clamp(rel(sp, p.id).respect + 0.07);
     addFact(w, { kind: 'report', actor: p.id, story: 'seat:' + to, minor: false, text: `${sp?.name ?? 'The boss'} heard how ${p.name} handled it. He said one word, and the word was “good”.`, district: p.district }, { broadcast: sp ? [p.id, sp.id] : [p.id] });
     return [`It goes the way you hoped. ${sp?.name ?? 'He'} hears about it before you tell him. ${sp ? `"Good," he says. That is all, and it is a great deal.` : ''}`, 'Whatever is left is formality. The family will be in touch.'];
@@ -256,7 +256,7 @@ export function trialChoose(w: World, p: Character, e: Enc, code: string): strin
   delete st.trial[to];
   (st.fails ??= {})[to] = (st.fails[to] ?? 0) + 1;
   st.retry[to] = w.now + 3 * DAY;
-  p.standing = clamp(p.standing - 1, 0, 100);
+  repute(w, p, -1, 'trial');
   if (sp) rel(sp, p.id).respect = clamp(rel(sp, p.id).respect - 0.03);
   return [`It doesn’t go well. Not a disaster, but not what ${sp?.name ?? 'he'} wanted to see.`, `${sp ? first(sp) : 'He'} says you can have another chance in a few days. Think about which way suits you.`];
 }
@@ -300,7 +300,7 @@ export function chairAct(w: World, p: Character, code: string): string[] {
     }
     p.cooldown.chair = w.now + 30 * DAY;
     rel(boss, p.id).trust = clamp(rel(boss, p.id).trust - 0.25);
-    rel(boss, p.id).grudge = clamp(rel(boss, p.id).grudge + 0.3);
+    bear(w, boss, p.id, 0.3, `${p.name} went for his chair`);
     return [`${boss.name} looks at you the way a man looks at a stranger in his house. "No." He doesn’t raise his voice.`, 'He will remember you asked.'];
   }
   if (win) {
@@ -309,13 +309,12 @@ export function chairAct(w: World, p: Character, code: string): string[] {
     handleDeath(w, boss.id, { cause: 'coup', favoured: p.id });
     if (fam.bossId !== p.id) takeChair(w, p, boss.id, 'coup');
     chairCeremony(w, p);
-    p.standing = clamp(p.standing - 6, 0, 100);
     return [`It is done quickly, and the men who matter are told before the street is. Nobody asks you where you were.`, 'You are the boss. Don’t let anyone work out how.'];
   }
   p.cooldown.chair = w.now + 45 * DAY;
   p.hurtUntil = w.now + 10 * DAY;
-  p.standing = clamp(p.standing - 20, 0, 100);
-  rel(boss, p.id).trust = 0; rel(boss, p.id).grudge = 0.9;
+  repute(w, p, -20, 'failed coup');
+  rel(boss, p.id).trust = 0; bearAtLeast(w, boss, p.id, 0.9, `${p.name} went for his chair and lost`);
   for (const c of members(w, fam.id)) if (c.rank === 'capo' && c.id !== p.id) rel(c, p.id).trust = clamp(rel(c, p.id).trust - 0.2);
   return ['It goes wrong. Somebody talked, or somebody lost their nerve.', `${boss.name} lets you live, because killing his own underboss in public would look like weakness. He will not forget.`];
 }
@@ -328,7 +327,7 @@ function takeChair(w: World, p: Character, oldId: Id, cause = 'stepped') {
   const cs = candidates(w, fam.id, oldId, { cause, favoured: p.id });
   fam.bossId = p.id;
   applyRank(w, p, 'boss', { fact: false, repair: false, place: (x) => { x.bossId = null; for (const c of Object.values(w.chars)) if (c.alive && c.bossId === oldId && c.id !== x.id) c.bossId = x.id; } });
-  p.standing = clamp(p.standing + 6, 0, 100);
+  repute(w, p, 6, 'took the chair');
   repairHierarchy(w, fam.id);
   leaderChanged(w, fam.id, p, oldId, cause, cs);
   void promote;
@@ -349,6 +348,7 @@ export function raise(w: World, p: Character, c: Character, to: Rank): string[] 
   if (!vacancy(w, fam.id, to)) {
     if (boss && rel(boss, p.id).trust < 0.5) return [`${boss.name} won’t add another ${to}. “Not yet. You’ve not earned that kind of say.”`];
     openSeat(w, fam.id, to);
+    if (!vacancy(w, fam.id, to)) return [`There is no room for another ${to}. The family hasn’t the men below to carry one.`];
   }
   promote(w, c, to, p);
   ledgerAdd(w, 'made', c.id, `You made ${c.name} a ${to}.`);
@@ -383,7 +383,7 @@ export function setRank(w: World, p: Character, c: Character, to: Rank): string[
   applyRank(w, c, to, { fact: false, repair: false });
   c.sponsor = p.id; delete c.backer;
   rel(c, p.id).trust = clamp(rel(c, p.id).trust + (up ? 0.25 : -0.25));
-  rel(c, p.id).grudge = clamp(rel(c, p.id).grudge + (up ? 0 : 0.3));
+  bear(w, c, p.id, (up ? 0 : 0.3), `${p.name} put him down`);
   addFact(w, { kind: 'promotion', actor: p.id, victim: c.id, text: up ? `${c.name} was made ${to === 'soldier' ? 'a soldier' : 'a ' + to} by ${p.name}.` : `${c.name} has been put down to ${to === 'soldier' ? 'soldier' : to === 'capo' ? 'captain' : 'associate'} by ${p.name}.`, district: c.district }, { broadcast: members(w, fam.id).map((x) => x.id) });
   repairHierarchy(w, fam.id);
   void was;
@@ -443,7 +443,7 @@ export function usePower(w: World, p: Character, code: string): string[] {
   if (code === 'counsel') {
     const boss = w.chars[w.fam[p.familyId!].bossId];
     if (boss) { rel(boss, p.id).trust = clamp(rel(boss, p.id).trust + 0.06); rel(boss, p.id).respect = clamp(rel(boss, p.id).respect + 0.04); }
-    p.standing = clamp(p.standing + 2, 0, 100); set(8);
+    repute(w, p, 2, 'trial'); set(8);
     return [`Over coffee, you put things the way he already half-thinks them. ${boss?.name ?? 'The boss'} nods. He thinks it was his idea. That is the art.`];
   }
   if (code === 'tribute') {
@@ -480,7 +480,7 @@ export function usePower(w: World, p: Character, code: string): string[] {
     c.hustle!.level++;
     rel(c, p.id).trust = clamp(rel(c, p.id).trust + 0.15); rel(c, p.id).affection = clamp(rel(c, p.id).affection + 0.08);
     c.traits.ambition = clamp(c.traits.ambition + 0.07);
-    p.standing = clamp(p.standing + 1, 0, 100); set(14);
+    repute(w, p, 1, 'trial'); set(14);
     if (c.traits.ambition > 0.8 && c.want?.kind !== 'independent') c.want = { kind: 'independent', since: w.now };
     return [`You give ${c.name} a bigger piece of the business to run. He thanks you in a way that makes you believe him.`, `He’ll make you more money. A man with that much to lose also starts to think about what he could win.`];
   }
@@ -524,7 +524,7 @@ export function usePower(w: World, p: Character, code: string): string[] {
     if (!d) return ['Nothing left to claim.'];
     p.cash -= 1500;
     (st.turf ??= []).push(d);
-    p.standing = clamp(p.standing + 1, 0, 100); set(10);
+    repute(w, p, 1, 'trial'); set(10);
     addFact(w, { kind: 'report', actor: p.id, minor: false, text: `${p.name} has let it be known that ${d} answers to him now.`, district: d }, { broadcast: members(w, p.familyId!).map((c) => c.id) });
     return [`A word in the right ears. By the end of the week every shopkeeper in ${d} knows whose name to say when a man in a good coat comes in.`, 'They’ll pay a little each week, and you’ll have to see that nobody else bothers them.'];
   }
@@ -549,7 +549,7 @@ export function usePower(w: World, p: Character, code: string): string[] {
     const fam = w.fam[p.familyId!];
     const worst = Object.entries(fam.tension).sort((a, b) => b[1] - a[1])[0];
     p.cash -= 1000; set(12);
-    p.standing = clamp(p.standing + 2, 0, 100);
+    repute(w, p, 2, 'trial');
     if (!worst || worst[1] <= 0) return ['You send the gifts and make the calls. There’s nothing to settle, which is a good way to find out.'];
     const f2 = w.fam[worst[0]];
     fam.tension[f2.id] = Math.max(0, worst[1] - 3); f2.tension[fam.id] = Math.max(0, (f2.tension[fam.id] ?? 0) - 3);
@@ -570,11 +570,11 @@ export function usePower(w: World, p: Character, code: string): string[] {
     if (p.cash < cost) return [`That’s ${money(cost)}. You haven’t got it.`];
     p.cash -= cost; set(30);
     for (const c of men) { c.cash += 200; rel(c, p.id).trust = clamp(rel(c, p.id).trust + 0.1); rel(c, p.id).affection = clamp(rel(c, p.id).affection + 0.05); }
-    p.standing = clamp(p.standing + 3, 0, 100);
+    repute(w, p, 3, 'trial');
     return [`An envelope for every made man in the family, with a card. It costs ${money(cost)}. They’ll remember who sent it, and they’ll remember if next year there isn’t one.`];
   }
   if (code === 'commission') {
-    p.heat = Math.max(0, p.heat - 0.3); p.standing = clamp(p.standing + 4, 0, 100); set(14);
+    p.heat = Math.max(0, p.heat - 0.3); repute(w, p, 4, 'trial'); set(14);
     return [`Five families, one table, one agreement that nobody will put in writing. You’re spoken to like a man whose word moves things. The police find, somehow, that there’s less to look at.`];
   }
   return [];

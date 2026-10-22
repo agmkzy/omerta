@@ -3,7 +3,7 @@
 // itself: a border dispute over a shop, and work or advancement that the family hands out.
 import { clearArrears, setCollector } from './econ';
 import { leaveCrew } from './rank';
-import { addFact, clamp, money, rel } from './core';
+import { addFact, bear, bearOn, clamp, money, rel, repute } from './core';
 import { addEnc, addFavour } from './encounters';
 import { members } from './career';
 import { wantFor } from './crewlife';
@@ -136,7 +136,7 @@ function turfLose(w: World, p: Character, s: Situation, why: string): string[] {
   const old = b.protection ? w.chars[b.protection.collectorId] : undefined;
   const fee = b.protection?.fee ?? 50;
   setCollector(w, b, rv.id, rv.familyId!, { fee });
-  p.standing = clamp(p.standing - 2, 0, 100);
+  if (old && old.id !== p.id) repute(w, p, -2, 'lost a shop'); // (his own shop lost is the poach itself: core.DEED)
   if (o) rel(o, p.id).trust = clamp(rel(o, p.id).trust - 0.15);
   addFact(w, { kind: 'poach', actor: rv.id, victim: old?.id ?? p.id, business: b.id, text: `${rv.name} (${w.fam[rv.familyId!].name}) took ${b.name} away from ${old?.name ?? p.name}.`, district: b.district }, { witnesses: [p.id], broadcast: members(w, p.familyId!).map((c) => c.id).slice(0, 6) });
   s.stage = 'resolved'; s.resolvedAt = w.now; s.how = 'closed';
@@ -153,11 +153,11 @@ function turfChoose(w: World, p: Character, e: Enc, code: string): string[] {
   if (code === 'show') {
     const pr = clamp(0.4 + Math.min(3, crewN) * 0.14 + p.standing / 400 + (hasPerk(w, p, 'enforcer') ? 0.12 : 0) - ((A.tension[B.id] ?? 0) + (B.tension[A.id] ?? 0)) * 0.03, 0.25, 0.9);
     A.tension[B.id] = (A.tension[B.id] ?? 0) + 0.4; B.tension[A.id] = (B.tension[A.id] ?? 0) + 0.4;
-    rel(rv, p.id).grudge = clamp(rel(rv, p.id).grudge + 0.1);
+    bear(w, rv, p.id, 0.1, `${p.name} faced him down over the shop`);
     if (w.rng.chance(pr)) {
       finish('helped');
       if (o) rel(o, p.id).trust = clamp(rel(o, p.id).trust + 0.12);
-      p.standing = clamp(p.standing + 1, 0, 100);
+      repute(w, p, 1, 'held a shop');
       addFact(w, { kind: 'event', actor: p.id, victim: rv.id, business: b.id, text: `${p.name} put men outside ${b.name}. ${rv.name}’s people didn’t come back.`, district: b.district }, { witnesses: [p.id], broadcast: [rv.id] });
       return [`You put ${crewN ? 'your men' : 'yourself'} outside ${b.name} for three days, visible and doing nothing. ${first(rv)}’s people drive past once and don’t come back.`, `${o ? first(o) : 'The owner'} looks twelve years younger. The ${B.name} family now knows exactly where you stand.`];
     }
@@ -172,7 +172,7 @@ function turfChoose(w: World, p: Character, e: Enc, code: string): string[] {
       addFact(w, { kind: 'sitdown', actor: p.id, victim: rv.id, business: b.id, text: `${p.name} and ${rv.name} agreed ${b.name} stays where it is.`, district: b.district }, { witnesses: [p.id] });
       return [`You meet ${first(rv)} at neutral ground. It takes an hour and nobody raises a voice. He agrees ${b.name} stays as it is, and he agrees to owe you one for the trouble of asking.`];
     }
-    rel(rv, p.id).grudge = clamp(rel(rv, p.id).grudge + 0.05);
+    bear(w, rv, p.id, 0.05, `${p.name} held on to the shop`);
     s.stage = 'handling'; s.weeks = 0; delete s.asked;
     return [`${first(rv)} listens, smiles, and says nothing was ever really agreed. You leave with the feeling the conversation is going to happen again, and the next one will be less friendly.`];
   }
@@ -247,7 +247,6 @@ function orgChoose(w: World, p: Character, e: Enc, code: string): string[] {
       lines.push(`${b.name} (${o.name}) will pay ${money(fee)} a week. He heard it from ${boss ? first(boss) : 'the family'}, so he doesn’t argue.`);
     }
     if (boss) rel(boss, p.id).trust = clamp(rel(boss, p.id).trust + 0.06);
-    p.standing = clamp(p.standing + 1, 0, 100);
     return lines;
   }
   if (e.data?.org === 'transfer') {
@@ -257,7 +256,7 @@ function orgChoose(w: World, p: Character, e: Enc, code: string): string[] {
     const ob = a.bossId ? w.chars[a.bossId] : undefined;
     a.bossId = p.id;
     rel(a, p.id).trust = clamp(rel(a, p.id).trust + 0.15);
-    if (ob?.alive) { if (code === 'ask') { rel(ob, p.id).respect = clamp(rel(ob, p.id).respect + 0.05); } else { rel(ob, p.id).grudge = clamp(rel(ob, p.id).grudge + 0.1); rel(ob, p.id).trust = clamp(rel(ob, p.id).trust - 0.06); addFact(w, { kind: 'poach', actor: p.id, victim: ob.id, text: `${p.name} took ${a.name} out from under ${ob.name} without asking.`, district: a.district }, { witnesses: [p.id], broadcast: [ob.id] }); } }
+    if (ob?.alive) { if (code === 'ask') { rel(ob, p.id).respect = clamp(rel(ob, p.id).respect + 0.05); } else { bear(w, ob, p.id, 0.1, `${p.name} took his man`); rel(ob, p.id).trust = clamp(rel(ob, p.id).trust - 0.06); addFact(w, { kind: 'poach', actor: p.id, victim: ob.id, text: `${p.name} took ${a.name} out from under ${ob.name} without asking.`, district: a.district }, { witnesses: [p.id], broadcast: [ob.id] }); } }
     return [code === 'ask' ? `You talk to ${ob ? first(ob) : 'his boss'} first. He lets him go with the air of a man who’s been shown a courtesy. ${first(a)} is yours.` : `${first(a)} is yours from today. ${ob ? first(ob) + ' will hear about it.' : ''}`];
   }
   return ['Nothing comes of it.'];
@@ -369,7 +368,7 @@ function lifeChoose(w: World, p: Character, e: Enc, code: string): string[] {
     if (p.cash < amt) return ['You can’t cover it right now. You send your regrets, and your embarrassment goes with them.'];
     p.cash -= amt; post(w, { from: p.id, to: c.id, amt, flow: 'gift', note: 'wedding envelope' });
     r.trust = clamp(r.trust + (code === 'big' ? 0.12 : 0.05)); r.affection = clamp(r.affection + (code === 'big' ? 0.08 : 0.03));
-    p.standing = clamp(p.standing + (code === 'big' ? 1 : 0.3), 0, 100);
+    repute(w, p, (code === 'big' ? 1 : 0.3), 'generous');
     if (code === 'big') addFavour(w, p.id, c.id, 1, 'a generous wedding gift');
     addFact(w, { kind: 'favour', actor: p.id, victim: c.id, minor: true, text: `${p.name} went to the wedding of ${c.name}’s daughter.`, district: c.district }, { witnesses: [p.id, c.id] });
     return [code === 'big' ? `You hand over the envelope and half the room sees how thick it is. ${first(c)} embraces you. You eat well and you leave early.` : `You eat, you dance once, you give a correct envelope. Nobody is offended.`];
@@ -387,12 +386,12 @@ function lifeChoose(w: World, p: Character, e: Enc, code: string): string[] {
     const r = rel(o, p.id);
     if (code === 'hunt') {
       if (p.cash < 200) return ['You can’t spare the money to look properly.'];
-      p.cash -= 200; r.trust = clamp(r.trust + 0.1); p.standing = clamp(p.standing + 1.5, 0, 100);
+      p.cash -= 200; r.trust = clamp(r.trust + 0.1); repute(w, p, 1.5, 'generous');
       addFact(w, { kind: 'favour', actor: p.id, victim: o.id, business: b.id, minor: false, text: `${p.name} found the men who robbed ${b.name}.`, district: b.district }, { witnesses: [p.id, o.id] });
       return [`Two days later the men who hit ${b.name} are found. The register comes back. They don’t. ${first(o)} sends you a case of wine.`];
     }
     if (code === 'waive') { clearArrears(b); r.trust = clamp(r.trust + 0.12); r.affection = clamp(r.affection + 0.05); if (b.protection) { b.protection.fee = Math.max(10, Math.round(b.protection.fee * 0.9 / 5) * 5); } return [`You tell ${first(o)} to keep his fee this month. He nearly cries. It will cost you about ${money(b.protection?.fee ?? 0)} a week less from now on.`]; }
-    r.trust = clamp(r.trust - 0.1); r.respect = clamp(r.respect - 0.08); p.standing = clamp(p.standing - 1, 0, 100);
+    r.trust = clamp(r.trust - 0.1); r.respect = clamp(r.respect - 0.08); repute(w, p, -1, 'hard');
     return [`"Sorry for your trouble." ${first(o)} pays up on Friday, in cash, not looking at you.`];
   }
   if (life === 'cop') {
@@ -401,10 +400,10 @@ function lifeChoose(w: World, p: Character, e: Enc, code: string): string[] {
       const victim = Object.values(w.chars).filter((x) => x.alive && !x.isPlayer && x.familyId && x.familyId !== p.familyId && x.rank !== 'civilian')[0];
       p.heat = clamp(p.heat - 0.12, 0, 1);
       if (victim) { victim.heat = clamp(victim.heat + 0.2, 0, 1); addFact(w, { kind: 'report', actor: p.id, victim: victim.id, minor: true, text: `Someone gave the police ${victim.name}’s name.`, district: victim.district }, { witnesses: [] }); }
-      if (w.rng.chance(0.25)) { p.standing = clamp(p.standing - 6, 0, 100); return [`You give him ${victim?.name ?? 'a name'}. It works. Then somebody sees you getting into the same car as the man in the raincoat. Within days people look at you differently.`]; }
+      if (w.rng.chance(0.25)) { repute(w, p, -6, 'informer'); return [`You give him ${victim?.name ?? 'a name'}. It works. Then somebody sees you getting into the same car as the man in the raincoat. Within days people look at you differently.`]; }
       return [`You give him ${victim?.name ?? 'a name'}. He writes it down without thanking you. Your heat falls, and so does something else.`];
     }
-    p.heat = clamp(p.heat + 0.1, 0, 1); p.standing = clamp(p.standing + 1, 0, 100);
+    p.heat = clamp(p.heat + 0.1, 0, 1); repute(w, p, 1, 'informer');
     return ['You leave your coffee and your silence. Within the week you hear that he asked about you. It gets round that he got nothing.'];
   }
   if (life === 'defect' && c?.alive) {
@@ -412,16 +411,16 @@ function lifeChoose(w: World, p: Character, e: Enc, code: string): string[] {
     if (code === 'raise') { c.kickRate = Math.max(0.05, c.kickRate - 0.05); r.trust = clamp(r.trust + 0.15); r.affection = clamp(r.affection + 0.08); return [`${first(c)} thanks you and doesn’t mention it again. He keeps a bit more of what he makes, and he stays.`]; }
     if (code === 'trust') {
       if (w.rng.chance(0.3 + r.trust * 0.5)) { r.trust = clamp(r.trust + 0.2); return [`${first(c)} looks at you for a long moment. "Then I’m staying." It costs you nothing, and it’s the strongest thing you could have done.`]; }
-      leaveCrew(w, c, String(e.data?.fam)); r.grudge = clamp(r.grudge + 0.1);
+      leaveCrew(w, c, String(e.data?.fam)); bearOn(w, r, 0.1, `${p.name} let him go`);
       return [`${first(c)} thanks you for your trust. A week later he’s gone, working for ${w.fam[String(e.data?.fam)]?.name ?? 'another family'}.`];
     }
     if (w.rng.chance(0.5)) { r.respect = clamp(r.respect + 0.1); r.trust = clamp(r.trust - 0.05); return [`"Yes, boss." You can’t tell if he means it, but he stays.`]; }
-    leaveCrew(w, c, String(e.data?.fam)); r.grudge = clamp(r.grudge + 0.2);
+    leaveCrew(w, c, String(e.data?.fam)); bearOn(w, r, 0.2, `${p.name} let him go`);
     return [`${first(c)} looks at you and nods slowly. A week later he’s gone. You told him he was yours; he didn’t like hearing it.`];
   }
   if (life === 'newcomer') {
     if (code === 'tax') { p.cash += 400; post(w, { from: 'world', to: p.id, amt: 400, flow: 'earn', src: 'cut' }); p.lifetimeGross = (p.lifetimeGross ?? 0) + 400; return ['"Understood," he says, counting it into your hand. The first of many envelopes, if he lasts.']; }
-    if (code === 'friend') { p.standing = clamp(p.standing + 0.5, 0, 100); const stranger = Object.values(w.chars).find((x) => x.alive && x.rank === 'civilian' && !x.familyId); if (stranger) addFavour(w, p.id, stranger.id, 1, 'let him open without a tax'); return ['You shake his hand. He looks like a man who will remember it.']; }
+    if (code === 'friend') { repute(w, p, 0.5, 'friend'); const stranger = Object.values(w.chars).find((x) => x.alive && x.rank === 'civilian' && !x.familyId); if (stranger) addFavour(w, p.id, stranger.id, 1, 'let him open without a tax'); return ['You shake his hand. He looks like a man who will remember it.']; }
     return ['"A pity," he says, and leaves. Somebody else’s street will get his money.'];
   }
   return ['Nothing comes of it.'];

@@ -8,7 +8,7 @@ import { askAbout, helpWith, sitOf } from './situations';
 import { readiness } from './career';
 import { share, confide } from './actions';
 import { react, envelopeDue, handOver, kickWindow, envelopeText, rateView } from './books';
-import { addFact, clamp, createDebt, earn, factText, famName, flavour, isResolved, learn, money, ownerBiz, payDebt, rel, shortTime } from './core';
+import { addFact, bear, bearOn, clamp, createDebt, earn, ease, factText, famName, flavour, isResolved, learn, money, ownerBiz, payDebt, rel, repute, shortTime } from './core';
 import { standingWord, mkJob, oppFrom, tipFrom, bossOffer, traitWords, jobSaid, takeJob, declineJob } from './jobs';
 import { openSitdown, Meeting } from './meetings';
 import { helpMan, lateOf, PROBLEM_LABEL } from './people';
@@ -1341,7 +1341,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
         tweak(-0.03, 0, 0.03);
       } else {
         lines.push(`${t.name}: “Careful, ${addr(w, t, p)}. You’re calling me a liar.”`);
-        r.grudge = clamp(r.grudge + 0.1);
+        bearOn(w, r, 0.1, `${p.name} as good as called him a liar`);
         tweak(-0.06, -0.03, -0.02);
       }
       return stay('root', 10);
@@ -1629,12 +1629,12 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
         if (give) {
           b.protection = { ...b.protection, fee: dl.ask };
           tweak(-0.08, -0.05, 0.0);
-          r.grudge = clamp(r.grudge + 0.08);
+          bearOn(w, r, 0.08, `${p.name} leaned on him to pay more`);
           lines.push(vsay(w, t, p, 'fee_press_yes', { X: money(dl.ask) }));
           t.memos.push({ id: 'm' + w.nextId++, t: w.now, other: p.id, kind: 'threat', text: `You leaned on him until the weekly fee went from ${money(dl.old!)} to ${money(dl.ask)}.` });
         } else {
           tweak(-0.1, -0.06, -0.01);
-          r.grudge = clamp(r.grudge + 0.15);
+          bearOn(w, r, 0.15, `${p.name} leaned on him to pay more`);
           lines.push(vsay(w, t, p, 'fee_press_no'));
           addFact(w, { kind: 'protection_refused', actor: t.id, victim: p.id, business: b.id, text: `${t.name} refused to pay ${p.name} more for ${b.name}.`, district: b.district }, { witnesses: [p.id] });
         }
@@ -1705,7 +1705,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
       }
       if (x.bossId === t.id && fl?.amt) react(w, t, x, { amt: fl.amt, n: Math.max(2, fl.n), last: w.now }, 'dialogue');
       lines.push(vsay(w, t, p, 'concern_ok', { X: x.name.split(' ')[0] }));
-      if (rng.chance(0.3)) rel(x, p.id).grudge = clamp(rel(x, p.id).grudge + 0.1);
+      if (rng.chance(0.3)) bear(w, x, p.id, 0.1, `${p.name} raised doubts about him`);
       tweak(0.02, 0, 0.02);
       return stay('family', 25);
     }
@@ -1865,7 +1865,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
     case 'own': {
       c.ctx.asked.push('own');
       lines.push(`You tell ${t.name} straight that it was you. He takes a long moment. "At least you said it to my face."`);
-      r.grudge = clamp(r.grudge - 0.08);
+      bearOn(w, r, -(0.08), 'owned up');
       tweak(0.03, 0, 0.03);
       return stay('incident', 15);
     }
@@ -1876,7 +1876,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
         lines.push(`${t.name} studies you, then nods slowly. "All right. I hear you."`);
       } else {
         lines.push(`${t.name} doesn’t blink. "Don’t insult me. I know what I know."`);
-        r.grudge = clamp(r.grudge + 0.12);
+        bearOn(w, r, 0.12, `${p.name} denied what he knows`);
         tweak(-0.08, -0.04, -0.03);
       }
       return stay('incident', 15);
@@ -1903,11 +1903,11 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
       if (c0 === 'a_start') {
         const ok = t.traits.violence < 0.6 || rng.chance(0.4);
         lines.push(ok ? `"You started it," you remind him. ${t.name} looks away. "Maybe. Maybe I did."` : `"You started it," you say. ${t.name}'s face hardens. "Don’t put this on me."`);
-        r.grudge = clamp(r.grudge + (ok ? -0.12 : 0.1));
+        bearOn(w, r, (ok ? -0.12 : 0.1), `${p.name} put the blame on him`);
         tweak(ok ? 0.02 : -0.03);
       } else {
         lines.push(`"I would do it again," you tell him. ${t.name} nods once, slowly, the way a man does when he has decided something.`);
-        r.grudge = clamp(r.grudge + 0.2);
+        bearOn(w, r, 0.2, `${p.name} said he would do it again`);
         tweak(-0.1, -0.06, 0.02);
         t.memos.push({ id: 'm' + w.nextId++, t: w.now, other: p.id, kind: 'threat', text: `You told him to his face you would do it again.` });
       }
@@ -1917,7 +1917,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
       c.ctx.asked.push('a_ask');
       const g = r.grudge;
       lines.push(g >= 0.5 ? `${t.name}: "You know exactly what you did. Or what you allowed."` : `${t.name} shrugs. "Word got round that you were against me. Maybe it was wrong."`);
-      r.grudge = clamp(r.grudge - 0.07);
+      bearOn(w, r, -(0.07), 'talked');
       tweak(0.02);
       return stay('amends', 15);
     }
@@ -1927,7 +1927,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
       else {
         p.cash -= 60;
         lines.push(`You buy a round and say nothing about it. ${t.name} says nothing back, which is a start.`);
-        r.grudge = clamp(r.grudge - 0.05);
+        bearOn(w, r, -(0.05), 'a drink');
         tweak(0.02, 0.03);
       }
       return stay('amends', 40);
@@ -1978,7 +1978,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
       giveTime(b);
       lines.push(`"One week," you say. ${t.name} nods too fast. He’ll pay, and he’ll remember who gave him the week.`);
       tweak(0.06, 0.04, -0.01);
-      p.standing = Math.max(0, p.standing - 0.5);
+      repute(w, p, -0.5, 'gave way');
       return stay('shop', 15);
     }
     case 'sh_lean': {
@@ -1989,7 +1989,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
       clearArrears(b);
       lines.push(`You say it quietly, which is worse. ${t.name} finds ${money(pay)} you both know he didn’t have to spare.`);
       tweak(-0.05, -0.06, 0.03);
-      r.grudge = clamp(r.grudge + 0.06);
+      bearOn(w, r, 0.06, `${p.name} made him pay what he could not spare`);
       return stay('shop', 20);
     }
     case 'cr_ask': {
@@ -2182,7 +2182,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
       if (d) d.balance = Math.round(d.balance * 0.75);
       lines.push(`You knock a quarter off what ${t.name} owes. He looks at you like he’s waiting for the catch.`);
       tweak(0.07, 0.05, -0.01);
-      p.standing = Math.max(0, p.standing - 0.5);
+      repute(w, p, -0.5, 'gave way');
       return stay('debt', 10);
     }
     case 'd_pay':
@@ -2251,7 +2251,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
       if (p.cash < amt) { lines.push('You’re short.'); return stay('myboss', 5); }
       p.cash -= amt; t.cash += amt; p.lifetimeKick += amt;
       tweak(amt >= 1000 ? 0.12 : 0.05, amt >= 1000 ? 0.06 : 0.02, 0.03);
-      p.standing = Math.min(100, p.standing + (amt >= 1000 ? 3 : 1));
+      repute(w, p, (amt >= 1000 ? 3 : 1), 'tribute');
       if (amt >= 1000) addFavour(w, p.id, t.id, 2, 'a thousand dollars pressed into his hand with no reason given');
       lines.push(amt >= 1000 ? `You add another ${money(amt)}, unasked. ${t.name} looks at it, then at you. "That’s a lot of respect." He is very still. "I’ll remember it."` : `You add ${money(amt)} on top. ${t.name} raises an eyebrow, then lets it go. "Appreciated."`);
       return stay('myboss', 15);
@@ -2284,7 +2284,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
         p.cash -= 300; t.cash += 300; p.lifetimeKick += 300;
         lines.push(`You leave an envelope on his table. ${t.name} doesn’t open it. "For what?" "For nothing." He almost smiles. "Nothing is a good reason."`);
         tweak(0.07, 0.04, 0.03);
-        p.standing = Math.min(100, p.standing + 1);
+        repute(w, p, 1, 'gift');
       }
       return stay('myboss', 15);
     }
@@ -2397,7 +2397,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
         tweak(0.02);
       } else {
         lines.push(`${t.name}: “You’re pushing, ${addr(w, t, p)}. I said what I said.”`);
-        r.grudge = clamp(r.grudge + 0.04);
+        bearOn(w, r, 0.04, `${p.name} kept pushing him`);
         tweak(-0.03, 0, -0.02);
       }
       return stay('incident', 8);
@@ -2528,8 +2528,8 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
       const f = w.facts[arg];
       const s = w.chars[f.actor!];
       learn(w, t.id, f, p.id, true);
-      r.grudge = clamp(r.grudge + 0.15);
-      rel(t, s.id).grudge = clamp(rel(t, s.id).grudge + 0.15);
+      bearOn(w, r, 0.15, `${p.name} told him who did it`);
+      bear(w, t, s.id, 0.15, f);
       tweak(0.04);
       lines.push(`${t.name} goes very still. "I didn’t know that."`);
       return stay('subject', 15);
@@ -2538,10 +2538,10 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
       const f = w.facts[arg];
       const s = w.chars[c.ctx.subject!];
       const real = f.actor ? w.chars[f.actor] : undefined;
-      rel(t, s.id).grudge *= 0.4;
+      ease(t, s.id, 0.4);
       if (real) {
         learn(w, t.id, f, p.id, true);
-        rel(t, real.id).grudge = clamp(rel(t, real.id).grudge + 0.25);
+        bear(w, t, real.id, 0.25, f);
       }
       tweak(0.05);
       lines.push(`${t.name} frowns. "Then I’ve been looking at the wrong man."`);
@@ -2584,7 +2584,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
         lines.push(`${t.name} shifts. "All right. It got out of hand."${amt > 0 && f.victim === p.id ? ` He hands over ${money(amt)}.` : ''}`);
         tweak(0.02);
       } else {
-        r.grudge = clamp(r.grudge + 0.15);
+        bearOn(w, r, 0.15, `${p.name} called him on it`);
         tweak(-0.05, -0.04, -0.02);
         lines.push(`${t.name} laughs without humour. "Who are you to ask me?"`);
         t.memos.push({ id: 'm' + w.nextId++, t: w.now, other: p.id, kind: 'threat', text: `You demanded an explanation from him. He didn’t take it well.` });
@@ -2618,7 +2618,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
       const rep = w.jobs.filter((j) => j.status === 'done' && j.giver === t.id && !j.reported).slice(0, 2);
       for (const j of rep) j.reported = true;
       tweak(0.03 * rep.length, 0, 0.02 * rep.length);
-      p.standing = clamp(p.standing + rep.length, 0, 100);
+      repute(w, p, rep.length, 'report');
       lines.push(`You walk ${t.name} through what you did. He seems satisfied. (standing +${rep.length})`);
       return stay('orders', 20);
     }
@@ -2639,7 +2639,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
       const j = w.jobs.find((q) => q.id === arg) as Job;
       j.status = 'declined';
       tweak(-0.1, -0.04, -0.06);
-      p.standing = clamp(p.standing - (j.via === 'boss' ? 5 : 2), 0, 100);
+      repute(w, p, -((j.via === 'boss' ? 5 : 2)), 'refused work');
       lines.push(`${t.name} doesn’t argue. That’s worse. "Noted."`);
       return stay('orders', 15);
     }
@@ -2667,8 +2667,8 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
       learn(w, t.id, f, p.id, true);
       m.done = true;
       tweak(0.1, 0.04, 0.05);
-      p.standing = clamp(p.standing + 1, 0, 100);
-      if (f.actor) rel(t, f.actor).grudge = clamp(rel(t, f.actor).grudge + 0.3);
+      repute(w, p, 1, 'told');
+      if (f.actor) bear(w, t, f.actor, 0.3, f);
       lines.push(`${t.name} listens, then nods once. "You kept your word. I’ll remember that."`);
       return stay('root', 20);
     }
@@ -2723,7 +2723,7 @@ export function memoTick(w: World) {
       if (kept) continue;
       rel(c, p.id).trust = clamp(rel(c, p.id).trust - 0.1);
       rel(c, p.id).respect = clamp(rel(c, p.id).respect - 0.06);
-      if (p.isPlayer) p.standing = clamp(p.standing - 1, 0, 100);
+      if (p.isPlayer) repute(w, p, -1, 'broke word');
       addFact(w, { kind: 'ruling', actor: p.id, victim: c.id, minor: true, text: `${p.name} didn’t keep his word to ${c.name}.`, district: c.district }, { witnesses: [c.id] });
     }
     if (c.memos.length > 24) c.memos = c.memos.filter((m) => !m.done).slice(-24);

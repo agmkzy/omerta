@@ -1,7 +1,7 @@
 // Settling a score: the player picks the method. Each method has its own price and its own reply.
 import { bizMove } from './econ';
 import { perform, tension } from './actions';
-import { addFact, clamp, factText, money, ownerBiz, rel, witnessesAt, famName } from './core';
+import { addFact, bear, bearAtLeast, clamp, easeOn, factText, famName, money, ownerBiz, rel, repute, witnessesAt } from './core';
 import { askPermission, isMade, sanctioned } from './politics';
 import { aftermath, warningFor, killMethods } from './violence';
 import { handleDeath } from './core';
@@ -80,10 +80,10 @@ export function settleDo(w: World, p: Character, x: Character, code: string): { 
       p.heat = clamp(p.heat + (worked ? (seen ? 0.6 : 0.25) : 0.15), 0, 1.5);
       const mins = rng.int(60, 180);
       if (!worked) {
-        rel(x, p.id).grudge = 0.95; rel(x, p.id).trust = 0;
+        bearAtLeast(w, x, p.id, 0.95, `${p.name} tried to have him killed`); rel(x, p.id).trust = 0;
         if (m.code === 'poison' || m.code === 'accident') {
           lines.push(rng.chance(0.5) ? `It doesn’t take. ${x.name} gets ill, or gets lucky, and walks away none the wiser.` : `It goes wrong, and ${x.name} works out why. He knows it was meant for him.`);
-          if (!rng.chance(0.5)) rel(x, p.id).grudge = 0.3;
+          if (!rng.chance(0.5)) bearAtLeast(w, x, p.id, 0.3, `${p.name} may have tried to have him killed`);
         } else {
           lines.push(`${x.name} gets away. Shots, a slammed door, and now he knows exactly who wants him dead.`);
           x.hurtUntil = rng.chance(0.4) ? w.now + 4 * DAY : x.hurtUntil;
@@ -121,7 +121,7 @@ export function settleDo(w: World, p: Character, x: Character, code: string): { 
       p.heat = clamp(p.heat + 0.05, 0, 1.5);
       const f = addFact(w, { kind: 'vandalism', actor: p.id, victim: x.id, business: b.id, text: `${p.name} had ${b.name} smashed up as a message to ${x.name}.`, textHidden: `Someone wrecked ${b.name}.`, district: b.district }, { witnesses: witnessesAt(w, b.district, [p.id, x.id], 3) });
       void f;
-      rel(x, p.id).grudge = clamp(rel(x, p.id).grudge + 0.1);
+      bear(w, x, p.id, 0.1, `${p.name} had his place smashed up`);
       tension(w, p, x, 0.5);
       L.push(`Windows go, shelves go, nobody’s hurt. The owner of ${b.name} gets the message and the word travels to ${x.name} by supper.`);
       return { minutes: 80, lines: L, done: true };
@@ -134,7 +134,7 @@ export function settleDo(w: World, p: Character, x: Character, code: string): { 
       p.cash += take;
       p.heat = clamp(p.heat + 0.15, 0, 1.5);
       addFact(w, { kind: 'robbery', actor: p.id, victim: x.id, business: b.id, amount: take, text: `${p.name} cleaned out ${b.name}.`, district: b.district }, { witnesses: witnessesAt(w, b.district, [p.id, x.id], 3) });
-      rel(x, p.id).grudge = clamp(rel(x, p.id).grudge + 0.15);
+      bear(w, x, p.id, 0.15, `${p.name} cleaned out his place`);
       tension(w, p, x, 0.7);
       L.push(take > 0 ? `You walk out of ${b.name} with ${money(take)}. ${x.name} won’t need to be told who.` : `${b.name} has nothing worth taking. The insult lands anyway.`);
       return { minutes: 75, lines: L, done: true };
@@ -148,8 +148,8 @@ export function settleDo(w: World, p: Character, x: Character, code: string): { 
         rel(y, x.id).respect = clamp(rel(y, x.id).respect - 0.1);
         rel(y, x.id).trust = clamp(rel(y, x.id).trust - 0.08);
       }
-      rel(x, p.id).grudge = clamp(rel(x, p.id).grudge + 0.08);
-      rp.grudge = clamp(rp.grudge * 0.6);
+      bear(w, x, p.id, 0.08, `${p.name} turned people against him`);
+      easeOn(rp, 0.6);
       L.push(`You say nothing loud. You say it to the right six people. By the weekend ${x.name} can’t walk into a room without a pause. ${factText(f, true)}`);
       return { minutes: 120, lines: L, done: true };
     }
@@ -158,12 +158,12 @@ export function settleDo(w: World, p: Character, x: Character, code: string): { 
       const boss = x.bossId ? w.chars[x.bossId] : undefined;
       const caught = rng.chance(clamp(0.25 + x.traits.caution * 0.1 - p.skills.charm * 0.1, 0.1, 0.5));
       if (caught) {
-        rel(x, p.id).grudge = clamp(rel(x, p.id).grudge + 0.25);
-        p.standing = clamp(p.standing - 8, 0, 100);
+        bear(w, x, p.id, 0.25, `${p.name} spread lies about him`);
+        repute(w, p, -8, 'lies');
         const b = w.chars[w.fam[p.familyId!].bossId]; if (b) rel(b, p.id).respect = clamp(rel(b, p.id).respect - 0.06);
         L.push(`You drop a word in two ears. One of them is ${x.name.split(' ')[0]}’s cousin. It’s back to him by dinner, and to the boss by the weekend: you’re a man who talks behind backs.`);
       } else {
-        x.standing = clamp(x.standing - 8, 0, 100);
+        repute(w, x, -8, 'lies');
         if (boss) rel(boss, x.id).trust = clamp(rel(boss, x.id).trust - 0.07);
         const b = w.chars[w.fam[p.familyId!].bossId]; if (b) rel(b, x.id).trust = clamp(rel(b, x.id).trust - 0.05);
         L.push(`You say nothing you can’t take back. You say it to men who repeat it. By the end of the week people are quietly wondering about ${x.name.split(' ')[0]}.`);
@@ -186,7 +186,7 @@ export function settleDo(w: World, p: Character, x: Character, code: string): { 
     }
     case 'perm': return { minutes: 60, lines: askPermission(w, p, x), done: true };
     case 'drop': {
-      rp.grudge = clamp(rp.grudge * 0.4);
+      easeOn(rp, 0.4);
       L.push(`You let it go. ${x.name} will hear that you did, and may read it as either wisdom or weakness.`);
       rel(x, p.id).respect = clamp(rel(x, p.id).respect + (rel(x, p.id).grudge > 0.5 ? -0.03 : 0.02));
       return { minutes: 5, lines: L, done: true };

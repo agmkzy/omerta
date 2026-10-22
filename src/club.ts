@@ -4,7 +4,7 @@
 import { pass, versionOf } from './rumour';
 import { fp } from './voice';
 import { amends, callSitdown, ignoreDispute, mineAgainst, againstMe, playerActed } from './disputes';
-import { addFact, clamp, learn, money, payDebt, rel } from './core';
+import { addFact, bearOn, clamp, learn, money, payDebt, rel } from './core';
 import { recommend, recommendable } from './career';
 import { Club, Here, Scene, clubOf, clubOpen, clubPresent, memOf, weekday } from './clubdata';
 import { addFavour, choose } from './encounters';
@@ -142,7 +142,7 @@ function script(w: World, p: Character, cl: Club, c: Character, s: Scene): Node 
         const reason = prob ? { gambling: 'He lost it at the track. Not all of it, but enough.', debt: 'He owes someone else and they got to him first.', family: 'His wife’s mother is ill and it has been costing him.', drink: 'He doesn’t say it, but you can smell last night on him.', house: 'The roof, the bank, the usual.', woman: 'There’s a woman, and she isn’t cheap.', resentment: 'He thinks you take too much, and he’s been taking it back.' }[prob.kind] : 'He says business was slow. It might even be true.';
         return { lines: [reason], opts: [
           o('cover', `Cover it (${money(Math.min(owes, 400))})`, 'He owes you one, and he knows it.', () => { const amt = Math.min(owes, 400, Math.floor(p.cash)); if (amt < 20) return { say: ['You can’t put your hand on it just now.'], end: true, mins: 5 }; p.cash -= amt; c.books.arrears = Math.max(0, c.books.arrears - amt); c.books.missed = 0; r.trust = clamp(r.trust + 0.12); r.affection = clamp(r.affection + 0.08); if (prob) prob.sev = clamp(prob.sev - 0.15); addFavour(w, p.id, c.id, 1, `covering ${money(amt)} of his envelope`); post(w, { from: p.id, to: c.id, amt, flow: 'gift', note: 'covered his envelope' }); return END([`You put ${money(amt)} on the table. ${f} doesn’t argue. "I won’t forget it."`], 20, `${f} hasn’t mentioned the money you put in. He doesn’t need to.`); }),
-          o('lean', 'Tell him to find it by Sunday', 'Direct. He won’t love it.', () => { r.trust = clamp(r.trust - 0.07); r.respect = clamp(r.respect + 0.02); r.grudge = clamp(r.grudge + 0.03); return END([`"By Sunday," you say. ${f} nods once, tight.`], 15, `${f} is still sore about the deadline you gave him.`); }),
+          o('lean', 'Tell him to find it by Sunday', 'Direct. He won’t love it.', () => { r.trust = clamp(r.trust - 0.07); r.respect = clamp(r.respect + 0.02); bearOn(w, r, 0.03, `${p.name} told him to find it by Sunday`); return END([`"By Sunday," you say. ${f} nods once, tight.`], 15, `${f} is still sore about the deadline you gave him.`); }),
           o('carry', 'Carry it, but he has to say so next time', 'He keeps the tab. Costs you nothing.', () => { r.trust = clamp(r.trust + 0.04); return END([`${f} nods. "Next week. Straight."`], 10); }),
         ] };
       }
@@ -150,7 +150,7 @@ function script(w: World, p: Character, cl: Club, c: Character, s: Scene): Node 
         o('why', 'What happened?', 'Ask him straight.', () => ({ say: [`You wait. ${f} looks at his hands.`], next: 'why', mins: 5 })),
         o('carry', 'Carry it', 'He keeps the tab.', () => { r.trust = clamp(r.trust + 0.03); return END([`"It stays on your tab," you say. ${f} breathes out.`], 10); }),
         o('forgive', 'Forget it', 'He stops owing. Some read that as weakness.', () => { c.books.arrears = 0; c.books.missed = 0; r.trust = clamp(r.trust + 0.1); r.respect = clamp(r.respect - 0.04); return END([`"Forget it." ${f} stares, then thanks you quietly.`], 10, `${f} hasn’t forgotten you wiped his tab.`); }),
-        o('lean', 'Tell him that isn’t good enough', 'Hard. Costs trust.', () => { r.trust = clamp(r.trust - 0.08); r.grudge = clamp(r.grudge + 0.04); return END([`${f} takes it without answering. That’s an answer.`], 10); }),
+        o('lean', 'Tell him that isn’t good enough', 'Hard. Costs trust.', () => { r.trust = clamp(r.trust - 0.08); bearOn(w, r, 0.04, `${p.name} told him it was not good enough`); return END([`${f} takes it without answering. That’s an answer.`], 10); }),
       ] };
     }
     case 'trouble': {
@@ -204,7 +204,7 @@ function script(w: World, p: Character, cl: Club, c: Character, s: Scene): Node 
       return { lines: [cash >= d.weeklyPayment ? `${f} puts some money on the table before you speak. "${money(pay)}. All I have this week."` : `${f} won’t meet your eye. "I haven’t got it, ${p.name.split(' ')[0]}. Not this week."`], opts: [
         ...(cash >= 20 ? [o('take', `Take ${money(pay)}`, 'Keeps the book moving.', () => { payDebt(w, d, pay); r.respect = clamp(r.respect + 0.02); return END([`You take it. ${f} relaxes a little.`], 15); })] : []),
         o('ease', 'Give him a week', 'Goodwill. The interest still runs.', () => { d.nextDue = w.now + WEEK; d.missed = Math.max(0, d.missed - 1); r.trust = clamp(r.trust + 0.05); r.affection = clamp(r.affection + 0.02); return END([`"A week," you say. ${f} thanks you too many times.`], 10, `${f} knows you gave him the extra week.`); }),
-        o('lean', 'Lean on him', 'He pays what he has. He resents it.', () => { const amt = Math.min(Math.floor(c.cash), d.balance); if (amt > 0) payDebt(w, d, amt); r.trust = clamp(r.trust - 0.08); r.grudge = clamp(r.grudge + 0.08); return END([amt > 0 ? `${f} empties his pockets onto the table. ${money(amt)}. He will not forget this.` : `${f} has nothing to give, and sees that you saw it.`], 15, `${f} is cold with you about the money.`); }),
+        o('lean', 'Lean on him', 'He pays what he has. He resents it.', () => { const amt = Math.min(Math.floor(c.cash), d.balance); if (amt > 0) payDebt(w, d, amt); r.trust = clamp(r.trust - 0.08); bearOn(w, r, 0.08, `${p.name} leaned on him for what he owed`); return END([amt > 0 ? `${f} empties his pockets onto the table. ${money(amt)}. He will not forget this.` : `${f} has nothing to give, and sees that you saw it.`], 15, `${f} is cold with you about the money.`); }),
       ] };
     }
     case 'sponsor': {

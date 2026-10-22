@@ -102,6 +102,7 @@ These live in [src/tests/tools/](../src/tests/tools) and assert nothing. They pr
 | `agency_measure.ts <seed> [days] [off]` | What NPCs achieved unattended, optionally with goals switched off for comparison |
 | `sit_measure.ts`, `sit_freq.ts`, `sit_trace.ts` | Situation frequency, and situations followed from cause to consequence |
 | `v76_smoke.ts`, `v76_trace_probe.ts` | Organisation smoke runs with `audit()` |
+| `longrun.ts <seed> [weeks=104] [outdir]` | The long-run baseline: totals over one to two years (hierarchy, money, reputation, plans, relationships, causes, families, coherence) and readable histories of individual men. It only observes (a determinism test proves the world is unchanged). The October 2026 baseline is in [docs/baseline/](baseline) |
 | `history_hashes.ts [case …]` | Fingerprints of world histories at 28 points. Run it before and after an engine change and diff: an identical output means no history changed |
 | [src/stress.ts](../src/stress.ts), [src/bot.ts](../src/bot.ts) | Long random-policy player runs |
 | [playtest/pt.ts](../playtest/pt.ts) | The interactive command-line harness used for the V85 playtest. **It hardcodes `/home/claude/omerta/playtest`**, so it fails on any other machine until that path is fixed |

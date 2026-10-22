@@ -42,6 +42,35 @@ export function rel(c: Character, id: Id): Rel {
   return (c.rels[id] ??= { trust: 0.1, respect: 0.3, affection: 0.1, grudge: 0, lastMet: -1e9 });
 }
 
+// Foundation (Oct 2026): one door for what one man holds against another, and why. Every change to a grudge comes through here,
+// with its reason: the event that caused it, or a plain reason where nothing was recorded as an event. The reason kept is the one
+// that did most to raise the grudge lately (a slight does not overwrite a beating; a month-old reason gives way to a new one), and
+// it goes when the grudge does, so anyone who reads a grudge can say what it is about.
+export const bear = (w: World, c: Character, other: Id, amount: number, why: Fact | string) => bearOn(w, rel(c, other), amount, why);
+// a grudge raised to at least a level (a killing, a betrayal), rather than by an amount
+export const bearAtLeast = (w: World, c: Character, other: Id, level: number, why: Fact | string) => bearAtLeastOn(w, rel(c, other), level, why);
+// a grudge let go, in part (by a factor) or wholly (0)
+export function ease(c: Character, other: Id, factor: number) { const r = c.rels[other]; if (r) easeOn(r, factor); }
+// the same, on a relationship already in hand
+export function bearOn(w: World, r: Rel, amount: number, why: Fact | string) {
+  const before = r.grudge;
+  r.grudge = clamp(r.grudge + amount);
+  if (r.grudge > before) noteWhy(w, r, r.grudge - before, why);
+  else if (r.grudge < 0.05) delete r.why;
+}
+export function bearAtLeastOn(w: World, r: Rel, level: number, why: Fact | string) {
+  if (r.grudge < level) { noteWhy(w, r, level - r.grudge, why); r.grudge = level; }
+}
+export function easeOn(r: Rel, factor: number) {
+  r.grudge = clamp(r.grudge * factor);
+  if (r.grudge < 0.05) delete r.why;
+}
+function noteWhy(w: World, r: Rel, a: number, why: Fact | string) {
+  const cur = r.why;
+  if (cur && a < cur.a * 0.5 && w.now - cur.t < 30 * DAY) return;
+  r.why = typeof why === 'string' ? { t: w.now, text: why, a: Math.round(a * 100) / 100 } : { t: w.now, text: why.text, f: why.id, a: Math.round(a * 100) / 100 };
+}
+
 // V89: what a man thinks of the player is earned, not accumulated. Every gain in an NPC's regard for the player goes through
 // here: it shrinks as the regard rises (the last stretch to complete trust is the hardest) and halves each time the same kind of
 // gesture is repeated with the same man within a week (a third drink in a week buys almost nothing). Losses are not damped.
@@ -61,6 +90,8 @@ export function regard(w: World, npc: Character, player: Character, field: 'trus
 
 // Standing (reputation) is earned the same way: each gain shrinks as reputation climbs and as the same kind of deed repeats
 // within a week. Losses are not damped: a name is quicker lost than made. Returns the change actually applied.
+// Foundation (Oct 2026): the one door for anyone's standing, player or not. Deeds come here from addFact (DEED); a rise in rank
+// from applyRank; everything else the game rewards or punishes calls it directly, with the kind of thing it was.
 export function repute(w: World, p: Character, amount: number, kind: string): number {
   if (amount <= 0) { const before = p.standing; p.standing = clamp(p.standing + amount, 0, 100); return p.standing - before; }
   const week = Math.floor(w.now / (7 * 1440));
@@ -168,6 +199,31 @@ export const factText = (f: Fact, knowsActor: boolean) => flavour(f, knowsActor 
 // ---------------------------------------------------------------- knowledge
 
 // How much a victim resents the culprit when they learn about it.
+// Foundation (Oct 2026): what an act does to the name of the man who did it and of the man it was done to. The same for
+// everyone, player or not: equivalent deeds, equivalent reputation. Applied once, where the act is recorded (addFact), through
+// repute (which damps the same kind of gain repeated in one week). A hidden hand earns nothing until it is known. Rising in rank
+// is reputed where every rank change goes (rank.ts applyRank).
+export const DEED: Partial<Record<FactKind, readonly [actor: number, victim: number]>> = {
+  protection_started: [1.5, 0], // brought a shop in
+  protection_refused: [0, -0.3], // the shopkeeper said no to him (the victim is the man refused)
+  beating: [0.8, -1.5],
+  vandalism: [0.3, -0.5],
+  robbery: [0.3, -0.5],
+  murder: [3, 0],
+  attempt: [0.5, -1],
+  poach: [1.5, -1.5], // took a shop from another family's man
+  threat: [0.2, -0.3],
+  discipline: [0.3, -2], // the boss called him to account
+  shortfall: [-1, 0], // his envelope came up light
+  debt_missed: [-0.5, 0],
+  debt_default: [-4, 0],
+  raid: [-1, 0],
+  informant: [-20, 0], // found out talking to the police
+  exposed: [-4, 2], // a false accusation came apart: the accuser loses, the accused is cleared
+};
+// and those who come to know of it think a little more, or less, of the men in it: respect follows deeds both ways
+const HEARD = 0.01;
+
 const GRUDGE: Partial<Record<FactKind, number>> = {
   beating: 0.5,
   vandalism: 0.5,
@@ -185,19 +241,21 @@ export function learn(w: World, cid: Id, fact: Fact, from: string, knowsActor: b
   c.known[fact.id] = { t: w.now, from, knowsActor };
   if (fact.kind === 'business_struggling' && fact.business) c.struggling[fact.business] = fact.t;
   if (!c.alive || !knowsActor || !fact.actor || fact.actor === cid) return;
+  const d = DEED[fact.kind];
+  if (d && !fact.minor && fact.victim !== cid) {
+    if (d[0]) { const r = rel(c, fact.actor); r.respect = clamp(r.respect + d[0] * HEARD); }
+    if (d[1] && fact.victim && fact.victim !== fact.actor) { const r = rel(c, fact.victim); r.respect = clamp(r.respect + d[1] * HEARD); }
+  }
   const g = GRUDGE[fact.kind];
   if (!g) return;
   if (fact.victim === cid) {
+    bear(w, c, fact.actor, g, fact);
     const r = rel(c, fact.actor);
-    r.grudge = clamp(r.grudge + g);
     r.trust = clamp(r.trust - g * 0.5);
   } else if (fact.victim) {
     const v = w.chars[fact.victim];
     const close = (c.rels[fact.victim]?.affection ?? 0) > 0.5 || (!!v?.familyId && v.familyId === c.familyId);
-    if (close) {
-      const r = rel(c, fact.actor);
-      r.grudge = clamp(r.grudge + g * 0.3);
-    }
+    if (close) bear(w, c, fact.actor, g * 0.3, fact);
   }
 }
 
@@ -242,6 +300,11 @@ export function addFact(
     district: f.district ?? actor?.district ?? victim?.district ?? DISTRICTS[0],
   };
   w.facts[fact.id] = fact;
+  const d = DEED[fact.kind];
+  if (d && !fact.minor) {
+    if (d[0] && actor && !fact.hiddenActor) repute(w, actor, d[0], 'deed:' + fact.kind);
+    if (d[1] && victim && victim.id !== actor?.id) repute(w, victim, d[1], 'deed:' + fact.kind);
+  }
   // Secrets leak. Sooner or later whoever was hurt usually finds out who did it.
   if (fact.hiddenActor && fact.actor && w.rng.chance(0.3)) (w.pending ??= []).push({ id: 'p' + w.nextId++, due: w.now + w.rng.int(14, 56) * DAY, kind: 'reveal', fact: fact.id });
   const witnesses = o.witnesses ?? [];

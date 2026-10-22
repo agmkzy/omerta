@@ -45,7 +45,9 @@ describe('memory', { tags: ['scenario'] }, () => {
     let n = 0;
     for (let d = 0; d < 20; d++) { for (let i = 0; i < 5; i++) if (recall(w, p, t)) n++; w.now += DAY; }
     assert.ok(n <= 20, 'not more than once a day');
-    assert.ok(n >= 3 && n < 20, `memories should be occasional, got ${n} in 20 days`);
+    // (each kind of memory comes up at most once a fortnight with the same man: with one favour on record that is two in twenty days
+    // for certain; anything else he remembers depends on the man)
+    assert.ok(n >= 2 && n < 20, `memories should be occasional, got ${n} in 20 days`);
   });
   ok('a word broken is remembered only if the game wrote it down', () => {
     const w = world60(), p = P(w);

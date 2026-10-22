@@ -1,6 +1,6 @@
 // V75: the player's side of situations. What he can see (only what he has been told or witnessed), and what he can do about it.
 // Availability depends on rank, on who trusts him, and on what he knows; nothing here reads a situation's hidden `truth`.
-import { clamp, learn, rel } from './core';
+import { clamp, learn, rel, repute } from './core';
 import { LADDER } from './rank';
 import * as situ from './situ';
 import { attendees, chairPick, claim, closeSit, hold, isOpen, kitOf, know, stanceOf, tell, titleOf } from './situ';
@@ -92,7 +92,7 @@ export function doMove(w: World, p: Character, sid: Id, code: string, who?: Id):
     for (const id of parts) know(w, s, id, 2, 'sat down');
     const pick = chairPick(w, s, p);
     const v = hold(w, s, p, pick); // the player's offer is a recommendation; the table settles on what the man in the chair would settle on
-    p.standing = clamp(p.standing + (v.opposed.length ? 0 : 1), 0, 100);
+    repute(w, p, (v.opposed.length ? 0 : 1), 'ruling');
     return { lines: [v.said, v.opposed.length ? `${v.opposed.map((id) => first(w.chars[id])).join(', ')} did not like it.` : 'Everyone at the table can live with it.'], minutes: 90 };
   }
   if (code === 'support' && who) {

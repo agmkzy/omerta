@@ -65,7 +65,8 @@ describe('organisations', () => {
     const f = other(w); const m = moneyTotal(w); treasuryWeek(w); assert.equal(moneyTotal(w), m, 'treasuryWeek only moves money');
     const inmate = rank(w, f.id, 'soldier')[0]; inmate.jailedUntil = w.now + 20 * DAY; f.treasury = (f.treasury ?? 0) + 1000; f.tin = (f.tin ?? 0) + 1000;
     const c0 = inmate.cash, t0 = f.treasury; treasuryWeek(w);
-    assert.ok(inmate.cash > c0 - 1 && f.treasury! < t0 + 400, 'support went from fund to man'); assert.equal(treasuryCheck(f), 0);
+    // (the fund's own balance also takes the week's dues, which grow with the family: the payment itself is what proves the rule)
+    assert.ok(inmate.cash > c0 - 1 && (f.tlog ?? []).some((x) => x.d < 0 && x.who === inmate.id && x.t === w.now), 'support went from fund to man'); assert.equal(treasuryCheck(f), 0); void t0;
     const lead = leaderOf(w, f.id)!; lead.cash = 40000; const mm = moneyTotal(w); treasuryMove(w, f.id, lead, 5000, 'x'); treasuryMove(w, f.id, lead, -3000, 'y'); assert.equal(moneyTotal(w), mm); assert.equal(treasuryCheck(f), 0);
     for (let i = 0; i < 70; i++) treasuryMove(w, f.id, lead, 1, 'z'); assert.ok(f.tlog!.length <= 40, 'ledger bounded');
     clean(w, 'finance');

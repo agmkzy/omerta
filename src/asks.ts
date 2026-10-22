@@ -6,7 +6,7 @@
 // about what their men are doing and have views. The player and the NPCs use exactly the same moves; NPCs choose theirs from who
 // they are. Each kind of ask only says what is being asked, what it is worth to the man asked, and what yes does in the real world.
 import { ASKS } from './askkinds'; // first: the registry must exist before anything below can reach matters.ts
-import { addFact, clamp, createDebt, famName, money, notifyProtector, ownerBiz, payDebt, regard, peek, rel, repute, witnessesAt } from './core';
+import { addFact, bear, bearOn, clamp, createDebt, ease, easeOn, famName, money, notifyProtector, ownerBiz, payDebt, peek, regard, rel, repute, witnessesAt } from './core';
 import { loanPosition } from './negotiate';
 import { say as vsay } from './voicesheet';
 import { bizMove, giveTime, setCollector } from './econ';
@@ -283,7 +283,7 @@ function answer(w: World, s: Situation, a: Character, t: Character, K: AskKind, 
     return { answer: 'stall', lines };
   }
   S.last = 'no'; s.phase = 'refused'; s.next = w.now + 2 * DAY;
-  if (!tried(S, 'refusedRec')) { bumpTried(S, 'refusedRec'); rel(t, a.id).grudge = clamp(peek(t, a.id).grudge + 0.05); }
+  if (!tried(S, 'refusedRec')) { bumpTried(S, 'refusedRec'); bear(w, t, a.id, 0.05, `${a.name} wanted what he would not give`); }
   // refused before, he says so (the matter remembers); the first time, he says why, in his own way. To anyone but the player, in
   // the words of this kind of matter.
   const firstNo = !tried(S, 'no');
@@ -316,7 +316,7 @@ function finish(w: World, s: Situation, a: Character, t: Character, K: AskKind, 
   lines.push(K.yes(w, s, a, t));
   S.last = 'yes'; S.coerced = coerced; if (s.m?.beat) s.m.beat = '';
   // how he feels about it afterwards is part of the bargain: a frightened yes is resented, a willing one is not
-  if (coerced) { rel(t, a.id).grudge = clamp(peek(t, a.id).grudge + 0.12); afterwards(w, s, a, t); }
+  if (coerced) { bear(w, t, a.id, 0.12, `${a.name} forced his hand`); afterwards(w, s, a, t); }
   else if (a.isPlayer) regard(w, t, a, 'trust', 0.03, 'deal');
   else rel(t, a.id).trust = clamp(peek(t, a.id).trust + 0.03);
   closeSit(w, s, coerced ? 'gave in' : 'agreed', [coerced ? `${first(t)} agreed because he was afraid` : `${first(t)} agreed`], K.cool ?? 6);
@@ -334,8 +334,8 @@ function afterwards(w: World, s: Situation, a: Character, t: Character) {
   // (between other men the same, without the talk: a story told about every frightened yes in the city would swamp the record)
   if (friend && a.isPlayer && tp.agreeable + tp.empathy + (1 - tp.pride) > 1.2) {
     addFact(w, { kind: 'threat', actor: a.id, victim: t.id, story: 'sit:' + s.id, business: s.biz, minor: false, text: `${t.name} told ${friend.name} that ${a.name} had squeezed him into it.`, district: t.district }, { witnesses: [friend.id] });
-    if (friend.rank !== 'civilian') rel(friend, a.id).grudge = clamp(peek(friend, a.id).grudge + 0.04 + peek(friend, t.id).affection * 0.06);
-  } else if (tp.pride > 0.6 && tp.courage > 0.5) r.grudge = clamp(r.grudge + 0.08 + tp.volatility * 0.08);
+    if (friend.rank !== 'civilian') bear(w, friend, a.id, 0.04 + peek(friend, t.id).affection * 0.06, `${a.name} squeezed ${t.name}`);
+  } else if (tp.pride > 0.6 && tp.courage > 0.5) bearOn(w, r, 0.08 + tp.volatility * 0.08, `${a.name} leaned on him`);
 }
 
 // ------------------------------------------------------------------ help
@@ -483,7 +483,7 @@ export function answerAsk(w: World, p: Character, e: Enc, code: string): { lines
   }
   if (code === 'counter') { const amt = Math.round((s.terms?.amt ?? 0) * 0.6 / 5) * 5; S.last = 'counter'; s.m = { ...(s.m ?? {}), offer: amt }; tell(w, s, `${p.name} offered ${a.name} ${money(amt)} instead.`, { actor: p.id, victim: a.id, minor: true }); s.next = w.now + DAY; return { lines: [`You offer ${money(amt)}. ${first(a)} says he will think about it.`], minutes: 20 }; }
   if (code === 'stall') { S.last = 'stall'; bumpTried(S, 'stalled'); s.next = w.now + 3 * DAY; return { lines: [`You tell ${first(a)} you need a few days. He gives you them, and no more.`], minutes: 15 }; }
-  S.last = 'no'; bumpTried(S, 'no'); rel(a, p.id).grudge = clamp(peek(a, p.id).grudge + 0.06);
+  S.last = 'no'; bumpTried(S, 'no'); bear(w, a, p.id, 0.06, `${p.name} turned him down`);
   tell(w, s, `${p.name} turned ${a.name} down.`, { actor: p.id, victim: a.id, minor: true });
   { const x = K.onNo?.(w, s, a, p); if (x) { if (K.keepOnNo) s.next = w.now + 2 * DAY; else closeSit(w, s, 'refused', [`${first(p)} said no`], K.cool ?? 6); return { lines: [`You tell ${first(a)} no.`, x], minutes: 15 }; } }
   if (s.m?.once) { closeSit(w, s, 'refused', [`${first(p)} said no`], K.cool ?? 6); return { lines: [`You tell ${first(a)} no. He nods, and he won’t ask you again.`], minutes: 15 }; }
@@ -718,7 +718,7 @@ ASKS.help = {
   },
   onNo: (w, s, a, t) => {
     // a man who pays for protection and doesn't get it remembers, and stops being sure what he is paying for
-    rel(a, t.id).grudge = clamp(peek(a, t.id).grudge + 0.15);
+    bear(w, a, t.id, 0.15, `${t.name} took his money and did not look after him`);
     rel(a, t.id).trust = clamp(peek(a, t.id).trust - 0.15);
     const o = sits(w).find((x) => x.id === String(s.m?.about));
     if (o && isOpen(o)) { const S = stance(w, o, a.id); S.resolve = clamp(S.resolve - 0.2); S.fear = clamp(S.fear + 0.1); }
@@ -866,8 +866,8 @@ ASKS.layoff = {
   yes: (w, s, a, t) => {
     const v = forOf(w, s)!, f = s.m?.fact ? w.facts[String(s.m.fact)] : undefined;
     const guilty = f ? f.actor === t.id : true;
-    const r = rel(t, v.id); r.grudge = clamp(r.grudge * 0.4); // he stays away: the bad blood that drove him is let go
-    rel(t, a.id).grudge = clamp(rel(t, a.id).grudge + 0.05);
+    const r = rel(t, v.id); easeOn(r, 0.4); // he stays away: the bad blood that drove him is let go
+    bear(w, t, a.id, 0.05, `${a.name} warned him off`);
     let line = `${t.isPlayer ? 'You agree' : `${first(t)} agrees`} to stay away from ${v.isPlayer ? 'you' : first(v)}.`;
     if (guilty && f) {
       // what he did to the man is what he makes good: what he took, if he took something; otherwise (an NPC) what he can spare
@@ -942,7 +942,7 @@ ASKS.favour = {
       // the man he has bad blood with sees who stands with him now, and holds it against him too
       const foe = Object.entries(a.rels).filter(([id, r]) => r.grudge > 0.3 && live(w, id) && id !== t.id).sort((x, y) => y[1].grudge - x[1].grudge)[0];
       const fc = foe ? w.chars[foe[0]] : undefined;
-      if (fc) { rel(fc, t.id).grudge = clamp(rel(fc, t.id).grudge + 0.1); rel(fc, a.id).respect = clamp(rel(fc, a.id).respect + 0.04); }
+      if (fc) { bear(w, fc, t.id, 0.1, `${t.name} stood with ${a.name}`); rel(fc, a.id).respect = clamp(rel(fc, a.id).respect + 0.04); }
       tell(w, s, `${t.name} stood beside ${a.name}${fc ? ` when he went to see ${fc.name}` : ' when it counted'}.`, { actor: t.id, victim: fc?.id ?? a.id, witnesses: [...new Set([a.id, ...(fc ? [fc.id] : []), ...witnessesAt(w, t.district, [a.id, t.id], 2)])], minor: true });
     }
     else line = `${t.isPlayer ? 'You keep' : `${first(t)} keeps`} it to ${t.isPlayer ? 'yourself' : 'himself'}.`;
@@ -954,7 +954,7 @@ ASKS.favour = {
     const f = favOf(w, s);
     if (!f || s.m?.welsh) return undefined;
     s.m = { ...(s.m ?? {}), welsh: 1 };
-    const r = rel(a, t.id); r.respect = clamp(r.respect - 0.1); r.trust = clamp(r.trust - 0.08); r.grudge = clamp(r.grudge + 0.1);
+    const r = rel(a, t.id); r.respect = clamp(r.respect - 0.1); r.trust = clamp(r.trust - 0.08); bearOn(w, r, 0.1, `${t.name} would not honour the favour he owed`);
     // not minor: a man who won't pay what he owes is talked about
     tell(w, s, `${t.name} refused ${a.name} a favour he owed him.`, { kind: 'favour', actor: t.id, victim: a.id, witnesses: [a.id], broadcast: witnessesAt(w, a.district, [a.id, t.id], 2) });
     if (t.isPlayer) { repute(w, t, -2, 'welsh'); return `${first(a)} doesn’t raise his voice. “I’ll remember you said that.” It will get around that you don’t pay what you owe.`; }
@@ -1051,8 +1051,8 @@ ASKS.amends = {
   yes: (w, s, a, t) => {
     const amt = Math.max(0, Math.min(s.terms?.amt ?? 0, a.cash));
     if (amt) { a.cash -= amt; t.cash += amt; }
-    const r = rel(t, a.id); r.grudge = clamp(r.grudge * (amt ? 0.3 : 0.5)); r.trust = clamp(r.trust + 0.03);
-    rel(a, t.id).grudge = clamp(rel(a, t.id).grudge * 0.5);
+    const r = rel(t, a.id); easeOn(r, (amt ? 0.3 : 0.5)); r.trust = clamp(r.trust + 0.03);
+    ease(a, t.id, 0.5);
     const wf = wordFact(w, s);
     if (wf) (t.talk ??= {})['word:' + wf.id] = { d: Math.floor(w.now / DAY), sig: 'x', n: 1 };
     const text = amt ? `${a.name} paid ${t.name} ${money(amt)} to make it right, and ${t.name} took it.` : `${a.name} owned up to ${t.name}, to his face, and ${t.name} accepted it.`;

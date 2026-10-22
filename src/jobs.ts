@@ -7,7 +7,7 @@ import { aptitude, grow, lateOf } from './people';
 import { arch, bossWhy, dodge, injury, pitch, whyOf } from './voice';
 import { confide, perform, share, tension } from './actions';
 import { afterClient, afterKilling } from './consequences';
-import { addFact, clamp, concealedGap, earn, factText, handleDeath, money, newId, notifyProtector, ownerBiz, recordCareer, regard, rel, repute, shortTime, travelTime, witnessesAt } from './core';
+import { addFact, bear, clamp, concealedGap, earn, factText, handleDeath, money, newId, notifyProtector, ownerBiz, recordCareer, regard, rel, repute, shortTime, travelTime, witnessesAt } from './core';
 import { askBetween, move as askMove, openAsk } from './asks';
 import { isOpen } from './situ';
 import { gigApproaches, gigTick, gigOffer, gigResolve, gigStale, GIG_HELP, GIG_LABEL } from './gigs';
@@ -351,11 +351,11 @@ export function declineJob(w: World, j: Job) {
   const g = j.giver ? w.chars[j.giver] : undefined;
   j.status = 'declined';
   if (g) rel(g, p.id).respect = clamp(rel(g, p.id).respect - 0.03);
-  if (j.via === 'boss') p.standing = clamp(p.standing - 2, 0, 100);
+  if (j.via === 'boss') repute(w, p, -2, 'refused work');
   if (j.reason === 'blackmail' && g) {
     // He will tell the people who would want to know.
     rel(g, p.id).trust = clamp(rel(g, p.id).trust - 0.2);
-    rel(g, p.id).grudge = clamp(rel(g, p.id).grudge + 0.3);
+    bear(w, g, p.id, 0.3, `${p.name} tried to blackmail him`);
     const f = Object.values(w.facts).filter((q) => q.kind === 'murder' && (q.actor === p.id || q.actor === g.id)).sort((a, b) => b.t - a.t)[0];
     if (f) {
       f.actor = p.id;
@@ -366,7 +366,7 @@ export function declineJob(w: World, j: Job) {
 export function dropJob(w: World, j: Job) {
   const p = PL(w);
   j.status = 'declined';
-  if (j.via === 'boss') p.standing = clamp(p.standing - 4, 0, 100);
+  if (j.via === 'boss') repute(w, p, -4, 'refused work');
   const g = j.giver ? w.chars[j.giver] : undefined;
   if (g) rel(g, p.id).trust = clamp(rel(g, p.id).trust - 0.05);
 }
@@ -594,16 +594,16 @@ export function resolve(w: World, j: Job, code: string): Result {
           const rest = Math.min(Math.round((t.cash * 0.5) / 10) * 10, 800);
           t.cash -= rest;
           giver.cash += rest;
-          rel(t, doer.id).grudge = clamp(rel(t, doer.id).grudge + 0.05);
+          bear(w, t, doer.id, 0.05, `${doer.name} made him pay`);
           lines.push(rest >= 50 ? `${t.name} studies his shoes and agrees to make it right: ${money(rest)} to ${giver.name}.` : `${t.name} apologises. He has nothing to give, but he’ll stay away from ${giver.name}.`);
           ok = true;
         } else if (!guilty) {
           lines.push(rng.chance(0.6) ? `${t.name} looks genuinely baffled. He swears he never touched ${giver.name}'s place. You’re not sure you believe him.` : `${t.name} denies everything, a little too smoothly.`);
-          rel(t, doer.id).grudge = clamp(rel(t, doer.id).grudge + 0.15);
+          bear(w, t, doer.id, 0.15, `${doer.name} accused him of something he did not do`);
           note = `${t.name} swore it wasn't him.`;
         } else {
           lines.push(`${t.name} tells you to mind your own business. The door closes on the last word.`);
-          rel(t, doer.id).grudge = clamp(rel(t, doer.id).grudge + 0.15);
+          bear(w, t, doer.id, 0.15, `${doer.name} came accusing him`);
         }
       } else if (code === 'squeeze') {
         const amt = Math.min(Math.round((t.cash * 0.6) / 10) * 10, 1000);
@@ -618,7 +618,7 @@ export function resolve(w: World, j: Job, code: string): Result {
           lines.push(`${t.name} counts out ${money(amt)} with shaking hands. He knows exactly who sent you.`);
           ok = true;
         } else {
-          rel(t, doer.id).grudge = clamp(rel(t, doer.id).grudge + 0.2);
+          bear(w, t, doer.id, 0.2, `${doer.name} leaned on him`);
           lines.push(`${t.name} spits a refusal and tells you what he thinks of you. It’s not flattering.`);
         }
       } else {
@@ -666,7 +666,7 @@ export function resolve(w: World, j: Job, code: string): Result {
         gained = paid(w, doer, j.pay, giver, 'hit');
         lines.push(`${giver.name} pays ${money(gained)}.`);
         if (!t.familyId) {
-          p.standing = clamp(p.standing - 3, 0, 100);
+          repute(w, p, -3, 'botched');
           lines.push('Killing a civilian for money isn’t the work your family respects. (standing -3)');
         }
       }
@@ -847,16 +847,15 @@ export function daily(w: World) {
       j.status = 'expired';
       const g = j.giver ? w.chars[j.giver] : undefined;
       if (j.via === 'boss' && g) {
-        p.standing = clamp(p.standing - 3, 0, 100);
+        repute(w, p, -3, 'ignored summons');
         rel(g, p.id).trust = clamp(rel(g, p.id).trust - 0.05);
         // Ignoring the man who runs your end twice in a month is asking for it.
         if (j.kind === 'summons' && w.jobs.filter((q) => q.kind === 'summons' && q.status === 'expired' && w.now - q.expires < 30 * DAY).length >= 2 && p.hurtUntil <= w.now) {
           if (temper(g).volatility > 0.5) {
             p.hurtUntil = w.now + 3 * DAY;
-            rel(p, g.id).grudge = clamp(rel(p, g.id).grudge + 0.3);
+            bear(w, p, g.id, 0.3, `${g.name} had him roughed up for not coming when called`);
             addFact(w, { kind: 'discipline', actor: g.id, victim: p.id, text: `${g.name} had ${p.name} beaten for ignoring him.`, district: p.district }, { witnesses: [] });
           } else {
-            p.standing = clamp(p.standing - 6, 0, 100);
             p.kickRate = Math.min(0.35, p.kickRate + 0.05);
             addFact(w, { kind: 'discipline', actor: g.id, victim: p.id, text: `${g.name} raised ${p.name}'s share for ignoring him.`, district: p.district }, { witnesses: [] });
           }
@@ -1021,13 +1020,13 @@ export function performMove(w: World, m: Move): { minutes: number; lines: string
       p.district = b.district;
       const accept = partner ? rng.chance(clamp(0.85 - temper(host).caution * 0.3, 0.4, 0.9)) : rng.chance(clamp(0.6 - temper(host).courage * 0.5 + p.traits.violence * 0.3, 0.15, 0.9));
       if (!accept) {
-        rel(host, p.id).grudge = clamp(rel(host, p.id).grudge + (partner ? 0.05 : 0.25));
+        bear(w, host, p.id, (partner ? 0.05 : 0.25), `${p.name} wanted in on his place`);
         lines.push(`${host.name} wants no part of it. He looks past you at the street.`);
         return { minutes: mins, lines };
       }
       p.cash -= cost;
       host.cash += cost;
-      if (!partner) rel(host, p.id).grudge = clamp(rel(host, p.id).grudge + 0.2);
+      if (!partner) bear(w, host, p.id, 0.2, `${p.name} forced his way in`);
       w.ventures.push({ id: newId(w, 'v'), ownerId: p.id, bizId: b.id, hostId: host.id, hostShare: partner ? 0.3 : 0.15, stock: 0, since: w.now, weeks: 0, takings: 0, open: true });
       lines.push(`${host.name} gives you the back bay at ${b.name}. Bring it cars; it clears two a week. Raids are always a risk, and more cars means more risk.`);
       return { minutes: mins, lines };

@@ -1,6 +1,6 @@
 // The part of the man that is not the job: a mother who wants Sundays, a woman who wants an answer, a sister who needs a favour.
 // None of it is a score. It is what you are choosing between when you are always choosing money.
-import { addFact, clamp, learn, money, rel } from './core';
+import { addFact, clamp, learn, money, rel, repute } from './core';
 import { addEnc } from './encounters';
 import { Character, DAY, Enc, Id, Kin, Life, Partner, World } from './types';
 import { FEMALE, spawnCivilian } from './world';
@@ -184,7 +184,7 @@ export function lifeChoose(w: World, p: Character, e: Enc, code: string): { line
       if (code === 'propose') {
         pr.stage = 'engaged';
         pr.warmth = 1;
-        p.standing = clamp(p.standing + 1, 0, 100);
+        repute(w, p, 1, 'family');
         p.cash -= 400;
         lines.push(`${g.name} says yes before you have finished the sentence. Within a week every man in the family has heard, and each of them has an opinion about the ring.`);
       } else {
@@ -228,8 +228,8 @@ export function lifeChoose(w: World, p: Character, e: Enc, code: string): { line
     if (e.data?.what === 'christening') {
       const ev = w.events.find((x) => x.id === e.data?.ev); if (ev) ev.done = true;
       const guests = Object.values(w.chars).filter((g) => g.alive && g.id !== p.id && g.familyId && g.familyId === p.familyId && g.rank !== 'associate' && (g.rels[p.id]?.trust ?? 0) > 0.2).slice(0, 14);
-      if (code === 'grand' && p.cash >= 900) { p.cash -= 900; for (const g of guests) rel(g, p.id).respect = clamp(rel(g, p.id).respect + 0.05); p.standing = clamp(p.standing + 2, 0, 100); k.warmth = clamp(k.warmth + 0.05); lines.push(`Our Lady of Pity is full to the doors. Your boss holds the baby for the photograph. Every man in the room remembers who paid for the wine.`); }
-      else if (code === 'modest' && p.cash >= 250) { p.cash -= 250; for (const g of guests) rel(g, p.id).respect = clamp(rel(g, p.id).respect + 0.01); p.standing = clamp(p.standing + 0.5, 0, 100); lines.push(`A small room, a good cake, and your mother crying in the second row. Nobody can say you didn’t do it right.`); }
+      if (code === 'grand' && p.cash >= 900) { p.cash -= 900; for (const g of guests) rel(g, p.id).respect = clamp(rel(g, p.id).respect + 0.05); repute(w, p, 2, 'wedding'); k.warmth = clamp(k.warmth + 0.05); lines.push(`Our Lady of Pity is full to the doors. Your boss holds the baby for the photograph. Every man in the room remembers who paid for the wine.`); }
+      else if (code === 'modest' && p.cash >= 250) { p.cash -= 250; for (const g of guests) rel(g, p.id).respect = clamp(rel(g, p.id).respect + 0.01); repute(w, p, 0.5, 'wedding'); lines.push(`A small room, a good cake, and your mother crying in the second row. Nobody can say you didn’t do it right.`); }
       else { for (const g of guests) rel(g, p.id).respect = clamp(rel(g, p.id).respect - 0.03); k.warmth = clamp(k.warmth - 0.03); lines.push(`The priest, your wife, and an empty church. It’s noticed, and not said out loud.`); }
       return { lines, minutes: 240 };
     }
@@ -381,7 +381,7 @@ export function askMarry(w: World, p: Character): { lines: string[]; ok: boolean
   if (p.cash < 400) return { lines: ['You can’t afford a ring that you’d be proud of.'], ok: false };
   p.cash -= 400;
   pr.stage = 'engaged'; pr.warmth = 1;
-  p.standing = clamp(p.standing + 1, 0, 100);
+  repute(w, p, 1, 'engaged');
   return { lines: [`${g.name} says yes before you have finished the sentence. Within a week every man in the family has heard, and each of them has an opinion about the ring.`], ok: true };
 }
 export function wedding(w: World, p: Character): string[] {
@@ -392,7 +392,7 @@ export function wedding(w: World, p: Character): string[] {
   p.cash -= 1500;
   pr.stage = 'married';
   pr.since = w.now;
-  p.standing = clamp(p.standing + 3, 0, 100);
+  repute(w, p, 3, 'married');
   const guests = Object.values(w.chars).filter((c) => c.alive && c.familyId && c.familyId === p.familyId && (c.rels[p.id]?.trust ?? 0) > 0.25).slice(0, 12);
   for (const c of guests) { rel(c, p.id).respect = clamp(rel(c, p.id).respect + 0.03); }
   addFact(w, { kind: 'event', actor: p.id, text: `${p.name} married ${g.name}. The whole family came.`, district: p.district }, { broadcast: guests.map((c) => c.id) });
@@ -425,7 +425,7 @@ function birth(w: World, p: Character, pr: Partner) {
   rel(kid, p.id).trust = 0.9; rel(kid, p.id).affection = 1; rel(p, kid.id).affection = 1; rel(p, kid.id).trust = 0.9;
   L.kin.push({ id: kid.id, role: boy ? 'son' : 'daughter', warmth: 0.9, lastSeen: w.now });
   pr.warmth = clamp(pr.warmth + 0.1);
-  p.standing = clamp(p.standing + 1, 0, 100);
+  repute(w, p, 1, 'family');
   addFact(w, { kind: 'event', actor: p.id, minor: false, text: `${p.name} is the father of a ${boy ? 'boy' : 'girl'}: ${kid.name}.`, district: p.district }, { witnesses: [p.id] });
   w.events.push({ id: 'ev' + w.nextId++, kind: 'christening', t: w.now + 30 * DAY, host: p.id, about: kid.id, place: 'Our Lady of Pity', invited: [] });
   addEnc(w, { kind: 'kin', from: kid.id, title: 'A new arrival', days: 5, lines: [`${w.chars[pr.id].name} puts a small shape in your arms. ${kid.name.split(' ')[0]}. ${boy ? 'He' : 'She'} has your father’s hands.`, `You have never been this frightened. Everything you do from here on has an extra name on it.`], opts: [{ code: 'go', label: 'Hold ' + (boy ? 'him' : 'her') + ' a while', hint: 'Nobody will call you here.' }], data: { what: 'birth' } });

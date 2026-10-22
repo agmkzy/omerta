@@ -7,7 +7,7 @@
 // (his boss, his crew, his family), so it travels by gossip like anything else. A plan that needs another man goes through the
 // shared asks engine (asks.ts: borrow, lend, join), so men negotiate instead of rolling once; and when the player is plausibly the
 // man to ask (his boss, his creditor, kin, a trusted friend, someone who knows the owner), the man comes to the player, rarely.
-import { addFact, clamp, createDebt, learn, money, ownerBiz, payDebt, rel } from './core';
+import { addFact, bear, bearOn, clamp, createDebt, learn, money, ownerBiz, payDebt, rel, repute } from './core';
 import { INVEST_CAP, addStake, bizMove, transferBusiness, trade } from './econ';
 import { LADDER, leaveCrew } from './rank';
 import { isRunner, members, readiness, recommend } from './career';
@@ -17,6 +17,7 @@ import { ASKS, askBetween, askTurn, move as askMove, openAsk } from './asks';
 import { closeSit, isOpen } from './situ';
 import { closeKin, kinOf, kinTie } from './kin';
 import { post } from './ledger';
+import { temper } from './temper';
 import { Agency, Business, Character, DAY, Debt, Enc, Goal, GoalEnd, GoalKind, Id, Rank, Situation, WEEK, World } from './types';
 
 export const AGENCY = { on: true, audit: false, caps: { perMan: 2, ended: 60 } };
@@ -81,7 +82,7 @@ function refund(w: World, g: Goal) {
   if (c && by?.alive) {
     const back = Math.min(c.cash, g.fin.amt);
     give(c, by, back);
-    if (back < g.fin.amt) { rel(by, c.id).grudge = clamp(rel(by, c.id).grudge + 0.25); rel(by, c.id).trust = clamp(rel(by, c.id).trust - 0.2); }
+    if (back < g.fin.amt) { bear(w, by, c.id, 0.25, `${c.name} did not pay back what he was lent`); rel(by, c.id).trust = clamp(rel(by, c.id).trust - 0.2); }
   }
   delete g.fin;
 }
@@ -514,7 +515,7 @@ function businessStep(w: World, g: Goal, c: Character) {
     const counter = Math.round(full * thr / 50) * 50;
     const proud = t.ambition > 0.7 && t.violence > 0.6;
     if (g.tries >= 4 || counter > full * 1.2) return endGoal(w, g, 'failed', 'could not agree a price');
-    if (proud && counter > offer * 1.12) { rel(c, o.id).grudge = clamp(rel(c, o.id).grudge + 0.1); return endGoal(w, g, 'failed', 'would not be made to pay more'); }
+    if (proud && counter > offer * 1.12) { bear(w, c, o.id, 0.1, `${o.name} tried to make him pay more`); return endGoal(w, g, 'failed', 'would not be made to pay more'); }
     if (counter <= c.cash - RESERVE || (t.greed < 0.7 && counter <= (c.cash - RESERVE) * 1.4)) {
       g.offer = Math.max(offer, Math.round(counter * 0.98 / 50) * 50); g.n = 1; g.next = 'come back with a better offer';
       return later(w, g, 1);
@@ -629,7 +630,7 @@ function wealthStep(w: World, g: Goal, c: Character) {
     if ((!debtor.isPlayer || askOk(w)) && putAsk(w, g, c, 'collect', debtor, { amt: due, why: `${debtor.name} is behind with what he owes ${c.name}`, m: { debt: d.id }, line: debtor.isPlayer ? `${c.name} finds you. You are behind with what you owe him, and he wants it.` : undefined })) { g.next = 'get what he is owed'; return; }
     if (debtor.isPlayer) return later(w, g, 1); // he does not just help himself to the player's money
     const amt = Math.min(d.balance, Math.round(debtor.cash * 0.6));
-    if (amt >= 20) { payDebt(w, d, amt); rel(debtor, c.id).grudge = clamp(rel(debtor, c.id).grudge + (t.violence > 0.5 ? 0.08 : 0.03)); g.next = 'keep the pressure on'; }
+    if (amt >= 20) { payDebt(w, d, amt); bear(w, debtor, c.id, (t.violence > 0.5 ? 0.08 : 0.03), `${c.name} squeezed him for what he owed`); g.next = 'keep the pressure on'; }
     else { g.tries++; g.obstacle = 'he has nothing'; }
     return later(w, g, 2);
   } else if (pick === 'lend') {
@@ -727,7 +728,17 @@ function advanceStep(w: World, g: Goal, c: Character) {
   // somebody senior has his name: now it is up to the men at the top. He waits, but not for ever.
   if (sp) {
     if (g.stage !== 'nod') { g.stage = 'nod'; g.since = w.now; }
-    if (w.now - (g.since ?? w.now) > 5 * WEEK) return endGoal(w, g, 'dropped', 'told to be patient; tired of waiting for the nod');
+    // Foundation step 2: how long he will wait is his temperament's (a careful, even man waits months; a hungry, hot one weeks), and
+    // while a seat is actually open the nod is coming, so the waiting does not count. When it runs out, the man at the top who kept
+    // him waiting is who he holds it against (core.bear: the reason goes with it), which is what the churn reads (orgs.discontent).
+    const tp = temper(c);
+    const patience = clamp(4 + tp.caution * 14 + (1 - tp.volatility) * 6 - t.ambition * 4, 4, 22) * WEEK;
+    if (r.openSeat) g.since = Math.max(g.since ?? w.now, w.now - patience / 2);
+    if (w.now - (g.since ?? w.now) > patience) {
+      const top = fam ? w.chars[fam.bossId] : undefined;
+      if (top?.alive && top.id !== c.id) bear(w, c, top.id, 0.12, `${top.name} kept him waiting for a seat that never came`);
+      return endGoal(w, g, 'dropped', 'told to be patient; tired of waiting for the nod');
+    }
   } else if (g.stage === 'nod') { g.stage = 'build'; delete g.since; } // his sponsor has gone cold on him
   const opts: { k: string; s: number }[] = [];
   if (!sp && boss?.alive) opts.push({ k: 'ask', s: 0.9 });
@@ -758,14 +769,14 @@ function advanceStep(w: World, g: Goal, c: Character) {
     g.tries++; bump(w, 'refused.ask'); rb.respect = clamp(rb.respect - 0.01); emit(w, g, c, 'refused');
     if (g.tries >= 3) {
       // told no three times: he takes it to heart, and it shows in how he deals with that man from now on
-      const rc = rel(c, boss.id); rc.grudge = clamp(rc.grudge + 0.12); rc.trust = clamp(rc.trust - 0.06);
+      const rc = rel(c, boss.id); bearOn(w, rc, 0.12, `${boss.name} would not put his name forward`); rc.trust = clamp(rc.trust - 0.06);
       return endGoal(w, g, 'failed', 'his superior would not back him');
     }
     return later(w, g, 2.5);
   }
   if (pick === 'gift' && boss) {
     const amt = Math.round(Math.min(c.cash * 0.15, 250) / 10) * 10;
-    if (amt >= 50 && give(c, boss, amt)) { rel(boss, c.id).trust = clamp(rel(boss, c.id).trust + 0.04); rel(boss, c.id).respect = clamp(rel(boss, c.id).respect + 0.02); c.standing = clamp(c.standing + 0.8, 0, 100); bump(w, 'inter.gift'); g.next = 'keep his name in front of them'; emit(w, g, c, 'gift', { amt }); }
+    if (amt >= 50 && give(c, boss, amt)) { rel(boss, c.id).trust = clamp(rel(boss, c.id).trust + 0.04); rel(boss, c.id).respect = clamp(rel(boss, c.id).respect + 0.02); repute(w, c, 0.8, 'gift'); bump(w, 'inter.gift'); g.next = 'keep his name in front of them'; emit(w, g, c, 'gift', { amt }); }
     return later(w, g, 3);
   }
   if (pick === 'undermine') {
@@ -773,11 +784,11 @@ function advanceStep(w: World, g: Goal, c: Character) {
     const rv = rivals.map((x) => ({ x, r: readiness(w, x)?.score ?? 0 })).sort((a, b) => b.r - a.r)[0]?.x;
     if (!rv || (readiness(w, rv)?.score ?? 0) < g.progress * 0.8) return later(w, g, 2);
     bump(w, 'inter.undermine');
-    rv.standing = clamp(rv.standing - 2, 0, 100);
+    repute(w, rv, -2, 'run down');
     if (boss?.alive) rel(boss, rv.id).trust = clamp(rel(boss, rv.id).trust - 0.03);
     const seen = w.rng.chance(0.15 + (1 - t.caution) * 0.2);
     if (seen) { // he was seen doing it
-      rel(rv, c.id).grudge = clamp(rel(rv, c.id).grudge + 0.25); rel(rv, c.id).trust = clamp(rel(rv, c.id).trust - 0.2);
+      bear(w, rv, c.id, 0.25, `${c.name} talked him down to get ahead`); rel(rv, c.id).trust = clamp(rel(rv, c.id).trust - 0.2);
       if (boss?.alive) rel(boss, c.id).respect = clamp(rel(boss, c.id).respect - 0.04);
       bump(w, 'caught');
     }
@@ -855,8 +866,8 @@ function debtStep(w: World, g: Goal, c: Character) {
   }
   if (pick === 'lean' && cr) {
     bump(w, 'inter.lean');
-    if (w.rng.chance(0.2 + t.violence * 0.15 - rel(cr, c.id).trust * 0.1)) { d.status = 'void'; bump(w, 'leaned'); rel(cr, c.id).grudge = clamp(rel(cr, c.id).grudge + 0.4); addFact(w, { kind: 'rumour', actor: c.id, victim: cr.id, minor: true, text: `${cr.name} let ${c.name}'s debt go after a talk. Nobody believes it was generosity.`, district: c.district }, { witnesses: [cr.id] }); return endGoal(w, g, 'done', 'frightened the debt away'); }
-    rel(cr, c.id).grudge = clamp(rel(cr, c.id).grudge + 0.3); rel(cr, c.id).respect = clamp(rel(cr, c.id).respect - 0.1); g.tries++;
+    if (w.rng.chance(0.2 + t.violence * 0.15 - rel(cr, c.id).trust * 0.1)) { d.status = 'void'; bump(w, 'leaned'); bear(w, cr, c.id, 0.4, `${c.name} leaned on him to forget a debt`); addFact(w, { kind: 'rumour', actor: c.id, victim: cr.id, minor: true, text: `${cr.name} let ${c.name}'s debt go after a talk. Nobody believes it was generosity.`, district: c.district }, { witnesses: [cr.id] }); return endGoal(w, g, 'done', 'frightened the debt away'); }
+    bear(w, cr, c.id, 0.3, `${c.name} leaned on him to forget a debt`); rel(cr, c.id).respect = clamp(rel(cr, c.id).respect - 0.1); g.tries++;
     return later(w, g, 2);
   }
   if (pick === 'borrow' && lender) {
@@ -927,8 +938,8 @@ function independenceStep(w: World, g: Goal, c: Character) {
 function walkAway(w: World, g: Goal, c: Character, boss: Character) {
   leaveCrew(w, c);
   addFact(w, { kind: 'rumour', actor: c.id, victim: boss.id, text: `${c.name} has stopped answering to ${boss.name}.`, district: c.district }, { witnesses: [boss.id], broadcast: audience(w, c) });
-  if (boss.isPlayer) rel(c, boss.id).grudge = clamp(rel(c, boss.id).grudge + 0.1);
-  else rel(boss, c.id).grudge = clamp(rel(boss, c.id).grudge + 0.3);
+  if (boss.isPlayer) bear(w, c, boss.id, 0.1, `${boss.name} lost him`);
+  else bear(w, boss, c.id, 0.3, `${c.name} walked out on him`);
   bump(w, 'broke');
   return endGoal(w, g, 'done', 'walked away from his superior');
 }
@@ -1006,7 +1017,7 @@ function answered(w: World, g: Goal, code: string): string[] {
       lines.push(`"You won't regret it," ${first(c)} says.`);
       later(w, g, 1);
     } else {
-      g.tries++; r.respect = clamp(r.respect - 0.03); r.grudge = clamp(r.grudge + 0.06);
+      g.tries++; r.respect = clamp(r.respect - 0.03); bearOn(w, r, 0.06, `${p.name} would not put his name forward`);
       lines.push(code === 'lapse' ? `${first(c)} waited for an answer that didn't come. He has stopped waiting.` : `${first(c)} nods slowly. "I'll keep earning it."`);
       // turned down by the man above him: an ambitious man starts thinking about the terms he works under
       if (c.traits.ambition > 0.6) (agencyOf(w).cool[c.id + ':advance'] = w.now + 10 * WEEK);
@@ -1023,7 +1034,7 @@ function answered(w: World, g: Goal, code: string): string[] {
       lines.push(was > c.kickRate ? `${first(c)} nods. "That's fair. You'll see it was worth it." Less of what he makes will come up to you from now on.` : `${first(c)} nods. He was already passing up as little as a man can.`);
       endGoal(w, g, 'done', 'got better terms');
     } else {
-      g.tries++; r.grudge = clamp(r.grudge + 0.06); r.trust = clamp(r.trust - 0.03);
+      g.tries++; bearOn(w, r, 0.06, `${p.name} would not give him better terms`); r.trust = clamp(r.trust - 0.03);
       lines.push(`${first(c)} hears it. "Sure. The cut stays." He doesn't look at you when he says it.`);
       later(w, g, 2);
     }

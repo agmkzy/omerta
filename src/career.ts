@@ -2,7 +2,7 @@ import { promotedOver } from './situ';
 import { ledgerAdd } from './powers2';
 // Career: associate -> soldier -> capo -> underboss -> boss. Nobody is promoted because a number ticked over.
 // Someone with standing has to speak for you, there has to be a vacancy, and the man at the top has to agree.
-import { addFact, clamp, famName, money, recordCareer, rel } from './core';
+import { addFact, bear, clamp, famName, money, peek, recordCareer, rel, repute } from './core';
 import { influence } from './books';
 import { mkJob } from './jobs';
 import { addEnc } from './encounters';
@@ -12,7 +12,6 @@ import { Character, DAY, Id, Rank, World } from './types';
 
 export { LADDER, WAGE } from './rank';
 import { LADDER, WAGE, applyRank, repairHierarchy } from './rank';
-export const CAP: Record<string, number> = { soldier: 6, capo: 3, underboss: 1 };
 const KICK_NEEDED: Record<string, number> = { soldier: 1500, capo: 6000, underboss: 14000 };
 const next = (r: Rank): Rank | undefined => LADDER[LADDER.indexOf(r) + 1];
 
@@ -20,7 +19,26 @@ const next = (r: Rank): Rank | undefined => LADDER[LADDER.indexOf(r) + 1];
 export const isRunner = (w: World, c: Character) => c.rank === 'associate' && !!c.bossId && w.chars[c.bossId]?.rank === 'associate';
 export const members = (w: World, fid: Id) => Object.values(w.chars).filter((c) => c.alive && c.familyId === fid);
 export const seats = (w: World, fid: Id, r: Rank) => members(w, fid).filter((c) => c.rank === r).length;
-export const capOf = (w: World, fid: Id, r: Rank) => (CAP[r] ?? 0) + (w.fam[fid]?.capBonus?.[r] ?? 0);
+// Foundation step 2 (Oct 2026): how many seats a family can carry at each rank comes from its shape, not a fixed number. A captain
+// needs men under him (one to about every five soldiers and associates, the shape the families start with), a captain carries about three soldiers, and there is one
+// underboss. On top of the structure, the one seat the boss may choose to open for a strong record (capBonus, see openSeatFor). A family that grows can carry more officers; one that has run short of men below cannot
+// keep making them.
+export function capOf(w: World, fid: Id, r: Rank): number {
+  const ms = members(w, fid), n = (x: Rank) => ms.filter((c) => c.rank === x).length;
+  const extra = w.fam[fid]?.capBonus?.[r] ?? 0;
+  if (r === 'capo') return Math.max(2, Math.round((n('soldier') + n('associate')) / 5)) + extra;
+  if (r === 'soldier') return Math.max(4, 3 * n('capo')) + extra;
+  if (r === 'underboss') return 1;
+  return 0;
+}
+// the boss opens a seat beyond what the structure carries, for a record that has earned it; never more than one above it
+export const SEAT_EXTRA = 1;
+export function openSeatFor(w: World, fid: Id, r: Rank): boolean {
+  const f = w.fam[fid];
+  if (!f || (f.capBonus?.[r] ?? 0) >= SEAT_EXTRA) return false;
+  f.capBonus = { ...(f.capBonus ?? {}), [r]: (f.capBonus?.[r] ?? 0) + 1 };
+  return true;
+}
 export const vacancy = (w: World, fid: Id, r: Rank) => r === 'boss' ? false : seats(w, fid, r) < capOf(w, fid, r);
 
 export interface Readiness {
@@ -94,15 +112,14 @@ export function promote(w: World, c: Character, to: Rank, by?: Character) {
   c.sponsor = by?.id ?? c.bossId ?? undefined;
   if (c.isPlayer && by && by.id !== c.id) ledgerAdd(w, 'sponsor', by.id, `${by.name} sponsored you to ${to}.`);
   delete c.backer;
-  c.standing = clamp(c.standing + 6, 0, 100);
   if (to === 'capo') {
     c.bossId = (members(w, fid).find((x) => x.rank === 'underboss') ?? boss)?.id ?? null;
     // a new captain takes his own people with him
   } else if (to === 'underboss') {
     c.bossId = boss?.id ?? null;
     for (const x of members(w, fid)) if (x.rank === 'capo' && x.id !== c.id) x.bossId = c.id;
-    if (c.isPlayer) {
-      // the crew you ran passes to another captain; you run captains now
+    {
+      // the crew he ran passes to another captain; he runs captains now (anyone's crew, not only the player's)
       const heir = members(w, fid).filter((x) => x.rank === 'capo' && x.id !== c.id).sort((a, b) => b.lifetimeKick - a.lifetimeKick)[0];
       const mine = Object.values(w.chars).filter((x) => x.alive && x.bossId === c.id && x.rank !== 'capo' && x.rank !== 'civilian');
       if (heir && mine.length) {
@@ -133,14 +150,14 @@ export function promote(w: World, c: Character, to: Rank, by?: Character) {
         const [glad, sour] = [pool[0], pool[pool.length - 1]];
         rel(glad, c.id).trust = clamp(rel(glad, c.id).trust + 0.15);
         rel(sour, c.id).trust = clamp(rel(sour, c.id).trust - 0.12);
-        rel(sour, c.id).grudge = clamp(rel(sour, c.id).grudge + 0.15);
+        bear(w, sour, c.id, 0.15, `${c.name} was put over him`);
         sour.problem = { kind: 'resentment', sev: 0.6, since: w.now };
         addFact(w, { kind: 'rumour', actor: sour.id, minor: true, text: `${sour.name} didn’t take it well that ${c.name} was put over him. ${glad.name} was pleased.`, district: c.district }, { witnesses: [c.id] });
       }
     }
   }
   const rivals = members(w, fid).filter((x) => x.id !== c.id && x.rank === was && !x.isPlayer && x.traits.ambition >= 0.6 && x.lifetimeKick >= (KICK_NEEDED[to] ?? 1e9) * 0.7);
-  for (const x of rivals) rel(x, c.id).grudge = clamp(rel(x, c.id).grudge + 0.1);
+  for (const x of rivals) bear(w, x, c.id, 0.1, `${c.name} was made ahead of him`);
   repairHierarchy(w, fid);
 }
 
@@ -150,6 +167,13 @@ export function careerTick(w: World) {
     const boss = w.chars[fam.bossId];
     if (!boss?.alive) continue;
     if ((fam.lastPromo ?? 0) > w.now - 10 * DAY) continue;
+    // Foundation step 2: an empty underboss's chair is filled. The boss names the captain he trusts and rates most, free to serve
+    // (the others' resentment of being passed over is promote's, as for any step up). The player rises by his own road (path.ts).
+    if (!boss.isPlayer && vacancy(w, fam.id, 'underboss')) {
+      const rate = (c: Character) => peek(boss, c.id).trust + peek(boss, c.id).respect * 0.5 + c.standing / 100;
+      const pick = members(w, fam.id).filter((c) => c.rank === 'capo' && !c.isPlayer && c.jailedUntil <= w.now).sort((a, b) => rate(b) - rate(a) || (a.id < b.id ? -1 : 1))[0];
+      if (pick && w.rng.chance(0.5)) { promote(w, pick, 'underboss', boss); fam.lastPromo = w.now; continue; }
+    }
     for (const to of ['capo', 'soldier'] as Rank[]) {
       if (to === 'soldier' && fam.booksClosed) continue;
       if (w.path?.hold === to && w.chars[w.playerId!]?.familyId === fam.id) continue; // the seat is spoken for
@@ -181,7 +205,7 @@ export function careerTick(w: World) {
 
 export function inductPlayer(w: World, p: Character, to: Rank, shown: number) {
   const sp = sponsorOf(w, p);
-  p.standing = clamp(p.standing + shown, 0, 100);
+  repute(w, p, shown, 'induction');
   promote(w, p, to, sp);
   w.fam[p.familyId!].lastPromo = w.now;
 }
@@ -189,7 +213,7 @@ export function inductPlayer(w: World, p: Character, to: Rank, shown: number) {
 export function turnedDown(w: World, p: Character) {
   const boss = w.chars[w.fam[p.familyId!].bossId];
   if (boss) rel(boss, p.id).respect = clamp(rel(boss, p.id).respect - 0.2);
-  p.standing = clamp(p.standing - 8, 0, 100);
+  repute(w, p, -8, 'turned down');
   p.cooldown['induct'] = w.now + 70 * DAY;
 }
 
@@ -424,11 +448,11 @@ export function promoChoose(w: World, p: Character, e: Enc, code: string): strin
   } else if (stage === 1) {
     const rv = e.about ? w.chars[e.about] : undefined;
     if (code === 'undermine' && rv) {
-      if (w.rng.chance(0.62)) { pc.points += 1; if (rv.rels) rel(rv, p.id).grudge = clamp(rel(rv, p.id).grudge + 0.1); lines.push(`A few careful words in the right places, and by the end of the week people are saying things about ${rv.name} that weren’t said before. Nobody traces it to you.`); }
-      else { pc.points -= 2.5; rel(rv, p.id).grudge = clamp(rel(rv, p.id).grudge + 0.4); lines.push(`It gets back to ${rv.name}. And to ${c?.name ?? 'your sponsor'}. A man who does that to a rival in front of the people who decide isn’t a man they want to make.`); }
+      if (w.rng.chance(0.62)) { pc.points += 1; if (rv.rels) bear(w, rv, p.id, 0.1, `${p.name} talked him down to get ahead`); lines.push(`A few careful words in the right places, and by the end of the week people are saying things about ${rv.name} that weren’t said before. Nobody traces it to you.`); }
+      else { pc.points -= 2.5; bear(w, rv, p.id, 0.4, `${p.name} talked him down to get ahead`); lines.push(`It gets back to ${rv.name}. And to ${c?.name ?? 'your sponsor'}. A man who does that to a rival in front of the people who decide isn’t a man they want to make.`); }
     } else if (code === 'outdo') {
       if (p.cash < 500) lines.push('You can’t cover it, and you don’t pretend you can.');
-      else { p.cash -= 500; pc.points += 1.2; p.standing = clamp(p.standing + 1, 0, 100); lines.push(`Five hundred goes round the room in the form of a round of drinks, a donation to the church and an envelope for a widow. People are very aware of it.`); }
+      else { p.cash -= 500; pc.points += 1.2; repute(w, p, 1, 'lobbying'); lines.push(`Five hundred goes round the room in the form of a round of drinks, a donation to the church and an envelope for a widow. People are very aware of it.`); }
     } else if (code === 'ally' && rv) {
       pc.points += 0.4;
       rel(rv, p.id).trust = clamp(rel(rv, p.id).trust + 0.15);
@@ -461,7 +485,7 @@ function noticeTick(w: World, fam: import('./types').Family, boss: Character, to
     if (r && eligibleIgnoringSeat(w, c)) { watch[c.id] = (watch[c.id] ?? 0) + 1; if (!top || r.score > top.r.score) top = { c, r }; }
     else if (watch[c.id]) { watch[c.id] = Math.max(0, watch[c.id] - 2); if (!watch[c.id]) delete watch[c.id]; }
   }
-  if (!top || (fam.seatNo?.[to] ?? 0) > w.now || (fam.capBonus?.[to] ?? 0) >= 3) return;
+  if (!top || (fam.seatNo?.[to] ?? 0) > w.now || (fam.capBonus?.[to] ?? 0) >= SEAT_EXTRA) return;
   const { c, r } = top;
   const n = watch[c.id];
   const who = c.isPlayer ? 'you' : c.name;
@@ -476,7 +500,7 @@ function noticeTick(w: World, fam: import('./types').Family, boss: Character, to
     const old = familyStyle(w, fam.id) === 'old';
     const chance = clamp(0.45 + r.score * 0.4 + (old ? rel(boss, c.id).trust * 0.1 : 0) - boss.traits.greed * 0.15, 0.2, 0.85);
     if (w.rng.chance(chance)) {
-      fam.capBonus = { ...(fam.capBonus ?? {}), [to]: (fam.capBonus?.[to] ?? 0) + 1 };
+      openSeatFor(w, fam.id, to);
       say(`${boss.name} has decided the ${famName(w, boss)} family can use another ${to}. A seat has been opened. He didn’t say who it’s for, but ${c.name} has been the one people mention.`, `${boss.name} has decided the family can use another ${to}. A seat has been opened. He didn’t say who it’s for, but you’ve been the name people mention.`);
     } else {
       fam.seatNo = { ...(fam.seatNo ?? {}), [to]: w.now + 30 * DAY };

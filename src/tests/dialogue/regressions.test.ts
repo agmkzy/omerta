@@ -22,7 +22,7 @@ const shops = (w: World) => Object.values(w.chars).filter((c) => c.alive && !c.i
 const meet = (w: World, t: Character) => { const p = P(w); (p.intro ??= {})[t.id] ??= w.now; return arrive(w, p, t, { lines: [] }, whereIs(w, p, t), -1e9).convo; };
 
 describe('V90 audit regressions', { timeout: 60_000 }, () => {
-  ok('his own name is "I" where it starts a clause and "me" where it is the object ("beat me up", "after I refused")', { tags: ['unit'] }, () => {
+  ok('his own name is "I" where it starts a clause and "me" where it is the object ("beat me up", "after I refused")', { tags: ['scenario'] }, () => {
     const w = world60(), p = P(w), t = shops(w)[0];
     const n = t.name;
     assert.equal(speechFor(w, p, t, `“${p.name} beat ${n} up.”`).includes('beat me up'), true);

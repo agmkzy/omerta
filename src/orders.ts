@@ -4,7 +4,7 @@
 // deserves more time. When he comes back he tells you a story, and the story may not be the true one.
 import { temper } from './temper';
 import { applyRank } from './rank';
-import { addFact, clamp, learn, money, ownerBiz, recordCareer, rel, shortTime, travelTime, witnessesAt } from './core';
+import { addFact, bear, clamp, learn, money, ownerBiz, recordCareer, rel, repute, shortTime, travelTime, witnessesAt } from './core';
 import { aptitude, grow, lateOf, PROBLEM_LABEL } from './people';
 import { bizMove, clearArrears, owedOf, takeFromBiz } from './econ';
 import { arch, admit, excuse, pick } from './voice';
@@ -233,7 +233,7 @@ export function resolveErrand(w: World, j: Job, doer: Character, code: string): 
       const minutes = travelTime(doer.district, t.district) + 240;
       doer.district = t.district;
       if (caught(0.3 + t.traits.caution * 0.3)) {
-        rel(t, doer.id).grudge = clamp(rel(t, doer.id).grudge + 0.15);
+        bear(w, t, doer.id, 0.15, `${doer.name} came after him`);
         t.cooldown.suspects = w.now + 14 * DAY;
         lines.push(`${t.name} noticed the tail within an hour and stared straight at you. He knows someone wants to know what he does.`);
         return { lines, minutes, ok: false };
@@ -299,12 +299,12 @@ export function resolveErrand(w: World, j: Job, doer: Character, code: string): 
         clearArrears(b);
         lines.push(code === 'soft' ? `${o.name} makes his excuses and hands it over, with an apology.` : code === 'firm' ? `${o.name} pays up, and doesn’t look you in the eye.` : `${o.name} pays, and you leave the door open on purpose so the street can see.`);
         if (code === 'hard') {
-          rel(o, doer.id).grudge = clamp(rel(o, doer.id).grudge + 0.15);
+          bear(w, o, doer.id, 0.15, `${doer.name} leaned on him hard`);
           doer.heat = clamp(doer.heat + 0.08, 0, 1.5);
         }
         return { lines, minutes: 90, ok: true, money: got };
       }
-      rel(o, doer.id).grudge = clamp(rel(o, doer.id).grudge + 0.1);
+      bear(w, o, doer.id, 0.1, `${doer.name} came for the money`);
       lines.push(`${o.name} can’t or won’t pay. Business has been bad, he says, and you can see the shelves are half empty.`);
       return { lines, minutes: 90, ok: false };
     }
@@ -415,7 +415,7 @@ export function recruitProspect(w: World, p: Character, c: Character): string[] 
   (c.rels[p.id] ??= { trust: 0.4, respect: 0.35, affection: 0.3, grudge: 0, lastMet: w.now });
   c.rels[p.id].trust = 0.45;
   addFact(w, { kind: 'promotion', actor: c.id, minor: true, text: `${c.name} has started running with ${p.name}.`, district: c.district }, { witnesses: [p.id] });
-  p.standing = clamp(p.standing + 0.5, 0, 100);
+  repute(w, p, 0.5, 'took a man on');
   return [`${c.name} shakes your hand. He’s yours now, and what he does will be put against your name.`];
 }
 
@@ -500,7 +500,7 @@ export function workShift(w: World, p: Character): { minutes: number; lines: str
   if (j.noticed >= 0.6 && !p.backer && ['soldier', 'capo', 'underboss', 'boss'].includes(boss.rank) && (j.shifts % 4 === 0)) {
     p.backer = boss.id;
     lines.push(`${boss.name} pulls you aside. "I’ve been watching you work. If anyone asks, I have a good word for you."`);
-    p.standing = clamp(p.standing + 3, 0, 100);
+    repute(w, p, 3, 'good work');
   }
   return { minutes: j.kind === 'porter' ? 240 : 360, lines };
 }

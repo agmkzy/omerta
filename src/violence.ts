@@ -1,6 +1,6 @@
 // What it costs to put hands on a man. Rank, family and permission decide who answers for it, and how hard.
 import { temper } from './temper';
-import { clamp, addFact, famName, rel } from './core';
+import { addFact, bear, bearAtLeast, bearAtLeastOn, clamp, famName, rel, repute } from './core';
 import { LADDER, members } from './career';
 import { isMade, sanctioned } from './politics';
 import { threatOf } from './danger';
@@ -36,7 +36,7 @@ export function startHunt(w: World, famId: Id, p: Character, sev: number, why: s
     .slice(0, Math.min(3, 1 + Math.floor(sev / 2)));
   hunters.forEach((h, i) => {
     const r = rel(h, p.id);
-    r.grudge = Math.max(r.grudge, 0.85);
+    bearAtLeastOn(w, r, 0.85, `${p.name} has to answer for what he did`);
     r.trust = 0;
     r.respect = Math.min(r.respect, 0.05);
     const t = threatOf(w, h);
@@ -55,7 +55,7 @@ export function huntDue(w: World, q: import('./types').Pending) {
   if (w.rng.chance(0.6)) startHunt(w, fid, p, q.amount ?? 1, q.note ?? '', q.b);
 }
 
-const standingLoss = (p: Character, n: number) => { p.standing = clamp(p.standing - n, 0, 100); };
+const standingLoss = (w: World, p: Character, n: number) => { repute(w, p, -n, 'violence'); };
 
 // Called straight after the act. Returns what the player gets told.
 export function aftermath(w: World, p: Character, x: Character, mode: 'beat' | 'hit'): string[] {
@@ -81,15 +81,15 @@ export function aftermath(w: World, p: Character, x: Character, mode: 'beat' | '
   if (same && (up || made)) {
     const fid = p.familyId!;
     if (kill) {
-      standingLoss(p, 40 + sev * 8);
+      standingLoss(w, p, 40 + sev * 8);
       everyone(fid, -0.45, -0.3);
       hunt(fid, Math.min(5, sev + 1), `${x.name} was ${x.rank === 'boss' ? 'the head of' : 'one of'} the family. Nobody else had a reason.`, true);
       lines.push(`${x.name} was one of your own. The ${famName(w, p)} family won’t ask who. It will simply start looking.`);
     } else {
-      standingLoss(p, 10 + sev * 5);
+      standingLoss(w, p, 10 + sev * 5);
       everyone(fid, -0.15, -0.15);
-      rel(x, p.id).grudge = 0.9; rel(x, p.id).trust = 0;
-      if (xBoss?.alive && xBoss.id !== p.id) rel(xBoss, p.id).grudge = clamp(rel(xBoss, p.id).grudge + 0.3);
+      bearAtLeast(w, x, p.id, 0.9, `${p.name} put hands on him`); rel(x, p.id).trust = 0;
+      if (xBoss?.alive && xBoss.id !== p.id) bear(w, xBoss, p.id, 0.3, `${p.name} put hands on one of his`);
       if (up) {
         const t = threatOf(w, x); t.level = Math.max(t.level, 1); t.truce = 0; t.last = w.now - 6 * DAY;
         if (sev >= 3) hunt(fid, Math.round(sev / 2), `You put your hands on ${x.name}.`, true);
@@ -102,7 +102,7 @@ export function aftermath(w: World, p: Character, x: Character, mode: 'beat' | '
     // a man of your own who isn't made: your boss and his crew will want an answer
     if (boss) { const r = rel(boss, p.id); r.trust = clamp(r.trust - (kill ? 0.3 : 0.1)); r.respect = clamp(r.respect - (kill ? 0.2 : 0.05)); }
     for (const c of Object.values(w.chars)) if (c.alive && c.bossId === p.id && c.id !== x.id) { const r = rel(c, p.id); r.trust = clamp(r.trust - (kill ? 0.3 : 0.1)); r.respect = clamp(r.respect - (kill ? 0.1 : 0)); }
-    standingLoss(p, kill ? 25 : 6);
+    standingLoss(w, p, kill ? 25 : 6);
     if (kill) hunt(p.familyId!, 1, `${x.name} went missing and you were the last to see him.`, false);
     lines.push(kill ? `Your own man. Your crew will not forget how easily you did it.` : `He was one of yours. The men who work for you saw how you handle your own.`);
     return lines;
@@ -111,7 +111,7 @@ export function aftermath(w: World, p: Character, x: Character, mode: 'beat' | '
     const fid = x.familyId;
     if (!sanc) {
       if (boss) { const r = rel(boss, p.id); r.trust = clamp(r.trust - (kill ? 0.3 : 0.12)); }
-      standingLoss(p, kill ? 15 + sev * 5 : 6);
+      standingLoss(w, p, kill ? 15 + sev * 5 : 6);
       lines.push(`Nobody gave you leave to touch a made man. ${boss ? first(boss) + ' will hear before you can tell him.' : 'It will get back.'}`);
       if (kill) {
         if (sev >= 4) {
@@ -121,8 +121,8 @@ export function aftermath(w: World, p: Character, x: Character, mode: 'beat' | '
         }
         hunt(fid, Math.min(5, sev + 1), `${x.name} is dead and they know where to look.`, sev >= 3);
       } else {
-        rel(x, p.id).grudge = 0.9;
-        if (xBoss?.alive) rel(xBoss, p.id).grudge = clamp(rel(xBoss, p.id).grudge + 0.25);
+        bearAtLeast(w, x, p.id, 0.9, `${p.name} put hands on him`);
+        if (xBoss?.alive) bear(w, xBoss, p.id, 0.25, `${p.name} put hands on one of his`);
         if (sev >= 3) hunt(fid, 1, `You put ${x.name} in the hospital.`, false);
       }
     } else if (boss) { rel(boss, p.id).trust = clamp(rel(boss, p.id).trust + 0.04); }
@@ -130,13 +130,13 @@ export function aftermath(w: World, p: Character, x: Character, mode: 'beat' | '
   }
   // everyone else: associates and civilians. The kin and the boss, if he had one, will want it paid back.
   if (xBoss?.alive && xBoss.familyId && xBoss.familyId !== p.familyId && isMade(xBoss)) {
-    rel(xBoss, p.id).grudge = clamp(rel(xBoss, p.id).grudge + (kill ? 0.5 : 0.25));
+    bear(w, xBoss, p.id, (kill ? 0.5 : 0.25), `${p.name} ${kill ? 'killed' : 'put hands on'} ${x.name}`);
     if (kill) hunt(xBoss.familyId, 1, `${x.name} was theirs.`, false);
   }
   if (kill) p.heat = clamp(p.heat + 0.25, 0, 1.5);
   const kin = Object.values(w.chars).filter((y) => y.alive && y.id !== p.id && (y.rels[x.id]?.affection ?? 0) > 0.4 && temper(y).volatility + temper(y).pride * 0.3 > 0.5).slice(0, 2);
   for (const y of kin) {
-    const r = rel(y, p.id); r.grudge = Math.max(r.grudge, kill ? 0.85 : 0.5);
+    const r = rel(y, p.id); bearAtLeastOn(w, r, kill ? 0.85 : 0.5, `${p.name} ${kill ? 'killed' : 'put hands on'} ${x.name}`);
     if (kill) { const t = threatOf(w, y); t.level = Math.max(t.level, 1); t.truce = 0; t.last = w.now - 6 * DAY; }
   }
   if (kin.length && kill) lines.push(`${x.name} had people who loved him. ${kin.map((y) => first(y)).join(' and ')} won’t let it lie.`);

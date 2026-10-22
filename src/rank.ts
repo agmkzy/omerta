@@ -10,7 +10,7 @@
 // Eligibility has one door too: career.readiness(). For NPCs it is the family's rule of thumb; for the player it reads
 // the road in path.ts (see career.ts), so the screen, the dialogue and the actual promotion can never disagree.
 import { BASE_RATE } from './books';
-import { addFact, recordCareer } from './core';
+import { addFact, recordCareer, repute } from './core';
 import { chooseLeader, logOrg } from './orgs';
 import type { Character, Id, Rank, World } from './types';
 
@@ -49,6 +49,9 @@ export function applyRank(w: World, c: Character, to: Rank, o: RankOpts = {}): b
   const label = (r: Rank) => (r === 'capo' ? 'captain' : r);
   if (o.career !== false) recordCareer(w, c, o.career ?? (rankIdx(from) < 0 || from === 'civilian' ? `Became ${to}` : up ? `Promoted from ${from} to ${to}` : `Put down from ${label(from)} to ${label(to)}`));
   o.place?.(c);
+  // a step up is a name made, a step down a name lost; the same for everyone (core.repute)
+  if (from !== 'civilian' && to !== 'civilian') repute(w, c, up ? 6 : -6, 'rank');
+  else if (from === 'civilian') repute(w, c, 2, 'rank');
   if (o.fact !== false && to !== 'civilian') {
     const f = o.fact ?? { text: up ? `${c.name} was made ${to === 'soldier' ? 'a soldier' : 'a ' + to}.` : `${c.name} was put down to ${to}.` };
     addFact(w, { kind: 'promotion', actor: f.actor ?? c.id, victim: f.victim, story: f.story, minor: f.minor, text: f.text, district: c.district }, { broadcast: f.broadcast, witnesses: f.witnesses });

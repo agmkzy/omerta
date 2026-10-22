@@ -4,7 +4,7 @@
 import { temper, viewOf } from './temper';
 import type { Convo, FollowOpt, Said } from './dialogue';
 import { readiness } from './career';
-import { addFact, clamp, learn, money, rel } from './core';
+import { addFact, bearOn, clamp, learn, money, rel } from './core';
 import { addFavour } from './encounters';
 import { RECRUIT_COST } from './orders';
 import { amendsAsk, askBetween, openAsk, playerMove, playerMoves, type AskMove } from './asks';
@@ -199,7 +199,7 @@ export function flow(w: World, p: Character, t: Character, c: Convo, code: strin
       return said(lines, c, [{ code: 'fl:th_hear', label: '“Go on. I’m listening.”', hint: 'He may tell you what is really wrong.' }, { code: 'fl:th_hold', label: '“It stands. I’m not changing it.”', hint: 'Fear works, for a while.' }], 15);
     }
     lines.push(pick(w, t, { hothead: ['“Thin ice? You come to me with that?” He doesn’t step back. “Say it plain, or don’t say it.”'], _: ['He gives a short, humourless laugh. “You’re threatening me? I’ve been in this longer than you think.”'] }));
-    tweak(-0.1, -0.06, -0.05); r.grudge = clamp(r.grudge + 0.12);
+    tweak(-0.1, -0.06, -0.05); bearOn(w, r, 0.12, `${p.name} told him he was on thin ice`);
     return said(lines, c, [{ code: 'fl:th_back', label: '“All right. Let’s calm down.”', hint: 'You lose face. You lose less than a fight.' }, { code: 'fl:th_push', label: '“Don’t make me say it twice.”', hint: 'He may break, or the two of you may. Others will hear.', big: true }], 15);
   }
   if (c0 === 'fl' && arg === 'th_ease') { tweak(0.03, 0.02, 0); lines.push('“Then I’ll give you one.” He means it, mostly.'); return said(lines, c, undefined, 5); }
@@ -213,7 +213,7 @@ export function flow(w: World, p: Character, t: Character, c: Convo, code: strin
   if (c0 === 'fl' && arg === 'th_push') {
     const breaks = temper(t).courage < 0.55 && w.rng.chance(0.55);
     if (breaks) { tweak(-0.05, -0.04, 0.04); lines.push('Something in his face gives. “All right. All right. Whatever you want.”'); }
-    else { tweak(-0.1, -0.08, -0.04); r.grudge = clamp(r.grudge + 0.2); lines.push('“Then do it,” he says quietly. Nobody moves. You have made an enemy without winning anything.'); }
+    else { tweak(-0.1, -0.08, -0.04); bearOn(w, r, 0.2, `${p.name} pushed him in front of others`); lines.push('“Then do it,” he says quietly. Nobody moves. You have made an enemy without winning anything.'); }
     addFact(w, { kind: 'threat', actor: p.id, victim: t.id, minor: true, text: `${p.name} had hard words with ${t.name}.`, district: t.district }, { witnesses: [] });
     return said(lines, c, undefined, 10);
   }
@@ -260,7 +260,7 @@ export function flow(w: World, p: Character, t: Character, c: Convo, code: strin
       tweak(-0.03, -0.02, 0.02); bump(0.15);
     } else if (higher || a === 'hothead' || a === 'proud') {
       lines.push(higher ? '“From you? Keep a civil tongue. You’re speaking out of turn to a man above you. I’ll pass your message on, and mine to your boss.”' : '“Our ground? Since when? Careful what you start.”');
-      tweak(-0.08, -0.05, -0.03); r.grudge = clamp(r.grudge + 0.1); bump(0.6);
+      tweak(-0.08, -0.05, -0.03); bearOn(w, r, 0.1, `${p.name} spoke out of turn to him`); bump(0.6);
     } else { lines.push('“Message received. Pass mine to your boss.” He smiles with no warmth.'); tweak(-0.06, -0.04, 0.03); bump(0.4); }
     addFact(w, { kind: 'threat', actor: p.id, victim: t.id, minor: true, text: `${p.name} warned ${t.name} off.`, district: t.district }, { witnesses: [] });
     return said(lines, c, [{ code: 'fl:rv_ease', label: '“I meant no insult by it.”', hint: 'Takes some heat out. It also reads as weakness.' }, drop], 10);
@@ -327,7 +327,7 @@ export function flow(w: World, p: Character, t: Character, c: Convo, code: strin
 function doOrder(w: World, p: Character, t: Character, c: Convo, code: string, forced: boolean): Said {
   const r = rel(t, p.id);
   const lines: string[] = [];
-  if (forced) { r.trust = clamp(r.trust - 0.04); r.respect = clamp(r.respect + 0.02); r.grudge = clamp(r.grudge + 0.05); }
+  if (forced) { r.trust = clamp(r.trust - 0.04); r.respect = clamp(r.respect + 0.02); bearOn(w, r, 0.05, `${p.name} gave him an order he did not like`); }
   if (code === 'assign_low') {
     t.heat = Math.max(0, t.heat - 0.2);
     lines.push(forced ? 'He nods once and says nothing more. He will stay out of sight, and he will not forget how it was put.' : '“All right. I’ll be quiet a while.”');

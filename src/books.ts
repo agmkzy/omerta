@@ -8,7 +8,7 @@ import { say as vsay } from './voicesheet';
 // refuse; the superior compares what he got with what he can see, and may warn, demand, punish or ignore.
 import { setCollector } from './econ';
 import { perform } from './actions';
-import { addFact, clamp, money, rel, travelTime } from './core';
+import { addFact, bear, bearOn, clamp, money, rel, repute, travelTime } from './core';
 import { mkJob } from './jobs';
 import { post, refreshHistory, statement, wkOf } from './ledger';
 import { Books, Character, Id, Rank, Tone, WEEK, World } from './types';
@@ -278,9 +278,9 @@ export function settleOne(w: World, c: Character) {
     }
     const patience = (rel(boss, c.id).trust > 0.6 ? 5 : 3);
     if (!boss.isPlayer && !understood && b.missed >= patience && !c.isPlayer && b.missed % patience === 0) discipline(w, boss, c, f.id, Math.min(due, 300));
-    if (c.isPlayer && b.missed >= 2) {
-      c.standing = clamp(c.standing - 2, 0, 100);
-      if (!boss.isPlayer) summonPlayer(w, boss, c, 'missed', owed - pay);
+    if (b.missed >= 2) {
+      repute(w, c, -2, 'short weeks');
+      if (c.isPlayer && !boss.isPlayer) summonPlayer(w, boss, c, 'missed', owed - pay);
     }
   }
 
@@ -302,7 +302,7 @@ export function settleOne(w: World, c: Character) {
   }
   if (!missedNow && gap <= Math.max(40, expected * 0.15)) {
     b.honest++;
-    if (c.isPlayer && b.honest % 4 === 0) c.standing = clamp(c.standing + 1, 0, 100);
+    if (b.honest % 4 === 0) repute(w, c, 1, 'honest weeks');
   } else b.honest = 0;
 
   // A man who is asked for too much, or kept on a short leash, resents it.
@@ -405,7 +405,7 @@ export function react(w: World, boss: Character, c: Character, fl: { amt: number
   if (fl.n === 2) {
     c.books.arrears += Math.round(fl.amt);
     rel(c, boss.id).trust = clamp(rel(c, boss.id).trust - 0.06);
-    rel(c, boss.id).grudge = clamp(rel(c, boss.id).grudge + 0.05);
+    bear(w, c, boss.id, 0.05, `${boss.name} made him make up what he was short`);
     addFact(w, { kind: 'discipline', actor: boss.id, victim: c.id, cause, text: `${boss.name} told ${c.name} to make up ${money(Math.round(fl.amt))}.`, district: c.district }, { witnesses: [] });
     return;
   }
@@ -419,7 +419,7 @@ export function discipline(w: World, boss: Character, c: Character, cause: Id, a
   if (temper(boss).volatility > 0.55 && c.hurtUntil <= w.now) {
     c.hurtUntil = w.now + 3 * DAYS;
     boss.heat = clamp(boss.heat + 0.1, 0, 1.5);
-    rel(c, boss.id).grudge = clamp(rel(c, boss.id).grudge + 0.25);
+    bear(w, c, boss.id, 0.25, `${boss.name} had him roughed up over his envelope`);
     addFact(w, { kind: 'discipline', actor: boss.id, victim: c.id, cause, text: `${boss.name} had ${c.name} beaten for skimming.`, district: c.district }, { witnesses: [], broadcast: subordinates(w, boss).map((x) => x.id) });
   } else if (protectedShops.length) {
     const s = protectedShops[0];
@@ -544,7 +544,7 @@ export function rule(w: World, p: Character, sub: Character, code: string): { mi
     case 'demand':
       sub.books.arrears += Math.round(fl.amt);
       r.trust = clamp(r.trust - 0.06);
-      r.grudge = clamp(r.grudge + 0.05);
+      bearOn(w, r, 0.05, `${p.name} made him make up what he was short`);
       lines.push(`${sub.name} owes you an extra ${money(Math.round(fl.amt))}, to be paid as he can.`);
       fl.amt = 0;
       fl.n = 0;
@@ -552,7 +552,7 @@ export function rule(w: World, p: Character, sub: Character, code: string): { mi
     case 'beat': {
       const a = perform(w, { kind: 'retaliate', mode: 'beat', actor: p.id, target: sub.id, label: '', score: 0 });
       lines.push(...a.lines);
-      p.standing = clamp(p.standing - 1, 0, 100);
+      repute(w, p, -1, 'audited');
       fl.amt = 0;
       fl.n = 0;
       return { minutes: a.minutes, lines };

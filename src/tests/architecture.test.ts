@@ -25,6 +25,15 @@ describe('architecture', { tags: ['architecture'] }, () => {
     }
     assert.deepEqual(bad, []);
   });
+  ok('grudges and reputation have one door each: no source line sets .grudge or .standing outside core.ts', () => {
+    // (core.bear/ease for grudges, which keep the reason with them; core.repute for anyone's standing. world.ts sets the first value.)
+    const bad: string[] = [];
+    const dir = fileURLToPath(new URL('../', import.meta.url));
+    for (const f of readdirSync(dir).filter((x) => x.endsWith('.ts') && !['core.ts', 'world.ts', 'cli.ts'].includes(x))) {
+      readFileSync(dir + f, 'utf8').split('\n').forEach((l, i) => { if (/(?<!KITS)\.grudge\s*[-+*]?=[^=]/.test(l) || (/\.standing\s*[-+*]?=[^=]/.test(l) && !/\b(fam|f|F|T|parent)\.standing/.test(l))) bad.push(`${f}:${i + 1}`); }); // (a family's standing is its own)
+    }
+    assert.deepEqual(bad, []);
+  });
   ok('11. no general logic names a family or counts five: other-sized worlds run clean', () => {
     for (const n of [4, 7]) {
       const w = orgWorld(5, 40, n); assert.equal(orgList(w).length, n); clean(w, n + ' orgs');

@@ -4,7 +4,7 @@ import { hasPerk } from './specs';
 // and what you do about it changes how those people feel and what the families make of you.
 import { temper } from './temper';
 import { bizMove } from './econ';
-import { addFact, clamp, earn, money, notifyProtector, ownerBiz, rel, witnessesAt } from './core';
+import { addFact, bear, clamp, earn, money, notifyProtector, ownerBiz, rel, repute, witnessesAt } from './core';
 import { addFavour } from './encounters';
 import { bump, jail, mkJob, paid } from './jobs';
 import { Approach, Result } from './jobs';
@@ -195,7 +195,7 @@ export function gigResolve(w: World, j: Job, doer: Character, code: string): Res
         rel(giver, doer.id).trust = clamp(rel(giver, doer.id).trust + 0.08);
         if (lean && rng.chance(0.4 + violence * 0.3)) {
           addFact(w, { kind: 'beating', actor: doer.id, victim: t.id, hiddenActor: true, text: `${doer.name} roughed up ${t.name}.`, textHidden: `${t.name} was roughed up outside his own door.`, district: t.district }, { witnesses: witnessesAt(w, t.district, [doer.id, t.id], 2) });
-          bump(doer, 0.08); rel(t, doer.id).grudge = clamp(rel(t, doer.id).grudge + 0.25);
+          bump(doer, 0.08); bear(w, t, doer.id, 0.25, `${doer.name} roughed him up`);
           lines.push(`It got rougher than it needed to. ${first(t)} will remember.`);
         }
       } else {
@@ -256,7 +256,7 @@ export function gigResolve(w: World, j: Job, doer: Character, code: string): Res
         bump(doer, 0.15);
         if (win) {
           gained = paid(w, doer, Math.round(j.pay * 1.5 / 10) * 10, col, 'handle'); ok = true;
-          p.standing = clamp(p.standing + 2, 0, 100);
+          repute(w, p, 2, 'handled');
           lines.push(`Somebody tries to stop the truck at the corner of ${b.district}. They didn’t expect a man in the cab. They leave faster than they came, and ${first(col)} pays you ${money(gained)} plus a bonus.`);
           addFact(w, { kind: 'report', actor: doer.id, minor: true, text: `${doer.name} drove off a hijack attempt on the ${b.name} truck.`, district: b.district }, { witnesses: [p.id] });
         } else {
@@ -291,7 +291,7 @@ export function gigResolve(w: World, j: Job, doer: Character, code: string): Res
         const caught = rng.chance(0.45 + temper(bk).caution * 0.35);
         lines.push(`You keep ${money(dip)}.`);
         if (caught) {
-          rel(bk, doer.id).trust = clamp(rel(bk, doer.id).trust - 0.3); rel(bk, doer.id).grudge = clamp(rel(bk, doer.id).grudge + 0.2); rel(bk, doer.id).respect = clamp(rel(bk, doer.id).respect - 0.15);
+          rel(bk, doer.id).trust = clamp(rel(bk, doer.id).trust - 0.3); bear(w, bk, doer.id, 0.2, `${doer.name} kept some of his money`); rel(bk, doer.id).respect = clamp(rel(bk, doer.id).respect - 0.15);
           addFact(w, { kind: 'theft', actor: doer.id, victim: bk.id, amount: dip, hiddenActor: false, text: `${doer.name} came up ${money(dip)} short on a bag he carried for ${bk.name}.`, district: bk.district }, { witnesses: [bk.id] });
           lines.push(`${first(bk)} counted twice. He knows exactly how much. He doesn’t say a word, which is worse.`);
         } else lines.push(`${first(bk)} counts it once and nods. You got away with it, this time.`);

@@ -11,7 +11,7 @@
 //   * relations: cooperation / competition / grievance between organisations as persistent state that the world reads back
 // Nothing in here knows how many organisations there are or what any of them is called.
 import { temper } from './temper';
-import { addFact, clamp, recordCareer, rel } from './core';
+import { addFact, bear, clamp, recordCareer, rel, repute } from './core';
 import { applyRank, rankIdx, repairHierarchy, WAGE } from './rank';
 import { ensureClubs, clubOf } from './clubdata';
 import { Character, DAY, Family, Id, OrgRel, Rank, WEEK, World } from './types';
@@ -191,13 +191,13 @@ export function leaderChanged(w: World, fid: Id, winner: Character, oldId: Id | 
     if (v.id === winner.id || v.isPlayer || v.rank === 'associate') continue;
     const r = rel(v, winner.id);
     if (r.trust >= 0.55) { backers++; r.trust = clamp(r.trust + 0.06); rel(winner, v.id).trust = clamp(rel(winner, v.id).trust + 0.08); }
-    else if (r.grudge >= 0.4) rel(winner, v.id).grudge = clamp(rel(winner, v.id).grudge + 0.12);
+    else if (r.grudge >= 0.4) bear(w, winner, v.id, 0.12, `${v.name} would not back him`);
   }
   let note = '';
   for (const r of rivals) {
-    rel(r.c, winner.id).grudge = clamp(rel(r.c, winner.id).grudge + 0.25);
+    bear(w, r.c, winner.id, 0.25, `${winner.name} took the chair over him`);
     rel(r.c, winner.id).trust = clamp(rel(r.c, winner.id).trust - 0.15);
-    r.c.standing = clamp(r.c.standing - 2, 0, 100);
+    repute(w, r.c, -2, 'lost the chair');
     note = ` ${first(r.c)} was passed over and has not forgotten it.`;
   }
   // a thin or violent win leaves the house unsettled for a while, and a clean one steadies it
@@ -277,7 +277,7 @@ export function defect(w: World, c: Character, to: Id, why: string) {
   if (next !== c.rank) applyRank(w, c, next, { fact: false, repair: false, career: `Came over to the ${T.name} family as a ${next}`, wage: WAGE[next] });
   else recordCareer(w, c, `Came over to the ${T.name} family`);
   for (const b of Object.values(w.biz)) if (b.protection?.collectorId === c.id) b.protection.familyId = to;
-  if (lead) { rel(lead, c.id).grudge = clamp(rel(lead, c.id).grudge + 0.5); rel(lead, c.id).trust = 0; }
+  if (lead) { bear(w, lead, c.id, 0.5, `${c.name} went over to the ${T.name} family`); rel(lead, c.id).trust = 0; }
   addFact(w, { kind: 'promotion', actor: c.id, text: `${c.name} has gone over to the ${T.name} family. ${why}`, district: c.district }, { broadcast: [...membersOf(w, from), ...membersOf(w, to)].map((x) => x.id) });
   logOrg(w, from, 'defect', `${c.name} left for the ${T.name}. ${why}`, c.id);
   logOrg(w, to, 'defect', `${c.name} came over from the ${F.name}.`, c.id);
@@ -306,7 +306,7 @@ export function foundOrg(w: World, leader: Character, name: string, why: string)
   applyRank(w, leader, 'boss', { fact: false, repair: false, career: `Founded the ${name} family`, wage: WAGE.boss });
   for (const x of followers) x.familyId = id;
   for (const b of Object.values(w.biz)) if (b.protection && (b.protection.collectorId === leader.id || followers.some((x) => x.id === b.protection!.collectorId))) b.protection.familyId = id;
-  if (lead0) { rel(lead0, leader.id).grudge = clamp(rel(lead0, leader.id).grudge + 0.6); rel(lead0, leader.id).trust = 0; }
+  if (lead0) { bear(w, lead0, leader.id, 0.6, `${leader.name} broke away and took men with him`); rel(lead0, leader.id).trust = 0; }
   parent.tension[id] = 3; fam.tension[parent.id] = 3;
   noteGrievance(w, parent.id, id, `${leader.name} took his men and left`, 0.6);
   logOrg(w, id, 'founded', fam.history!, leader.id);
@@ -389,7 +389,10 @@ function standingWeek(w: World) {
     const ms = membersOf(w, f.id);
     const lead = leaderOf(w, f.id);
     const target = clamp(20 + Math.min(30, ms.length * 0.6) + f.districts.length * 6 + Math.min(15, interestsOf(w, f.id).length * 0.8) + (lead ? 0 : -15) + (lead && lead.jailedUntil > w.now ? -8 : 0) - (f.unrest && f.unrest.until > w.now ? 6 : 0), 5, 95);
+    const was = f.standing ?? 50;
     f.standing = Math.round(clamp((f.standing ?? 50) + (target - (f.standing ?? 50)) * 0.05, 5, 95) * 10) / 10;
+    // Foundation step 2: a boss's own name rises and falls with his family's (he rarely acts in person, so his deeds are the family's)
+    if (lead && f.standing !== was) repute(w, lead, (f.standing - was) * 0.5, 'family fortunes');
     if (f.unrest && f.unrest.until <= w.now) delete f.unrest;
   }
 }
@@ -411,7 +414,7 @@ function leadershipWeek(w: World) {
       const next = succeed(w, f.id, boss, 'imprisonment');
       if (next && next.id !== boss.id) {
         applyRank(w, boss, 'capo', { fact: false, repair: false, career: `Put on the shelf while inside`, wage: WAGE.capo, place: (x) => { x.bossId = next.id; } });
-        rel(boss, next.id).grudge = clamp(rel(boss, next.id).grudge + 0.2);
+        bear(w, boss, next.id, 0.2, `${next.name} took his chair while he was inside`);
         repairHierarchy(w, f.id);
       }
       continue;

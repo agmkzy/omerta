@@ -2,7 +2,7 @@
 //   MILESTONES  - the ladder of goals each rank band expects (AMBITIONS). Automatic; meeting one pays a reward. Stored in w.goals.done.
 //   CURRENT AMBITION - the one thing the player has chosen to pursue (AMBS). Stored on the character as p.ambition.
 // They share their measures (crew, shops, cash) and one tick. Nothing here belongs to NPCs: what NPCs want is in people.ts / pulse.ts.
-import { addFact, clamp, money, rel } from './core';
+import { addFact, clamp, money, rel, repute } from './core';
 import { owedTo } from './encounters';
 import { pathInfo } from './path';
 import { prospects } from './orders';
@@ -93,7 +93,7 @@ export function ambitionTick(w: World) {
     w.goals.done[a.key] = w.now;
     if (quiet) continue;
     if (a.reward.cash) p.cash += a.reward.cash;
-    if (a.reward.standing) p.standing = clamp(p.standing + a.reward.standing, 0, 100);
+    if (a.reward.standing) repute(w, p, a.reward.standing, 'milestone');
     const bits = [a.reward.cash ? `+${money(a.reward.cash)}` : '', a.reward.standing ? `standing +${a.reward.standing}` : ''].filter(Boolean).join(', ');
     addFact(w, { kind: 'report', actor: p.id, minor: true, text: `Ambition met: ${a.title}.${bits ? ' (' + bits + ')' : ''}`, district: p.district }, { witnesses: [p.id] });
   }
@@ -160,7 +160,7 @@ function currentAmbitionTick(w: World, p: Character) {
   if (a.kind === 'made' && a.rank0 && a.rank0 !== p.rank) pr.frac = 1;
   if (pr.frac >= 1) {
     a.done = true;
-    p.standing = clamp(p.standing + 2, 0, 100);
+    repute(w, p, 2, 'ambition');
     addFact(w, { kind: 'report', actor: p.id, minor: true, text: `${p.name} did what he set out to do: ${AMBS.find((x) => x.kind === a.kind)?.label.toLowerCase()}.`, district: p.district }, { witnesses: [p.id] });
   }
 }

@@ -1,7 +1,7 @@
 // What happens above and around you: an informant in the ranks, an underboss who wants the chair,
 // the Commission settling what the families cannot, and the rule that a made man cannot be touched on your say-so.
 import { tension } from './actions';
-import { addFact, clamp, handleDeath, money, rel } from './core';
+import { addFact, bear, clamp, handleDeath, money, rel, repute } from './core';
 import { addEnc, addFavour } from './encounters';
 import { threatOf } from './danger';
 import { logOrg } from './orgs';
@@ -138,13 +138,13 @@ export function suspectChoose(w: World, p: Character, e: Enc, code: string): str
       sus.alive && handleDeath(w, sus.id);
       sus.informant!.exposed = true;
       addFact(w, { kind: 'murder', actor: who.id, victim: sus.id, hiddenActor: true, text: `${who.name} had ${sus.name} killed.`, textHidden: `${sus.name} was found in the trunk of a car.`, district: sus.district }, {});
-      p.standing = clamp(p.standing + (confirmed ? 6 : 4), 0, 100);
+      repute(w, p, (confirmed ? 6 : 4), 'gave up an informant');
       rel(who, p.id).respect = clamp(rel(who, p.id).respect + 0.1);
       addFavour(w, who.id, p.id, 3, `giving him ${sus.name} before it was too late`);
       lines.push(`${who.name} listens, and says nothing for a long time. Four days later ${sus.name} is gone, and so is whatever he was going to tell them. Nobody thanks you out loud. ${who.name} will remember it.`);
     } else if (confirmed || w.rng.chance(0.3)) {
       handleDeath(w, sus.id);
-      p.standing = clamp(p.standing - 4, 0, 100);
+      repute(w, p, -4, 'false accusation');
       lines.push(`${who.name} doesn’t wait for proof. ${sus.name} is dead within the week. It turns out he was seeing a woman in Queens. You’ll think about that for a long time.`);
       addFact(w, { kind: 'murder', actor: who.id, victim: sus.id, hiddenActor: true, text: `${who.name} had ${sus.name} killed on a bad rumour.`, textHidden: `${sus.name} was found dead.`, district: sus.district }, {});
     } else {
@@ -161,7 +161,7 @@ export function suspectChoose(w: World, p: Character, e: Enc, code: string): str
     } else lines.push(`${sus.name} laughs, offended, and swears on his mother. It’s a very good performance.`);
   } else {
     rel(sus, p.id).trust = clamp(rel(sus, p.id).trust - 0.25);
-    rel(sus, p.id).grudge = clamp(rel(sus, p.id).grudge + 0.2);
+    bear(w, sus, p.id, 0.2, `${p.name} accused him of talking`);
     lines.push(`${sus.name} goes red, then white. "You think I'm a rat?" He doesn’t hit you. He walks out. That was an innocent man's anger, and now he’s an enemy.`);
   }
   return lines;
@@ -214,7 +214,7 @@ export function sideChoose(w: World, p: Character, e: Enc, code: string): string
   if (code === 'boss') {
     c.back.boss.push(p.id);
     rel(b, p.id).trust = clamp(rel(b, p.id).trust + 0.25);
-    rel(u, p.id).grudge = clamp(rel(u, p.id).grudge + 0.2);
+    bear(w, u, p.id, 0.2, `${p.name} stood with the boss against him`);
     c.resolveAt = Math.min(c.resolveAt, w.now + 10 * DAY);
     return [`${b.name} listens without moving, and then he says: "You did right." The look on his face isn’t gratitude. It’s calculation. Within a fortnight this will be settled one way or the other.`];
   }
@@ -242,13 +242,13 @@ function resolveCoup(w: World) {
     addFact(w, { kind: 'murder', actor: u.id, victim: b.id, hiddenActor: true, text: `${u.name} had ${b.name} killed and took the chair.`, textHidden: `${b.name} was shot outside his club. The family is ${u.name}'s now.`, district: b.district }, { broadcast: everyone });
     if (p?.alive && p.familyId === fam.id) {
       if (c.back.plotter.includes(p.id)) {
-        p.standing = clamp(p.standing + 6, 0, 100);
+        repute(w, p, 6, 'coup');
         p.backer = u.id;
         addFavour(w, u.id, p.id, 3, `standing with him when it counted`);
       } else if (c.back.boss.includes(p.id)) {
         threatOf(w, u).level = 1;
-        rel(u, p.id).grudge = clamp(rel(u, p.id).grudge + 0.5);
-        p.standing = clamp(p.standing - 6, 0, 100);
+        bear(w, u, p.id, 0.5, `${p.name} stood with the boss against him`);
+        repute(w, p, -6, 'coup');
       }
     }
   } else {
@@ -259,12 +259,12 @@ function resolveCoup(w: World) {
     for (const x of c.back.plotter.map((id) => w.chars[id]).filter(Boolean)) {
       if (x.isPlayer) {
         threatOf(w, b).level = 1;
-        rel(b, x.id).grudge = clamp(rel(b, x.id).grudge + 0.6);
-        x.standing = clamp(x.standing - 12, 0, 100);
+        bear(w, b, x.id, 0.6, `${x.name} plotted against him`);
+        repute(w, x, -12, 'coup');
       }
     }
     if (p?.alive && p.familyId === fam.id && c.back.boss.includes(p.id)) {
-      p.standing = clamp(p.standing + 5, 0, 100);
+      repute(w, p, 5, 'coup');
       p.backer = b.id;
       addFavour(w, b.id, p.id, 3, `warning him before it was too late`);
     }

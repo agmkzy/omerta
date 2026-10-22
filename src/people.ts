@@ -1,6 +1,9 @@
 // People: what they are good at, what is going wrong in their lives, and how that leaks into their work.
 // A man who is late with his envelope has a reason. The reason is usually not the one he gives.
-import { addFact, clamp, createDebt, money, witnessesAt } from './core';
+import { addFact, clamp, createDebt, money, ownerBiz, witnessesAt } from './core';
+import { spawnCivilian } from './world';
+import { FEMALE, rollFirst } from './names';
+import { interestsOf } from './orgs';
 import { Business, Character, DAY, Id, Problem, ProblemKind, Rank, Skill, Skills, World } from './types';
 import { Rng } from './rng';
 
@@ -110,6 +113,52 @@ export function peopleWeek(w: World) {
   // prospects drift in and out
   const ps = Object.values(w.chars).filter((c) => c.prospect && c.alive);
   for (const c of ps) if (rng.chance(0.06)) c.prospect = false;
+  newBlood(w);
+}
+
+// Foundation step 2 (Oct 2026): new blood. A family short of men at the bottom (about four associates to every five made men) draws
+// them from the street, as long as it has the work to feed them, and each comes for a reason that is recorded: a man who already knows one of its people, or who needs money,
+// starts hanging around; failing anyone like that, a young relative of somebody in its neighbourhoods comes of age. Taking him on is
+// the family's men's own business (goals.ts recruit plans). Paced by the family's need, never by a quota: a family with enough men at
+// the bottom draws nobody.
+function newBlood(w: World) {
+  const rng = w.rng, all = Object.values(w.chars);
+  const waiting = all.filter((c) => c.alive && c.prospect && c.rank === 'civilian').length;
+  for (const f of Object.values(w.fam).sort((a, b) => (a.id < b.id ? -1 : 1))) {
+    const ms = all.filter((c) => c.alive && c.familyId === f.id);
+    const made = ms.filter((c) => c.rank === 'soldier' || c.rank === 'capo').length, assoc = ms.filter((c) => c.rank === 'associate').length;
+    const short = Math.round(made * 0.8) - assoc - Math.round(waiting / Math.max(1, Object.keys(w.fam).length));
+    // and only while the family has work to feed another man: a baseline, two to a district it holds, one to every business it owns
+    // or protects. A family that wins shops takes on men; one that loses them stops.
+    const carry = 10 + f.districts.length * 2 + interestsOf(w, f.id).length;
+    if (short <= 0 || ms.length >= carry || !rng.chance(clamp(short * 0.06, 0, 0.45))) continue;
+    const home = f.districts.length ? f.districts : [ms[0]?.district ?? 'Little Italy'];
+    const men = ms.filter((c) => (c.rank === 'soldier' || c.rank === 'capo') && !c.isPlayer && c.jailedUntil <= w.now);
+    // someone who already has a reason to come
+    const near = all.filter((c) => c.alive && !c.isPlayer && c.rank === 'civilian' && !c.familyId && !c.prospect && !ownerBiz(w, c.id) && c.traits.ambition >= 0.45 && home.includes(c.district) && !FEMALE.includes(c.name.split(' ')[0]))
+      .map((c) => ({ c, tie: men.filter((m) => (c.rels[m.id]?.trust ?? 0) >= 0.3 || (m.rels[c.id]?.trust ?? 0) >= 0.3).sort((a, b) => (a.id < b.id ? -1 : 1))[0], need: c.cash < 150 }))
+      .filter((x) => x.tie || x.need).sort((a, b) => (a.c.id < b.c.id ? -1 : 1));
+    if (near.length) {
+      const { c, tie } = rng.pick(near);
+      c.prospect = true;
+      addFact(w, tie
+        ? { kind: 'report', actor: c.id, victim: tie.id, text: `${c.name} has started hanging around ${tie.name}'s crew.`, district: c.district }
+        : { kind: 'report', actor: c.id, text: `${c.name} is short of money and has been asking the ${f.name} people for work.`, district: c.district }, { witnesses: tie ? [tie.id] : [] });
+      continue;
+    }
+    // or a young man of the neighbourhood comes of age, with an uncle or a cousin in it
+    const elders = all.filter((c) => c.alive && !c.isPlayer && home.includes(c.district) && !FEMALE.includes(c.name.split(' ')[0]) && (c.familyId === f.id || (c.rank === 'civilian' && !!ownerBiz(w, c.id)))).sort((a, b) => (a.id < b.id ? -1 : 1));
+    const elder = elders.length ? rng.pick(elders) : undefined;
+    if (!elder) continue;
+    const surname = elder.name.split(' ').slice(1).join(' ');
+    const y = spawnCivilian(w, `${rollFirst(() => rng.next())} ${surname}`, elder.district, rng.int(20, 150));
+    y.prospect = true;
+    y.traits.ambition = Math.round(rng.range(0.45, 0.95) * 100) / 100;
+    y.traits.violence = Math.round(rng.range(0.2, 0.7) * 100) / 100;
+    y.traits.courage = Math.round(rng.range(0.45, 0.9) * 100) / 100;
+    y.rels[elder.id] ??= { trust: 0.4, respect: 0.4, affection: 0.4, grudge: 0, lastMet: w.now }; // (family)
+    addFact(w, { kind: 'report', actor: y.id, victim: elder.id, text: `${y.name}, ${elder.name}'s nephew, is old enough now, and has started coming round the ${f.name} people.`, district: y.district }, { witnesses: [elder.id] });
+  }
 }
 
 export const lateOf = (b: Business) => b.protection?.late ?? 0;

@@ -7,7 +7,7 @@
 // through the same stance the rest of the negotiation uses, and the decision is still the matter's own (asks.reconsider).
 //
 // The point in hand lives on the matter (s.m.beat, s.m.claim, s.m.claimT), so it is there when you come back days later.
-import { clamp, money, ownerBiz, peek, rel } from './core';
+import { bear, clamp, money, ownerBiz, peek, rel } from './core';
 import { askee, kindOf, reconsider, stance } from './asks';
 import { noteHard, temper, viewOf } from './temper';
 import type { Character, Situation, World } from './types';
@@ -203,7 +203,7 @@ export function reply(w: World, p: Character, s: Situation, k: string): string[]
       S.anger = clamp(S.anger - tp.pride * 0.12); S.resolve = clamp(S.resolve - tp.pride * 0.12);
       return settle(tp.pride > 0.55 ? 'Something in his shoulders eases. “Asking. All right. That’s different.”' : '“Asking, telling. Fine.”', tp.pride > 0.55 ? '“I appreciate you saying it. The answer’s still no.”' : '“Asking, telling. It comes to the same.”', '“Asking. All right. Then here’s what I’d say back.”');
     case 'nochoice':
-      if (tp.courage + tp.pride > 1.2) { S.resolve = clamp(S.resolve + 0.12); S.anger = clamp(S.anger + 0.15); rel(t, p.id).grudge = clamp(peek(t, p.id).grudge + 0.04); beat(undefined); return ['“Then I’ll be the first.”']; }
+      if (tp.courage + tp.pride > 1.2) { S.resolve = clamp(S.resolve + 0.12); S.anger = clamp(S.anger + 0.15); bear(w, t, p.id, 0.04, `${p.name} told him he had no choice`); beat(undefined); return ['“Then I’ll be the first.”']; }
       S.fear = clamp(S.fear + 0.12); S.resolve = clamp(S.resolve - 0.1); noteHard(w, p, t, 'threats', 0.5);
       return settle('He says nothing for a long moment. “…Fine.”', 'He says nothing for a long moment, and then shakes his head.', 'He says nothing for a long moment. “…Then here’s what I can do.”');
     case 'name': {

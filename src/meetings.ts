@@ -5,7 +5,7 @@ import { temper } from './temper';
 import { noteDeal } from './orgs';
 import { inductPlayer, sponsorOf, turnedDown } from './career';
 import { RULINGS, effectiveRate, influence, react, rule, subordinates } from './books';
-import { addFact, clamp, recordCareer, createDebt, famName, isAwake, learn, money, rel, shortTime } from './core';
+import { addFact, bear, bearOn, clamp, createDebt, ease, famName, isAwake, learn, money, recordCareer, rel, repute, shortTime } from './core';
 import { mkJob, tipFrom, traitWords } from './jobs';
 import { share } from './actions';
 import { HUSTLES } from './hustle';
@@ -154,12 +154,12 @@ function ruleGrievance(w: World, p: Character, g: Grievance, code: string, lines
       rx.trust = clamp(rx.trust + 0.08);
       ry.trust = clamp(ry.trust - 0.06);
       if (T) {
-        p.standing = clamp(p.standing + 1, 0, 100);
+        repute(w, p, 1, 'ruling');
         lines.push(`${y.name} takes it badly but knows it’s fair.${a ? ` He pays ${x.name} ${money(a)}.` : ''}`);
       } else {
-        ry.grudge = clamp(ry.grudge + 0.15);
-        rel(y, x.id).grudge = clamp(rel(y, x.id).grudge + 0.25);
-        p.standing = clamp(p.standing - 2, 0, 100);
+        bearOn(w, ry, 0.15, `${p.name} ruled against him`);
+        bear(w, y, x.id, 0.25, `${x.name} brought it to the table`);
+        repute(w, p, -2, 'ruling');
         lines.push(`${y.name} says nothing, but the look he gives ${x.name} says plenty. It wasn’t true, and he knows you didn’t check.`);
       }
       if (cross) tension(w, x, y, T ? 0 : 1);
@@ -171,12 +171,12 @@ function ruleGrievance(w: World, p: Character, g: Grievance, code: string, lines
       ry.trust = clamp(ry.trust + 0.08);
       rx.trust = clamp(rx.trust - 0.06);
       if (!T) {
-        p.standing = clamp(p.standing + 1, 0, 100);
+        repute(w, p, 1, 'ruling');
         lines.push(`${x.name} backs down, a little embarrassed.`);
       } else {
-        rel(x, y.id).grudge = clamp(rel(x, y.id).grudge + 0.2);
-        rx.grudge = clamp(rx.grudge + 0.1);
-        p.standing = clamp(p.standing - 2, 0, 100);
+        bear(w, x, y.id, 0.2, `${y.name} won it at the table`);
+        bearOn(w, rx, 0.1, `${p.name} ruled against him`);
+        repute(w, p, -2, 'ruling');
         lines.push(`${x.name} walks off. He was right, and he knows you knew it, or should have.`);
       }
       note(y, x);
@@ -187,8 +187,8 @@ function ruleGrievance(w: World, p: Character, g: Grievance, code: string, lines
       const a = g.claim > 0 ? pay(y, x, g.claim / 2) : 0;
       rx.trust = clamp(rx.trust - 0.02);
       ry.trust = clamp(ry.trust - 0.02);
-      rel(x, y.id).grudge *= 0.5;
-      rel(y, x.id).grudge *= 0.5;
+      ease(x, y.id, 0.5);
+      ease(y, x.id, 0.5);
       lines.push(`You split it down the middle.${a ? ` ${y.name} pays ${x.name} ${money(a)}.` : ''} Nobody’s delighted, nobody walks out angry.`);
       if (cross) tension(w, x, y, -1);
       break;
@@ -198,14 +198,14 @@ function ruleGrievance(w: World, p: Character, g: Grievance, code: string, lines
       rx.trust = clamp(rx.trust - 0.03);
       lines.push(`You tell them it will wait. ${x.name} doesn’t like that.`);
       if (g.postponed >= 2) {
-        rel(x, y.id).grudge = clamp(rel(x, y.id).grudge + 0.15);
+        bear(w, x, y.id, 0.15, `${y.name} still has not answered for it`);
         lines.push(`It has been put off twice. ${x.name} may take it into his own hands.`);
       }
       break;
     case 'r_dismiss':
       g.status = 'dropped';
       rx.trust = clamp(rx.trust - 0.1);
-      rel(x, y.id).grudge = clamp(rel(x, y.id).grudge + 0.15);
+      bear(w, x, y.id, 0.15, `${y.name} got away with it`);
       lines.push(`You send them both away. The matter isn’t settled; it’s just no longer your problem, until it is.`);
       break;
   }
@@ -540,7 +540,7 @@ export function choose(w: World, p: Character, m: Meeting, code: string): string
         const top = crew.slice().sort((a, b) => (b.books.history.at(-1)?.paid ?? 0) - (a.books.history.at(-1)?.paid ?? 0))[0];
         rel(top, p.id).trust = clamp(rel(top, p.id).trust + 0.06);
         rel(top, p.id).affection = clamp(rel(top, p.id).affection + 0.04);
-        for (const c of crew) if (c.id !== top.id) rel(c, top.id).grudge = clamp(rel(c, top.id).grudge + (c.traits.ambition > 0.6 ? 0.04 : 0));
+        for (const c of crew) if (c.id !== top.id) bear(w, c, top.id, (c.traits.ambition > 0.6 ? 0.04 : 0), `${top.name} got the praise`);
         lines.push(`You single out ${top.name} in front of the others. He stands a little straighter.`);
       } else if (c0 === 'press') {
         const c = w.chars[arg];
@@ -667,7 +667,7 @@ export function choose(w: World, p: Character, m: Meeting, code: string): string
         p.books.missed = 0;
         clear();
         rb.trust = clamp(rb.trust + 0.04);
-        p.standing = clamp(p.standing + 1, 0, 100);
+        repute(w, p, 1, 'meeting');
         lines.push(`You count it out on his desk. ${boss.name} puts it away without a word. That’s as warm as he gets.`);
       } else if (c0 === 'promise') {
         p.books.arrears = Math.max(p.books.arrears, amt);
@@ -682,7 +682,7 @@ export function choose(w: World, p: Character, m: Meeting, code: string): string
           lines.push(`${boss.name} studies you for a long time. "Fine. I’ll look again."`);
         } else {
           rb.trust = clamp(rb.trust - 0.15);
-          p.standing = clamp(p.standing - 3, 0, 100);
+          repute(w, p, -3, 'meeting');
           p.books.arrears += amt * 2;
           clear();
           lines.push(`${boss.name} doesn’t raise his voice. "Don’t lie to me." He turns a page. "Twice, then. Make it up."`);
@@ -694,11 +694,11 @@ export function choose(w: World, p: Character, m: Meeting, code: string): string
           clear();
           sub.books.arrears += amt;
           rel(sub, p.id).trust = clamp(rel(sub, p.id).trust - 0.2);
-          rel(sub, p.id).grudge = clamp(rel(sub, p.id).grudge + 0.2);
+          bear(w, sub, p.id, 0.2, `${p.name} made him make up what he was short`);
           lines.push(`${boss.name} nods slowly. "I’ll talk to ${sub.name}." You don’t feel good about it.`);
         } else {
           rb.trust = clamp(rb.trust - 0.12);
-          p.standing = clamp(p.standing - 3, 0, 100);
+          repute(w, p, -3, 'meeting');
           p.books.arrears += amt;
           lines.push(`"${sub.name}?" ${boss.name} says. "A man who blames his own people doesn’t last." He doesn’t believe you.`);
         }
@@ -732,8 +732,8 @@ export function choose(w: World, p: Character, m: Meeting, code: string): string
           if (fl) react(w, boss, sub, { amt: fl.amt, n: Math.max(2, fl.n), last: w.now }, 'meeting');
           fl.amt = 0;
           fl.n = 0;
-          rel(sub, p.id).grudge = clamp(rel(sub, p.id).grudge + 0.2);
-          p.standing = clamp(p.standing + 1, 0, 100);
+          bear(w, sub, p.id, 0.2, `${p.name} called him to account over his envelope`);
+          repute(w, p, 1, 'meeting');
         } else lines.push(`${boss.name} lets you finish. "Noted." Nothing in his voice says it will be acted on. Perhaps you don’t carry the weight yet.`);
       } else if (c0 === 'propose') {
         const f = w.facts[arg];
@@ -741,10 +741,10 @@ export function choose(w: World, p: Character, m: Meeting, code: string): string
         const pr = clamp(0.1 + inf * 0.8 + rel(boss, p.id).trust * 0.3 - temper(boss).caution * 0.2, 0.05, 0.9);
         if (w.rng.chance(pr)) {
           mkJob(w, { kind: 'handle', title: `${boss.name} wants ${t.name} dealt with`, brief: `You made the case in front of the family: "${f.text}" ${boss.name} agreed. It’s yours to handle.`, giver: boss.id, via: 'boss', assignee: p.id, target: t.id, cause: f.id, pay: 400 });
-          p.standing = clamp(p.standing + 2, 0, 100);
+          repute(w, p, 2, 'meeting');
           lines.push(`The table goes quiet. ${boss.name} nods. "Do it." The work is yours.`);
         } else {
-          p.standing = clamp(p.standing - 1, 0, 100);
+          repute(w, p, -1, 'meeting');
           lines.push(`${boss.name} lets the silence sit. "Not now." Somebody across the table smirks.`);
         }
       } else lines.push('You say nothing. Nobody notices.');
@@ -757,18 +757,18 @@ export function choose(w: World, p: Character, m: Meeting, code: string): string
       if (c0 === 'step_in') {
         const pr = clamp(0.25 + influence(w, p) / 100 * 0.6 + (rel(a, p.id).respect + rel(b, p.id).respect) * 0.2, 0.1, 0.9);
         if (w.rng.chance(pr)) {
-          rel(a, b.id).grudge *= 0.5;
-          rel(b, a.id).grudge *= 0.5;
-          p.standing = clamp(p.standing + 1, 0, 100);
+          ease(a, b.id, 0.5);
+          ease(b, a.id, 0.5);
+          repute(w, p, 1, 'meeting');
           lines.push(`You put a hand on the table and say two words. They both sit back. It’s not over, but it’s quieter.`);
         } else {
           rel(a, p.id).respect = clamp(rel(a, p.id).respect - 0.03);
           lines.push(`They talk right over you. ${a.name} storms out first.`);
-          rel(a, b.id).grudge = clamp(rel(a, b.id).grudge + 0.05);
+          bear(w, a, b.id, 0.05, `${b.name} would not hear him`);
         }
       } else {
-        rel(a, b.id).grudge = clamp(rel(a, b.id).grudge + 0.08);
-        rel(b, a.id).grudge = clamp(rel(b, a.id).grudge + 0.08);
+        bear(w, a, b.id, 0.08, `${b.name} would not hear him`);
+        bear(w, b, a.id, 0.08, `${a.name} would not hear him`);
         addFact(w, { kind: 'gathering', actor: a.id, victim: b.id, minor: true, text: `${a.name} and ${b.name} had words at a dinner.`, district: p.district }, { witnesses: [p.id] });
         lines.push('It burns itself out. Nothing is resolved.');
       }
@@ -934,7 +934,7 @@ export function inductionChoose(w: World, p: Character, m: Meeting, code: string
   it.opts = [];
   m.idx++;
   if (last || m.idx >= m.items.length) {
-    if (to === 'boss') { p.standing = clamp(p.standing + data.shown, 0, 100); recordCareer(w, p, 'Took the chair of the family'); }
+    if (to === 'boss') { repute(w, p, data.shown, 'took the chair'); recordCareer(w, p, 'Took the chair of the family'); }
     else inductPlayer(w, p, to, data.shown);
     if (job) job.status = 'done';
     delete m.jobId;

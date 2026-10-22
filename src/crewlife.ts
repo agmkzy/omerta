@@ -5,7 +5,7 @@ import { sitChoose } from './situations';
 import { pulseChoose } from './pulse';
 // The crew as people: what each man wants, who he likes and who he doesn't, and what he asks of you.
 // None of it is shown until you work it out. Most of it comes out on a Sunday.
-import { addFact, clamp, createDebt, money, rel } from './core';
+import { addFact, bear, bearOn, clamp, createDebt, money, rel } from './core';
 import { addEnc, addFavour } from './encounters';
 import { Character, DAY, Enc, Id, World } from './types';
 import { arch, pick } from './voice';
@@ -84,7 +84,7 @@ export function crewTick(w: World) {
         ra.trust = clamp(ra.trust + 0.2); rb.trust = clamp(rb.trust + 0.2);
         tells.push({ who: a.id, text: pick([`${first(a)} says he and ${first(b)} have been spending more time together. Good. A man should have a friend.`, `${first(a)} and ${first(b)} were seen at the same table twice this week, and neither looked like he was being made to.`, `${first(b)} has started sending ${first(a)} the work he can’t get to. They seem to like each other.`], a.id + w.now), learn: `tie:${b.id}` });
       } else if (roll < 0.62 && bad) {
-        ra.grudge = clamp(ra.grudge + 0.25); rb.grudge = clamp(rb.grudge + 0.25);
+        bearOn(w, ra, 0.25, `${b.name} rubs him the wrong way`); bearOn(w, rb, 0.25, `${a.name} rubs him the wrong way`);
         a.cooldown.friction = w.now + 14 * DAY; b.cooldown.friction = w.now + 14 * DAY;
         addFact(w, { kind: 'trouble', actor: a.id, victim: b.id, minor: true, text: pick([`${a.name} and ${b.name} had words over money.`, `${a.name} and ${b.name} stopped speaking after an argument nobody will repeat.`, `${a.name} thinks ${b.name} got credit he didn’t earn.`], a.id + b.id + w.now), district: a.district }, { witnesses: [p.id] });
         tells.push({ who: b.id, text: `${first(b)} isn’t saying much about ${first(a)}. Whatever it was, it isn’t finished.`, learn: `rival:${a.id}` });
@@ -243,7 +243,7 @@ export function lapsedAsks(w: World) {
     r.ignored++; r.broken++;
     rel(c, p.id).trust = clamp(rel(c, p.id).trust - 0.07);
     rel(c, p.id).respect = clamp(rel(c, p.id).respect - 0.06);
-    if (arch(c) === 'proud') rel(c, p.id).grudge = clamp(rel(c, p.id).grudge + 0.08);
+    if (arch(c) === 'proud') bear(w, c, p.id, 0.08, `${p.name} broke his word to him`);
   }
 }
 

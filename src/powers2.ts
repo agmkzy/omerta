@@ -4,9 +4,9 @@ import { temper } from './temper';
 import { noteDeal } from './orgs';
 import { addStake, bizMove, stakesOf } from './econ';
 import { orgRecord, treasuryMove } from './orgs';
-import { addFact, clamp, earn, factText, learn, money, rel } from './core';
+import { addFact, bear, bearOn, clamp, earn, factText, learn, money, rel, repute } from './core';
 import { addEnc, addFavour } from './encounters';
-import { members, LADDER } from './career';
+import { members, LADDER, openSeatFor } from './career';
 import { newOffer } from './jobs';
 import { Character, DAY, Enc, Id, PathState, Rank, WEEK, World } from './types';
 import { pathState, underlings } from './path';
@@ -90,7 +90,7 @@ export function buyLife(w: World, p: Character, code: string): string[] {
   else if (code.startsWith('car')) l.car = Number(code.slice(3));
   else if (code === 'hq') l.hq = true;
   else if (code === 'driver') l.driver = true;
-  p.standing = clamp(p.standing + 2, 0, 100);
+  repute(w, p, 2, 'lifestyle');
   return [`${x.label}. ${money(x.cost)}, and ${money(x.upkeep)} a week to keep it. ${x.hint}`];
 }
 function lifeWeek(w: World) {
@@ -104,7 +104,7 @@ function lifeWeek(w: World) {
   if (l.car >= 2) up -= 60;
   p.cash = Math.max(0, p.cash - up); p.books.expenses += up;
   p.heat = Math.max(0, p.heat - 0.02 * l.home - (l.driver ? 0.05 : 0));
-  if (l.home >= 3) p.standing = clamp(p.standing + 0.15, 0, 100);
+  if (l.home >= 3) repute(w, p, 0.15, 'lifestyle');
   if (l.hq) for (const c of underlings(w, p)) { rel(c, p.id).trust = clamp(rel(c, p.id).trust + 0.01); rel(c, p.id).affection = clamp(rel(c, p.id).affection + 0.005); }
 }
 export const hasHQ = (w: World) => !!w.path?.life?.hq;
@@ -251,7 +251,7 @@ export function usePower2(w: World, p: Character, codeIn: string): string[] | un
       if (!b || !b.alive) return ['There’s nobody above you to do a favour for.'];
       set(7);
       rel(b, p.id).trust = clamp(rel(b, p.id).trust + 0.05); rel(b, p.id).respect = clamp(rel(b, p.id).respect + 0.03);
-      p.standing = clamp(p.standing + 0.5, 0, 100);
+      repute(w, p, 0.5, 'favour');
       addFavour(w, p.id, b.id, 1, 'an errand you ran and never mentioned');
       addFact(w, { kind: 'favour', actor: p.id, victim: b.id, minor: true, text: `${p.name} ran an errand for ${b.name}.`, district: p.district }, { witnesses: [b.id] });
       return [`You carry something across town for ${b.name} and ask nothing. He notices that you didn’t ask.`, 'He owes you one now, and he knows it.'];
@@ -267,7 +267,7 @@ export function usePower2(w: World, p: Character, codeIn: string): string[] | un
       for (const c of crew.filter((x) => x.books.arrears > 0 && x.cash > 20)) {
         const take = Math.min(c.books.arrears, Math.floor(c.cash * 0.8)); if (take <= 0) continue;
         c.cash -= take; c.books.arrears -= take; got += take; names.push(c.name.split(' ')[0]);
-        rel(c, p.id).trust = clamp(rel(c, p.id).trust - 0.06); rel(c, p.id).grudge = clamp(rel(c, p.id).grudge + 0.03);
+        rel(c, p.id).trust = clamp(rel(c, p.id).trust - 0.06); bear(w, c, p.id, 0.03, `${p.name} took what he owed out of his pocket`);
         post(w, { from: c.id, to: p.id, amt: take, flow: 'kickup', src: 'arrears', note: 'squeezed' });
       }
       if (!got) return ['Nobody has anything to give you right now.'];
@@ -309,7 +309,7 @@ export function usePower2(w: World, p: Character, codeIn: string): string[] | un
       if (!c) return ['Nobody’s short.'];
       const pay = Math.min(p.cash, Math.max(150, c.books.arrears));
       p.cash -= pay; c.books.arrears = Math.max(0, c.books.arrears - pay); c.books.missed = 0;
-      p.standing = clamp(p.standing - 2, 0, 100);
+      repute(w, p, -2, 'covered');
       rel(c, p.id).trust = clamp(rel(c, p.id).trust + 0.2); rel(c, p.id).affection = clamp(rel(c, p.id).affection + 0.08);
       set(10);
       return [`${c.name} was short, and everyone knew it. You told ${p.bossId ? w.chars[p.bossId]?.name : 'the man upstairs'} it was your oversight, and covered ${money(pay)}.`, `${first(c)} won’t say anything about it. That’s how you know he won’t forget.`];
@@ -372,14 +372,14 @@ export function usePower2(w: World, p: Character, codeIn: string): string[] | un
       if (!rng.chance(clamp(0.2 + rel(boss, p.id).trust * 0.6, 0.1, 0.85))) return [`${boss.name} hears you out. “He stays. For now.”`];
       applyRank(w, worst, 'soldier', { wage: 150, fact: false, repair: false, place: (x) => { x.bossId = p.id; } });
       for (const x of Object.values(w.chars)) if (x.alive && x.bossId === worst.id) x.bossId = p.id;
-      rel(worst, p.id).grudge = clamp(rel(worst, p.id).grudge + 0.4); rel(worst, p.id).trust = clamp(rel(worst, p.id).trust - 0.3);
+      bear(w, worst, p.id, 0.4, `${p.name} had him put down to soldier`); rel(worst, p.id).trust = clamp(rel(worst, p.id).trust - 0.3);
       addFact(w, { kind: 'promotion', actor: boss.id, victim: worst.id, text: `${worst.name} has been put back to soldier. ${boss.name} didn’t say why. Everyone has a theory, and most of them involve ${p.name}.`, district: worst.district }, { broadcast: members(w, fam.id).map((c) => c.id) });
       repairHierarchy(w, p.familyId!);
       return [`${boss.name} makes the decision the way he makes them, in one sentence. ${worst.name} is a soldier again, and a captain’s seat is open.`, 'He knows who spoke.'];
     }
     case 'books': {
       fam.booksClosed = !fam.booksClosed; set(20);
-      if (!fam.booksClosed) fam.capBonus = { ...(fam.capBonus ?? {}), soldier: (fam.capBonus?.soldier ?? 0) + 2 };
+      if (!fam.booksClosed) { openSeatFor(w, fam.id, 'soldier'); openSeatFor(w, fam.id, 'soldier'); }
       return [fam.booksClosed ? 'You close the books. No new soldiers until further notice. A lot of ambitious men are going to find out about it tonight.' : 'You open the books. Two more places. Every associate who ever wanted it now has a reason to try.'];
     }
     case 'emergency': {
@@ -475,8 +475,8 @@ export function agendaChoose(w: World, p: Character, e: Enc, code: string): stri
     const s = stakesOf(w, p.id).find((x) => x.b.id === b?.id)?.s;
     if (code === 'pay') { if (s) s.share = Math.max(0.1, s.share - 0.1); return [`${c.name} nods. "Sensible." You keep a smaller share of something you built. You also keep your teeth.`]; }
     if (code === 'confront') {
-      if (w.rng.chance(clamp(0.25 + p.traits.violence * 0.25 + p.traits.courage * 0.2 + p.standing / 400, 0.15, 0.7))) { p.standing = clamp(p.standing + 4, 0, 100); rel(c, p.id).respect = clamp(rel(c, p.id).respect + 0.15); return [`You don’t raise your voice. ${c.name} measures you, and finds something he didn’t expect. He leaves. Word gets round that you can’t be leaned on.`]; }
-      p.hurtUntil = w.now + 5 * DAY; p.standing = clamp(p.standing - 3, 0, 100); if (s) s.share = Math.max(0.1, s.share - 0.1);
+      if (w.rng.chance(clamp(0.25 + p.traits.violence * 0.25 + p.traits.courage * 0.2 + p.standing / 400, 0.15, 0.7))) { repute(w, p, 4, 'stood up'); rel(c, p.id).respect = clamp(rel(c, p.id).respect + 0.15); return [`You don’t raise your voice. ${c.name} measures you, and finds something he didn’t expect. He leaves. Word gets round that you can’t be leaned on.`]; }
+      p.hurtUntil = w.now + 5 * DAY; repute(w, p, -3, 'stood up'); if (s) s.share = Math.max(0.1, s.share - 0.1);
       return [`${c.name} has two men with him. It’s over quickly. You’re hurt for a few days, and your share is smaller anyway.`];
     }
     const sp = p.bossId ? w.chars[p.bossId] : undefined;
@@ -496,8 +496,8 @@ export function agendaChoose(w: World, p: Character, e: Enc, code: string): stri
   if (what === 'agenda_territory') {
     const d = e.about ? w.chars[e.about] : undefined;
     if (!d) return ['It has settled itself.'];
-    if (code === 'for') { rc.trust = clamp(rc.trust + 0.12); rel(d, p.id).trust = clamp(rel(d, p.id).trust - 0.12); rel(d, c.id).grudge = clamp(rel(d, c.id).grudge + 0.2); fav(); return [`${first(c)} keeps the block. ${first(d)} doesn’t say anything, which is worse.`]; }
-    if (code === 'against') { rel(d, p.id).trust = clamp(rel(d, p.id).trust + 0.12); rc.trust = clamp(rc.trust - 0.12); rc.grudge = clamp(rc.grudge + 0.08); return [`${first(d)} keeps the block. ${first(c)} tells you it’s a mistake, and that he’ll remember.`]; }
+    if (code === 'for') { rc.trust = clamp(rc.trust + 0.12); rel(d, p.id).trust = clamp(rel(d, p.id).trust - 0.12); bear(w, d, c.id, 0.2, `${c.name} blocked him`); fav(); return [`${first(c)} keeps the block. ${first(d)} doesn’t say anything, which is worse.`]; }
+    if (code === 'against') { rel(d, p.id).trust = clamp(rel(d, p.id).trust + 0.12); rc.trust = clamp(rc.trust - 0.12); bearOn(w, rc, 0.08, `${p.name} went against him`); return [`${first(d)} keeps the block. ${first(c)} tells you it’s a mistake, and that he’ll remember.`]; }
     if (p.cash < 300) return ['You can’t even cover dinner.'];
     p.cash -= 300; rc.trust = clamp(rc.trust + 0.03); rel(d, p.id).trust = clamp(rel(d, p.id).trust + 0.03); rel(c, d.id).trust = clamp(rel(c, d.id).trust + 0.08); rel(d, c.id).trust = clamp(rel(d, c.id).trust + 0.08);
     return ['A long dinner, a bottle, and two men who both want to be seen as reasonable. They split it. Neither is happy. Neither is angry.'];
@@ -567,17 +567,17 @@ export function propose(w: World, p: Character, code: string, fid?: Id): string[
   p.cash -= prop.cost;
   const mine = w.fam[p.familyId!];
   if (!passed) {
-    p.standing = clamp(p.standing - 2, 0, 100);
+    repute(w, p, -2, 'commission');
     if (code === 'invest') { earn(p, 0, 'business'); p.cash += 4000; }
     if (code === 'alliance' && fid) { mine.tension[fid] = (mine.tension[fid] ?? 0) + 1; }
     return [...lines, 'It doesn’t pass. Nobody says why. You’ll have to work out who to speak to before next time.'];
   }
   if (code === 'peace') for (const f of others) { mine.tension[f.id] = Math.max(0, (mine.tension[f.id] ?? 0) - 3); f.tension[mine.id] = Math.max(0, (f.tension[mine.id] ?? 0) - 3); noteDeal(w, mine.id, f.id, 'a peace agreed at the Commission', 0.15); }
   else if (code === 'invest') { earn(p, 14000, 'business'); for (const f of others) { mine.tension[f.id] = Math.max(0, (mine.tension[f.id] ?? 0) - 1); } }
-  else if (code === 'recognise') { p.standing = clamp(p.standing + 8, 0, 100); for (const c of members(w, mine.id)) rel(c, p.id).respect = clamp(rel(c, p.id).respect + 0.03); }
+  else if (code === 'recognise') { repute(w, p, 8, 'commission'); for (const c of members(w, mine.id)) rel(c, p.id).respect = clamp(rel(c, p.id).respect + 0.03); }
   else if (code === 'collective') { for (const c of Object.values(w.chars)) if (c.alive && c.familyId) c.heat = Math.max(0, c.heat - 0.4); mine.directive = { kind: 'quiet', until: w.now + 28 * DAY }; }
   else if (code === 'alliance' && fid) { cm.allies.push(fid); mine.tension[fid] = 0; w.fam[fid].tension[mine.id] = 0; }
-  p.standing = clamp(p.standing + 2, 0, 100);
+  repute(w, p, 2, 'commission');
   return [...lines, code === 'peace' ? `It passes. For a while, ${others.length + 1} families want the same thing.` : code === 'invest' ? 'It passes. The money moves, and your cut is considerable.' : code === 'recognise' ? 'It passes. Your name is said differently in rooms you’ve never been in.' : code === 'collective' ? 'It passes. For a month, the city is a little quieter.' : 'It passes. You have an ally, and so do they.'];
 }
 function commissionWeek(w: World) {

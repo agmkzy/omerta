@@ -2,7 +2,7 @@ import { hasPerk } from './specs';
 // Ongoing operations. Each one has a runner, a weekly take, and a way to go wrong. Money from these comes through the books
 // like everything else, so what your superiors can see is a choice with consequences.
 import { aptitude, grow } from './people';
-import { addFact, clamp, earn, handleDeath, money, newId, rel } from './core';
+import { addFact, bearOn, clamp, earn, handleDeath, money, newId, rel } from './core';
 import { addEnc } from './encounters';
 import { Character, DAY, Id, Op, OpKind, World } from './types';
 import { arch, pick } from './voice';
@@ -106,7 +106,7 @@ export function opRule(w: World, p: Character, op: Op, code: string, found: numb
   }
   if (code === 'fire') {
     op.runner = null;
-    rr.grudge = clamp(rr.grudge + 0.1);
+    bearOn(w, rr, 0.1, `${p.name} took him off the operation`);
     rr.trust = clamp(rr.trust - 0.15);
     return [`You take the operation away from ${r.name}. He takes it the way men take a public embarrassment.`];
   }

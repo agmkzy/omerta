@@ -1,7 +1,7 @@
 // The player can die, but never without a ladder: rumour, warning, menace, an attempt he survives, and only then the real thing.
 // Every rung offers a way out, and every way out costs something.
 import { addEnc } from './encounters';
-import { addFact, clamp, handleDeath, money, rel } from './core';
+import { addFact, bear, clamp, handleDeath, money, rel } from './core';
 import { tension } from './actions';
 import { Arch, arch, pick } from './voice';
 import { DAY, Character, Enc, Threat, World } from './types';
@@ -161,7 +161,7 @@ export function threatChoose(w: World, p: Character, e: Enc, code: string): stri
       p.cash = Math.max(0, p.cash - 150);
       t.truce = w.now + 20 * DAY;
       t.level = Math.max(0, t.level - 1);
-      rel(enemy, p.id).grudge = clamp(rel(enemy, p.id).grudge - 0.25);
+      bear(w, enemy, p.id, -(0.25), 'settled');
       lines.push(a === 'proud' ? `${enemy.name} sits stiffly and takes an apology that’s not quite an apology. It’s enough. For now.` : `You meet ${enemy.name} in a back room. Nobody apologises and everybody pays for the coffee. That’s how you know it went well.`);
     } else {
       t.level = Math.min(4, t.level + (refuse ? 1 : 0));
@@ -185,7 +185,7 @@ export function threatChoose(w: World, p: Character, e: Enc, code: string): stri
     p.heat = clamp(p.heat + 0.12, 0, 1.5);
     addFact(w, { kind: 'beating', actor: p.id, victim: enemy.id, text: `${p.name} beat up ${enemy.name}.`, district: enemy.district }, { witnesses: [p.id] });
     tension(w, p, enemy, 1);
-    rel(enemy, p.id).grudge = clamp(rel(enemy, p.id).grudge + 0.15);
+    bear(w, enemy, p.id, 0.15, `${p.name} beat him`);
     t.lethal += 1;
     lines.push(`You find ${enemy.name} before he finds you. It’s quick and ugly. He’ll be laid up a few days. He’ll also not forget it.`);
   } else if (code === 'hide') {

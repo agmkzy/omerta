@@ -2,7 +2,7 @@
 // It emerges from real state (a business losing money, a man in trouble), the people involved respond on their own,
 // and it reaches the player through a believable channel: a conversation, a request for help, or a report.
 import { temper } from './temper';
-import { addFact, clamp, createDebt, money, ownerBiz, rel } from './core';
+import { addFact, bear, clamp, createDebt, money, ownerBiz, rel } from './core';
 import { bizMove } from './econ';
 import { addEnc, addFavour, makeLoan } from './encounters';
 import { Character, DAY, Enc, Id, Situation, WEEK, World } from './types';
@@ -138,7 +138,7 @@ export function helpWith(w: World, p: Character, c: Character, how: 'cover' | 'l
     const ro = w.chars[rb.ownerId];
     rb.distress += 1; if (b) b.distress = Math.max(0, b.distress - 1);
     p.heat = Math.min(1, p.heat + 0.04); r.trust = clamp(r.trust + 0.08); s.helped = true; s.knows = true;
-    if (ro) rel(ro, p.id).grudge = clamp(rel(ro, p.id).grudge + 0.15);
+    if (ro) bear(w, ro, p.id, 0.15, `${p.name} helped take his trade`);
     return [`A word goes to ${ro?.name ?? 'the owner of ' + rb.name}. Nothing violent. By the end of the week ${rb.name} is quieter and ${c.name}’s door is busier.`, `${ro ? first(ro) : 'He'} knows who sent it.`];
   }
   if (how === 'leave') { s.knows = true; r.respect = clamp(r.respect + 0.02); r.trust = clamp(r.trust - 0.06); return [`"You’ll work it out." ${c.name} nods once. He hears what you’re saying about what he’s worth to you.`]; }

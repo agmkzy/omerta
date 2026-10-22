@@ -2,7 +2,7 @@
 // the injured side asks its superiors, the other side presses or backs off, someone plans a reply, a sit-down gets called, terms are agreed and sometimes broken.
 import { temper, viewOf } from './temper';
 import { addEnc } from './encounters';
-import { addFact, clamp, famName, money, ownerBiz, rel, witnessesAt } from './core';
+import { addFact, bear, bearOn, clamp, famName, money, ownerBiz, rel, repute, witnessesAt } from './core';
 import { Character, DAY, Dispute, Fact, Id, World } from './types';
 
 const KINDS: Record<string, Dispute['kind']> = { poach: 'territory', beating: 'violence', vandalism: 'violence', robbery: 'theft' };
@@ -57,7 +57,7 @@ export function disputeScan(w: World) {
       const mid = w.chars[w.fam[bound.a === a.id ? a.familyId : b.familyId].bossId];
       if (mid) rel(mid, b.id).respect = clamp(rel(mid, b.id).respect - 0.05);
       const mine = w.chars[w.playerId!];
-      if (mine && b.bossId === mine.id) { mine.standing = clamp(mine.standing - 2, 0, 100); if (mine.bossId) rel(w.chars[mine.bossId], mine.id).trust = clamp(rel(w.chars[mine.bossId], mine.id).trust - 0.05); }
+      if (mine && b.bossId === mine.id) { repute(w, mine, -2, 'crew trouble'); if (mine.bossId) rel(w.chars[mine.bossId], mine.id).trust = clamp(rel(w.chars[mine.bossId], mine.id).trust - 0.05); }
       continue;
     }
     // One quarrel per pair of men, whichever of them struck last: what happens next is added to the same record.
@@ -98,7 +98,7 @@ export function disputeTick(w: World) {
       } else if (roll < 0.6 && rng.chance(temper(b).caution + 0.2)) {
         const comp = Math.min(Math.max(0, b.cash), rng.int(100, 300));
         if (comp > 0) { a.cash += comp; b.cash -= comp; }
-        rel(b, a.id).grudge = clamp(rel(b, a.id).grudge - 0.05);
+        bear(w, b, a.id, -(0.05), 'paid for it');
         d.status = 'dropped';
         log(w, d, `${b.name} sent ${comp ? money(comp) + ' and ' : ''}word that he’s finished with it. Either he got what he wanted, or he got scared.`);
         continue;
@@ -149,7 +149,7 @@ export function intentDue(w: World, q: import('./types').Pending, perform: (w: W
     const op = w.ops.find((o) => o.id === q.c);
     if (!op || op.state !== 'running' || a.jailedUntil > w.now || w.rng.chance(0.3)) return;
     op.state = 'raided'; op.until = w.now + 14 * DAY;
-    rel(a, b.id).grudge = clamp(rel(a, b.id).grudge + 0.1);
+    bear(w, a, b.id, 0.1, `${b.name}'s people got his operation raided`);
     addFact(w, { kind: 'vandalism', actor: a.id, victim: b.id, text: `${a.name}'s men wrecked the place ${b.name} was running a racket from.`, textHidden: `Somebody wrecked a back room in ${op.district}.`, district: op.district }, { witnesses: [b.id] });
     return;
   }
@@ -226,7 +226,7 @@ export function sitdownChoose(w: World, p: Character, e: import('./types').Enc, 
   const barredFam = o.familyId ?? undefined;
   if (code === 'walk') {
     rr.respect = clamp(rr.respect - 0.1);
-    rel(o, p.id).grudge = clamp(rel(o, p.id).grudge + 0.1);
+    bear(w, o, p.id, 0.1, `${p.name} put him off the place`);
     log(w, d, `${p.name} walked out of the sit-down.`);
     lines.push(`You push back your chair and go. Nobody says a word until you’re out the door, and after that nobody says anything else. It won’t be forgotten.`);
     return lines;
@@ -237,7 +237,7 @@ export function sitdownChoose(w: World, p: Character, e: import('./types').Enc, 
       rr.respect = clamp(rr.respect + 0.04);
       lines.push(`You say it plainly: it’s yours and it stays yours. ${o.name} looks at you a while, then nods. "All right. We’ll keep off." He won’t pretend to like it. The agreement is good for three months, if everyone keeps it.`);
     } else {
-      rr.grudge = clamp(rr.grudge + 0.1);
+      bearOn(w, rr, 0.1, `${p.name} kept him off what he wanted`);
       log(w, d, `The sit-down broke up with no agreement.`);
       lines.push(`${o.name} listens to all of it and gives you nothing. "That isn’t how I heard it." The meeting ends politely, which is worse than loudly.`);
     }
@@ -319,7 +319,7 @@ export function playerActed(w: World, p: Character, x: Character, how: string) {
     switch (how) {
       case 'beat':
         if (rng.chance(0.45 + resp * 0.3)) { d.status = 'dropped'; log(w, d, `${p.name} had ${x.name} beaten. He’s keeping clear of the place now.`); }
-        else { log(w, d, `${p.name} had ${x.name} beaten. He hasn’t backed down; he’s nursing it.`); d.next = w.now + 2 * DAY; rel(x, p.id).grudge = clamp(rel(x, p.id).grudge + 0.15); }
+        else { log(w, d, `${p.name} had ${x.name} beaten. He hasn’t backed down; he’s nursing it.`); d.next = w.now + 2 * DAY; bear(w, x, p.id, 0.15, `${p.name} had him beaten`); }
         break;
       case 'hit': d.status = 'dropped'; log(w, d, `${x.name} is dead. The quarrel went with him, and what follows won’t be settled by anyone in this room.`); break;
       case 'warn':

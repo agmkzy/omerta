@@ -48,3 +48,17 @@ describe('determinism', { tags: ['determinism'] }, () => {
   });
   ok.each(SEEDS)('seed %i: 180 days, every cash balance finite', (seed) => console.log(got<string>(seed - 1)));
 });
+
+// The long-run baseline (tools/longrun.ts) only watches: a world run under it, stepped a day at a time and sampled every week,
+// comes out byte-identical to the same world run straight through.
+describe('the long-run observer', { tags: ['determinism'] }, () => {
+  ok('observing a world does not change it (seed 5, 6 weeks)', async () => {
+    const { run } = await import('./tools/longrun');
+    const { createWorld } = await import('../world');
+    const { advance, serialize } = await import('../engine');
+    const watched = run(5, 6).w;
+    const plain = createWorld(5, 'Tony Marino');
+    advance(plain, watched.now);
+    assert.equal(serialize(watched), serialize(plain));
+  });
+});

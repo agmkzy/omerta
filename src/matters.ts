@@ -17,7 +17,7 @@ import { temper, viewOf } from './temper';
 import { perform, tension } from './actions';
 import { openAsk, amendsAsk, favoursWeek, layoffFor, move as askMove, askee, asker } from './asks';
 import { ASKS } from './askkinds'; // (the registry itself: it exists however the program is entered)
-import { clamp, factHooks, learn, money, regard, peek, rel, repute, witnessesAt } from './core';
+import { bear, clamp, ease, easeOn, factHooks, learn, money, peek, regard, rel, repute, witnessesAt } from './core';
 import { addEnc, addFavour } from './encounters';
 import { agencyOf, goalHooks } from './goals';
 import { closeKin, kinTie, madeKin } from './kin';
@@ -93,7 +93,7 @@ export function confront(w: World, s: Situation, by: Character, t: Character, gu
   const r: 'admit' | 'deny' | 'defy' = tp.volatility + tp.pride * 0.4 > 0.85 && fear < 0.3 ? 'defy' : guilty && (fear > 0.35 || tp.caution < 0.35 || tp.empathy > 0.72) ? 'admit' : 'deny';
   const wit = witnessesAt(w, t.district, [by.id, t.id], 2);
   tell(w, s, r === 'admit' ? `${t.name} owned up to ${by.name}, face to face.` : r === 'deny' ? `${by.name} had it out with ${t.name}, who swore it wasn't him.` : `${by.name} went to ${t.name} about it, and ${t.name} told him where to go.`, { actor: by.id, victim: t.id, witnesses: wit, minor: true });
-  if (r === 'defy') { rel(by, t.id).grudge = clamp(peek(by, t.id).grudge + 0.12); rel(t, by.id).grudge = clamp(peek(t, by.id).grudge + 0.08); tension(w, by, t, 0.5); }
+  if (r === 'defy') { bear(w, by, t.id, 0.12, `${t.name} defied him to his face`); bear(w, t, by.id, 0.08, `${by.name} came at him over it`); tension(w, by, t, 0.5); }
   if (r === 'admit') rel(by, t.id).respect = clamp(peek(by, t.id).respect + 0.03);
   return r;
 }
@@ -135,7 +135,7 @@ export function reconcile(w: World, s: Situation, by: Character, t: Character, g
   const v = 0.25 + tp.agreeable * 0.15 + tp.empathy * 0.1 + tp.caution * 0.15 + r.affection * 0.25 + Math.min(0.3, gift / 1000) + (rk(by) > rk(t) ? 0.1 : 0) - r.grudge * 0.6 - (tp.pride - 0.5) * 0.15;
   if (gift > 0 && by.cash >= gift) { by.cash -= gift; t.cash += gift; }
   const ok = v + w.rng.range(-0.12, 0.12) > 0.3;
-  if (ok) { r.grudge = clamp(r.grudge * 0.4); rel(by, t.id).grudge = clamp(peek(by, t.id).grudge * 0.5); r.trust = clamp(r.trust + 0.03); }
+  if (ok) { easeOn(r, 0.4); ease(by, t.id, 0.5); r.trust = clamp(r.trust + 0.03); }
   else r.respect = clamp(r.respect - 0.02);
   tell(w, s, ok ? `${by.name} and ${t.name} made their peace${gift ? `, and ${money(gift)} changed hands` : ''}.` : `${by.name} tried to make peace with ${t.name}${gift ? ` and offered ${money(gift)}` : ''}. ${first(t)} wasn't having it.`, { actor: by.id, victim: t.id, witnesses: witnessesAt(w, t.district, [by.id, t.id], 2), minor: true });
   return ok;
@@ -210,13 +210,13 @@ function rivalryStep(w: World, s: Situation) {
         y.cash < 300 ? `${x.name} has been saying ${y.name} can't pay for his own coffee.` : `${x.name} has been asking where ${y.name}'s money really comes from.`,
         yb ? `${x.name} told people not to bother with ${yb}.` : `${x.name} has been calling ${y.name} a ${y.rank === 'associate' ? 'gofer' : 'has-been'}.`,
       ]), { actor: x.id, victim: y.id, witnesses: witnessesAt(w, x.district, [x.id, y.id], 3), broadcast: [y.id], minor: true });
-      rel(y, x.id).grudge = clamp(peek(y, x.id).grudge + 0.08); M(s).heat = clamp(heat + 0.12); M(s)['sl:' + x.id] = num(s, 'sl:' + x.id) + 1;
+      bear(w, y, x.id, 0.08, `${x.name} has been running him down`); M(s).heat = clamp(heat + 0.12); M(s)['sl:' + x.id] = num(s, 'sl:' + x.id) + 1;
     } else if (k === 'undermine' && up) {
       const caught = w.rng.chance(0.2 + (1 - temper(x).caution) * 0.25);
       claim(w, s, x.id, `${first(y)} can't be trusted with anything that matters`, false);
       rel(up, y.id).trust = clamp(peek(up, y.id).trust - 0.02);
       tell(w, s, `${x.name} has been putting ${y.name} down to ${up.name}.`, { actor: x.id, victim: y.id, witnesses: caught ? [up.id, y.id] : [up.id], minor: true });
-      if (caught) { rel(y, x.id).grudge = clamp(peek(y, x.id).grudge + 0.15); M(s).heat = clamp(heat + 0.15); }
+      if (caught) { bear(w, y, x.id, 0.15, `${x.name} put him down to ${up.name}`); M(s).heat = clamp(heat + 0.15); }
     } else if (k === 'strike') {
       // blows end the quarrel as a quarrel: what follows is payback, a dispute between families, or a sit-down
       if (retaliate(w, s, x, y, 'beat')) return closeSit(w, s, 'came to blows', [`${first(x)} put ${first(y)} in the hospital`, x.familyId !== y.familyId ? 'two families are in it now' : 'the crew is watching'], 10);
@@ -229,7 +229,7 @@ function rivalryStep(w: World, s: Situation) {
       else if (reconcile(w, s, x, y)) return closeSit(w, s, 'made peace', [`${first(x)} made peace`], 8);
     }
     else if (k === 'upstairs' && up) return ruleOn(w, s, up, x, y);
-    else { M(s).heat = clamp(num(s, 'heat') - 0.08); rel(x, y.id).grudge = clamp(peek(x, y.id).grudge - 0.04); M(s).quiet = num(s, 'quiet') + 1; }
+    else { M(s).heat = clamp(num(s, 'heat') - 0.08); bear(w, x, y.id, -(0.04), 'cooled'); M(s).quiet = num(s, 'quiet') + 1; }
   }
   // men who keep letting it lie end up simply keeping out of each other's way
   if (isOpen(s) && num(s, 'quiet') >= 3 && s.weeks >= 3) return closeSit(w, s, 'kept apart', ['they keep out of each other\'s way'], 10);
@@ -240,8 +240,8 @@ function rivalryStep(w: World, s: Situation) {
 function ruleOn(w: World, s: Situation, up: Character, x: Character, y: Character, playerFor?: Id) {
   const score = (c: Character) => peek(up, c.id).trust + peek(up, c.id).respect * 0.6 + c.standing / 200 + num(s, 'sup:' + c.id) + (playerFor === c.id ? 0.15 : 0);
   const [win, lose] = score(x) >= score(y) ? [x, y] : [y, x];
-  rel(lose, win.id).grudge = clamp(peek(lose, win.id).grudge * 0.6); rel(win, lose.id).grudge = clamp(peek(win, lose.id).grudge * 0.4);
-  rel(lose, up.id).grudge = clamp(peek(lose, up.id).grudge + 0.06);
+  ease(lose, win.id, 0.6); ease(win, lose.id, 0.4);
+  bear(w, lose, up.id, 0.06, `${up.name} ruled against him`);
   tell(w, s, `${up.name} sat ${x.name} and ${y.name} down and told ${first(lose)} to let it go.`, { actor: up.id, victim: lose.id, witnesses: [x.id, y.id], minor: true });
   return closeSit(w, s, 'ruled on', [`${first(up)} ruled for ${first(win)}`, `${first(lose)} has to swallow it`], 10);
 }
@@ -296,14 +296,14 @@ MATTERS.rivalry = {
       return [`${first(who)} tells you about ${first(y)} at some length. In his telling, ${first(y)} started all of it.`];
     }
     if (code === 'calm') {
-      const g = rel(who, y.id); g.grudge = clamp(g.grudge * (rk(p) > rk(who) ? 0.6 : 0.75)); M(s).heat = clamp(num(s, 'heat') - 0.15);
-      if (rk(p) > rk(who)) rel(who, p.id).grudge = clamp(peek(who, p.id).grudge + 0.03);
+      const g = rel(who, y.id); easeOn(g, (rk(p) > rk(who) ? 0.6 : 0.75)); M(s).heat = clamp(num(s, 'heat') - 0.15);
+      if (rk(p) > rk(who)) bear(w, who, p.id, 0.03, `${p.name} told him to let it go`);
       tell(w, s, `${p.name} told ${who.name} to let it go with ${y.name}.`, { actor: p.id, victim: who.id, minor: true });
       return [`${first(who)} doesn't like it. "For you, I'll leave it. For now."`];
     }
     if (code === 'side') {
       addParty(s, p.id, 'with:' + who.id); M(s)['sup:' + who.id] = num(s, 'sup:' + who.id) + 0.3;
-      regard(w, who, p, 'affection', 0.05, 'took-side'); rel(y, p.id).grudge = clamp(peek(y, p.id).grudge + (w.rng.chance(0.5) ? 0.1 : 0));
+      regard(w, who, p, 'affection', 0.05, 'took-side'); bear(w, y, p.id, (w.rng.chance(0.5) ? 0.1 : 0), `${p.name} took ${who.name}'s side against him`);
       tell(w, s, `${p.name} let ${who.name} know he is with him against ${y.name}.`, { actor: p.id, victim: y.id, witnesses: [who.id], minor: true });
       return [`${first(who)} grips your arm. "I won't forget it."`];
     }
@@ -364,7 +364,7 @@ function arrestStep(w: World, s: Situation) {
   if (s.phase === 'doubt') {
     const found = talked && (investigate(w, s, boss, undefined, c) || w.rng.chance(0.2 + boss.traits.caution * 0.2)) && w.rng.chance(0.55);
     if (found) {
-      rel(boss, c.id).trust = clamp(peek(boss, c.id).trust - 0.4); rel(boss, c.id).grudge = clamp(peek(boss, c.id).grudge + 0.4);
+      rel(boss, c.id).trust = clamp(peek(boss, c.id).trust - 0.4); bear(w, boss, c.id, 0.4, `${c.name} talked to the police`);
       if (c.informant) c.informant.exposed = true;
       tell(w, s, `${boss.name} found out ${c.name} talked to the police.`, { kind: 'informant', actor: c.id, victim: boss.id, broadcast: [boss.id], minor: false });
       const crew = Object.values(w.chars).find((x) => x.alive && x.bossId === boss.id && x.id !== c.id && !x.isPlayer && x.traits.violence > 0.5 && free(w, x));
@@ -386,7 +386,7 @@ function arrestStep(w: World, s: Situation) {
 }
 function clear(w: World, s: Situation, c: Character, boss: Character) {
   if (c.isPlayer) { regard(w, boss, c, 'respect', 0.06, 'kept-quiet'); repute(w, c, 2, 'kept-quiet'); }
-  else { rel(boss, c.id).trust = clamp(peek(boss, c.id).trust + 0.05); rel(boss, c.id).respect = clamp(peek(boss, c.id).respect + 0.05); c.standing = clamp(c.standing + 2, 0, 100); }
+  else { rel(boss, c.id).trust = clamp(peek(boss, c.id).trust + 0.05); rel(boss, c.id).respect = clamp(peek(boss, c.id).respect + 0.05); repute(w, c, 2, 'kept-quiet'); }
   tell(w, s, `${c.name} kept his mouth shut. ${boss.name} knows it.`, { actor: c.id, victim: boss.id, broadcast: [boss.id], minor: true });
   return closeSit(w, s, 'kept quiet', [`${first(c)} kept quiet`], 10);
 }
@@ -435,7 +435,7 @@ MATTERS.arrest = {
     }
     if (code === 'doubt') {
       M(s).doubted = 1; if (s.phase === 'out' || s.phase === 'questioned') at(w, s, 'doubt', 1);
-      if (w.rng.chance(0.4)) rel(c, p.id).grudge = clamp(peek(c, p.id).grudge + 0.2);
+      if (w.rng.chance(0.4)) bear(w, c, p.id, 0.2, `${p.name} doubted him to his boss`);
       tell(w, s, `${p.name} told ${boss.name} he isn't sure of ${c.name}.`, { actor: p.id, victim: c.id, witnesses: [boss.id], minor: true });
       return [`${first(boss)} says nothing for a while. "I'll look into it."`];
     }
@@ -572,7 +572,7 @@ MATTERS.revenge = {
       if (a === 'let') { regard(w, av, p, 'affection', 0.03, 'let-avenge'); return [`${first(av)} nods. "Leave it with me."`]; }
       M(s).held = 1;
       if (a === 'mine') { regard(w, av, p, 'respect', 0.04, 'own-score'); closeSit(w, s, 'stood down', ['he left it to you'], 8); return [`"All right," ${first(av)} says. "But if you don't, I will."`]; }
-      rel(av, p.id).grudge = clamp(peek(av, p.id).grudge + 0.05); closeSit(w, s, 'stood down', ['you made him leave it'], 8);
+      bear(w, av, p.id, 0.05, `${p.name} made him leave his score unsettled`); closeSit(w, s, 'stood down', ['you made him leave it'], 8);
       return [`${first(av)} stares at you. "You'd let that go?" He goes, but he goes angry.`];
     }
     if (code === 'amends' && av) {
@@ -593,7 +593,7 @@ MATTERS.revenge = {
     }
     if (code === 'leash' && who) {
       const ok = peek(who, p.id).trust * 0.6 + peek(who, p.id).respect * 0.3 + (who.familyId === p.familyId ? 0.15 : 0) + who.traits.caution * 0.2 > 0.55;
-      if (ok) { M(s).held = 1; closeSit(w, s, 'held back', [`${first(who)} called ${first(av)} off`], 8); rel(av, p.id).grudge = clamp(peek(av, p.id).grudge + 0.08); return [`${first(who)} hears you. "I'll speak to him. Stay out of his way a while."`]; }
+      if (ok) { M(s).held = 1; closeSit(w, s, 'held back', [`${first(who)} called ${first(av)} off`], 8); bear(w, av, p.id, 0.08, `${p.name} went to ${who.name} to call him off`); return [`${first(who)} hears you. "I'll speak to him. Stay out of his way a while."`]; }
       return [`${first(who)} shrugs. "What his family does about his family isn't mine to stop."`];
     }
     if (code === 'truth' && root?.actor) {
@@ -730,7 +730,7 @@ MATTERS.climb = {
     if (code.startsWith('enc:climb:')) {
       const a = code.slice(10);
       if (a === 'yes') { praise(); regard(w, c, p, 'affection', 0.05, 'backed-climb'); return [`${first(c)} claps your shoulder. "I knew I could count on you."`]; }
-      if (a === 'no') { rel(c, p.id).grudge = clamp(peek(c, p.id).grudge + 0.12); return [`${first(c)}'s smile stays where it is. His eyes don't.`]; }
+      if (a === 'no') { bear(w, c, p.id, 0.12, `${p.name} would not speak up for him`); return [`${first(c)}'s smile stays where it is. His eyes don't.`]; }
       regard(w, c, p, 'trust', -0.03, 'hedged'); return [`"Sure," ${first(c)} says. "You'll see."`];
     }
     if (code === 'plans') {
@@ -739,13 +739,13 @@ MATTERS.climb = {
       const g = agencyOf(w).goals.find((x) => x.id === s.m?.goal);
       return [`${first(c)} leans in. "${g?.next && g.next !== 'wait for the nod' ? `I need to ${g.next.replace(/^he /, '')}.` : 'I\'m waiting on the nod.'} After that, a crew of my own."`];
     }
-    if (code === 'wait') { rel(c, p.id).grudge = clamp(peek(c, p.id).grudge + 0.1); const g = agencyOf(w).goals.find((x) => x.id === s.m?.goal); if (g && c.traits.caution > 0.6) g.review = w.now + 4 * WEEK; return [`${first(c)} hears you out. "Sure. My turn." He doesn't say when that is.`]; }
+    if (code === 'wait') { bear(w, c, p.id, 0.1, `${p.name} told him to wait his turn`); const g = agencyOf(w).goals.find((x) => x.id === s.m?.goal); if (g && c.traits.caution > 0.6) g.review = w.now + 4 * WEEK; return [`${first(c)} hears you out. "Sure. My turn." He doesn't say when that is.`]; }
     if (code === 'praise') { praise(); return [`${first(boss)} listens. "${first(c)}. Hm. Maybe."`]; }
     if (code === 'knock') {
       rel(boss, c.id).trust = clamp(peek(boss, c.id).trust - 0.02 - weight * 0.05); M(s)['said:' + p.id] = 1;
       const heard = w.rng.chance(0.3);
       tell(w, s, `${p.name} told ${boss.name} that ${c.name} is getting ahead of himself.`, { actor: p.id, victim: c.id, witnesses: heard ? [boss.id, c.id] : [boss.id], minor: true });
-      if (heard) { rel(c, p.id).grudge = clamp(peek(c, p.id).grudge + 0.25); startRivalry(w, c, p, `${c.name} heard what ${p.name} said about him to ${boss.name}`); }
+      if (heard) { bear(w, c, p.id, 0.25, `${p.name} ran him down to ${boss.name}`); startRivalry(w, c, p, `${c.name} heard what ${p.name} said about him to ${boss.name}`); }
       return [`${first(boss)} nods slowly. "I've wondered."`];
     }
     return [];
