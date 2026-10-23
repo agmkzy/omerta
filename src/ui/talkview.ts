@@ -164,5 +164,6 @@ function choices(v: TalkV, w: World, p: Character, t: Character): string {
   }
   const g = (name: string) => all.filter((x) => x.o.group === name);
   const sec = (h: string, xs: typeof all, kind: 'reply' | 'topic' | 'quiet') => (xs.length ? `<h2 class="cv-g">${h}</h2><div class="cv-list">${xs.map((x) => btn(x, kind)).join('')}</div>` : '');
-  return sec('He brings it up', g('He brings it up'), 'reply') + sec('On his mind', g('On his mind'), 'topic') + sec('Between you', g('Between you'), 'topic') + sec('Talk', g('Talk'), 'topic') + sec('You could put to him', g('Propose'), 'topic') + quiet(all.filter((x) => !x.o.group));
+  // (Stage 5C: what he raises, what is real and pending between you, then the five ways into the rest, then leaving)
+  return sec('He brings it up', g('He brings it up'), 'reply') + sec('On his mind', g('On his mind'), 'topic') + sec('On your mind', g('Between you'), 'topic') + sec('Other subjects', g('Other subjects'), 'topic') + quiet(all.filter((x) => !x.o.group));
 }

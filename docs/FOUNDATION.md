@@ -753,3 +753,65 @@ Much of what Stage 5 asks for already exists from V89 and V90. The work is to ma
 - the five kinds of knowing, including a believed name that leaves the truth unchanged;
 - a missed payment going stale once paid;
 - a witness telling the player he saw it.
+
+### Increment 5C: the conversation
+
+The conversation engine (`dialogue.ts`) was already the one engine for the player. Matters, negotiations, his reasons, the point in hand, the used-option rule and the no-repeated-lines rule all sit on the same records NPCs use. This increment reorganises what the player sees and how a conversation moves.
+
+**The opening screen, in order:**
+1. **What he brings up himself.** If he has come to you with something, he asks for a minute in his own manner ("A word." / "Got a minute? There's something I want to discuss." / "We need to talk. Now."). You choose how to take it:
+   - **"Sure. What's going on?"** His matter becomes the subject.
+   - **"Depends what it's about."** He tells you, and you still choose.
+   - **"Can it wait?"** It waits, and he notices he had to.
+   - **"Not right now."** He takes it as it sounds: trust and respect fall a little.
+2. **On your mind.** What is real and pending between you, most pressing first, three at most and one row to the rest:
+   - his requests;
+   - your negotiations with him (Stage 4's purchases, loans, protection and runs included);
+   - money owed either way;
+   - the arrangement at his shop;
+   - work he has offered you;
+   - a lie of his you have since found out;
+   - a word you broke;
+   - a favour he owes you.
+
+   It reads the records, so a debt paid is gone from it.
+3. **Other subjects: five ways in, the same five with everyone, in the same order, each only when there is something in it.** The words fit who he is to you, and he answers before you go on.
+
+| Way in | Said to a stranger / a friend / a superior / your own man / a shopkeeper | His answer, by temperament |
+|---|---|---|
+| Business | "Mind if I talk business with you?" / "Got something I wanna run by you." / "I wanted to discuss some business." / "We need to go over some business." / "I'd like to talk about your business." | "Sure. What've you got in mind?" / "Depends what kind of business." / "What is it?" |
+| Socialize | "How are things?" / "How've you been keeping?" / "How are things with you?" | "Can't complain. You?" / "Could be better." (a man in trouble) / "Fine. Why?" |
+| Ask about | "I wanted to ask you something." / "Can I ask you something?" / "Could I ask you something?" | "Ask away." / "Depends what you're asking." |
+| Organization (only with a man in the life) | "Let's talk about the family." / "I wanted to talk about where I stand." / "Let's talk about the crew." / with another family, "Let's talk about how things stand between our people." | "What about it?" / "Sure. What do you need?" |
+| Settle matters | "There's something we need to straighten out." / "We need to clear something up." / "There's something I need to raise with you." | "Go on. What is it?" / "What now?" |
+
+4. **Leaving,** said to suit him: "I'll let you get on." / "That's all for now." / "I'll catch you later."
+
+**How a conversation moves:**
+- **Inside a way in:** only what belongs to it, every line something the player really means to say and do, and "Actually, something else".
+- **Between subjects:** the player can go from how he is to a loan to his shop without leaving. Negotiations keep their point in hand across subjects, as they did.
+- **The four everyday questions** are where they belong:
+  - "How are you keeping?" under Socialize;
+  - "How's business?" under Business;
+  - "Heard anything?" and "What do you make of…?" under Ask About.
+
+**The social club.** Its own conversation engine (scripted scenes, the player's scene topics and scene greetings, about 170 lines) is deleted. Sitting down with a man at the club is the conversation, opened there. The club keeps its identity: owner, hours, who is in, and who wants a word and why. A scene left open in an old save is closed when it loads.
+
+**The encounter screen** (a request from Today) offers "Go and see him", so the request can be taken up in conversation with everything else between them.
+
+**Tests:**
+- `social/conversation.test.ts`:
+  - the openings by relationship;
+  - opening a way in, his answer, only what belongs to it, and moving between ways;
+  - "On your mind" holding a debt until it's paid;
+  - the approach and the four ways to take it, each with its consequence.
+- **Rewritten for the new layout, testing the same rules:**
+  - the menus test (the opening screen is short and ordered);
+  - the first playtest (the everyday questions in their places);
+  - the NPC-initiated playtest and regression (he asks for a minute first);
+  - the used-option test.
+  
+  The playtest helper now chooses as a player does: if a line isn't on screen, it opens the way in that holds it.
+- `saves/save-load.test.ts`: an old save with a club scene in progress loads cleanly.
+
+**Checked in the browser.** With the player's own captain, the ways in read "I wanted to discuss some business", "How are things with you?", "Could I ask you something?", "I wanted to talk about where I stand", with "I'll let you get on" to leave and no "straighten out", because nothing stands between them. "Where I stand" was answered "What about it?" and offered "Where do I stand with you?", "Would you put in a word for me?", "Is there anything you need done?" and "I'm ready for more". At phone width there is no sideways scroll.

@@ -242,7 +242,6 @@ export function todayView(): string {
   if (S.log.length) out += `<section class="g-just" aria-label="Just now">${S.log.map((l) => `<p>${l}</p>`).join('')}</section>`;
   if (S.chips.length) out += `<div class="chips">${S.chips.map((c) => `<span class="chip2 ${c.tone}">${esc(c.t)}</span>`).join('')}</div>`;
   if (S.news.length) out += `<section class="g-word"><h3 class="sub">Word reaches you</h3><ul class="news">${S.news.map((n) => `<li>${n}</li>`).join('')}</ul>${S.routine ? `<p class="muted" style="margin:8px 0 0">${S.routine} routine matter${S.routine > 1 ? 's' : ''} besides, filed under History.</p>` : ''}</section>`;
-  if (w.scene) out += `<button class="need" data-a="place:club"><span class="dot amber"></span><span><span class="t">In the middle of a conversation</span><span class="s" style="display:block">${esc(w.chars[w.scene.npc]?.name ?? 'Someone')} at the club.</span></span></button>`;
   out += `<div class="g-pass"><h3 class="sub">Let time pass</h3>${timeBar()}</div>`;
   out += guideCard();
   const ns = needs();
@@ -413,6 +412,8 @@ export function encView(id: string, lines: string[]): string {
   let out = back();
   out += `<div class="pers">${c ? avatar(c) : '<div class="avatar fx">?</div>'}<div><h1>${esc(e.title)}</h1><div class="sub">${c ? lk(c.name) + (c.rank !== 'civilian' ? ' · ' + esc(c.rank[0].toUpperCase() + c.rank.slice(1)) : '') : 'Nobody you can name'}${e.status === 'open' && e.kind !== 'kin' ? ` · ${!c ? 'they' : isFemale(c) ? 'she' : 'he'}’ll want an answer ${esc(byWhen(w.now, e.expires))}` : ''}</div></div></div>`;
   out += `<div class="card">${e.lines.map((l, i) => `<p class="${i ? 'say' : ''}">${lk(l)}</p>`).join('')}${lines.map((l) => `<div class="note">${lk(l)}</div>`).join('')}</div>`;
+  // (Stage 5C: or go and see him, and take it up in conversation, where everything else between you is too)
+  if (e.status === 'open' && c?.alive && !c.isPlayer && e.opts.length) out += `<button class="btn primary" data-a="talk:${c.id}">Go and see ${esc(c.name.split(' ')[0])}</button>`;
   if (e.status === 'open') out += `<div class="list">${e.opts.map((o) => `<button class="opt" data-a="echoose:${e.id}|${o.code}"><b>${lk(o.label)}</b>${o.hint ? `<span class="because">${esc(o.hint)}</span>` : ''}</button>`).join('')}</div>`;
   else out += `<button class="btn primary" data-a="back:">Done</button>`;
   return out;

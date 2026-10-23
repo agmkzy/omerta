@@ -263,6 +263,8 @@ export function deserialize(s: string): World {
     if (kind && c.alive) w.ops.push({ id: 'op' + w.nextId++, kind, owner: c.id, runner: null, district: c.district, since: h.since, state: 'running', last: h.net, total: h.total, skimmed: 0, weeks: 0, level: h.level, bad: h.bad, cause: h.cause, stake: h.stake, lull: h.lull });
     delete c.hustle;
   }
+  // Stage 5C: the club's own conversation scenes are gone (a man at the club is talked to like anywhere else): one left open is closed
+  if (w.scene) w.scene = null;
   w.schema = SCHEMA;
   if (Object.keys(w.biz).length < 34) addShops(w, 14);
   for (const c of Object.values(w.chars)) {

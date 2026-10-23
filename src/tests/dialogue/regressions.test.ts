@@ -121,7 +121,9 @@ describe('V90 audit regressions', { timeout: 60_000 }, () => {
       makeLoan(w, p, t); const e = w.enc.at(-1)!;
       const asked = e.lines.at(-1)!;
       assert.ok(!/It’s (I|my|the|a man|we|there|rent|an) /i.test(asked) && !/It’s It’s/.test(asked), asked);
-      const c = meet(w, t);
+      const c0 = meet(w, t);
+      assert.equal(c0.ctx.focus, 'apx:' + e.id, 'he asks for a minute');
+      const c = say(w, p, t, c0, 'f:enc:' + e.id).convo!;
       assert.equal(c.ctx.focus, 'enc:' + e.id);
       const r = say(w, p, t, c, `enc:${e.id}:ask`);
       assert.ok(!/It’s (resentful|in debt|saving|drinking|a woman who)|”.*resentful/.test(r.lines.join(' ')), r.lines.join(' / '));

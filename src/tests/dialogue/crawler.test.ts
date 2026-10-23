@@ -210,17 +210,19 @@ function fast() {
   ok('a used option is greyed out for the rest of the conversation, and a new conversation starts clean', { tags: ['unit'] }, () => {
     const w = world60(); const p = P(w); const m = sample.find((x) => x.rank === 'soldier') ?? sample[0];
     (p.intro ??= {})[m.id] = w.now;
+    // (Stage 5C: "How are you keeping?" is under catching up)
+    const social = (c: Convo) => options(w, p, m, { ...c, ctx: { ...c.ctx, focus: 'g:social' } });
     let c = startConvo(m.id);
-    const first = options(w, p, m, c).find((o) => o.code === 'how')!;
+    const first = social(c).find((o) => o.code === 'how')!;
     assert.ok(first && !first.done);
     const s = say(w, p, m, c, 'how'); c = s.convo!;
-    assert.ok(options(w, p, m, c).find((o) => o.code === 'how')!.done, 'greyed after use');
+    assert.ok(social(c).find((o) => o.code === 'how')!.done, 'greyed after use');
     const before = stateOf(w, m);
     const again = say(w, p, m, c, 'how');
     assert.equal(stateOf(w, m), before, 'a repeat pays nothing');
     assert.match(again.lines[0], /already/);
     const fresh2 = startConvo(m.id);
-    assert.ok(!options(w, p, m, fresh2).find((o) => o.code === 'how')?.done, 'a new conversation starts clean');
+    assert.ok(!social(fresh2).find((o) => o.code === 'how')?.done, 'a new conversation starts clean');
   });
 }
 describe('conversation crawler', fast);

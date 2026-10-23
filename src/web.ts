@@ -6,7 +6,6 @@ import { subjectRows } from './talk';
 import { generate, perform } from './actions';
 import { crewOf } from './crewlife';
 import { clubOf } from './clubdata';
-import { closeScene, sceneAct } from './club';
 import { addFact, bearOn, clamp, factText, famName, feelOn, fmtTime, money, rel } from './core';
 import { advance, deserialize, serialize } from './engine';
 import { pruneJobs, approaches, assign, declineJob, dropJob, performMove, resolve, startScheme, takeJob, askAroundJob, haggleJob, investigateJob, pressJob, questionJob } from './jobs';
@@ -403,24 +402,12 @@ function handle(a: string, v: string) {
       // else, opened at the club (a scene already under way in an old save still plays out below).
       const p = P(), cl = clubOf(w, p.familyId), x = w.chars[v];
       if (!cl || !x?.alive) return;
-      if (w.scene) closeScene(w);
       const prevMet = x.rels[p.id]?.lastMet ?? -1e9;
       const act = introduced(w, p, x) ? generate(w, p, 'socialise').find((a) => a.target === v) : undefined;
       const r = act ? (act.quiet = true, perform(w, act)) : { lines: [] as string[], minutes: 10 };
       const a = arrive(w, p, x, r, { kind: 'club', name: cl.name, line: `${x.name.split(' ')[0]} is at the club.`, mins: 0 } as never, prevMet);
       return pass(r.minutes ?? 10, [], { t: 'talk', convo: a.convo, lines: a.lines });
     }
-    case 'cact': { sceneAct(w, P(), v); save(); return; }
-    case 'caside': { // V89: from the club's small talk into a proper conversation, perhaps starting with something on his mind
-      const [id, code] = args;
-      const mins = closeScene(w), t = w.chars[id];
-      if (!t?.alive) return pass(mins, [], { t: 'place', id: 'club' });
-      if (!code) return pass(mins, [], { t: 'talk', convo: startConvo(id), lines: [`You and ${t.name.split(' ')[0]} find a table at the back.`] });
-      const label = subjectRows(w, P(), t, 6).find((o) => o.code === code)?.label;
-      const res = say(w, P(), t, startConvo(id), code);
-      return pass(mins + res.minutes, [], { t: 'talk', convo: res.convo ?? startConvo(id), lines: res.lines, q: label });
-    }
-    case 'cend': { const mins = closeScene(w); return pass(mins, [], v === 'stay' ? { t: 'place', id: 'club' } : { t: 'tab', name: 'today' }); }
     case 'club': {
       const r = v === 'sit' ? sitAtClub(w, P()) : v === 'shave' ? shave(w, P()) : drinkAt(w, P());
       return pass(r.minutes, r.lines);

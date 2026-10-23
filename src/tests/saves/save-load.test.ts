@@ -8,9 +8,6 @@ import { DAY } from '../../types';
 import { audit } from '../../consistency';
 import { addFact, createDebt } from '../../core';
 import { referencedFacts, sweep } from '../../retain';
-import { clubOf } from '../../clubdata';
-import { prospects, recruitProspect } from '../../orders';
-import { startScene, sceneNode, sceneAct, topicsFor } from '../../club';
 import { newWorld, P } from '../helpers';
 
 describe('retention', () => {
@@ -49,17 +46,12 @@ describe('retention', () => {
 });
 
 describe('resume', { tags: ['determinism'] }, () => {
-  ok('mid-scene save/load resumes the same scene', () => {
-    const w = newWorld(7); const p = P(w); p.cash = 5000;
-    for (const pr of prospects(w, p).slice(0, 2)) recruitProspect(w, p, pr.c);
-    const man = Object.values(w.chars).find((c) => c.bossId === p.id)!;
-    man.books.arrears = 240; man.books.missed = 2; man.problem = { kind: 'gambling', sev: 0.7, since: 0 };
-    const cl = clubOf(w, p.familyId)!; void cl; void topicsFor;
-    startScene(w, p, man.id, 'chat' as never);
-    const a = sceneNode(w, p); if (!a) return; // nothing to talk about on this seed: covered by club tests
-    const r = deserialize(serialize(w)); const b = sceneNode(r, r.chars[r.playerId!]);
-    assert.deepEqual(b!.lines, a.lines); assert.deepEqual(b!.opts.map((o) => o.code), a.opts.map((o) => o.code));
-    if (a.opts[0]) { sceneAct(w, p, a.opts[0].code); sceneAct(r, r.chars[r.playerId!], a.opts[0].code); assert.equal(serialize(w), serialize(r)); }
+  ok('an old save with a club scene in progress loads, and the scene is closed: the club is talked in like anywhere else', () => {
+    const w = newWorld(7);
+    (w as { scene?: unknown }).scene = { npc: Object.keys(w.chars)[3], topic: 'chat', node: 'open', data: {}, log: [], mins: 0, t: w.now };
+    const r = deserialize(serialize(w));
+    assert.equal(r.scene, null);
+    assert.equal(serialize(deserialize(serialize(r))), serialize(r), 'and it round-trips');
   });
 });
 

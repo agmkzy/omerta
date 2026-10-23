@@ -41,7 +41,12 @@ class Talk {
   act(mv: string): string[] { return this.pick(new RegExp(`^(mv|x):[^:]+:${mv}$`), true); }
   can(mv: string) { return this.opts().some((x) => !x.done && new RegExp(`^(mv|x):[^:]+:${mv}$`).test(x.code)); }
   pick(m: RegExp | string, byCode = false): string[] {
-    const o = this.opts().find((x) => (typeof m === 'string' ? x.code === m : m.test(byCode ? x.code : x.label)) && !x.done);
+    const hit = (x: DOpt) => (typeof m === 'string' ? x.code === m : m.test(byCode ? x.code : x.label)) && !x.done;
+    // (as a player would: if it is not on the screen, it is inside one of the five ways in; open that one first)
+    if (!this.opts().some(hit) && this.c) for (const d of this.opts().filter((x) => x.code.startsWith('f:g:'))) {
+      if (options(this.w, P(this.w), this.t, { ...this.c, ctx: { ...this.c.ctx, focus: d.code.slice(2) } }).some(hit)) { this.pick(d.code); break; }
+    }
+    const o = this.opts().find(hit);
     assert.ok(o, `${this.title}: no "${m}" among: ${this.opts().map((x) => x.label).join(' | ')}`);
     const r = say(this.w, P(this.w), this.t, this.c!, o!.code);
     this.log.push(`**You:** ${r.q ?? o!.label}`, '', ...r.lines.filter((l) => !l.startsWith('⟡')).map((l) => `> ${l}`), '');
@@ -52,7 +57,7 @@ class Talk {
   has(m: RegExp) { return this.opts().some((x) => !x.done && m.test(x.label)); }
   // back out of whatever is in hand, and go
   // (a follow-up may offer only its own way out, "Let's leave it": the way out is always there, not always in the same words)
-  leave() { for (let i = 0; i < 4 && this.c; i++) this.pick(this.has(/Take your leave/) ? /Take your leave/ : this.has(/Talk about something else/) ? /Talk about something else/ : /leave it/i); }
+  leave() { for (let i = 0; i < 4 && this.c; i++) this.pick(this.opts().some((x) => x.code === 'root' && !x.done) ? 'root' : this.has(/Talk about something else|Actually, something else/) ? /Talk about something else|Actually, something else/ : /leave it/i); }
   note(s: string) { this.log.push(`*${s}*`, ''); }
   done() { OUT.push(...this.log, '---', ''); }
 }
@@ -77,11 +82,14 @@ const setT = (c: Character, t: Partial<Character['traits']>) => Object.assign(c.
 const temperament = (c: Character, k: 'meek' | 'proud' | 'agreeable') => setT(c, k === 'meek' ? { courage: 0, caution: 1, violence: 0, ambition: 0, greed: 0.3 } : k === 'proud' ? { courage: 1, caution: 0.2, violence: 0.8, ambition: 1, greed: 0.8 } : { courage: 0.5, caution: 0.5, violence: 0, ambition: 0.2, greed: 0 });
 
 describe('V90 playtests', () => {
-  ok('1. an ordinary man: the four questions, answers that follow from what he says, and a way back', { tags: ['scenario'] }, () => {
+  ok('1. an ordinary man: the ways in, the everyday questions inside them, answers that follow from what he says, and a way back', { tags: ['scenario'] }, () => {
     const w = world60(), t = civ(w).find((c) => !ownerBiz(w, c.id))!;
     rel(t, P(w).id).trust = 0.4;
     const x = new Talk(w, t, '1. An ordinary man');
-    assert.deepEqual(x.opts().filter((o) => o.group === 'Talk').map((o) => o.label), QUESTIONS);
+    // (Stage 5C: the everyday questions are where they belong: how he is, under catching up; what is going round and what he
+    // makes of things, under asking him)
+    const inside = (k: string) => options(w, P(w), t, { ...x.c!, ctx: { ...x.c!.ctx, focus: 'g:' + k } }).map((o) => o.label);
+    assert.ok(inside('social').includes(QUESTIONS[0]) && inside('ask').includes(QUESTIONS[2]) && inside('ask').includes(QUESTIONS[3]), 'the everyday questions');
     x.pick(/How are you keeping/);
     if (x.c && x.c.node !== 'root') x.pick(/./); // whatever his answer opened, answer it
     if (x.has(/Heard anything/)) x.pick(/Heard anything/);
@@ -192,11 +200,14 @@ describe('V90 playtests', () => {
     x.done();
   });
 
-  ok('8. he starts it: what he came to say is the subject, at once', { tags: ['scenario'] }, () => {
+  ok('8. he starts it: he asks for a minute, and once you say so, what he came to say is the subject', { tags: ['scenario'] }, () => {
     const w = world60(), p = P(w), t = Object.values(w.chars).find((c) => c.alive && c.familyId === p.familyId && c.rank === 'soldier')!;
     p.cash = Math.max(p.cash, 1000); makeLoan(w, p, t); const e = w.enc.at(-1)!; // (his own request, as the game makes it)
     const x = new Talk(w, t, '8. NPC-initiated');
-    assert.equal(x.c!.ctx.focus, 'enc:' + e.id, 'his request is the subject from the start');
+    assert.equal(x.c!.ctx.focus, 'apx:' + e.id, 'he asks for a minute first');
+    for (const l of [/What’s going on/, /Depends what it’s about/, /Can it wait/, /Not right now/]) assert.ok(x.has(l), 'you choose how to take it: ' + l);
+    x.pick(/What’s going on/);
+    assert.equal(x.c!.ctx.focus, 'enc:' + e.id, 'his request is the subject');
     x.pick(/What’s it really for/);
     if (x.c && x.has(/Lend him/)) x.pick(/Lend him/);
     x.leave();

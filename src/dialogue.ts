@@ -9,7 +9,7 @@ import { askAbout, helpWith, sitOf } from './situations';
 import { readiness } from './career';
 import { share, confide } from './actions';
 import { react, envelopeDue, handOver, kickWindow, envelopeText, rateView } from './books';
-import { addFact, bear, bearOn, clamp, createDebt, earn, ease, factText, famName, feel, feelAtLeast, feelOn, feelToOn, flavour, isResolved, learn, money, ownerBiz, payDebt, rel, repute, restructure, shortTime, writeDown } from './core';
+import { addFact, bear, bearOn, clamp, createDebt, earn, ease, factText, famName, feel, feelAtLeast, feelOn, feelToOn, flavour, isResolved, learn, money, ownerBiz, payDebt, peek, rel, repute, restructure, shortTime, writeDown } from './core';
 import { standingWord, mkJob, oppFrom, tipFrom, bossOffer, traitWords, jobSaid, takeJob, declineJob } from './jobs';
 import { openSitdown, Meeting } from './meetings';
 import { helpMan, lateOf, PROBLEM_LABEL } from './people';
@@ -56,7 +56,7 @@ export interface Convo {
 }
 // Moving around the menu is not something said, so it is never used up.
 const LEGACY = ['personal', 'business', 'family', 'disputes', 'orders', 'memos', 'amends', 'shop', 'crew', 'debt', 'myboss', 'rival'];
-export const isNavCode = (code: string) => code === 'root' || code.startsWith('f:') || code.startsWith('deal:') || code.startsWith('n:') || code.startsWith('sub') || ['pick_member', 'pick_concern', 'pick_incident', 'drop'].includes(code);
+export const isNavCode = (code: string) => code === 'root' || code.startsWith('f:') || code.startsWith('apx:what:') || code.startsWith('deal:') || code.startsWith('n:') || code.startsWith('sub') || ['pick_member', 'pick_concern', 'pick_incident', 'drop'].includes(code);
 // Only questions about one particular matter are scoped to that matter; everything else is used up for the conversation as a whole.
 const MATTER = new Set(['who', 'how_much', 'witness', 'source', 'view', 'tell_more', 'involve', 'can_do', 'p_how', 'p_claim', 'p_owner', 'why', 'press', 'find', 'speak', 'sitdown', 'own', 'lie', 'take']);
 export const usedKey = (c: Convo, code: string) => `${MATTER.has(code) ? c.ctx.fact ?? '' : ''}|${code}`;
@@ -271,17 +271,22 @@ export function arrive(w: World, p: Character, t: Character, r: { lines: string[
   if (broke && !t.talk?.['said:' + broke.id]) { (t.talk ??= {})['said:' + broke.id] = { d: Math.floor(w.now / 1440), sig: 'x', n: 1 }; word.push(pickBy(t)); }
   // V89: what shows on him before he says a word, if something is weighing on him (talk.ts)
   const shows = asks.length ? undefined : nudgeOf(w, p, t);
-  const lines = [`${venue}. ${vsay(w, t, p, 'scene')}`, vsay(w, t, p, recent ? 'greet_again' : 'greet', { S: addr(w, t, p) }), ...(shows ? [shows] : []), ...word, ...r.lines, ...(asks.length ? [askLead(asks[0])] : [])];
+  const lines = [`${venue}. ${vsay(w, t, p, 'scene')}`, vsay(w, t, p, recent ? 'greet_again' : 'greet', { S: addr(w, t, p) }), ...(shows ? [shows] : []), ...word, ...r.lines, ...(asks.length ? [approachLine(t)] : [])];
   const convo: Convo = { ...startConvo(t.id), named: lines.some((l) => l.includes(t.name)) };
   // V90: he decides whether there is a conversation at all. A man who threw you out today won't start another one.
   if ((p.cooldown[`shut:${t.id}`] ?? 0) > w.now) { lines.splice(1); lines.push(shutLine(w, t)); convo.ctx = { ...convo.ctx, cold: true, shut: true }; }
-  else if (asks.length) convo.ctx = { ...convo.ctx, focus: 'enc:' + asks[0].id, raised: [asks[0].id] }; // what he came to say is the subject
+  else if (asks.length) convo.ctx = { ...convo.ctx, focus: 'apx:' + asks[0].id, raised: [asks[0].id] }; // (Stage 5C: he asks for a minute, and you answer how you take it)
   return { lines, convo };
 }
 const shutLine = (w: World, t: Character) => { const tp = temper(t); return tp.volatility + tp.pride > 1.15 ? '“I told you once today. Out.”' : tp.agreeable > 0.55 ? '“Not today. Please.”' : 'He turns his back on you. He has nothing to say today.'; };
 
 // What he has come to you about: any request or matter of his own that the world has put in front of you. These are the same records the
 // Today tab shows, so answering here or there is the same act, and a matter dealt with in one place is gone from the other.
+// Stage 5C: a man who has come to you with something asks for a minute first, in his own manner; you choose how to take it.
+function approachLine(t: Character): string {
+  const tp = temper(t), a = arch(t);
+  return a === 'cold' ? '“A word.”' : tp.volatility + tp.pride > 1.15 ? '“We need to talk. Now.”' : a === 'frightened' ? '“Have you got a minute? It’s important.”' : a === 'jovial' ? '“Got a minute? There’s something I want to discuss.”' : '“Got a minute? There’s something I want to talk to you about.”';
+}
 export const asksOf = (w: World, t: Character) => w.enc.filter((e) => e.status === 'open' && e.from === t.id && e.expires > w.now && e.opts.length);
 const askLead = (e: { lines: string[] }) => e.lines.filter((l) => /["“]/.test(l)).slice(-1)[0] ?? e.lines[e.lines.length - 1] ?? '';
 
@@ -426,6 +431,27 @@ function ack(w: World, t: Character, p: Character, lines: string[], leaving = fa
   return i < 0 ? [...lines, l] : [...lines.slice(0, i), l, ...lines.slice(i)];
 }
 const BIZ_SUBJ = /^tk:(shop|racket)\b/;
+// Stage 5C: five ways into the rest of a conversation, the same five with everyone: Business, Socialize, Ask About, Organization,
+// Settle Matters. What is in each is what this man and this moment allow (only things that are true); each is opened in words that
+// fit who he is to you, and he answers before you go on.
+export const GROUPS = ['business', 'social', 'ask', 'org', 'settle'] as const;
+export type Group = (typeof GROUPS)[number];
+const GRP: Record<string, Group> = {};
+const grp = (g: Group, codes: string[]) => codes.forEach((c) => { GRP[c] = g; });
+grp('business', ['op', 'earn', 'sh_how', 'biz_none', 'rate_ask', 'buy_ask', 'stake_ask', 'sell_ask', 'run_ask', 'borrow', 'offer_loan', 'partner_chop', 'partner_fence', 'suggest', 'terms_cut', 'terms_raise', 'sh_ears', 'sh_time', 'sh_back', 'b_envelope', 'b_extra', 'b_extra2', 'd_pay', 'd_all', 'd_ask', 'rv_favour', 'assign_hustle']);
+grp('social', ['how', 'old_times', 'drink', 'help_gift', 'help_loan', 'welcome', 'congrats', 'rv_drink', 'cr_money', 'cr_cash', 'a_gift', 'b_tribute', 'sit_ask']);
+grp('ask', ['chat', 'f:think', 'ask_around', 'ask_history', 'pick_member', 'leaders', 'ask_want', 'ask_crew', 'ask_rep', 'pick_incident', 'suspect', 'about', 'rv_ears', 'rv_mood', 'a_ask', 'cr_ask', 'inc']);
+grp('org', ['b_stand', 'b_need', 'b_more', 'promo', 'recommend', 'rk_back', 'rk_back_ask', 'work', 'cr_duties', 'assign_low', 'recruit_offer', 'intro', 'intro_via', 'pick_concern', 'report']);
+grp('settle', ['demand', 'mediate', 'mediate2', 'challenge', 'refuse', 'a_own', 'a_start', 'a_defy', 'a_pay', 'd_remind', 'd_time', 'd_half', 'd_favour', 'd_forgive', 'cr_thin', 'cr_drop', 'cr_look', 'sh_lean', 'sh_why', 'rv_warn', 'memo', 'confront', 'word_make', 'favcall', 'sit_cover', 'sit_lend', 'sit_rival', 'sit_leave']);
+function groupOf(code: string, cat = 'root'): Group {
+  const k = code.split(':')[0];
+  if (k === 'tk') return BIZ_SUBJ.test(code) ? 'business' : 'social';
+  if (k === 'f') return code === 'f:think' ? 'ask' : 'settle';
+  if (GRP[k]) return GRP[k];
+  if (cat === 'family' || cat === 'orders' || cat === 'myboss' || cat === 'crew') return 'org';
+  const i = INTENT[k];
+  return i === 0 ? 'ask' : i === 1 ? 'social' : i === 3 ? 'settle' : 'business';
+}
 // What counts as trouble between men (a quarrel, a wrong), as against the ordinary record of what was agreed or owned.
 const TROUBLE = new Set(['beating', 'murder', 'robbery', 'vandalism', 'theft', 'burglary', 'raid', 'attempt', 'threat', 'poach', 'protection_refused', 'scam', 'exposed', 'discipline', 'arrest', 'debt_default']);
 const TALKQ = new Set(['how', 'op', 'chat', 'earn', 'sh_how', 'sit_ask', 'old_times', 'drink', 'rv_drink']);
@@ -511,14 +537,38 @@ function hub(w: World, p: Character, t: Character, c: Convo, all = false): DOpt[
   out.length = 0; out.push(...rest);
   // a man who is angry with you, or out of patience, is in no mood for small talk or proposals
   if (c.ctx.cold) return [...out, { code: 'root', label: 'Take your leave' }];
-  // 3. talk: always the same four questions; his answer is where the variety is
-  for (const o of talkRows(w, p, t, c, g)) out.push({ ...o, group: 'Talk' });
-  // 4. what you could put to him: the two things that fit who he is to you, and a quiet row to anything else
-  const puts = putRows(w, p, t, g), lead = leadPuts(w, p, t, puts);
-  for (const o of lead) out.push({ ...o, group: 'Propose' });
-  if (puts.length > lead.length) out.push({ code: 'f:put', label: lead.length ? 'Something else in mind…' : 'Put something to him', hint: lead.length ? undefined : 'Ask him for something, offer him something, or take something up with him.', group: 'Propose', nav: true });
-  out.push({ code: 'root', label: 'Take your leave' });
+  // 3. the five ways into the rest of it, each only where there is something to say (Stage 5C)
+  const say = openers(w, p, t);
+  for (const k of GROUPS) if (groupRows(w, p, t, c, g, k).length) out.push({ code: 'f:g:' + k, label: say[k], group: 'Other subjects', nav: true, fixed: true });
+  out.push({ code: 'root', label: say.leave, fixed: true });
   return out;
+}
+// What belongs in one of the five: the everyday questions, what he has on his mind, and what can be put to him, sorted by what it is.
+function groupRows(w: World, p: Character, t: Character, c: Convo, g: ReturnType<typeof gather>, k: Group): DOpt[] {
+  const rows: DOpt[] = [];
+  const has = (code: string) => rows.some((r) => r.code === code);
+  for (const o of talkRows(w, p, t, c, g)) if (groupOf(o.code) === k && !has(o.code)) rows.push({ ...o, group: undefined });
+  for (const o of subjectRows(w, p, t, 4)) if (groupOf(o.code) === k && !has(o.code)) rows.push({ ...o, group: undefined });
+  for (const x of g.items) if (groupOf(x.o.code, x.cat) === k && !has(x.o.code) && !(PLACE[x.o.code.split(':')[0]] === 'talk' && k !== 'social' && x.o.code !== 'earn')) rows.push({ ...x.o, group: undefined });
+  // (what is between you is what straightening things out is about)
+  if (k === 'settle') for (const o of hub(w, p, t, { ...c, ctx: { ...c.ctx, focus: undefined, cold: true } }, true).filter((o) => o.group === 'Between you')) if (!has(o.code) && o.code !== 'root' && o.code !== 'f:more') rows.push({ ...o, group: undefined }); // (the hub without its groups: no going round in circles)
+  if (k === 'org' && !(p.familyId && (t.familyId || t.bossId === p.id))) return [];
+  return rows;
+}
+// The words you open each with, by who he is to you: a stranger, a friend, the man above you, one of your own, a shopkeeper.
+function openers(w: World, p: Character, t: Character): Record<Group | 'leave', string> {
+  const RK = (r: string) => ['civilian', 'associate', 'soldier', 'capo', 'underboss', 'boss'].indexOf(r);
+  const above = t.id === p.bossId || (!!t.familyId && t.familyId === p.familyId && RK(t.rank) > RK(p.rank));
+  const mine = t.bossId === p.id, r = peek(t, p.id), close = r.trust >= 0.6 && r.affection >= 0.45, stranger = (p.rels[t.id]?.known ?? 0) < 0.25 && !close;
+  const shop = t.rank === 'civilian' && !!ownerBiz(w, t.id), rival = !!t.familyId && !!p.familyId && t.familyId !== p.familyId;
+  return {
+    business: shop ? 'I’d like to talk about your business.' : above ? 'I wanted to discuss some business.' : mine ? 'We need to go over some business.' : close ? 'Got something I wanna run by you.' : stranger ? 'Mind if I talk business with you?' : 'Let’s talk business.',
+    social: close ? 'How’ve you been keeping?' : above ? 'How are things with you?' : stranger ? 'How are things?' : 'How’ve you been?',
+    ask: above ? 'Could I ask you something?' : close ? 'Can I ask you something?' : 'I wanted to ask you something.',
+    org: mine ? 'Let’s talk about the crew.' : above ? 'I wanted to talk about where I stand.' : rival ? 'Let’s talk about how things stand between our people.' : 'Let’s talk about the family.',
+    settle: above ? 'There’s something I need to raise with you.' : close ? 'We need to clear something up.' : 'There’s something we need to straighten out.',
+    leave: above ? 'I’ll let you get on.' : mine ? 'That’s all for now.' : close ? 'I’ll catch you later.' : 'I’ll leave you to it.',
+  };
 }
 // How pressing a row between you is: what he is waiting on, what has just moved, what is overdue, before what merely exists.
 function prio(o: DOpt, g: ReturnType<typeof gather>): number {
@@ -618,7 +668,9 @@ function focused(w: World, p: Character, t: Character, c: Convo): DOpt[] | undef
   else if (k === 'sit') { const sit = sitOf(w, t.id); if (sit && (sit.told || sit.knows)) { if (sit.rival && w.biz[sit.rival]?.open) rows.push({ code: 'sit_rival', label: `“I’ll send word to ${w.biz[sit.rival].name}.”`, hint: 'Nothing violent. A little heat, a grudge, and his customers come back.', story: 'end' }); if (p.cash >= 600) rows.push({ code: 'sit_cover', label: '“Let me cover what you’ve lost.” ($600)', hint: 'No book, no vig. He won’t forget it.', story: 'end' }); if (p.cash >= 400) rows.push({ code: 'sit_lend', label: '“I can lend you $400. The usual terms.”', hint: 'The usual weekly. He owes you.', story: 'end' }); rows.push({ code: 'sit_leave', label: '“You’ll have to sort this out yourself.”', hint: 'He learns what he’s worth to you.', story: 'end' }); } }
   else if (k === 'job') { const j = w.jobs.find((x) => x.id === id && x.status === 'offered'); if (j) rows = [{ code: 'jobtake:' + j.id, label: 'I’ll take care of it', hint: `It’s yours. Pays ${money(j.pay ?? 0)}.`, big: true, story: 'go' }, { code: 'jobpass:' + j.id, label: 'Not this time', hint: 'He will think a little less of you for it.' }]; }
   else if (k === 'put') { const puts = putRows(w, p, t, g), lead = new Set(leadPuts(w, p, t, puts).map((o) => o.code)); rows = puts.filter((o) => !lead.has(o.code)).sort((a, b) => (INTENT[a.code.split(':')[0]] ?? 2) - (INTENT[b.code.split(':')[0]] ?? 2)).map((o) => ({ ...o, group: undefined })); } // (one plain list, offers before requests before complaints: no headings to read)
+  else if (k === 'apx') { const e = asksOf(w, t).find((x) => x.id === id); if (e) { const heard = c.ctx.asked.includes('apx:what:' + id); rows = [{ code: 'f:enc:' + id, label: 'Sure. What’s going on?', story: 'go', big: true }, ...(heard ? [] : [{ code: 'apx:what:' + id, label: 'Depends what it’s about.' }, { code: 'apx:wait:' + id, label: 'Can it wait?', hint: 'He will wait. He will notice he had to.' }]), { code: 'apx:no:' + id, label: 'Not right now.', hint: 'He will take it as it sounds.' }]; return rows; } }
   else if (k === 'more') rows = hubBetween(w, p, t, c);
+  else if (k === 'g') { rows = groupRows(w, p, t, c, g, id as Group); if (!rows.length) return undefined; return [...rows, { code: 'f:', label: 'Actually, something else', nav: true }, { code: 'root', label: openers(w, p, t).leave }]; }
   else if (k === 'think') {
     rows = g.items.filter((x) => PLACE[x.o.code.split(':')[0]] === 'think').map((x) => x.o);
     for (const o of subjectRows(w, p, t, 6)) if (!rows.some((r) => r.code === o.code)) rows.push(o);
@@ -635,6 +687,7 @@ export function focusTitle(w: World, p: Character, t: Character, c: Convo): stri
   const f = c.ctx.focus; if (!f) return undefined;
   const [k, id] = [f.split(':')[0], f.slice(f.indexOf(':') + 1)];
   if (k === 'm') { const s = openMatters(w).find((x) => x.id === id); return s ? mTitle(w, s) : undefined; }
+  if (k === 'g') return ({ business: 'Business', social: 'Catching up', ask: 'Asking about something', org: 'The family', settle: 'Straightening something out' } as Record<string, string>)[id];
   if (k === 'enc') return w.enc.find((x) => x.id === id)?.title;
   if (k === 'mt') { const s = (w.situations ?? []).find((x) => x.id === id); return s ? matterTitle(w, s) ?? s.cause : undefined; }
   if (k === 'sit') return 'His trouble';
@@ -687,6 +740,18 @@ function openSubject(w: World, p: Character, t: Character, c: Convo, focus: stri
   if (k === 'job') { const j = w.jobs.find((x) => x.id === id); return j ? ['“You had something for me?”', jobSaid(j), ...(j.brief ? [j.brief] : [])] : []; }
   if (k === 'enc') { const e = w.enc.find((x) => x.id === id); return e ? ['“You wanted to ask me something?”', e.lines.at(-1) ?? ''].filter(Boolean) : []; }
   if (k === 'mt') { const s = (w.situations ?? []).find((x) => x.id === id); return s ? [`“This business with ${(matterTitle(w, s) ?? s.cause).replace(/^./, (m) => m.toLowerCase())}…”`, pickL(['He waits to hear what you know.', '“What about it?”', 'He gives you a long look. “Go on.”'])] : []; }
+  if (k === 'g') {
+    const say = openers(w, p, t), r = peek(t, p.id), close = r.trust >= 0.55, shy = tp.caution > 0.6 && r.trust < 0.3, trouble = !!sitOf(w, t.id);
+    const his: Record<Group, string> = {
+      business: hot ? '“What is it?”' : shy ? '“Depends what kind of business.”' : close || soft ? '“Sure. What’ve you got in mind?”' : '“Go on.”',
+      social: trouble ? '“Could be better.”' : hot ? '“Fine. Why?”' : soft ? '“Can’t complain. You?”' : '“Getting by.”',
+      ask: shy ? '“Depends what you’re asking.”' : soft ? '“Ask away.”' : '“Go ahead.”',
+      org: t.bossId === p.id ? '“Sure. What do you need?”' : t.id === p.bossId ? '“What about it?”' : '“What about the family?”',
+      settle: hot ? '“What now?”' : soft ? '“Go on. What is it?”' : '“I’m listening.”',
+    };
+    const gk = id as Group;
+    return his[gk] ? [`“${say[gk]}”`, his[gk]] : [];
+  }
   if (k === 'put') return [pickL(['“There’s something I want to put to you.”', '“I’ve got a proposition.”', '“Can I ask you something?”']), hot ? '“Make it quick.”' : soft ? '“Of course. What is it?”' : '“Go on.”'];
   if (k === 'think') return ['“I wanted your opinion on something.”', soft ? '“If I can help.”' : tp.caution > 0.6 ? '“Depends what you’re asking.”' : '“Ask.”'];
   if (k === 'debt' || k === 'shop' || k === 'amends' || k === 'memos' || k === 'myboss' || k === 'crew' || k === 'disputes' || k === 'sit') {
@@ -1150,6 +1215,16 @@ function sayOne(w: World, p: Character, t: Character, c: Convo, code: string): S
     const lines = kept.some((l) => answered(l)) ? kept : [...kept, already()]; // (his answer is never lost to the no-repeats rule: if all he had was said before, he says so)
     return { ...r, lines, convo: r.convo ? { ...r.convo, spoken: [...(c.spoken ?? []), ...lines.filter((l) => l.length > 30)].slice(-60) } : r.convo };
   };
+  if (code.startsWith('apx:')) { // Stage 5C: how you take a man who has come to you with something
+    const [, how, id] = code.split(':');
+    const e = asksOf(w, t).find((x) => x.id === id);
+    const tp = temper(t), hot = tp.volatility + tp.pride > 1.15, soft = tp.agreeable + tp.empathy > 1.1;
+    if (!e) return fresh({ lines: ['He lets it go.'], minutes: 2, convo: { ...c, node: 'root', ctx: { ...c.ctx, focus: undefined } } });
+    if (how === 'what') return fresh({ lines: [askLead(e)], minutes: 2, convo: { ...c, node: 'root', ctx: { ...c.ctx, focus: 'apx:' + id, asked: [...c.ctx.asked, code] } } });
+    if (how === 'wait') { e.expires = Math.max(e.expires, w.now + 2 * DAY); feel(w, t, p.id, 'trust', -0.01); return fresh({ lines: [hot ? '“It won’t keep for ever.”' : soft ? '“Of course. When you have a minute.”' : '“All right. Don’t make me wait long.”'], minutes: 2, convo: { ...c, node: 'root', ctx: { ...c.ctx, focus: undefined, asked: [...c.ctx.asked, code] } } }); }
+    feel(w, t, p.id, 'respect', -0.02); feel(w, t, p.id, 'trust', -0.02);
+    return fresh({ lines: [hot ? '“Fine. Remember you said that.”' : soft ? '“I understand. Another time.”' : '“Right.”'], minutes: 2, convo: { ...c, node: 'root', ctx: { ...c.ctx, focus: undefined, asked: [...c.ctx.asked, code] } } });
+  }
   if (code.startsWith('f:')) { // V90: opening a subject (or going back to the rest of the conversation) is said, and answered
     const focus = code.slice(2) || undefined;
     const said = focus ? openSubject(w, p, t, c, focus) : [];

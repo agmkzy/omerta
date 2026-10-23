@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { deserialize, serialize } from '../../engine';
 import { DAY } from '../../types';
-import { options, optionsRaw, say, startConvo, incidentsOf, involvedIn, isNavCode, focusTitle, QUESTIONS } from '../../dialogue';
+import { options, optionsRaw, say, startConvo, incidentsOf, involvedIn, isNavCode, focusTitle, GROUPS, QUESTIONS } from '../../dialogue';
 import { world60, men, introAll, reach, BASELINES } from './fixtures';
 import { P } from '../helpers';
 
@@ -14,16 +14,19 @@ import { P } from '../helpers';
 beforeAll(() => { world60(); });
 
 describe('menus', () => {
-  ok('the opening screen is short: what he raises, at most 3 matters and a row to the rest, the 4 everyday questions, at most 2 proposals and a row to the rest', { tags: ['unit'] }, () => {
+  ok('the opening screen is short: what he raises, at most 3 matters and a row to the rest, the five ways in (in the same order, each only when there is something in it), and leaving', { tags: ['unit'] }, () => {
     const w = world60(); introAll(w);
     for (const m of men(w)) {
       const o = options(w, P(w), m, startConvo(m.id));
       const g = (n: string) => o.filter((x) => x.group === n);
       assert.ok(g('He brings it up').length + g('On his mind').length <= 2, `${m.name}: ${g('He brings it up').length} raised`);
       assert.ok(g('Between you').filter((x) => x.code !== 'f:more').length <= 3, `${m.name}: ${g('Between you').length} matters`);
-      assert.deepEqual(g('Talk').map((x) => x.label), QUESTIONS, `${m.name}: the four questions, always the same`);
-      assert.ok(g('Propose').filter((x) => !x.nav).length <= 2, `${m.name}: proposals`);
-      assert.ok(o.length <= 14, `${m.name}: ${o.length} rows`);
+      const ways = g('Other subjects').map((x) => x.code.replace('f:g:', ''));
+      assert.deepEqual(ways, GROUPS.filter((k) => ways.includes(k)), `${m.name}: the five ways in, always in the same order`);
+      assert.ok(ways.includes('social') && ways.includes('ask'), `${m.name}: there is always something to ask him, and how he is`);
+      if (!(m.familyId && m.familyId === P(w).familyId) && m.bossId !== P(w).id && !m.familyId) assert.ok(!ways.includes('org'), `${m.name}: a man outside the life has no family to talk about`);
+      assert.equal(o.at(-1)!.code, 'root', 'and there is always a way to leave');
+      assert.ok(o.length <= 12, `${m.name}: ${o.length} rows`);
       assert.ok(!o.some((x) => /^(more|n):/.test(x.code)), `${m.name}: the old menus are gone`);
     }
   });
@@ -106,7 +109,7 @@ describe('menus', () => {
     assert.ok(o.some((x) => x.code === 'f:') && o.some((x) => x.code === 'root'), 'a way back and a way out');
     assert.ok(focusTitle(w, P(w), m, c), 'the subject is named');
     c = say(w, P(w), m, c, 'f:').convo!;
-    assert.ok(options(w, P(w), m, c).some((x) => x.group === 'Talk'), 'back on the hub');
+    assert.ok(options(w, P(w), m, c).some((x) => x.group === 'Other subjects'), 'back on the hub');
   });
   ok('a man who owes you money: the debt is among the matters, not buried', { tags: ['unit'] }, () => {
     const w = world60(); introAll(w); const p = P(w);

@@ -1,5 +1,5 @@
-// The social club screen: who is in, who has come over to you, and the conversation in progress.
-import { clubOf, clubOpen, clubPresent, sceneNode, topicsFor, waiting } from '../club';
+// The social club screen: who is in, and who has come over to you. Sitting down with a man is the conversation (Stage 5C).
+import { clubOf, clubOpen, clubPresent, topicsFor, waiting } from '../club';
 import { fmtTime } from '../core';
 import { sundayDue } from './sunday';
 import { avatar, back } from './common';
@@ -13,17 +13,6 @@ export function clubView(): string {
   const owner = w.chars[cl.ownerId];
   let out = back() + `<div class="card"><h2>${esc(cl.name)}</h2><p class="muted">${esc(cl.district)} &middot; run by ${owner ? esc(owner.name) : 'nobody now'}. Open ${cl.open[0]}:00 to ${cl.open[1] % 24}:00.</p></div>`;
   if (!clubOpen(w, cl)) return out + `<p class="muted pad">The shutters are down. ${owner ? esc(owner.name.split(' ')[0]) + ' opens' : 'It opens'} at ${cl.open[0]}:00.</p>`;
-
-  const sc = sceneNode(w, p);
-  if (sc) {
-    out += `<div class="card"><div class="pers" style="margin:0">${avatar(sc.c)}<div><b>${esc(sc.c.name)}</b><div class="sub">${esc(sc.c.rank)} &middot; ${esc(fmtTime(w.now))}</div></div></div></div>`;
-    if (sc.log.length) out += `<div class="card scenelog">${sc.log.map((l) => `<p class="muted">${lk(l)}</p>`).join('')}</div>`;
-    if (sc.ended) return out + `<div class="list"><button class="opt" data-a="cend:stay"><b>Stay a while</b><span class="because">Back to the room.</span></button><button class="opt" data-a="cend:leave"><b>Leave the club</b></button></div>`;
-    out += `<div class="card">${sc.lines.map((l) => `<p class="say">${lk(l)}</p>`).join('')}</div>`;
-    // V89: what is on his mind (talk.ts) can be taken up properly, away from the room: the full conversation, starting there
-    const aside = sc.ended ? [] : subjectRows(w, p, sc.c, 2);
-    return out + `<div class="list">${sc.opts.map((o) => `<button class="opt" data-a="cact:${o.code}"><b>${esc(o.label)}</b>${o.hint ? `<span class="because">${esc(o.hint)}</span>` : ''}</button>`).join('')}${aside.map((o) => `<button class="opt" data-a="caside:${sc.c.id}|${o.code}"><b>${esc(o.label)}</b><span class="because">Take him aside. ${esc(o.hint)}</span></button>`).join('')}<button class="opt nav" data-a="caside:${sc.c.id}|"><b>Take him aside to talk properly</b></button></div>`;
-  }
 
   const here = clubPresent(w, cl);
   if (sundayDue()) out += `<button class="need" data-a="sunday:"><span class="dot blue"></span><span><span class="t">Sunday</span><span class="s" style="display:block">Your men are bringing their envelopes in.</span></span></button>`;
