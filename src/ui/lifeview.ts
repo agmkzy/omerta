@@ -70,7 +70,7 @@ export function lifeTab(): string {
 }
 
 // =================================================================== You
-function youRoom(): string {
+export function youRoom(): string {
   const w = W(), p = P();
   const bgx = p.bg ? bgLabel(p.bg) : undefined;
   let out = `<header class="lf-me">${avatar(p)}<div><h1>${esc(p.name)}</h1><div class="sub">${esc(cap(p.rank))}${p.familyId ? ` of the ${esc(famName(w, p))} family` : ''} &middot; ${esc(p.district)}</div>${bgx ? `<p class="lf-bg"><b>${esc(bgx)}.</b>${bgOf(p.bg) ? ' ' + esc(bgOf(p.bg)!.blurb) : ''}</p>` : ''}<div class="tags">${traitTags(p)}</div></div></header>`;
@@ -146,7 +146,7 @@ function savesFold(): string {
 }
 
 // =================================================================== People
-function peopleRoom(): string {
+export function peopleRoom(): string {
   const w = W(), p = P();
   let out = homeSection(w, p);
 
@@ -221,7 +221,7 @@ function peopleSide(w: World, p: Character): string {
 }
 
 // =================================================================== Business
-function businessRoom(): string {
+export function businessRoom(): string {
   const w = W(), p = P();
   const b = p.books;
   const boss = p.bossId ? w.chars[p.bossId] : undefined;
@@ -290,7 +290,7 @@ function lendingCard(): string {
 }
 
 // =================================================================== What you know
-function knownRoom(): string {
+export function knownRoom(): string {
   const w = W(), p = P();
   let out = disputesList();
   const all = Object.entries(p.known).filter(([id]) => w.facts[id] && !w.facts[id].minor).sort((a, b) => w.facts[b[0]].t - w.facts[a[0]].t);

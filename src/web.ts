@@ -52,6 +52,7 @@ import { onSaved, openSaves, saveBox, storageNote } from './savestore';
 import { briefView } from './ui/brief';
 import { bottomTabs, rail, takeSide, topBar } from './ui/layout';
 import { roomOf } from './ui/lifeview';
+import { openSection, sectionView } from './ui/sections';
 import { startingLines } from './background';
 import { draftBg, draftDone, draftName, forgetSummary, openingAct, openingView, typed } from './ui/opening';
 import { fullName } from './names';
@@ -160,7 +161,7 @@ function go(v: View) {
 }
 function tab(name: Tab) {
   S.stack = [];
-  S.view = { t: 'tab', name };
+  S.view = { t: 'tab', name: openSection(name) };
 }
 function pop() {
   const prev = S.stack.pop();
@@ -238,7 +239,7 @@ function body(): string {
   const j = (id: string) => job(id);
   switch (v.t) {
     case 'tab':
-      return v.name === 'today' ? todayView() : v.name === 'rackets' ? racketsView() : v.name === 'crew' ? crewView() : v.name === 'family' ? familyTab() : v.name === 'stories' ? storiesTab() : lifeTab();
+      return sectionView(v.name);
     case 'person': return personView(v.id);
     case 'brief': return briefView();
     case 'sunday': return sundayView();
@@ -393,7 +394,15 @@ function handle(a: string, v: string) {
     case 'biz': return go({ t: 'biz', id: v });
     case 'fact': return go({ t: 'fact', id: v });
     case 'tree': S.treeFam = v || undefined; if (S.view.t === 'tab' && S.view.name === 'family') return; return go({ t: 'tree', fam: v || P().familyId! });
-    case 'lsub': S.lifeSub = roomOf(v); if (S.lifeSub === 'people' && W().life) { datingPool(W(), P()); save(); } return;
+    // (the four rooms of the old Life tab now live in the sections: you on your page, people, the money under Business, what you know in the Journal)
+    case 'lsub': {
+      const r = roomOf(v);
+      if (r === 'people' && W().life) { datingPool(W(), P()); save(); }
+      if (r === 'business') S.sub.business = 'money';
+      if (r === 'known') S.sub.journal = 'known';
+      return tab(r === 'you' ? 'life' : r === 'people' ? 'people' : r === 'business' ? 'business' : 'journal');
+    }
+    case 'sub': { const [sec, room] = v.split('.'); S.sub[sec] = room; if (S.view.t !== 'tab' || S.view.name !== sec) tab(sec as Tab); return; }
     case 'pf': S.worldFilter = v; return;
     case 'place': return go({ t: 'place', id: v });
     case 'places': return go({ t: 'places' });
@@ -899,7 +908,7 @@ document.addEventListener('click', (e) => {
     S.stack = [];
   }
   render();
-  const inPlace = ['tog', 'gpick', 'lsub', 'pf', 'stance', 'tree', 'opdist', 'oprun', 'hjpick'].includes(raw.slice(0, i)) || /^om:(both|first|last|bg|shuffle|look|keep|new|lg)/.test(raw);
+  const inPlace = ['tog', 'gpick', 'lsub', 'sub', 'pf', 'stance', 'tree', 'opdist', 'oprun', 'hjpick'].includes(raw.slice(0, i)) || /^om:(both|first|last|bg|shuffle|look|keep|new|lg)/.test(raw);
   // a conversation keeps its place: the newest exchange is brought into view, with what was said before it just above
   const now = S.view.t === 'talk' && raw.startsWith('say:') ? document.querySelector('.cv-now') as HTMLElement | null : null;
   if (now) window.scrollTo(0, Math.max(0, now.getBoundingClientRect().top + window.scrollY - (window.innerWidth >= 900 ? 120 : 90)));

@@ -140,7 +140,7 @@ export function powerOptions(w: World, p: Character): Power2[] {
   const patron = p.bossId ? w.chars[p.bossId] : undefined;
   add('associate', 'errand', `Do ${patron ? patron.name.split(' ')[0] + ' ' : 'your captain '}a favour`, 'Run something for the man above you, no questions and no pay. He owes you after, and he thinks better of you. Once a week.', !patron);
   add('associate', 'tipoff', 'Buy a tip from a cop', 'Costs $200. Heat drops and you hear which way the police are looking. Once a week.', p.cash < 200 || p.heat < 0.1);
-  add('associate', 'findscore', 'Find a score', 'Spend a few days asking around. One or two new jobs turn up on your Today screen, same as any other job. Every five days.');
+  add('associate', 'findscore', 'Find a score', 'Spend a few days asking around. One or two new jobs turn up under World, same as any other job. Every five days.');
   add('associate', 'sidearr', 'Make a side arrangement', `Put $800 into a deal outside the family’s books. It adds about $120 a week to your own money, and it never counts in your envelope. Your boss can find it${p.books.side ? ` (you already have ${money(p.books.side)} a week running)` : ''}, and then you’ll have some explaining to do.`, p.cash < 800 || (p.books.side ?? 0) >= 360);
   const owed = w.favours.filter((f) => f.to === p.id && !f.settled && w.chars[f.from]?.alive).sort((a, b) => b.size - a.size).slice(0, 3);
   if (!owed.length) add('associate', 'favour:none', 'Collect on a favour', 'Nobody owes you yet. Help men out, and they will.', true);
@@ -280,7 +280,7 @@ export function usePower2(w: World, p: Character, codeIn: string): string[] | un
       newOffer(w); newOffer(w);
       set(5);
       const fresh = w.jobs.filter((j) => !before.has(j.id));
-      return fresh.length ? ['You spend a few days asking the right people the right questions.', ...fresh.map((j) => `A lead: “${j.title}”. It’s under Needs you on your Today screen. Take it or leave it; the job system handles it from there.`)] : ['Nobody knows of anything right now. Try again later.'];
+      return fresh.length ? ['You spend a few days asking the right people the right questions.', ...fresh.map((j) => `A lead: “${j.title}”. It’s under Needs you, in World. Take it or leave it; the job system handles it from there.`)] : ['Nobody knows of anything right now. Try again later.'];
     }
     case 'sidearr': {
       p.cash -= 800; p.books.side = (p.books.side ?? 0) + 120; set(14);

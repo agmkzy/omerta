@@ -210,7 +210,7 @@ export function callSitdown(w: World, p: Character, d: Dispute): string[] {
     data: { dispute: d.id }, days: 3,
   });
   log(w, d, `A sit-down was called with ${other.name}.`);
-  return [`You send word through the usual channels. ${other.name} agrees to meet. It’s now waiting on Today.`];
+  return [`You send word through the usual channels. ${other.name} agrees to meet. It’s now waiting under World.`];
 }
 
 export function sitdownChoose(w: World, p: Character, e: import('./types').Enc, code: string): string[] {
