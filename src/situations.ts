@@ -1,11 +1,12 @@
 // A situation is something going on in the world that has consequences whether or not the player is involved.
 // It emerges from real state (a business losing money, a man in trouble), the people involved respond on their own,
 // and it reaches the player through a believable channel: a conversation, a request for help, or a report.
+import { bound } from './situ';
 import { move, openAsk } from './asks';
 import { temper } from './temper';
 import { addFact, bear, clamp, createDebt, feel, feelOn, money, ownerBiz, rel } from './core';
 import { bizMove } from './econ';
-import { addEnc, addFavour, makeLoan } from './encounters';
+import { addEnc, addFavour } from './encounters';
 import { Character, DAY, Enc, Id, Situation, WEEK, World } from './types';
 
 const LIVING_LINE: Record<string, number> = { civilian: 70, associate: 100, soldier: 170, capo: 330, underboss: 520, boss: 900 };
@@ -41,8 +42,7 @@ export function situationTick(w: World) {
     const cause = causeOf(w, c);
     const rv = ownerBiz(w, c.id) && cause?.includes('losing customers to') ? Object.values(w.biz).find((x) => cause.endsWith(x.name))?.id : undefined;
     if (cause) list.push({ id: 's' + w.nextId++, kind: 'money', who: c.id, biz: ownerBiz(w, c.id)?.id, rival: rv, since: w.now, stage: 'brewing', cause, knows: false, told: false, weeks: 0 });
-    else if (c.bossId === p.id && c.want && ['made', 'independent', 'lieutenant', 'rich'].includes(c.want.kind) && c.traits.ambition > 0.5)
-      list.push({ id: 's' + w.nextId++, kind: 'ambition', who: c.id, since: w.now, stage: 'brewing', cause: ({ made: 'he wants to be made', independent: 'he wants out from under you', lieutenant: 'he wants to be your right hand', rich: 'he wants more money' } as Record<string, string>)[c.want.kind], knows: false, told: false, weeks: 0 });
+    // (Stage 5: a man who wants more from the player says so through his own plan, goals.ts 'advance': no separate ambition story)
   }
   for (const s of list) {
     if (s.stage === 'resolved') continue;
@@ -64,32 +64,15 @@ export function situationTick(w: World) {
       continue;
     }
     if (s.stage === 'brewing' && s.weeks >= 1) s.stage = 'handling';
-    // He asked and nothing came of it. Time passes, he tries again.
-    if (s.stage === 'asking' && s.asked && w.now - s.asked > 10 * DAY && !w.enc.some((e) => e.from === c.id && e.status === 'open')) { s.stage = 'handling'; delete s.asked; s.weeks = Math.max(0, s.weeks - 2); }
-    // He tries on his own first. Proud and capable men take longer to ask.
-    if (s.stage === 'handling' && !s.asked) {
-      const t = rel(c, p.id).trust;
-      const proud = temper(c).pride * 0.5 + temper(c).courage * 0.3;
-      const patience = 1 + Math.round(proud * 2);
-      if (s.weeks >= patience && t >= (c.bossId === p.id || c.familyId === p.familyId ? 0.12 : 0.25) && w.enc.filter((e) => e.kind === 'loan' && e.status === 'open').length < 2) {
-        s.asked = w.now; s.stage = 'asking'; s.knows = true;
-        makeLoan(w, p, c);
-      } else if (s.weeks >= patience + 3 && t < 0.3) {
-        // He goes to someone he trusts more. The situation moves on without you.
-        const friend = Object.values(w.chars).filter((x) => x.alive && x.id !== c.id && x.id !== p.id && x.cash > 800 && (c.rels[x.id]?.trust ?? 0) > 0.3).sort((a, b) => b.cash - a.cash)[0];
-        // (a friend who already has money out to him does not lend again on top of it)
-        if (friend && !w.debts.some((d) => d.status === 'active' && d.creditor === friend.id && d.debtor === c.id)) { // (the friend offers, on a friend's terms, and he takes it or not: asks 'lend', the one way a loan is made)
-          const o = openAsk(w, 'lend', friend, c, { amt: Math.min(500, Math.round(friend.cash * 0.2)), biz: s.biz, rate: 0.03, why: `${friend.name} offered ${c.name} a loan` });
-          if (o && move(w, o, 'ask').answer === 'yes') { feel(w, c, friend.id, 'trust', 0.1, `${friend.name} lent him money when he needed it`); s.weeks = 0; } }
-      }
-    }
+    // (Stage 5: whom he asks for help, and when, is his own intention: intent.ts 'help', the player among the men he may go to)
     // Left to rot, a business gives out (the economy engine closes it); the situation records it.
     if (s.biz && w.biz[s.biz] && !w.biz[s.biz].open) { s.stage = 'resolved'; s.resolvedAt = w.now; s.how = 'closed'; }
   }
   // keep the record from growing without end. Only finished ones go (V89: this used to cut the oldest whatever their state, so
   // matters still under way vanished mid-course once the world had more than sixty of them; situ.ts prunes its own)
-  const old = list.filter((s) => s.stage === 'resolved' && !s.key);
-  if (old.length > 60) { const drop = new Set(old.slice(0, old.length - 60)); w.situations = list.filter((s) => !drop.has(s)); }
+  bound(w); // (the shared ceiling on closed matters: situ.ts)
+  const old = (w.situations ?? []).filter((s) => s.stage === 'resolved' && !s.key);
+  if (old.length > 60) { const drop = new Set(old.slice(0, old.length - 60)); w.situations = (w.situations ?? []).filter((s) => !drop.has(s)); }
 }
 
 function askAmbition(w: World, p: Character, c: Character, s: Situation) {

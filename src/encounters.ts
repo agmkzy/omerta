@@ -51,22 +51,15 @@ interface Cand {
   key?: string; // the template it comes from, so the same one doesn't keep coming back
 }
 
-function loanAsk(w: World, p: Character): Cand[] {
-  const out: Cand[] = [];
-  if (out.length === 0) return out; // loan requests now come from situations (src/situations.ts)
-  const pool = Object.values(w.chars).filter((c) => c.alive && c.id !== p.id && c.rank !== 'boss' && (c.problem && c.problem.sev > 0.3 || (ownerBiz(w, c.id)?.distress ?? 0) >= 2) && (c.rels[p.id]?.trust ?? 0) >= 0.3 && !pending(w, 'loan', c.id));
-  for (const c of pool.slice(0, 4)) {
-    out.push({ weight: c.bossId === p.id ? 1.4 : 1, make: () => makeLoan(w, p, c) });
-  }
-  return out;
-}
 // what the money is really for, as he would admit it
 const ADMIT: Record<ProblemKind, string> = {
   gambling: 'It’s the cards. I can’t leave them alone', debt: 'I owe the wrong people', family: 'It’s trouble at home', drink: 'It’s the drink',
   house: 'I’m putting money by to get out', resentment: 'I’m tired of carrying other people. I’m owed more than I get', woman: 'There’s a woman. She costs',
 };
-export function makeLoan(w: World, p: Character, c: Character) {
-  const amt = Math.round((c.rank === 'civilian' ? w.rng.int(200, 700) : w.rng.int(250, 900)) / 50) * 50;
+// A man in trouble comes to the player for money (Stage 5: intent.ts decides whom he goes to; when it is the player, this is how it
+// reaches him). What he says it is for may not be what it is for: the player can ask.
+export function makeLoan(w: World, p: Character, c: Character, need?: number) {
+  const amt = Math.round((need ?? (c.rank === 'civilian' ? w.rng.int(200, 700) : w.rng.int(250, 900))) / 50) * 50;
   const pr = c.problem?.kind;
   // (each a whole sentence in his own mouth, so it reads however it is put)
   const stated: Record<string, string[]> = {
@@ -365,24 +358,21 @@ function witnessTell(w: World, p: Character): Cand[] {
 }
 
 // A man behind on a loan from somebody else asks you to speak for him.
-function debtorAsk(w: World, p: Character): Cand[] {
-  const out: Cand[] = [];
-  for (const d of w.debts.filter((x) => x.status === 'active' && x.missed >= 1 && x.creditor !== p.id && x.debtor !== p.id).slice(0, 6)) {
-    const c = w.chars[d.debtor], cr = w.chars[d.creditor];
-    if (!c?.alive || !cr?.alive || c.rank === 'civilian' && (c.rels[p.id]?.trust ?? 0) < 0.2 || pending(w, 'debtor', c.id)) continue;
-    if ((c.rels[p.id]?.trust ?? 0) < 0.25) continue;
-    out.push({ weight: 0.9, key: 'debtor', make: () => addEnc(w, {
-      kind: 'debtor', from: c.id, about: cr.id, title: `${first(c)} is behind with ${first(cr)}`,
-      lines: [`${c.name} has been avoiding the place he usually drinks.`, `"I owe ${cr.name} ${money(d.balance)}. I’m ${d.missed} payment${d.missed > 1 ? 's' : ''} behind, and I know what that sounds like. If you spoke to him, he’d listen. He wouldn’t listen to me."`],
-      opts: [
-        { code: 'speak', label: `Speak to ${first(cr)} for him`, hint: 'Buys him a week. Your name goes with his.' },
-        { code: 'cover', label: `Cover this week’s ${money(d.weeklyPayment)} yourself`, hint: 'The debt stays. You become his creditor too, in a way.' },
-        { code: 'no', label: 'Tell him it’s his debt' },
-      ],
-      data: { debt: d.id }, days: 4,
-    }) });
-  }
-  return out;
+// A man behind with a creditor asks the player to speak for him (Stage 5: intent.ts 'intercede' decides whom he asks; when it is the
+// player, this is how it reaches him).
+export function askToIntercede(w: World, p: Character, c: Character, d: import('./types').Debt) {
+  const cr = w.chars[d.creditor];
+  if (!cr?.alive || pending(w, 'debtor', c.id)) return;
+  addEnc(w, {
+    kind: 'debtor', from: c.id, about: cr.id, title: `${first(c)} is behind with ${first(cr)}`,
+    lines: [`${c.name} has been avoiding the place he usually drinks.`, `"I owe ${cr.name} ${money(d.balance)}. I’m ${d.missed} payment${d.missed > 1 ? 's' : ''} behind, and I know what that sounds like. If you spoke to him, he’d listen. He wouldn’t listen to me."`],
+    opts: [
+      { code: 'speak', label: `Speak to ${first(cr)} for him`, hint: 'Buys him a week. Your name goes with his.' },
+      { code: 'cover', label: `Cover this week’s ${money(d.weeklyPayment)} yourself`, hint: 'The debt stays. You become his creditor too, in a way.' },
+      { code: 'no', label: 'Tell him it’s his debt' },
+    ],
+    data: { debt: d.id }, days: 4,
+  });
 }
 
 // A shop under your wing is being leaned on by another family: the owner comes to you.
@@ -405,7 +395,7 @@ function shopHelp(w: World, p: Character): Cand[] {
   return out;
 }
 
-const GENERATORS = [loanAsk, favourAsk, mediate, shopBegs, tipSale, callIn, witnessTell, debtorAsk, shopHelp];
+const GENERATORS = [favourAsk, mediate, shopBegs, tipSale, callIn, witnessTell, shopHelp]; // (Stage 5: a man in trouble, or behind with a creditor, comes for his own reasons: intent.ts)
 
 // ------------------------------------------------------------ the tick
 

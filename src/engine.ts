@@ -1,3 +1,4 @@
+import { intentDay } from './intent';
 import { workWeek } from './work';
 import { mattersWeek } from './matters';
 import { pulseWeek } from './pulse';
@@ -51,6 +52,7 @@ export function advance(w: World, until: number) {
       daily(w);
       sitDay(w);
       agencyDay(w); // V89: NPC plans move on the day they fall due
+      intentDay(w); // Stage 5: men go and see each other for their own reasons (intent.ts)
       summonsTick(w);
       memoTick(w);
       pendingTick(w);

@@ -16,7 +16,7 @@ export type Claim = 'money' | 'taken' | 'you' | 'pride' | 'doubt' | 'time';
 // What kind of thing is being asked of him decides what his reasons and your answers to them can be: a demand (pay me, back off),
 // a request (lend me, cut my share, let me), an offer (a loan, a place, amends) or a claim on something owed (the favour, the pay).
 export type AskClass = 'demand' | 'request' | 'offer' | 'claim' | 'trade'; // (Stage 4: a deal, buying or selling a place or a share, or running a man's enterprise for a cut)
-const CLS: Record<string, AskClass> = { protect: 'demand', collect: 'demand', warn: 'demand', layoff: 'demand', borrow: 'request', rate: 'request', permit: 'request', help: 'request', lend: 'offer', recruit: 'offer', amends: 'offer', join: 'offer', favour: 'claim', jobpay: 'claim', buy: 'trade', sell: 'trade', run: 'trade' };
+const CLS: Record<string, AskClass> = { protect: 'demand', collect: 'demand', warn: 'demand', layoff: 'demand', borrow: 'request', rate: 'request', permit: 'request', help: 'request', lend: 'offer', recruit: 'offer', amends: 'offer', join: 'offer', favour: 'claim', jobpay: 'claim', buy: 'trade', sell: 'trade', run: 'trade', time: 'request' };
 export const classOf = (s: Situation): AskClass => CLS[s.ak ?? ''] ?? 'request';
 const first = (c: Character) => c.name.split(' ')[0];
 const pick = (w: World, s: Situation, k: string, xs: string[]) => { let h = 7; for (const ch of s.id + k + Math.floor(w.now / 1440)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return xs[h % xs.length]; };

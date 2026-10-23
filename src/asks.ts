@@ -6,7 +6,7 @@
 // about what their men are doing and have views. The player and the NPCs use exactly the same moves; NPCs choose theirs from who
 // they are. Each kind of ask only says what is being asked, what it is worth to the man asked, and what yes does in the real world.
 import { ASKS } from './askkinds'; // first: the registry must exist before anything below can reach matters.ts
-import { addFact, bear, bearOn, clamp, createDebt, ease, easeOn, famName, feel, feelOn, money, notifyProtector, ownerBiz, payDebt, peek, regard, rel, repute, witnessesAt } from './core';
+import { addFact, bear, bearOn, clamp, createDebt, restructure, ease, easeOn, famName, feel, feelOn, money, notifyProtector, ownerBiz, payDebt, peek, regard, rel, repute, witnessesAt } from './core';
 import { loanPosition } from './negotiate';
 import { say as vsay } from './voicesheet';
 import { bizMove, changedSince, giveTime, noteRefusal, priceOf, sellerFloor, sellTo, setCollector, stakeRoom } from './econ';
@@ -1279,6 +1279,34 @@ ASKS.run = {
   phrase: {
     ask: (w, s) => { const o = opOf(w, s); return `Let me run your ${o ? OPS[o.kind as keyof typeof OPS]?.label.toLowerCase() : 'operation'}. ${s.terms?.amt ?? 15}% of the take.`; },
     yes: 'He agrees.', no: '“I’ve got it covered.”', counter: '“{amt}. {why}.”', stall: '“Let me see how it goes this month.”',
+  },
+};
+// ================================================================== Stage 5: asking for more time on a debt
+// A man who can't make his payments goes to the man he owes and asks for easier terms: a smaller weekly payment, named by him. The
+// lender weighs what he thinks of him, whether he can see the money is really not there, his own greed and his own need.
+const debtOf = (w: World, s: Situation) => w.debts.find((d) => d.id === s.terms?.what && d.status === 'active');
+ASKS.time = {
+  id: 'time', sev: 0.1, roles: ['debtor', 'creditor'], cool: 3, ttl: 10, low: true, fear0: 0.3,
+  moves: ['take', 'ask', 'sweeten', 'persuade', 'wait', 'drop', 'name'], fmt: (n) => `${money(n)} a week`, sweeten: (n) => `Offer ${money(n)} a week`,
+  title: (w, s) => { const t = askee(w, s); return t ? `More time from ${first(t)}` : 'More time'; },
+  valid: (w, s) => { const d = debtOf(w, s); return !!d && d.debtor === s.terms?.by && d.creditor === s.terms?.of; },
+  lean: (w, s, a, t) => {
+    const d = debtOf(w, s)!, amt = s.terms?.amt ?? d.weeklyPayment;
+    const r = rel(t, a.id), can = a.cash >= d.weeklyPayment ? -0.4 : 0; // he can see the money is there
+    return clamp(r.trust * 0.4 + r.affection * 0.2 - t.traits.greed * 0.3 - d.missed * 0.08 + can + (amt / Math.max(5, d.weeklyPayment)) * 0.3 - (t.cash < 300 ? 0.2 : 0) - 0.05, -1, 1);
+  },
+  counter: (w, s, a, t) => { const d = debtOf(w, s)!, amt = s.terms?.amt ?? 0, want = Math.round(d.weeklyPayment * 0.75 / 5) * 5; return want > amt && want < d.weeklyPayment ? { amt: want, why: 'I can carry you a little, not that much' } : undefined; },
+  better: (w, s) => { const d = debtOf(w, s); if (!d) return undefined; const next = Math.round((s.terms?.amt ?? 0) * 1.3 / 5) * 5; return next > (s.terms?.amt ?? 0) && next < d.weeklyPayment ? next : undefined; },
+  figure: (w, s) => { const d = debtOf(w, s); return d ? { min: 5, max: Math.max(5, d.weeklyPayment - 5), step: 5 } : undefined; },
+  yes: (w, s, a, t) => {
+    const d = debtOf(w, s)!, amt = s.terms?.amt ?? Math.round(d.weeklyPayment / 2 / 5) * 5;
+    restructure(d, { payment: amt }); d.missed = 0;
+    addFact(w, { kind: 'terms', actor: t.id, victim: a.id, amount: amt, story: 'sit:' + s.id, cause: d.cause, text: `${t.name} gave ${a.name} more time on what he owes: ${money(amt)} a week now.`, district: a.district }, { witnesses: [a.id, t.id] });
+    return `${first(t)} agrees to ${money(amt)} a week. ${a.isPlayer ? 'You have' : `${first(a)} has`} some room to breathe.`;
+  },
+  phrase: {
+    ask: (w, s) => `More time. ${money(s.terms?.amt ?? 0)} a week until I’m back on my feet.`,
+    yes: 'He gives him the time.', no: '“A debt is a debt.”', counter: '“{amt}. {why}.”', stall: '“Let me think about it.”',
   },
 };
 void kinOf;

@@ -684,3 +684,49 @@ Much of what Stage 5 asks for already exists from V89 and V90. The work is to ma
 2. **5B, knowledge.** Reporting up the hierarchy. Each claim keeps what kind of knowing it is (seen, told, rumour, suspected, out of date). Denials and claims are remembered for later confrontation. Routine talk stays bounded.
 3. **5C, the conversation.** On your mind, then the five groups with natural, context-dependent openings and replies, then leave. Negotiation controls in place (Stage 4). NPC-initiated conversations. The club's engine deleted.
 4. **5D, situations.** Stage 4's work and deals as matters, with the player's history readable from the records.
+
+### Increment 5A: social intentions
+
+**One place where a man decides to go and see someone** (`intent.ts`). Each NPC weighs his intentions once a week, on his own day, and acts on the one that matters most to him, if any matters enough. Every intention comes from something true in his world, chooses its man by what is between them, and acts through the existing doors:
+
+| Intention | When | Whom | What happens |
+|---|---|---|---|
+| **More time** | He can't make his payments | The man he owes | A new negotiation (`asks` 'time'): he names an easier weekly payment, and the lender weighs what he thinks of him, whether he can see the money really isn't there, and his own greed and need. Agreed terms change the debt. |
+| **Someone to speak for him** | Two or more payments behind | A man the creditor trusts, whom he trusts | That man speaks for him if he thinks well enough of him, and the creditor gives a week. When it's the player, he's asked in person (the existing scene). |
+| **Help** | His business is going under, or his pockets are empty | The man he trusts most who could help | The borrow negotiation. When it's the player, the existing scene, where what he says the money is for may not be what it's for. |
+| **Reporting up** | He knows of something done to the family's men or shops that his superior doesn't | His superior | The superior learns it from him, with his knowledge of who did it (`core.learn`). |
+| **Amends** | A man he values holds something against him | That man | The amends negotiation. |
+| **Taking a man to task** | One of his own men hurt a shop under the family's protection | His man | Trust falls, it's recorded, and a proud man resents it. |
+| **Asking for work** | Short of money | His superior | Work only if something needs doing (`work.needsOf`). |
+
+**Removed and consolidated:**
+- **`situations.ts`'s player-only loan request** and its NPC-to-NPC copy are replaced by the "help" intention. It keeps only its record of who is in trouble, which the conversation reads.
+- **Its "ambition" story is removed.** It duplicated the NPC advancement plan.
+- **The random encounter generators for a debtor's plea and a loan request are removed.** Those approaches now come from the men's own intentions. The scenes remain as the player's way of being asked.
+- **The cap on closed matters is kept whenever one closes** (`situ.bound`), not only when a new one starts. More activity had shown up the gap.
+
+**Tests** (`social/intentions.test.ts`), each from a real circumstance:
+- the debtor asks his lender;
+- the man in trouble goes to the player when the player is the one he trusts, and to a friend otherwise;
+- news climbs to the captain with its source;
+- a captain takes his man to task;
+- a man asking for work gets it only when something needs doing;
+- an intermediary buys a debtor a week.
+
+**Two years, four worlds** (per world):
+
+| Intention | Count |
+|---|---|
+| More time | 61–133 |
+| Someone to speak for him | 7–17 |
+| Help | 30–69 |
+| Reports up | 1,900–2,850 |
+| Amends | 40–76 |
+| Taking a man to task | 54–77 |
+| Asking for work | 310–566 |
+
+- **Defaults fall** to 31–46 (from 41–65).
+- **Promotions:** 30–39.
+- **Consistency and ledger problems:** 0.
+- **Saves:** 7.3–8.9 MB.
+- **None went to the player.** The harness player does nothing, so nobody trusts him enough to come to him. The tests cover that path.

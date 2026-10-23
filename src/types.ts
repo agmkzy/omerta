@@ -514,6 +514,7 @@ export interface Situation {
   st?: Record<Id, Stance>;
 }
 export interface World {
+  intentStats?: Record<string, number>; // (Stage 5) how many of each social intention men have acted on, for the record
   clubs?: Record<string, import('./clubdata').Club>; // the social clubs, one to a family
   scene?: import('./clubdata').Scene | null; // a conversation in progress, so a reload resumes it
   situations?: Situation[]; // things going on in the world, with or without the player

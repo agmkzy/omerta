@@ -66,14 +66,18 @@ export function spawn(w: World, kind: SitKind, key: string, who: Id, o: Init): S
   if (major) pace(w).lastMajor = w.now;
   l.push(s);
   bump(w, 'start.' + kind);
-  // keep the record bounded: closed ones go first
-  // (asks are many and short; they are pruned among themselves, so they never push older situations out of the record)
+  bound(w);
+  return s;
+}
+// keep the record bounded: closed ones go first (when one starts, and each week, since matters close between starts)
+// (asks are many and short; they are pruned among themselves, so they never push older situations out of the record)
+export function bound(w: World) {
+  const l = w.situations ?? [];
   const drop = new Set<Id>();
   const ownK = (x: Situation) => !!x.kind && SIT.cap.own[x.kind] !== undefined;
   for (const [pool, cap] of [[l.filter((x) => !isOpen(x) && x.kind === 'ask'), 15], [l.filter((x) => !isOpen(x) && ownK(x) && x.kind !== 'ask'), SIT.cap.closedOwn], [l.filter((x) => !isOpen(x) && !ownK(x)), SIT.cap.closed]] as [Situation[], number][])
     if (pool.length > cap) for (const x of pool.slice(0, pool.length - cap)) drop.add(x.id);
   if (drop.size) w.situations = l.filter((x) => !drop.has(x.id));
-  return s;
 }
 export function know(w: World, s: Situation, id: Id, l: 1 | 2, via: string) {
   const k = (s.k ??= {});
@@ -109,6 +113,7 @@ export function closeSit(w: World, s: Situation, out: string, cons: string[] = [
   const par = s.m?.parent ? sits(w).find((x) => x.id === s.m!.parent) : undefined;
   if (par && isOpen(par)) { par.m = { ...(par.m ?? {}), ['child:' + (s.ak ?? s.kind)]: out }; par.next = Math.min(par.next ?? w.now + DAY, w.now + DAY); }
   bump(w, 'end.' + (s.kind ?? 'x')); bump(w, 'out.' + (s.kind ?? 'x') + '.' + out);
+  bound(w);
 }
 const phase = (s: Situation, ph: string, days: number, w: World) => { s.phase = ph; s.next = w.now + Math.round(days * DAY); if (s.stage === 'brewing') s.stage = 'handling'; };
 
@@ -890,6 +895,7 @@ export function sitDay(w: World) {
 }
 // Weekly: look at the world for things that have started, and keep the books on quiet and noise.
 export function sitWeek(w: World) {
+  bound(w);
   if (!SIT.on) return;
   const sp = pace(w);
   sp.weeks = (sp.weeks ?? 0) + 1;
