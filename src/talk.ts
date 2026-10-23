@@ -25,8 +25,8 @@ import { surname } from './voicesheet';
 
 export interface Choice { code: string; label: string; hint?: string; big?: boolean }
 export interface Beat { lines: string[]; choices: Choice[]; minutes?: number; go?: { node: string; subject?: Id; fact?: Id } }
-interface X { w: World; p: Character; t: Character }
-interface Subject {
+export interface X { w: World; p: Character; t: Character }
+export interface Subject {
   key: string;
   weight: number; // how much it is on his mind (and how much he would say to you about it)
   sig: string; // what it looks like now; if it has changed since you last talked about it, it is news again
@@ -40,20 +40,20 @@ interface Subject {
 const first = (c: Character) => c.name.split(' ')[0];
 const rk = (c: Character) => Math.max(0, LADDER.indexOf(c.rank));
 const live = (w: World, id?: Id | null) => { const c = id ? w.chars[id] : undefined; return c?.alive ? c : undefined; };
-const by = (t: Character, m: Partial<Record<Arch, string>> & { _: string }) => m[arch(t)] ?? m._;
-const q = (t: Character, s: string) => `${first(t)}: “${s}”`;
+export const by = (t: Character, m: Partial<Record<Arch, string>> & { _: string }) => m[arch(t)] ?? m._;
+export const q = (t: Character, s: string) => `${first(t)}: “${s}”`;
 // (V90: one man's way of saying a thing, out of several: the same man says it the same way each time, two men rarely alike)
-const vary = (t: Character, salt: string, xs: string[]) => { let h = 2166136261; for (const ch of t.id + '~' + salt) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return xs[(h >>> 0) % xs.length]; };
+export const vary = (t: Character, salt: string, xs: string[]) => { let h = 2166136261; for (const ch of t.id + '~' + salt) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return xs[(h >>> 0) % xs.length]; };
 // what he calls you: family by your first name, everyone else by your surname
 export const addr = (w: World, t: Character, p: Character) => (kinTie(w, t, p) ? first(p) : surname(p));
 const day = (w: World) => Math.floor(w.now / DAY);
-const mem = (t: Character, k: string) => t.talk?.[k];
-const remember = (w: World, t: Character, k: string, sig: string) => { const m = (t.talk ??= {}); const o = m[k]; m[k] = { d: day(w), sig, n: (o?.n ?? 0) + 1 }; };
-const said = (w: World, t: Character, key: string, code: string) => remember(w, t, 'tkc:' + key, code);
-const lastSaid = (t: Character, key: string) => mem(t, 'tkc:' + key)?.sig;
-const done = (key: string): Choice => ({ code: `tk:${key}:end`, label: '“Let’s leave it there.”' });
-const ch = (key: string, code: string, label: string, hint?: string, big?: boolean): Choice => ({ code: `tk:${key}:${code}`, label, hint, big });
-const trust = (x: X) => peek(x.t, x.p.id).trust;
+export const mem = (t: Character, k: string) => t.talk?.[k];
+export const remember = (w: World, t: Character, k: string, sig: string) => { const m = (t.talk ??= {}); const o = m[k]; m[k] = { d: day(w), sig, n: (o?.n ?? 0) + 1 }; };
+export const said = (w: World, t: Character, key: string, code: string) => remember(w, t, 'tkc:' + key, code);
+export const lastSaid = (t: Character, key: string) => mem(t, 'tkc:' + key)?.sig;
+export const done = (key: string): Choice => ({ code: `tk:${key}:end`, label: '“Let’s leave it there.”' });
+export const ch = (key: string, code: string, label: string, hint?: string, big?: boolean): Choice => ({ code: `tk:${key}:${code}`, label, hint, big });
+export const trust = (x: X) => peek(x.t, x.p.id).trust;
 const warm = (x: X, amt: number, kind: string) => regard(x.w, x.t, x.p, 'affection', amt, kind);
 // What he has told you, in plain words, kept with what you know about him (shown beside the conversation). Only ever what he said
 // or showed you, never what the world knows about him privately. Bounded: the latest few.
@@ -591,12 +591,15 @@ function pressed(x: X): Subject | undefined {
 
 // ------------------------------------------------------------------ the conversation
 const ALL = [pressed, trouble, shop, racket, wants, opinion, family, hisBoss, tellOn];
+// (Stage 6 of the conversation: the matters between you are subjects too, registered from threads.ts)
+export const MORE: ((x: X) => Subject | undefined)[] = [];
+const every = () => [...MORE, ...ALL];
 const ALLOW_COOLED = 7; // days before the same subject, unchanged, is worth raising again
 export function subjectsOf(w: World, p: Character, t: Character): Subject[] {
   if (t.isPlayer || !t.alive) return [];
   const x = { w, p, t };
   const out: Subject[] = [];
-  for (const f of ALL) { const s = f(x); if (s) out.push(s); }
+  for (const f of every()) { const s = f(x); if (s) out.push(s); }
   // a subject you have just been over, that hasn't changed, has nothing new in it
   const fresh = out.filter((s) => { const m = mem(t, 'tk:' + s.key); return !m || m.sig !== s.sig || day(w) - m.d >= ALLOW_COOLED; });
   return fresh.sort((a, b) => b.weight - a.weight);
@@ -609,7 +612,7 @@ export function nudgeOf(w: World, p: Character, t: Character): string | undefine
 export function talkAbout(w: World, p: Character, t: Character, code: string): Beat | undefined {
   const parts = code.split(':');
   // (ranks: associate 0, soldier 1, capo 2...) keys may carry an id ('op:c12'), so the choice is the part after the key
-  const all = subjectsOf(w, p, t).concat(ALL.map((f) => f({ w, p, t })).filter((s): s is Subject => !!s));
+  const all = subjectsOf(w, p, t).concat(every().map((f) => f({ w, p, t })).filter((s): s is Subject => !!s));
   const s = all.find((y) => code === 'tk:' + y.key || code.startsWith('tk:' + y.key + ':'));
   if (!s) return parts.length > 2 ? { lines: ['He has moved on to something else.'], choices: [] } : undefined;
   const rest = code.slice(('tk:' + s.key).length + 1);

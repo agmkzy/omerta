@@ -49,9 +49,9 @@ describe('the conversation', () => {
     const m = Object.values(w.chars).filter((c) => c.alive && !c.isPlayer && c.rank !== 'civilian' && c.id !== p.bossId && c.bossId !== p.id).sort(byId)[0];
     const d = createDebt(w, p.id, m.id, 600, 0.05, 'a private loan'); d.missed = 1;
     const mind = () => options(w, p, m, meet(w, m)).filter((o) => o.group === 'Between you').map((o) => o.code);
-    assert.ok(mind().includes('f:debt'), 'the money is there: ' + mind().join());
+    assert.ok(mind().includes('tk:debt:' + d.id), 'the money is there: ' + mind().join());
     m.cash = 5000; payDebt(w, d, d.balance);
-    assert.ok(!mind().includes('f:debt'), 'paid, and gone');
+    assert.ok(!mind().some((c) => c.startsWith('tk:debt:')), 'paid, and gone');
   });
 
   ok('a man who has come to you asks for a minute; you choose how to take it, and each choice has its consequence', { tags: ['scenario'] }, () => {

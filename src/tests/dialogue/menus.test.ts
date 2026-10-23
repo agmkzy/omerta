@@ -116,9 +116,10 @@ describe('menus', () => {
     const m = men(w).find((x) => x.rank !== 'civilian' && x.id !== p.bossId && x.bossId !== p.id)!;
     w.debts.push({ id: 'dbg1', creditor: p.id, debtor: m.id, principal: 600, balance: 600, weeklyPayment: 60, missed: 1, status: 'active', rate: 0.05, since: w.now - 20 * DAY } as never);
     const o = options(w, p, m, startConvo(m.id)).filter((x) => x.group === 'Between you' || x.group === 'He brings it up');
-    assert.ok(o.some((x) => x.code === 'f:debt'), o.map((x) => x.code).join());
-    const c = say(w, p, m, startConvo(m.id), 'f:debt').convo!;
-    assert.ok(options(w, p, m, c).some((x) => x.code.startsWith('d_')), 'and inside it, what can be done about the debt');
+    assert.ok(o.some((x) => x.code === 'tk:debt:dbg1'), o.map((x) => x.code).join());
+    const r = say(w, p, m, startConvo(m.id), 'tk:debt:dbg1');
+    assert.ok(r.lines.some((l) => /\$600/.test(l)), 'he answers with the sum: ' + r.lines.join(' | '));
+    assert.ok(options(w, p, m, r.convo!).some((x) => /tk:debt:dbg1:(week|ease|forgive|manage)/.test(x.code)), 'and what can be done about the debt follows from it');
   });
   ok('a quiet man has no manufactured matters', { tags: ['unit'] }, () => {
     const w = world60(); introAll(w); const p = P(w);

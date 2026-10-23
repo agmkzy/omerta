@@ -248,7 +248,8 @@ ok('anyone can be worth talking to: ordinary men have things on their minds, and
   assert.ok(withSome >= men.length * 0.6, `most men have something to talk about: ${withSome}/${men.length}`);
   assert.ok(keys.size >= 6, 'many kinds of subject: ' + [...keys]);
   // and a man in no matter at all still opens with something of his own
-  const quiet = men.find((m) => !(w.situations ?? []).some((s) => s.stage !== 'resolved' && s.parties?.some((x) => x.id === m.id)) && subjectsOf(w, p, m).length)!;
+  // (his own: not the questions you can always put to him, nor the matters between you, which are threads of their own)
+  const quiet = men.find((m) => !(w.situations ?? []).some((s) => s.stage !== 'resolved' && s.parties?.some((x) => x.id === m.id)) && subjectsOf(w, p, m).some((s) => !/^(hurting|ev:|debt:|earn|job:)/.test(s.key)))!;
   const o = options(w, p, quiet, startConvo(quiet.id));
   assert.ok(o.some((x) => x.code.startsWith('tk:')), 'his own subjects are offered: ' + o.map((x) => x.code));
 });

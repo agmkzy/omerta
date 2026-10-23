@@ -8,6 +8,7 @@
 //
 // The point in hand lives on the matter (s.m.beat, s.m.claim, s.m.claimT), so it is there when you come back days later.
 import { bear, clamp, feel, money, ownerBiz, peek, rel } from './core';
+import { priceOf } from './econ';
 import { askee, kindOf, reconsider, stance } from './asks';
 import { noteHard, temper, viewOf } from './temper';
 import type { Character, Situation, World } from './types';
@@ -89,6 +90,16 @@ export function giveReason(w: World, s: Situation, a: Character, t: Character, a
     const real: Claim = ans === 'stall' ? 'time' : v.resent > 0.35 || S.anger > 0.45 ? 'you' : o?.runner && w.chars[o.runner]?.alive ? 'taken' : ans !== 'counter' && v.trust < 0.15 && S.good < 0.2 ? 'doubt' : 'money';
     s.m = { ...(s.m ?? {}), beat: 'claim', claim: real, claimT: 1 };
     if (ans === 'counter') return undefined; // (a counter already gives its reason)
+    if (real === 'money') {
+      // the terms, said back: a proud man takes a low figure as an insult (and remembers it); a cautious senior man gives no reason;
+      // a man in trouble says what he would really take soon enough
+      const amt = s.terms?.amt ?? 0, sh = s.terms?.share, low = dealLow(w, s);
+      if (tp.caution > 0.72 && rk(t) >= 3) return '“I’ll pass.”';
+      if (low && tp.pride > 0.6 && s.ak !== 'run') { bear(w, t, a.id, 0.05, `${a.name} made him an insulting offer`); return sh ? `“${Math.round(sh * 100)} percent for ${money(amt)}? You insult me.”` : `“${money(amt)}? For this place? You insult me.”`; }
+      if (s.ak === 'buy') return sh ? `“${Math.round(sh * 100)} percent? For ${money(amt)}? You’re asking for a lot.”` : `“${money(amt)} for the whole place? It’s worth more than that.”`;
+      if (s.ak === 'sell') return `“${money(amt)}? It isn’t worth that to me.”`;
+      if (s.ak === 'run') return `“${amt} percent of my take? That’s a lot to ask.”`;
+    }
     return pick(w, s, 'r' + real, reasonWords(cls, s.ak ?? '', real, tp.volatility + tp.pride > 1.15, rk(t) > rk(a), true));
   }
   // (what weighs most: someone else's claim on him, bad blood, the money, then whether he knows you at all, then his pride)
@@ -138,7 +149,14 @@ function repliesTo(w: World, p: Character, s: Situation, t: Character): Reply[] 
       default: return [];
     }
     if (cls === 'trade') switch (claim) {
-      case 'money': return [{ k: 'manage', label: s.ak === 'sell' ? 'Then what would you pay?' : s.ak === 'run' ? 'Then what would you give a man?' : 'Then name your price.', hint: 'Let him put a figure on it.' }];
+      case 'money': {
+        // what can be said back to a figure turned down: ask his, go up, change what is asked for, or tell him what you know of his need
+        const out: Reply[] = [{ k: 'manage', label: s.ak === 'sell' ? 'What would you pay?' : s.ak === 'run' ? 'What would you give a man?' : 'What would you accept?', hint: 'Let him put a figure on it.' }];
+        if (s.ak === 'buy' || s.ak === 'run') out.push({ k: 'raise', label: s.ak === 'run' ? `Then ${Math.max(5, (s.terms?.amt ?? 15) - 3)} percent.` : `I’ll make it ${money(Math.round((s.terms?.amt ?? 0) * 1.15 / 50) * 50)}.`, hint: 'A better offer, said to his face.' });
+        if (s.ak === 'buy' && (s.terms?.share ?? 0) > 0.1) out.push({ k: 'share', label: `Then make it ${Math.round(((s.terms?.share ?? 0.25) - 0.1) * 100)} percent.`, hint: 'The same money for less of the place.' });
+        if (s.ak === 'buy' && knowsNeed(w, p, s)) out.push({ k: 'need', label: 'You need the money more than you’re admitting.', hint: 'You know how his place is doing. He won’t like that you do.', big: true });
+        return out;
+      }
       case 'doubt': return [{ k: 'word', label: 'Ask around. I keep my word.', hint: 'Only as good as what people say about you.' }, ...(boss ? [{ k: 'name', label: `I’m with ${boss.name}.`, hint: 'Say whose man you are. It carries weight, and it travels.' }] : [])];
       case 'you': return [{ k: 'past', label: 'Whatever happened, this is business.', hint: 'A man with a heart may meet you halfway. A proud one won’t.' }];
       case 'pride': return [{ k: 'asking', label: 'I’m making you an offer, that’s all.', hint: 'Give him his dignity back.' }];
@@ -200,6 +218,24 @@ export function reply(w: World, p: Character, s: Situation, k: string): string[]
     case 'assume':
       S.fear = clamp(S.fear + 0.12 * (1 - tp.courage * 0.5)); S.anger = clamp(S.anger + 0.05 + tp.pride * 0.1); noteHard(w, p, t, 'threats', 0.5);
       return settle(T ? '“Then you’ll have it, and God help me finding it.”' : '“…Maybe I can find something.”', T ? (hot ? '“Take it how you like. It won’t make the money appear.”' : 'He spreads his hands. “Then you’ll be disappointed.”') : '“Take what you like. You won’t get it from me.”', T ? '“If I must, here’s what I can manage.”' : '“…Maybe I can find something.”');
+    case 'raise': { // a better figure, said to his face
+      if (!s.terms) return [];
+      s.terms.amt = s.ak === 'run' ? Math.max(5, (s.terms.amt ?? 15) - 3) : Math.round((s.terms.amt ?? 0) * 1.15 / 50) * 50;
+      S.good = clamp(S.good + 0.03);
+      return settle('“Now you’re talking. All right.”', hot ? '“Better. Not good enough.”' : '“That’s closer. It’s still not there.”', '“Closer. Here’s where I’d meet you.”');
+    }
+    case 'share': { // the same money for less of the place
+      if (!s.terms) return [];
+      s.terms.share = Math.max(0.1, Math.round(((s.terms.share ?? 0.25) - 0.1) * 100) / 100);
+      S.good = clamp(S.good + 0.02);
+      return settle(`“${Math.round(s.terms.share * 100)} percent. That I can live with.”`, `“Even at ${Math.round(s.terms.share * 100)}, no.”`, `“${Math.round(s.terms.share * 100)}? Then here’s what I’d want for it.”`);
+    }
+    case 'need': { // what you know of how his place is doing, put to him
+      const b = s.biz ? w.biz[s.biz] : undefined, real = !!b && (b.distress >= 1 || b.cash < b.expense);
+      if (!real) { S.anger = clamp(S.anger + 0.1); bear(w, t, p.id, 0.04, `${p.name} told him he was desperate`); beat(undefined); return ['“Need? I’m doing fine. Who told you otherwise?”']; }
+      S.resolve = clamp(S.resolve - 0.2); S.anger = clamp(S.anger + tp.pride * 0.1); noteHard(w, p, t, 'threats', 0.3);
+      return settle('He looks at the floor a long moment. “…All right. All right.”', hot ? '“So I need it. I don’t need it that bad.”' : 'He doesn’t deny it. “I still won’t take that.”', '“…Maybe I do. Then here’s what I’d take.”');
+    }
     case 'manage': {
       const K = kindOf(s), c = K?.counter?.(w, s, p, t);
       if (!c) { beat(undefined); return [T ? '“Nothing. That’s what I’m telling you.”' : '“I didn’t say I’d pay anything.”']; }
@@ -253,4 +289,15 @@ export function reply(w: World, p: Character, s: Situation, k: string): string[]
     case 'now': S.anger = clamp(S.anger + 0.05); S.fear = clamp(S.fear + 0.05); return settle(soft ? '“All right. Yes. Fine.”' : '“You want it now? Fine. Yes.”', hot ? '“Then it’s no.”' : '“Then I’m sorry. No.”', '“Now? Then it’s this.”');
   }
   return [];
+}
+
+// (a deal: is the figure low, against what the place is worth, and does the player know how the man's business is doing)
+function dealLow(w: World, s: Situation): boolean {
+  const b = s.biz ? w.biz[s.biz] : undefined; if (!b) return false;
+  const full = priceOf(w, b) * (s.terms?.share ?? 1);
+  return (s.terms?.amt ?? 0) < full * 0.55;
+}
+function knowsNeed(w: World, p: Character, s: Situation): boolean {
+  const b = s.biz ? w.biz[s.biz] : undefined; if (!b) return false;
+  return Object.keys(p.known).some((id) => { const f = w.facts[id]; return f && f.kind === 'business_struggling' && f.business === b.id && w.now - f.t < 60 * 1440; }) || (p.insight?.[b.ownerId] ?? []).some((n) => /struggling|slow|barely open/i.test(n) && n.includes(b.name));
 }

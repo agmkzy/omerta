@@ -1,3 +1,4 @@
+import './threads'; // (the matters between you, as conversations: registers its subjects with talk.ts)
 import { OPS, enterpriseLine, lineOf } from './rackets';
 import { matterAct, matterTitle, topicsWith } from './matters';
 import { addr, note, nudgeOf, subjectRows, talkAbout } from './talk';
@@ -267,6 +268,13 @@ export function arrive(w: World, p: Character, t: Character, r: { lines: string[
   const word: string[] = [];
   const open = t.memos.find((m) => m.kind === 'promise' && m.other === p.id && !m.done && m.due && m.due > w.now && m.due - w.now <= 5 * DAY && !t.talk?.['prm:' + m.id]);
   if (open) { (t.talk ??= {})['prm:' + open.id] = { d: Math.floor(w.now / 1440), sig: 'x', n: 1 }; word.push(`“You said you’d see to it. Don’t leave it too long.”`); }
+  // a man you helped says so (a favour he owes you, for what you did), now and then, in his own manner; it is what lies between you
+  const helped = w.favours.find((f) => !f.settled && f.from === p.id && f.to === t.id && w.now - f.t < 120 * DAY);
+  if (helped && Math.floor(w.now / 1440) - (t.talk?.['ack:' + helped.id]?.d ?? -99) >= 14) {
+    (t.talk ??= {})['ack:' + helped.id] = { d: Math.floor(w.now / 1440), sig: 'x', n: 1 };
+    const a0 = arch(t);
+    word.push(a0 === 'proud' ? '“I don’t forget a thing like what you did. You know that.”' : a0 === 'cold' ? '“I remember what you did. I pay my debts.”' : a0 === 'jovial' ? '“There he is. The man who stood by me. Sit, sit.”' : a0 === 'frightened' ? '“I haven’t forgotten. What you did for me. I haven’t.”' : '“I haven’t forgotten what you did for me.”');
+  }
   const broke = brokenWord(w, p, t);
   if (broke && !t.talk?.['said:' + broke.id]) { (t.talk ??= {})['said:' + broke.id] = { d: Math.floor(w.now / 1440), sig: 'x', n: 1 }; word.push(pickBy(t)); }
   // V89: what shows on him before he says a word, if something is weighing on him (talk.ts)
@@ -431,6 +439,8 @@ function ack(w: World, t: Character, p: Character, lines: string[], leaving = fa
   return i < 0 ? [...lines, l] : [...lines.slice(0, i), l, ...lines.slice(i)];
 }
 const BIZ_SUBJ = /^tk:(shop|racket)\b/;
+// the matters between you that are conversations of their own (threads.ts)
+const THREAD = /^tk:(earn|debt:|job:|ev:)/;
 // Stage 5C: five ways into the rest of a conversation, the same five with everyone: Business, Socialize, Ask About, Organization,
 // Settle Matters. What is in each is what this man and this moment allow (only things that are true); each is opened in words that
 // fit who he is to you, and he answers before you go on.
@@ -445,7 +455,7 @@ grp('org', ['b_stand', 'b_need', 'b_more', 'promo', 'recommend', 'rk_back', 'rk_
 grp('settle', ['demand', 'mediate', 'mediate2', 'challenge', 'refuse', 'a_own', 'a_start', 'a_defy', 'a_pay', 'd_remind', 'd_time', 'd_half', 'd_favour', 'd_forgive', 'cr_thin', 'cr_drop', 'cr_look', 'sh_lean', 'sh_why', 'rv_warn', 'memo', 'confront', 'word_make', 'favcall', 'sit_cover', 'sit_lend', 'sit_rival', 'sit_leave']);
 function groupOf(code: string, cat = 'root'): Group {
   const k = code.split(':')[0];
-  if (k === 'tk') return BIZ_SUBJ.test(code) ? 'business' : 'social';
+  if (k === 'tk') return BIZ_SUBJ.test(code) || /^tk:debt:/.test(code) ? 'business' : /^tk:earn/.test(code) ? 'settle' : /^tk:job:/.test(code) ? 'org' : /^tk:(ev:|hurting)/.test(code) ? 'ask' : 'social';
   if (k === 'f') return code === 'f:think' ? 'ask' : 'settle';
   if (GRP[k]) return GRP[k];
   if (cat === 'family' || cat === 'orders' || cat === 'myboss' || cat === 'crew') return 'org';
@@ -504,9 +514,12 @@ function hub(w: World, p: Character, t: Character, c: Convo, all = false): DOpt[
   const job = w.jobs.find((j) => j.giver === t.id && j.status === 'offered' && (!j.assignee || j.assignee === p.id));
   if (job && !his[0]) out.push(door('job:' + job.id, job.title, `Pays ${money(job.pay ?? 0)}. He wants an answer.`, 'He brings it up', true));
   // nothing pressing: what is on his mind (talk.ts), if anything is
-  if (!his[0] && !env && !job) for (const o of subjectRows(w, p, t, 3).filter((x) => !BIZ_SUBJ.test(x.code)).slice(0, 1)) if (!(c.used ?? []).includes(usedKey(c, o.code))) out.push({ ...o, group: 'On his mind' });
-  // 2. what is open between you, one row a matter, by name
+  if (!his[0] && !env && !job) for (const o of subjectRows(w, p, t, 6).filter((x) => !BIZ_SUBJ.test(x.code) && !THREAD.test(x.code) && x.code !== 'tk:hurting').slice(0, 1)) if (!(c.used ?? []).includes(usedKey(c, o.code))) out.push({ ...o, group: 'On his mind' });
+  // 2. what is open between you, one row a matter, by name. The matters that are conversations of their own (threads.ts: his money,
+  // a debt, a job, something that happened) come first, said the way you would open them.
   const bw = 'Between you';
+  const threads = subjectRows(w, p, t, 10).filter((o) => THREAD.test(o.code) && !(c.used ?? []).includes(usedKey(c, o.code)));
+  for (const o of threads) out.push({ ...o, group: bw, big: true, story: 'go' });
   for (const e of his.slice(1, 3)) out.push(door('enc:' + e.id, e.title, 'He is waiting on your answer.', bw, true));
   for (const s of openMatters(w).filter((x) => x.terms?.by === p.id && x.terms?.of === t.id).slice(0, 3)) out.push(door('m:' + s.id, mTitle(w, s), matterWhere(w, s, t), bw, true));
   const seenSit = new Set<string>();
@@ -519,6 +532,7 @@ function hub(w: World, p: Character, t: Character, c: Convo, all = false): DOpt[
   for (const n of OWN_NODES) {
     const r = g.raw.find((o) => o.code === 'n:' + n);
     if (!r || !g.leaves(n).length) continue;
+    if (n === 'debt' && threads.some((o) => o.code.startsWith('tk:debt:'))) continue; // (the debt is a conversation of its own now)
     // (trouble he has heard of is what "Heard anything?" is for; it is between you only when it is his own, or yours)
     const trouble = incidentsOf(w, t).find(({ f }) => TROUBLE.has(f.kind) && p.known[f.id] && (f.victim === t.id || f.actor === t.id || f.actor === p.id || f.victim === p.id));
     if (n === 'disputes' && !grudgeTarget(w, t) && !trouble) continue;
@@ -575,6 +589,7 @@ function prio(o: DOpt, g: ReturnType<typeof gather>): number {
   if (o.code.startsWith('f:enc:')) return 10;
   if (o.code === 'b_envelope') return 9.5;
   if (o.code.startsWith('f:m:')) return 9;
+  if (THREAD.test(o.code)) return /^tk:(earn|debt:)/.test(o.code) ? 8.5 : 6.5;
   if (o.code.startsWith('confront:') || o.code === 'word_make') return 7;
   if (o.code === 'f:debt' || o.code === 'f:shop') return o.story === 'go' || /late|behind|missed/i.test(o.label + (o.hint ?? '')) ? 8 : 5;
   if (o.code.startsWith('f:mt:') || o.code.startsWith('inc:')) return 6;
