@@ -97,7 +97,7 @@ describe('work down the hierarchy', () => {
     assert.ok(caught >= 3, `a careful man checks (${caught} of 10)`);
   });
 
-  ok('a senior man puts one of his men in charge of his enterprise, and a count that doesn\'t add up is found out', { tags: ['scenario'] }, () => {
+  ok('a senior man puts one of his men in charge of his enterprise, and a light take becomes a matter between them', { tags: ['scenario'] }, () => {
     let found = 0;
     for (let i = 0; i < 10; i++) {
       const w = newWorld(7), { cap } = owed(w);
@@ -108,10 +108,12 @@ describe('work down the hierarchy', () => {
       delegate(w, cap);
       assert.ok(op.runner && w.chars[op.runner].bossId === cap.id, 'he gave it to one of his men to run');
       op.skimmed = 400; cap.traits.caution = 1;
-      for (let k = 0; k < 6 && op.skimmed > 0; k++) delegate(w, cap);
-      if (op.skimmed === 0) { found++; assert.ok(Object.values(w.facts).some((f) => f.kind === 'discipline' && f.actor === cap.id && /skimming/.test(f.text))); }
+      for (let k = 0; k < 6; k++) delegate(w, cap);
+      // (Stage 5D: his suspicion is a matter, the same one as a gap in a man's numbers: situ.ts 'skim')
+      const m = (w.situations ?? []).find((x) => x.kind === 'skim' && x.m?.op === op.id);
+      if (m) { found++; assert.equal(m.truth, 'guilty', 'and it is true: he was keeping it'); }
     }
-    assert.ok(found >= 5, `a careful owner counts (${found} of 10)`);
+    assert.ok(found >= 5, `a careful owner notices (${found} of 10)`);
   });
 
   ok('the player\'s own orders come from the same list: his affairs, the same needs an NPC superior hands out from', { tags: ['unit'] }, () => {

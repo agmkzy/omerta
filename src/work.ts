@@ -16,7 +16,8 @@ import { aptitude, lateOf } from './people';
 import { crewGround, owedOf } from './econ';
 import { shopInPlay } from './asks';
 import { activityOf, assign, inHand, mkJob } from './jobs';
-import { countOp, opRule, OPS } from './rackets';
+import { OPS } from './rackets';
+import { opSkimNoticed } from './situ';
 import { Character, DAY, Id, Job, JobKind, World } from './types';
 
 export interface Need { kind: JobKind; title: string; brief: string; target?: Id; biz?: Id; debt?: Id; cause?: Id; pay: number; why: string; weight: number }
@@ -163,17 +164,11 @@ export function delegate(w: World, g: Character) {
       }
       continue;
     }
-    // a count, now and then: more often for a careful man, and when the take has fallen
-    if (op.skimmed <= 0 || !w.rng.chance(0.08 + temper(g).caution * 0.2 + (op.last < 0 ? 0.1 : 0))) continue;
-    const r = w.chars[op.runner];
-    const { found } = countOp(w, g, op);
-    if (found <= 30) continue;
-    const tp = temper(g);
-    const code = tp.volatility > 0.6 || tp.pride > 0.7 ? 'fire' : g.traits.greed > 0.55 ? 'repay' : 'warn';
-    const f = addFact(w, { kind: 'discipline', actor: g.id, victim: r.id, amount: found, text: `${g.name} found ${r.name} had been skimming his ${d.label.toLowerCase()}: about ${money(found)}.${code === 'fire' ? ' He took it off him.' : code === 'repay' ? ' He made him pay it back.' : ' He told him it stops.'}`, district: op.district }, { witnesses: [g.id, r.id] });
-    bear(w, g, r.id, 0.15, f);
-    repute(w, r, -2, 'caught');
-    opRule(w, g, op, code, found);
+    // Suspicion, from what he can see: the take light while money is going missing, or now and then a bad week alone. It becomes a
+    // matter (situ.ts 'skim'): he asks, the man explains or lies, others may say what they saw, he looks into it, and decides.
+    const light = op.last < d.base * 0.5;
+    if ((op.skimmed > 100 && w.rng.chance(0.12 + temper(g).caution * 0.25)) || (light && w.rng.chance(0.03 + temper(g).caution * 0.04)))
+      opSkimNoticed(w, g, w.chars[op.runner], op, d.label.toLowerCase());
   }
 }
 

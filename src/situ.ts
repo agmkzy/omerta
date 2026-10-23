@@ -6,7 +6,7 @@
 // what the simulation knows to be true (`truth`) is never shown to anybody.
 import { temper } from './temper';
 import { discipline, influence } from './books';
-import { addFact, bear, clamp, createDebt, ease, feel, feelOn, feelTo, ownerBiz, payDebt, rel, repute, restructure, writeDown } from './core';
+import { addFact, bear, clamp, createDebt, ease, feel, feelOn, feelTo, money, ownerBiz, payDebt, rel, repute, restructure, writeDown } from './core';
 import { addStake, clearArrears, evidence, giveTime, seizeShare, transferBusiness } from './econ';
 import { LADDER, leaveCrew } from './rank';
 import { begin as beginGoal, goalsOf, priceOf } from './goals';
@@ -303,6 +303,23 @@ export function skimNoticed(w: World, boss: Character, c: Character, fl: { amt: 
   s.stage = 'handling';
   return true;
 }
+// Stage 5D: the same matter when it is an enterprise's take that is light and the man running it is the one in question (work.ts
+// delegate). Whether he is guilty is whether he has been skimming it (rackets.ts); the owner only sees the take.
+export function opSkimNoticed(w: World, owner: Character, c: Character, op: import('./types').Op, label: string): boolean {
+  if (!SIT.on || owner.isPlayer || c.isPlayer) return false;
+  const key = `skim:op:${op.id}`;
+  if (sits(w).some((s) => s.key === key && isOpen(s))) return true;
+  const guilty = op.skimmed >= 30;
+  const s = spawn(w, 'skim', key, c.id, {
+    cause: `${owner.name} has noticed the take from his ${label} is light, and ${c.name} runs it`, parties: [{ id: owner.id, role: 'boss' }, { id: c.id, role: 'accused' }],
+    sev: clamp(0.3 + op.skimmed / 700, 0.3, 0.8), phase: 'noticed', next: w.now + 4 * DAY, orgs: c.familyId ? [c.familyId] : [], truth: guilty ? 'guilty' : 'innocent', amt: Math.max(50, Math.round(op.skimmed)), m: { cert: 25, g: 0, op: op.id },
+  });
+  if (!s) return false;
+  tell(w, s, `${owner.name} thinks the take from his ${label} has been light.`, { actor: owner.id, victim: c.id, witnesses: [owner.id] });
+  know(w, s, owner.id, 1, 'the take'); know(w, s, c.id, 2, 'self');
+  s.stage = 'handling';
+  return true;
+}
 const skimUtil = (w: World, s: Situation, id: Id, code: string): number => {
   const boss = w.chars[(s.parties ?? []).find((p) => p.role === 'boss')!.id], c = w.chars[(s.parties ?? []).find((p) => p.role === 'accused')!.id];
   const g = clamp(Number(s.m?.cert ?? 30) / 100, 0, 1), guilty = s.truth === 'guilty';
@@ -323,7 +340,17 @@ KITS.skim = {
   apply: (w, s, code, chair) => {
     const c = w.chars[(s.parties ?? []).find((p) => p.role === 'accused')!.id];
     const boss = chair, amt = s.amt ?? 0, guilty = s.truth === 'guilty';
+    const op = s.m?.op ? w.ops.find((o) => o.id === s.m!.op) : undefined; // (an enterprise he runs: what is made right, or taken off him, is that)
     if (guilty && s.m?.vouched && P(w) && P(w).id !== boss.id) { repute(w, P(w), -3, 'vouched wrong'); feel(w, boss, P(w).id, 'trust', -0.1); s.cons = [...(s.cons ?? []), 'the man you vouched for was guilty'].slice(-SIT.cap.cons); }
+    if (code === 'repay' && op) {
+      const back = Math.min(Math.max(0, c.cash), guilty ? Math.round(op.skimmed) : Math.round(amt * 0.5));
+      c.cash -= back; boss.cash += back; if (guilty) op.skimmed = 0;
+      feel(w, c, boss.id, 'trust', -0.05);
+      closeSit(w, s, 'repay', guilty ? [`${first(c)} paid back what he kept`] : [`${first(c)} paid for a light take that was not his doing`], 8);
+      if (!guilty) bear(w, c, boss.id, 0.1, `${boss.name} made him pay for a light take that was not his doing`);
+      return `${boss.name} settled it. ${c.name} pays back ${money(back)}.`;
+    }
+    if (op && (code === 'punish' || code === 'expel') && op.runner === c.id) op.runner = null; // (whatever else, he no longer runs it)
     if (code === 'repay') {
       c.books.arrears += guilty ? amt : Math.round(amt * 0.5);
       c.kickRate = Math.min(0.3, c.kickRate + 0.02);

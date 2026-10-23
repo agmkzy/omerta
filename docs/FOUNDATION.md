@@ -815,3 +815,63 @@ The conversation engine (`dialogue.ts`) was already the one engine for the playe
 - `saves/save-load.test.ts`: an old save with a club scene in progress loads cleanly.
 
 **Checked in the browser.** With the player's own captain, the ways in read "I wanted to discuss some business", "How are things with you?", "Could I ask you something?", "I wanted to talk about where I stand", with "I'll let you get on" to leave and no "straighten out", because nothing stands between them. "Where I stand" was answered "What about it?" and offered "Where do I stand with you?", "Would you put in a word for me?", "Is there anything you need done?" and "I'm ready for more". At phone width there is no sideways scroll.
+
+### Increment 5D: situations that come of the work
+
+**The shared situation record** (`situ.ts`) already gives each matter its participants, cause, state, what each man knows of it, its history and how it ended, and quiet outcomes are common: a matter can be understood, dropped, settled or let go. The Stories screen reads it. This increment makes Stage 4's work produce matters where it naturally would, instead of a parallel mechanism.
+
+- **A light take is a matter, not an instant count.** When a captain's enterprise is run by one of his men and the take goes light, his suspicion opens the same matter as a gap in a man's kick-up numbers (`situ.opSkimNoticed`, matter kind 'skim'). Suspicion comes from what he can see: the take light while money is going missing, or now and then a bad week alone, which can make him wrongly suspicious of an honest man. Then the existing chain plays out:
+  1. he asks;
+  2. the man explains, truthfully or not;
+  3. a man under him who saw it may tell, or keep it to sell;
+  4. a rival may voice suspicion, true or not;
+  5. the boss has it looked into;
+  6. he decides.
+  
+  The decision falls on the enterprise:
+  - **Make it right:** the man pays back what he kept, or, if innocent, pays for a light take that wasn't his doing and holds it against him.
+  - **Punish him, or cut him loose:** he no longer runs it.
+  - **Let it go:** the skimming goes on.
+  
+  This replaces increment 4's instant count in `work.delegate`.
+- **The player hears of his own runner the same way:** from someone who'd know. When enough has gone missing from an enterprise the player owns, one of his men, or someone close to the runner who trusts the player, tells him the count has been coming up light. What he does about it is his: count it and rule on it (the existing count-and-rule controls).
+- **The player's history comes from the records.**
+  - Negotiations, intentions and the matters they open carry their story (`Fact.story`).
+  - The Stories screen shows them as they develop: an offer for a shop, a counter, a figure named, the deal.
+
+**Tests** (`social/situations.test.ts`):
+- a runner keeping part of the take becomes a matter that runs its course and leaves a history;
+- the player is told by a man who'd know.
+
+The increment 4 delegation test now checks that the matter opens and is true.
+
+### Stage 5: acceptance
+
+**Tests:**
+- The full suite: 334 pass.
+- The 13 opt-in long tests, run with `SLOW=1`, all pass: 180-day runs, save round trips, save growth, ledger stability, succession, the temperament measures and the full conversation audit. 347 of 347 with them included.
+
+**Two years, four worlds** (seeds 3, 7, 11, 19):
+
+| Measure | Stage 4 | Stage 5 |
+|---|---|---|
+| Men who went to see someone: more time / an intermediary / help / amends / taking a man to task / asking for work | — | 102–135 / 7–15 / 33–64 / 54–88 / 44–64 / 349–607 |
+| Reports up the hierarchy | — | 1,977–3,158 |
+| Enterprise takes gone light that became a matter | (instant counts) | 4–16 |
+| Defaults | 41–65 | 44–71 |
+| Friends / mutual | — | 656–1,165 / 327–582, every one resting on something recorded |
+| Enemies (grudge ≥ .4) / mutual | — | 116–138 / 29–37 |
+| Promotions | 29–37 | 32–37 |
+| Consistency and ledger problems | 0 | 0 |
+| Save size at two years | 7.2–9.1 MB | 8.0–8.9 MB |
+
+**What the checks covered:**
+- **Interactions have reasons and consequences.** Every intention is counted by reason and acts through a door that changes the world: a negotiation, a debt's terms, a man's knowledge, a grudge or trust with its reason, work given.
+- **No forced drama.** Nothing sets a number of friendships, rivalries or betrayals. Many matters end quietly: understood, dropped, settled, let go.
+- **Repetition.** Reports are the most common intention. They pass knowledge only, are bounded by retention, and stop when the news is stale.
+- **Performance.** A two-year world runs in about four minutes on the harness, as before.
+
+**Open items carried forward:**
+- **The harness player never acts,** so no NPC went to see him in the long runs. The player-facing paths are covered by tests and were checked in the browser.
+- **A few encounter generators remain random:** a tip for sale, a call-in, a witness, a favour, a shop begging, a mediation. They're grounded in real state, but they only ever reach the player, and they're the next candidates to become intentions.
+- **Enemies have grown** (116–138; step 3 had 55–91). More men now act on what they know (reports, men taken to task, matters). The figure is worth watching in the next long playtest.

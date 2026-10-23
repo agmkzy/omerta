@@ -230,6 +230,13 @@ export function enterpriseWeek(w: World) {
       }
       grow(runner, d.skill, 0.01);
     }
+    // Stage 5D: what a man runs for the player is noticed by others: when enough has gone missing, someone tells him the count has
+    // been coming up light (one of his own men, or someone who drinks with the runner). What he does about it is his: count it, and
+    // rule on it (countOp, opRule), as an NPC owner's suspicion becomes a matter (work.delegate).
+    if (owner.isPlayer && runner?.alive && op.skimmed > 150 && (op.tipped ?? -1e9) < w.now - 4 * WEEK) {
+      const by = Object.values(w.chars).filter((x) => x.alive && !x.isPlayer && x.id !== runner.id && (x.bossId === owner.id || (x.rels[runner.id]?.affection ?? 0) > 0.3) && (x.rels[owner.id]?.trust ?? 0) >= 0.3).sort((a, b) => (a.id < b.id ? -1 : 1))[0];
+      if (by) { op.tipped = w.now; addFact(w, { kind: 'report', actor: by.id, victim: runner.id, text: `${by.name} says the count on your ${d.label.toLowerCase()} has been coming up light, and ${runner.name} runs it.`, district: op.district }, { witnesses: [owner.id] }); }
+    }
     const net = Math.round(take - skim);
     op.last = net;
     op.total += net;

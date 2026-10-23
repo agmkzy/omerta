@@ -614,6 +614,7 @@ export interface Op {
   stake?: number;
   lull?: number;
   cut?: number; // (Stage 4) the runner's agreed share of each week's take, paid by the owner
+  tipped?: number; // (Stage 5) when the player was last told the count on it was coming up light
 }
 
 // Someone comes to you. A small scene with its own options; closes when you answer or it lapses.

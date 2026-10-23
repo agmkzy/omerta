@@ -33,6 +33,7 @@ export interface WeekRow {
   cash: Record<string, number>; treasury: number; debts: number; debtBal: number; hustles: number; hustleNet: number;
   loans?: { principal: number; arrears: number; worst: number; made: number; defaults: number };
   intents?: Record<string, number>;
+  lightTake?: { noticed: number; repaid: number; tipped: number };
   fund?: { lawyers: number; rescued: number; treasury: number };
   work?: { given: number; done: number; failed: number; refused: number; caught: number; delegated: number };
   prot?: { paying: number; started: number; refused: number; poached: number; smashed: number };
@@ -250,6 +251,7 @@ export class Observer {
       loans: (() => { const act = w.debts.filter((d) => d.status === 'active'); const left = (d: typeof act[0]) => d.owed ?? d.balance - (d.arrears ?? 0);
         return { principal: sum(act.map(left)), arrears: sum(act.map((d) => d.arrears ?? 0)), worst: r2(Math.max(0, ...act.map((d) => d.balance / Math.max(1, d.principal)))), made: w.debts.length, defaults: w.debts.filter((d) => d.status === 'defaulted').length }; })(),
       intents: { ...(w.intentStats ?? {}) },
+      lightTake: { noticed: this.facts.filter((f) => / thinks the take from his .* has been light/.test(f.text)).length, repaid: this.facts.filter((f) => /settled it\. .* pays back/.test(f.text)).length, tipped: this.facts.filter((f) => /coming up light/.test(f.text)).length },
       fund: { lawyers: this.facts.filter((f) => /family's lawyer took/.test(f.text)).length, rescued: this.facts.filter((f) => / family cleared /.test(f.text)).length, treasury: sum(Object.values(w.fam).map((f) => f.treasury ?? 0)) },
       work: (() => { const st = [...this.jobsSeen.values()]; const n = (re: RegExp, k?: string) => this.facts.filter((f) => (!k || f.kind === k) && re.test(f.text)).length;
         return { given: st.length, done: st.filter((x) => x === 'done').length, failed: st.filter((x) => x === 'failed').length, refused: n(/ refused when /, 'report'), caught: n(/found out .* on "|had been skimming his/, 'discipline'), delegated: n(/ put .* in charge of his /, 'report') }; })(),
@@ -312,6 +314,7 @@ export function report(o: Observer, seed: number): { md: string; json: unknown }
     row('Loans: principal out / unpaid vig / worst owed÷lent / ever made / defaulted', (r) => (r.loans ? `$${r.loans.principal.toLocaleString('en-US')} / $${r.loans.arrears.toLocaleString('en-US')} / ${r.loans.worst}× / ${r.loans.made} / ${r.loans.defaults}` : '–')),
     row('Men with a side business / its weekly net', (r) => `${r.hustles} / $${r.hustleNet.toLocaleString('en-US')}`),
     row('Men who went to see someone, by reason (to date): time / intercede / help / report / amends / confront / work / of which to the player', (r) => (r.intents ? ['time', 'intercede', 'help', 'report', 'amends', 'confront', 'work', 'player'].map((k) => r.intents![k] ?? 0).join(' / ') : '–')),
+    row('An enterprise\'s take gone light: owners who suspected the man running it / the player told (to date)', (r) => (r.lightTake ? `${r.lightTake.noticed} / ${r.lightTake.tipped}` : '–')),
     row('The family fund: lawyers paid for / outside debts cleared for its men (to date) / in the funds now', (r) => (r.fund ? `${r.fund.lawyers} / ${r.fund.rescued} / $${r.fund.treasury.toLocaleString('en-US')}` : '–')),
     row('Work handed down by NPC superiors: given / done / came to nothing / refused / lies caught / enterprises delegated (to date)', (r) => (r.work ? `${r.work.given} / ${r.work.done} / ${r.work.failed} / ${r.work.refused} / ${r.work.caught} / ${r.work.delegated}` : '–')),
     row('Protection: shops paying / deals / refusals / taken from another / smashed after refusing (to date)', (r) => (r.prot ? `${r.prot.paying} / ${r.prot.started} / ${r.prot.refused} / ${r.prot.poached} / ${r.prot.smashed}` : '–')),
