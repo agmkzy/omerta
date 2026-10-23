@@ -177,6 +177,24 @@ export function delegate(w: World, g: Character) {
   }
 }
 
+// What a finished piece of work puts on the record (career.ts reads it for every man's road): the man's own count, his superior's
+// count of work his men did on his orders, rough work done for a superior, and the family's hard work. Called where every job ends.
+const ROUGH: JobKind[] = ['collect', 'shake', 'lean', 'handle', 'hit'];
+export function noteWork(w: World, j: Job, ok: boolean) {
+  const m = w.chars[j.assignee];
+  if (!m || j.kind === 'summons') return;
+  recordCareer(w, m, `${ok ? 'Finished' : 'Botched'}: ${j.title}`, ok);
+  if (!ok) return;
+  const rec = m.career!;
+  const g = j.giver ? w.chars[j.giver] : j.via === 'order' ? w.chars[w.playerId!] : undefined;
+  if (g && g.id !== m.id && (j.via === 'order' || j.via === 'boss')) {
+    const gr = (g.career ??= { done: 0, failed: 0, log: [] });
+    gr.led = (gr.led ?? 0) + 1;
+    if (ROUGH.includes(j.kind)) rec.rough = (rec.rough ?? 0) + 1;
+    if (j.kind === 'handle' || j.kind === 'hit') rec.hard = (rec.hard ?? 0) + 1;
+  }
+}
+
 // Each week every NPC superior looks at what needs doing and hands it out to whichever of his men are free. Nothing is handed out
 // that isn't needed, and no more than he has men for.
 export function workWeek(w: World) {

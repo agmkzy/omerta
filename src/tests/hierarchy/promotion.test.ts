@@ -3,7 +3,10 @@
 import assert from 'node:assert';
 import { describe, test as ok } from 'vitest';
 import { applyRank, hierarchyIssues, leaveCrew } from '../../rank';
-import { promote, readiness, eligible } from '../../career';
+import { careerTick, eligible, isRunner, promote, readiness, vacancy } from '../../career';
+import { rel } from '../../core';
+import { noteWork } from '../../work';
+import type { Job } from '../../types';
 import { chairAct, chairOptions, pathInfo } from '../../path';
 import { prospects, recruitProspect } from '../../orders';
 import { newWorld, P } from '../helpers';
@@ -61,5 +64,46 @@ describe('promotion', { tags: ['unit'] }, () => {
       if (r && i) { assert.equal(r.to, i.to); assert.equal(r.ready, i.ready); assert.equal(eligible(r), i.ready && r.openSeat); assert.ok(r.earn <= 1 && r.score <= 1); }
     }
     p.lifetimeKick = 0; assert.equal(readiness(w, p)!.ready, false);
+  });
+  // Stage 4, increment 5: one rulebook for every man
+  ok('the road is the same for every man: the player and an NPC associate are measured on the same things', () => {
+    const w = newWorld(7), p = P(w);
+    const a = fam(w, p.familyId!).find((c) => c.rank === 'associate' && !c.isPlayer && !c.prospect)!;
+    const keys = (c: typeof p) => pathInfo(w, c)!.goals.map((g) => g.key).sort();
+    assert.deepEqual(keys(a), keys(p));
+    assert.ok(readiness(w, a)!.blockers.every((b) => !/\byou\b/.test(b)), 'his blockers speak of him, not you');
+  });
+  ok('an NPC is not made because time has passed: a seat open and his road undone, he stays where he is', () => {
+    const w = newWorld(7), p = P(w);
+    const a = fam(w, p.familyId!).find((c) => c.rank === 'associate' && !c.isPlayer && !c.prospect)!;
+    for (const c of fam(w, p.familyId!)) if (c.rank === 'associate' && c.id !== a.id) c.lifetimeKick = 0; // nobody else is ready either
+    a.lifetimeKick = 0; a.career = { done: 0, failed: 0, log: [] };
+    for (let i = 0; i < 20; i++) { w.now += 7 * 24 * 60; w.fam[p.familyId!].lastPromo = 0; careerTick(w); }
+    assert.equal(a.rank, 'associate');
+  });
+  ok('an NPC whose road is done is made when there is a seat: money passed up, work done, backing, a name, and the test passed', () => {
+    const w = newWorld(7), p = P(w), fid = p.familyId!;
+    const a = fam(w, fid).find((c) => c.rank === 'associate' && !c.isPlayer && !c.prospect && !isRunner(w, c))!;
+    a.lifetimeKick = 5000; a.standing = 60; a.jailedUntil = 0; a.career = { done: 4, failed: 0, log: [], proved: 'soldier' };
+    for (const c of fam(w, fid)) if (c.id !== a.id) rel(c, a.id).trust = 0.8;
+    assert.ok(readiness(w, a)!.ready, 'his road is done: ' + readiness(w, a)!.blockers.join('; '));
+    delete a.career.proved;
+    assert.ok(!readiness(w, a)!.ready, 'until he has passed the test the family sets him, he is not ready to be made');
+    a.career.proved = 'soldier';
+    while (!vacancy(w, fid, 'soldier')) { const s = fam(w, fid).find((c) => c.rank === 'soldier' && !c.isPlayer)!; s.alive = false; }
+    for (let i = 0; i < 12 && a.rank === 'associate'; i++) { w.now += 7 * 24 * 60; w.fam[fid].lastPromo = 0; for (const c of fam(w, fid)) if (c.rank === 'associate' && c.id !== a.id) c.lifetimeKick = 0; careerTick(w); }
+    assert.equal(a.rank, 'soldier');
+  });
+  ok('work a man finishes is on his record, and on his superior\'s when he sent him', () => {
+    const w = newWorld(7), p = P(w);
+    const cap = Object.values(w.chars).find((c) => c.alive && !c.isPlayer && c.rank === 'capo')!;
+    const m = Object.values(w.chars).find((c) => c.alive && c.bossId === cap.id && !c.isPlayer)!;
+    const j = { id: 'jx', kind: 'collect', title: 'Collect', brief: '', giver: cap.id, via: 'order', assignee: m.id, pay: 0, created: w.now, expires: w.now, status: 'done' } as Job;
+    const d0 = m.career?.done ?? 0, l0 = cap.career?.led ?? 0;
+    noteWork(w, j, true);
+    assert.equal(m.career!.done, d0 + 1); assert.equal(m.career!.rough, 1); assert.equal(cap.career!.led, l0 + 1);
+    noteWork(w, { ...j, kind: 'handle' }, true);
+    assert.equal(m.career!.hard, 1, 'dealing with a man who hurt one of ours is the family\'s hard work');
+    void p;
   });
 });

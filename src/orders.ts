@@ -9,7 +9,7 @@ import { aptitude, grow, lateOf, PROBLEM_LABEL } from './people';
 import { bizMove, clearArrears, owedOf, takeFromBiz } from './econ';
 import { arch, admit, excuse, pick } from './voice';
 import { approaches, mkJob, resolve } from './jobs';
-import { giveWork, needsOf, type Need } from './work';
+import { giveWork, needsOf, noteWork, type Need } from './work';
 import { perform } from './actions';
 import { Behaviour, Character, DAY, Id, Job, JobKind, Report, World } from './types';
 
@@ -107,7 +107,7 @@ export function runCrewJob(w: World, j: Job) {
   let extra = '';
   const finish = (ok: boolean) => {
     j.status = ok ? 'done' : 'failed';
-    recordCareer(w, m, `${ok ? 'Finished' : 'Botched'}: ${j.title}`, ok);
+    noteWork(w, j, ok);
   };
   const failWith = (kind: Behaviour, lie: boolean) => {
     finish(false);

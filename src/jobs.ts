@@ -4,7 +4,7 @@ import { lineOf } from './rackets';
 import { temper } from './temper';
 import { bizMove } from './econ';
 import { ERRAND_KINDS, resolveErrand, runCrewJob } from './orders';
-import { giveWork, judge, needsOf } from './work';
+import { giveWork, judge, needsOf, noteWork } from './work';
 import { aptitude, grow, lateOf } from './people';
 import { arch, bossWhy, dodge, injury, pitch, whyOf } from './voice';
 import { confide, perform, share, tension } from './actions';
@@ -447,7 +447,7 @@ function conclude(w: World, j: Job, res: Result): Result {
   const p = PL(w);
   const giver = j.giver ? w.chars[j.giver] : undefined;
   j.status = res.ok ? 'done' : 'failed';
-  if (j.assignee !== p.id) recordCareer(w, w.chars[j.assignee], `${res.ok ? 'Finished' : 'Botched'}: ${j.title}`, res.ok);
+  noteWork(w, j, res.ok); // (the record every man's road reads: work.ts)
   if (w.chars[j.assignee]) grow(w.chars[j.assignee], j.kind, res.ok ? 0.02 : 0.008);
   const doer = w.chars[j.assignee];
   if (giver && doer && giver.id !== doer.id && doer.isPlayer) {

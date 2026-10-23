@@ -12,7 +12,6 @@ import { Character, DAY, Id, Rank, World } from './types';
 
 export { LADDER, WAGE } from './rank';
 import { LADDER, WAGE, applyRank, repairHierarchy } from './rank';
-const KICK_NEEDED: Record<string, number> = { soldier: 1500, capo: 6000, underboss: 14000 };
 const next = (r: Rank): Rank | undefined => LADDER[LADDER.indexOf(r) + 1];
 
 // A man who works for an associate is a runner, not a rival: he isn't in the line for a seat and can't be made ahead of his own boss.
@@ -59,48 +58,35 @@ export function sponsorOf(w: World, c: Character): Character | undefined {
   return rel(s, c.id).trust >= 0.35 ? s : undefined;
 }
 
-// The one place that answers "is he ready to move up?". For NPCs it is the family's rule of thumb below. For the player
-// it is the road in path.ts (what you do, what you are asked to prove), so every screen and every conversation reports
-// the same state that the actual promotion uses.
+// The one place that answers "is he ready to move up?", for every man: the road in path.ts (what he has passed up, the work he has
+// done, the backing of the right men, his name, proof of himself), so every screen, every conversation and the family's own
+// decision about an NPC read the same state. A seat is the family's: open, or opened for a record that has earned one (noticeTick).
 export function readiness(w: World, c: Character): Readiness | undefined {
-  if (c.isPlayer) return playerReadiness(w, c);
-  return npcReadiness(w, c);
-}
-function playerReadiness(w: World, c: Character): Readiness | undefined {
   const info = pathInfo(w, c);
   if (!info || !c.familyId) return undefined;
   const goals = info.goals.filter((g) => g.key !== 'trial');
   const earn = info.goals.find((g) => g.key === 'earn')?.frac ?? 1;
   const score = goals.length ? goals.reduce((a, g) => a + g.frac, 0) / goals.length : 1;
-  const blockers = goals.filter((g) => !g.done).map((g) => `${g.label.toLowerCase()} (${g.note})`);
-  if (c.jailedUntil > w.now) blockers.push('you’re locked up');
-  return { to: info.to, score, earn, sponsor: sponsorOf(w, c), openSeat: info.to === 'boss' ? false : vacancy(w, c.familyId, info.to) || info.ready, parts: [], blockers, ready: info.ready };
-}
-function npcReadiness(w: World, c: Character): Readiness | undefined {
-  const to = next(c.rank);
-  if (!to || !c.familyId || to === 'boss' && false) return undefined;
-  const boss = w.chars[w.fam[c.familyId].bossId];
-  const earn = clamp(c.lifetimeKick / (KICK_NEEDED[to] ?? 99999), 0, 1);
-  const sp = sponsorOf(w, c);
-  const trustBoss = boss ? rel(boss, c.id).trust : 0;
-  const old = familyStyle(w, c.familyId) === 'old';
-  const score = (old ? 0.22 : 0.42) * earn + (old ? 0.3 : 0.14) * clamp(trustBoss / 0.7, 0, 1) + (old ? 0.24 : 0.16) * (c.standing / 100) + 0.15 * (influence(w, c) / 60 > 1 ? 1 : influence(w, c) / 60) + (sp ? 0.1 : 0);
-  const openSeat = to === 'boss' ? false : vacancy(w, c.familyId, to);
-  const blockers: string[] = [];
-  if (earn < 1) blockers.push('you haven’t earned enough yet');
-  if (!sp) blockers.push('nobody senior is ready to put your name forward');
-  if (c.standing < 45) blockers.push('your reputation isn’t what it should be');
-  if (!openSeat && to !== 'boss') blockers.push('there’s no room at that level right now (a strong record gets one opened)');
-  if (c.jailedUntil > w.now) blockers.push('you’re locked up');
-  return { to, score, earn, sponsor: sp, openSeat, parts: [], blockers };
+  const you = (s: string) => (c.isPlayer ? s : s.replace(/\byou(r)?\b/g, (_m, r) => (r ? 'his' : 'he')));
+  const blockers = info.goals.filter((g) => !g.done && (g.key !== 'trial' || !c.isPlayer)).map((g) => you(`${g.label.toLowerCase()} (${g.note})`));
+  if (c.jailedUntil > w.now) blockers.push(c.isPlayer ? 'you’re locked up' : 'he’s locked up');
+  // (the player is set his proof in person once the rest is done; another man's is part of his road)
+  const ready = c.isPlayer ? info.ready : info.ready && info.trial === 'passed';
+  return { to: info.to, score, earn, sponsor: sponsorOf(w, c), openSeat: info.to === 'boss' ? false : vacancy(w, c.familyId, info.to), parts: [], blockers, ready };
 }
 
-export const familyStyle = (w: World, fid: Id | null): 'old' | 'new' => (fid ? ((fid.length * 7 + fid.charCodeAt(fid.length - 1)) % 2 === 0 ? 'old' : 'new') : 'new');
 export function eligibleIgnoringSeat(w: World, c: Character): boolean {
-  const r = readiness(w, c);
-  return !!r && (r.ready ?? (r.earn >= 1 && !!r.sponsor && r.score >= 0.55));
+  return !!readiness(w, c)?.ready;
 }
-export const eligible = (r?: Readiness) => !!r && (r.ready !== undefined ? r.ready && r.openSeat : r.earn >= 1 && !!r.sponsor && r.openSeat && r.score >= 0.55);
+export const eligible = (r?: Readiness) => !!r && !!r.ready && r.openSeat;
+
+// The chair beside the boss goes to a captain whose road is done: into an empty chair, or in place of the man in it if the boss
+// rates him well above that man (and the man moved aside holds it against him). The same rule for the player (path.ts).
+const rateBy = (boss: Character, c: Character) => peek(boss, c.id).trust + peek(boss, c.id).respect * 0.5 + c.standing / 100;
+export function canSeatUnderboss(w: World, boss: Character, c: Character): boolean {
+  const u = members(w, c.familyId!).find((x) => x.rank === 'underboss' && x.id !== c.id);
+  return !u || !u.alive || rateBy(boss, c) > rateBy(boss, u) + 0.3;
+}
 
 export function promote(w: World, c: Character, to: Rank, by?: Character) {
   const fid = c.familyId!;
@@ -156,7 +142,7 @@ export function promote(w: World, c: Character, to: Rank, by?: Character) {
       }
     }
   }
-  const rivals = members(w, fid).filter((x) => x.id !== c.id && x.rank === was && !x.isPlayer && x.traits.ambition >= 0.6 && x.lifetimeKick >= (KICK_NEEDED[to] ?? 1e9) * 0.7);
+  const rivals = members(w, fid).filter((x) => x.id !== c.id && x.rank === was && !x.isPlayer && x.traits.ambition >= 0.6 && x.lifetimeKick >= (ROAD[to]?.kick ?? 1e9) * 0.7);
   for (const x of rivals) bear(w, x, c.id, 0.1, `${c.name} was made ahead of him`);
   repairHierarchy(w, fid);
 }
@@ -169,16 +155,28 @@ export function careerTick(w: World) {
     if ((fam.lastPromo ?? 0) > w.now - 10 * DAY) continue;
     // Foundation step 2: an empty underboss's chair is filled. The boss names the captain he trusts and rates most, free to serve
     // (the others' resentment of being passed over is promote's, as for any step up). The player rises by his own road (path.ts).
-    if (!boss.isPlayer && vacancy(w, fam.id, 'underboss')) {
-      const rate = (c: Character) => peek(boss, c.id).trust + peek(boss, c.id).respect * 0.5 + c.standing / 100;
-      const pick = members(w, fam.id).filter((c) => c.rank === 'capo' && !c.isPlayer && c.jailedUntil <= w.now).sort((a, b) => rate(b) - rate(a) || (a.id < b.id ? -1 : 1))[0];
-      if (pick && w.rng.chance(0.5)) { promote(w, pick, 'underboss', boss); fam.lastPromo = w.now; continue; }
+    // The chair beside the boss: a captain whose road is done, the one the boss rates most. While the chair is empty and nobody's road
+    // is done, the family still needs a second: after a season he names the captain he rates most (an empty seat the structure needs
+    // filling, not a reward for waiting).
+    if (!boss.isPlayer) {
+      const caps = members(w, fam.id).filter((c) => c.rank === 'capo' && !c.isPlayer && c.jailedUntil <= w.now).sort((a, b) => rateBy(boss, b) - rateBy(boss, a) || (a.id < b.id ? -1 : 1));
+      const ready = caps.find((c) => readiness(w, c)?.ready && canSeatUnderboss(w, boss, c));
+      const empty = vacancy(w, fam.id, 'underboss');
+      if (empty) fam.ubSince ??= w.now; else delete fam.ubSince;
+      const pick = ready ?? (empty && w.now - (fam.ubSince ?? w.now) > 12 * 7 * DAY ? caps[0] : undefined);
+      if (pick && w.rng.chance(0.5)) {
+        const u = members(w, fam.id).find((x) => x.rank === 'underboss');
+        if (u && u.id !== pick.id) { bear(w, u, pick.id, 0.25, `${pick.name} was given the seat above him`); applyRank(w, u, 'capo', { wage: 300, place: (x) => { x.bossId = boss.id; }, fact: { actor: boss.id, victim: u.id, story: 'seat:underboss', text: `${boss.name} has moved ${u.name} aside. He is a captain again.`, broadcast: members(w, fam.id).map((y) => y.id) } }); }
+        promote(w, pick, 'underboss', boss); fam.lastPromo = w.now; delete fam.ubSince; continue;
+      }
     }
     for (const to of ['capo', 'soldier'] as Rank[]) {
       if (to === 'soldier' && fam.booksClosed) continue;
       if (w.path?.hold === to && w.chars[w.playerId!]?.familyId === fam.id) continue; // the seat is spoken for
       const from = LADDER[LADDER.indexOf(to) - 1];
       if (!vacancy(w, fam.id, to)) { noticeTick(w, fam, boss, to, from); continue; }
+      // a man whose road is otherwise done is set his test before he can be made (the player's comes in person: path.ts)
+      if (to === 'soldier') for (const c of members(w, fam.id)) if (c.rank === from && !c.isPlayer && c.jailedUntil <= w.now && !isRunner(w, c) && pathInfo(w, c)?.ready && c.career?.proved !== to) npcTrial(w, c, to, sponsorOf(w, c) ?? boss);
       const cands = members(w, fam.id)
         .filter((c) => c.rank === from && c.jailedUntil <= w.now && !isRunner(w, c) && !c.isPlayer)
         .map((c) => ({ c, r: readiness(w, c)! }))
@@ -191,7 +189,7 @@ export function careerTick(w: World) {
         fam.lastPromo = w.now;
         // the player was passed over
         const p = w.chars[w.playerId!];
-        if (p?.alive && p.familyId === fam.id && p.rank === from && p.lifetimeKick >= (KICK_NEEDED[to] ?? 1e9) * 0.8) {
+        if (p?.alive && p.familyId === fam.id && p.rank === from && p.lifetimeKick >= (ROAD[to]?.kick ?? 1e9) * 0.8) {
           feel(w, p, boss.id, 'respect', -0.03);
           p.memos.push({ id: 'm' + w.nextId++, kind: 'question', other: top.c.id, text: `${top.c.name} was made ${to} ahead of you.`, t: w.now, done: true });
         }
@@ -271,8 +269,7 @@ export function standingTable(w: World, p: Character): { rows: Row[]; verdict: s
     { label: 'Senior sponsor', value: r.sponsor ? r.sponsor.name : 'Not secured', tone: r.sponsor ? 'good' : 'bad' },
     { label: `Seats open at ${r.to}`, value: String(Math.max(0, capOf(w, p.familyId, r.to) - seats(w, p.familyId, r.to))), tone: r.openSeat ? 'good' : 'bad' },
   ];
-  rows.push({ label: 'What the family values', value: familyStyle(w, p.familyId) === 'old' ? 'Respect, patience, tradition' : 'Earners above all', tone: '' });
-  const rivals = members(w, p.familyId).filter((c) => c.id !== p.id && c.rank === p.rank && c.lifetimeKick >= (KICK_NEEDED[r.to] ?? 1e9) * 0.8).length;
+  const rivals = members(w, p.familyId).filter((c) => c.id !== p.id && c.rank === p.rank && c.lifetimeKick >= (ROAD[r.to]?.kick ?? 1e9) * 0.8).length;
   if (rivals) rows.push({ label: 'Others in line', value: String(rivals), tone: 'warn' });
   const inbox = w.jobs.find((j) => j.kind === 'summons' && j.meeting === 'induction' && j.status === 'offered');
   const verdict = inbox ? 'They’re ready for you. Go.' : eligible(r) ? 'You’re being considered.' : r.blockers.length ? 'Held up: ' + r.blockers.map((b) => b.replace('you ', 'you ').replace(/^./, (c) => c.toLowerCase())).join('; ') + '.' : 'You’re being considered.';
@@ -471,7 +468,7 @@ export function promoChoose(w: World, p: Character, e: Enc, code: string): strin
   return lines;
 }
 import { addFavour } from './encounters';
-import { trialChoose, pathInfo } from './path';
+import { npcTrial, trialChoose, pathInfo, ROAD } from './path';
 
 // A seat doesn't appear because a box was ticked. A man who keeps it up, week after week, gets noticed; the
 // sponsor says something; the boss thinks about it. Slip, and it all cools off.
@@ -490,15 +487,14 @@ function noticeTick(w: World, fam: import('./types').Family, boss: Character, to
   const n = watch[c.id];
   const who = c.isPlayer ? 'you' : c.name;
   const say = (text: string, textKin: string) => addFact(w, { kind: 'report', actor: c.id, minor: false, text: c.isPlayer ? textKin : text, story: 'seat:' + to, district: c.district }, { broadcast: [c.id, r.sponsor?.id ?? c.id, boss.id] });
-  const sp = r.sponsor!;
+  const sp = r.sponsor ?? boss; // (a man whose road is done may since have lost the man who spoke for him)
   if (n === 3) say(`${boss.name} has started to hear the name ${c.name}. Results, mostly.`, `${boss.name} has started to hear your name. Results, mostly. Keep it up.`);
   else if (n === 7) {
     say(`${sp.name} told ${boss.name} the family is short of ${to}s, and that ${c.name} is the reason he knows it.`, `${sp.name} told ${boss.name} the family is short of ${to}s, and named you as the reason he knows it.`);
     feel(w, boss, c.id, 'respect', 0.04);
     if (c.isPlayer && p) p.memos.push({ id: 'm' + w.nextId++, kind: 'question', other: boss.id, text: `${boss.name} is weighing another ${to}’s chair. ${sp.name} says to keep the numbers up, and to stay out of trouble.`, t: w.now, done: false });
   } else if (n >= 12) {
-    const old = familyStyle(w, fam.id) === 'old';
-    const chance = clamp(0.45 + r.score * 0.4 + (old ? rel(boss, c.id).trust * 0.1 : 0) - boss.traits.greed * 0.15, 0.2, 0.85);
+    const chance = clamp(0.45 + r.score * 0.4 + rel(boss, c.id).trust * 0.05 - boss.traits.greed * 0.15, 0.2, 0.85);
     if (w.rng.chance(chance)) {
       openSeatFor(w, fam.id, to);
       say(`${boss.name} has decided the ${famName(w, boss)} family can use another ${to}. A seat has been opened. He didn’t say who it’s for, but ${c.name} has been the one people mention.`, `${boss.name} has decided the family can use another ${to}. A seat has been opened. He didn’t say who it’s for, but you’ve been the name people mention.`);

@@ -8,18 +8,24 @@ import { powerOptions as powerOptions2, usePower2 } from './powers2';
 import { addFact, bear, bearAtLeast, clamp, earn, factText, famName, feel, feelTo, handleDeath, learn, money, rel, repute } from './core';
 import { addEnc } from './encounters';
 import { mkJob } from './jobs';
-import { capOf, isRunner, LADDER, members, openSeatFor, promote, sponsorOf, vacancy, WAGE } from './career';
+import { canSeatUnderboss, capOf, isRunner, LADDER, members, openSeatFor, promote, sponsorOf, vacancy, WAGE } from './career';
 import { applyRank, repairHierarchy } from './rank';
 import { candidates, leaderChanged, noteDeal } from './orgs';
 import { Character, DAY, Enc, Id, PathState, Rank, World } from './types';
 
 
-const NEED: Record<string, { kick: number; deeds: number; kills: number }> = {
-  soldier: { kick: 15000, deeds: 20, kills: 0 },
-  capo: { kick: 25000, deeds: 40, kills: 1 },
-  underboss: { kick: 50000, deeds: 50, kills: 2 },
-  boss: { kick: 0, deeds: 0, kills: 0 },
+// The road up is the same for every man (Stage 4, increment 5): what he has passed up, the work he has done for the family (his
+// own and what his men did on his orders), the family's hard work for the higher seats, the backing of the right men, a name worth
+// having, and, before he is made, proof of himself. The numbers come from what men in this world actually do: over two years an
+// associate passes up about $2,000 (the best $10,000), a soldier about $8,000, a captain about $11,000; a superior hands a man below
+// him a piece of work every few months.
+export const ROAD: Record<string, { kick: number; work: number; hard: number; standing: number }> = {
+  soldier: { kick: 3000, work: 2, hard: 0, standing: 30 },
+  capo: { kick: 10000, work: 3, hard: 0, standing: 40 },
+  underboss: { kick: 20000, work: 6, hard: 1, standing: 50 },
+  boss: { kick: 0, work: 0, hard: 0, standing: 0 },
 };
+export const READY_AT = 0.75; // how much of the rest of the road, taken together
 const first = (c: Character) => c.name.split(' ')[0];
 const nextRank = (r: Rank): Rank | undefined => LADDER[LADDER.indexOf(r) + 1];
 export const pathState = (w: World): PathState => (w.path ??= { deeds: 0, counted: [], trial: {}, retry: {} });
@@ -40,14 +46,17 @@ export function underlings(w: World, c: Character): Character[] {
 export interface Goal { key: string; label: string; frac: number; done: boolean; note: string; tip: string }
 export interface PathInfo { to: Rank; goals: Goal[]; ready: boolean; trial: 'none' | 'open' | 'passed'; retryAt: number }
 
+// One road for every man: the player's screens read it, and so does the family deciding on an NPC (career.readiness).
 export function pathInfo(w: World, p: Character): PathInfo | undefined {
   const to = nextRank(p.rank);
   if (!to || !p.familyId || p.rank === 'civilian') return undefined;
-  const n = NEED[to];
-  const st = pathState(w);
+  const n = ROAD[to];
+  const st = p.isPlayer ? pathState(w) : undefined;
+  const rec = p.career ?? { done: 0, failed: 0, log: [] };
   const fam = w.fam[p.familyId];
   const boss = w.chars[fam.bossId];
   const goals: Goal[] = [];
+  const you = p.isPlayer;
   const g = (key: string, label: string, frac: number, note: string, tip: string, done = frac >= 1) => goals.push({ key, label, frac: clamp(frac, 0, 1), done, note, tip });
   if (to === 'boss') {
     const gone = !!boss && !boss.alive;
@@ -55,11 +64,13 @@ export function pathInfo(w: World, p: Character): PathInfo | undefined {
     return { to, goals, ready: true, trial: 'passed', retryAt: 0 };
   }
   g('earn', 'Pass up to the family', p.lifetimeKick / n.kick, `${money(p.lifetimeKick)} of ${money(n.kick)} passed up in total`, 'It all adds up over the whole climb. Declare it straight, hand it over in person, and be generous to the man above you.');
-  g('deeds', 'Get the work done', st.deeds / n.deeds, `${Math.min(st.deeds, n.deeds)} of ${n.deeds} jobs finished`, 'Take the jobs you’re offered and finish them. Your crew’s count too.');
-  if (n.kills) {
-    const k = st.kills ?? 0;
-    g('kills', n.kills > 1 ? 'Kill for the family, twice' : 'Kill for the family', k / n.kills, `${Math.min(k, n.kills)} of ${n.kills} done on the family’s orders`, 'It has to be work the family gave you. When you’re ready for it, one will come. You can also ask your boss for work.');
+  const work = Math.max(rec.done + (rec.led ?? 0), st?.deeds ?? 0); // (an old save's count of the player's deeds carries over)
+  g('deeds', 'Get the work done', work / n.work, `${Math.min(work, n.work)} of ${n.work} jobs finished`, 'Take the work you’re given and finish it. What your own men finish on your orders counts too.');
+  if (n.hard) {
+    const k = Math.max(rec.hard ?? 0, st?.kills ?? 0);
+    g('kills', n.hard > 1 ? 'Do the family’s hard work, twice' : 'Do the family’s hard work', k / n.hard, `${Math.min(k, n.hard)} of ${n.hard} done on the family’s orders`, 'A man who hurt one of ours, dealt with because your superior asked. When there is such work, ask for it.');
   }
+  g('name', 'A name worth having', p.standing / n.standing, p.standing >= n.standing ? 'people speak well of you' : 'not yet', 'What people say of you comes from what you do and who sees it.');
   const made = members(w, p.familyId).filter((x) => x.id !== p.id && LADDER.indexOf(x.rank) >= 1);
   if (to === 'soldier') {
     const backers = made.filter((x) => rel(x, p.id).trust >= 0.4);
@@ -68,17 +79,23 @@ export function pathInfo(w: World, p: Character): PathInfo | undefined {
     const bossT = boss ? rel(boss, p.id).trust : 0;
     const ub = made.find((x) => x.rank === 'underboss');
     const ubT = ub ? rel(ub, p.id).trust : 1;
-    g('sponsor', `${boss ? first(boss) : 'The boss'}${ub ? ` and ${first(ub)}` : ''} behind you`, Math.min(bossT, ubT) / 0.5, `${boss ? first(boss) : 'boss'} ${bossT >= 0.5 ? 'yes' : 'not yet'}${ub ? `, ${first(ub)} ${ubT >= 0.5 ? 'yes' : 'not yet'}` : ''}`, 'Both of them have to want you. Be useful to them personally.', bossT >= 0.5 && ubT >= 0.5);
+    g('sponsor', `${boss ? first(boss) : 'The boss'}${ub ? ` and ${first(ub)}` : ''} behind ${you ? 'you' : 'him'}`, Math.min(bossT, ubT) / 0.5, `${boss ? first(boss) : 'boss'} ${bossT >= 0.5 ? 'yes' : 'not yet'}${ub ? `, ${first(ub)} ${ubT >= 0.5 ? 'yes' : 'not yet'}` : ''}`, 'Both of them have to want you. Be useful to them personally.', bossT >= 0.5 && ubT >= 0.5);
   } else {
     const t = boss ? rel(boss, p.id).trust : 0;
-    g('sponsor', `${boss ? first(boss) : 'The boss'} has to trust you`, t / 0.6, t >= 0.6 ? 'he does' : 'not yet', 'Be seen. Be useful. Never be the reason he has a bad week.');
+    g('sponsor', `${boss ? first(boss) : 'The boss'} has to trust ${you ? 'you' : 'him'}`, t / 0.6, t >= 0.6 ? 'he does' : 'not yet', 'Be seen. Be useful. Never be the reason he has a bad week.');
   }
-  const trial = to === 'soldier' ? st.trial[to] ?? 'none' : 'passed';
+  // proof of himself before he is made: once the rest of the road is done the family sets him a test (the same for every man: the
+  // player chooses how to go about it, another man goes about it his best way; npcTrial below).
+  const trial = to !== 'soldier' ? 'passed' : you ? st!.trial[to] ?? 'none' : rec.proved === to ? 'passed' : 'none';
   if (to === 'soldier') g('trial', 'Make your bones', trial === 'passed' ? 1 : 0, trial === 'passed' ? 'done' : trial === 'open' ? 'waiting on you: check your messages' : 'comes once the rest is done', 'A job is put to you. You choose how to do it.', trial === 'passed');
-  const latched = !!st.latch?.[to];
+  const latched = you ? !!st!.latch?.[to] : rec.latch === to;
   if (latched) for (const x of goals) if (x.key !== 'trial') { x.done = true; x.frac = 1; }
-  const ready = goals.filter((x) => x.key !== 'trial').every((x) => x.done);
-  return { to, goals, ready, trial: trial as PathInfo['trial'], retryAt: st.retry[to] ?? 0 };
+  // Ready: the money passed up and a senior man who will speak for him are not negotiable; the rest (the breadth of his backing, the
+  // work, his name, the family's hard work) is weighed together, so a man strong in most and short in one is still in the running.
+  const rest = goals.filter((x) => x.key !== 'trial');
+  const ready = latched || (goals.find((x) => x.key === 'earn')!.done && !!sponsorOf(w, p) && rest.reduce((a, x) => a + x.frac, 0) / rest.length >= READY_AT);
+  if (ready && !you) (p.career ??= { done: 0, failed: 0, log: [] }).latch = to; // once he has done the work it stays done
+  return { to, goals, ready, trial: trial as PathInfo['trial'], retryAt: st?.retry[to] ?? 0 };
 }
 
 // What to tell the player when they ask where they stand.
@@ -93,12 +110,6 @@ export function pathTick(w: World) {
   const p = w.playerId ? w.chars[w.playerId] : undefined;
   if (!p?.alive || !p.familyId) return;
   const st = pathState(w);
-  const mine = new Set<Id>([p.id, ...underlings(w, p).map((c) => c.id)]);
-  for (const j of w.jobs) if (j.status === 'done' && j.kind !== 'summons' && mine.has(j.assignee) && !st.counted.includes(j.id)) {
-    st.deeds++; st.counted.push(j.id);
-    if (j.kind === 'hit' && j.assignee === p.id && j.via === 'boss') st.kills = (st.kills ?? 0) + 1;
-  }
-  if (st.counted.length > 300) st.counted.splice(0, 100);
   for (const g of [...(st.guar ?? [])]) {
     if (g.due > w.now) continue;
     st.guar = st.guar!.filter((x) => x !== g);
@@ -121,12 +132,6 @@ export function pathTick(w: World) {
   if (to === 'boss') { delete st.hold; return; }
   if (!info.ready) {
     delete st.hold;
-    // Everything but the killing is done: the family finds you something.
-    const only = info.goals.filter((x) => !x.done);
-    if (only.length === 1 && only[0].key === 'kills' && (p.cooldown.famHit ?? 0) <= w.now && !w.jobs.some((j) => j.kind === 'hit' && j.via === 'boss' && (j.status === 'offered' || j.status === 'active'))) {
-      p.cooldown.famHit = w.now + 6 * DAY;
-      familyHit(w, p, w.chars[w.fam[p.familyId].bossId]);
-    }
     return;
   }
   (st.latch ??= {})[to] = true; // once you've done the work it stays done
@@ -145,6 +150,8 @@ export function pathTick(w: World) {
   }
   if ((p.cooldown.induct ?? 0) > w.now) return;
   if (w.jobs.some((j) => j.kind === 'summons' && j.meeting === 'induction' && j.status === 'offered')) return;
+  if (to !== 'underboss' && !vacancy(w, p.familyId, to)) return; // he waits for a seat, like any man whose road is done (career.noticeTick)
+  if (to === 'underboss' && !canSeatUnderboss(w, boss, p)) return;
   st.hold = to;
   makeRoom(w, p, boss, to);
   const sp = sponsorOf(w, p) ?? boss;
@@ -156,35 +163,16 @@ function openSeat(w: World, fid: Id, to: Rank) {
   while (!vacancy(w, fid, to) && openSeatFor(w, fid, to));
 }
 
-// The family gives you a name, and a reason.
-function familyHit(w: World, p: Character, boss: Character) {
-  const foes = Object.values(w.chars).filter((x) => x.alive && x.familyId && x.familyId !== p.familyId && (x.rank === 'associate' || x.rank === 'soldier'));
-  if (!foes.length) return;
-  const x = w.rng.pick(foes);
-  const them = w.fam[x.familyId!];
-  mkJob(w, {
-    kind: 'hit', subject: 'disloyal', via: 'boss', giver: boss.id, assignee: p.id, target: x.id, pay: 2500, days: 10,
-    title: `${boss.name} has a name for you`,
-    brief: `${boss.name} says ${x.name}, of the ${them.name} family, has been taking what isn’t his on your ground. "It has to be done by someone I trust, and it has to be done properly." This is what the family asks of a man who wants to rise.`,
-    reason: `${x.name} has been working against the family.`,
-  } as never);
-}
-
-// A seat is never the thing that holds you back once you've done everything. If the family is full, it makes room.
+// The chair beside the boss: empty, or the boss rates this man well above the one in it, in which case he moves that one aside
+// (the same for any captain whose road is done: career.careerTick).
 function makeRoom(w: World, p: Character, boss: Character, to: Rank) {
   const fam = w.fam[p.familyId!];
-  if (to === 'underboss') {
-    const u = members(w, fam.id).find((x) => x.rank === 'underboss' && !x.isPlayer);
-    if (u) {
-      bear(w, u, p.id, 0.25, `${p.name} went for the seat above him`);
-      applyRank(w, u, 'capo', { wage: 300, place: (x) => { x.bossId = boss.id; }, fact: { actor: boss.id, victim: u.id, story: 'seat:underboss', text: `${boss.name} has moved ${u.name} aside. He is a captain again, and the chair beside the boss is to go to ${p.name}.`, broadcast: members(w, fam.id).map((y) => y.id) } });
-    }
-    return;
+  if (to !== 'underboss') return;
+  const u = members(w, fam.id).find((x) => x.rank === 'underboss' && x.id !== p.id);
+  if (u) {
+    bear(w, u, p.id, 0.25, `${p.name} went for the seat above him`);
+    applyRank(w, u, 'capo', { wage: 300, place: (x) => { x.bossId = boss.id; }, fact: { actor: boss.id, victim: u.id, story: 'seat:underboss', text: `${boss.name} has moved ${u.name} aside. He is a captain again, and the chair beside the boss is to go to ${p.name}.`, broadcast: members(w, fam.id).map((y) => y.id) } });
   }
-  if (vacancy(w, fam.id, to)) return;
-  openSeat(w, fam.id, to);
-  addFact(w, { kind: 'report', actor: boss.id, story: 'seat:' + to, minor: false, text: `${boss.name} has decided the ${famName(w, boss)} family can use another ${to}. There’s a seat, and the name he’s using for it is ${p.name}.`, district: boss.district }, { broadcast: [p.id, boss.id] });
-  void capOf;
 }
 
 // ---------------------------------------------------------------- the trial
@@ -221,7 +209,7 @@ const TRIAL: Record<string, { title: string; lead: string; ways: Record<Way, str
     },
   },
 };
-function chanceOf(p: Character, way: Way, bonus = 0): number {
+export function chanceOf(p: Character, way: Way, bonus = 0): number {
   const T = p.traits, S = p.skills;
   const base = way === 'muscle' ? 0.35 + T.violence * 0.3 + S.muscle * 0.25 + T.courage * 0.1
     : way === 'charm' ? 0.3 + S.charm * 0.4 + T.sociability * 0.2 + p.standing / 400
@@ -230,6 +218,21 @@ function chanceOf(p: Character, way: Way, bonus = 0): number {
   return clamp(base + bonus, 0.35, 0.92);
 }
 const bonusOf = (w: World, to: Rank) => Math.min(0.3, (w.path?.fails?.[to] ?? 0) * 0.12);
+// An NPC's test: the same test, the same odds, taken the way that suits him best; a man who fails may try again, and they know he tried.
+export function npcTrial(w: World, c: Character, to: Rank, by: Character) {
+  const rec = (c.career ??= { done: 0, failed: 0, log: [] });
+  if (rec.proved === to || !TRIAL[to]) return;
+  const way = (Object.keys(TRIAL[to].ways) as Way[]).sort((a, b) => chanceOf(c, b) - chanceOf(c, a))[0];
+  const bonus = Math.min(0.3, (rec.tries ?? 0) * 0.12);
+  if (w.rng.chance(chanceOf(c, way, bonus))) {
+    rec.proved = to; delete rec.tries;
+    repute(w, c, 3, 'trial'); feel(w, by, c.id, 'respect', 0.07);
+    addFact(w, { kind: 'report', actor: c.id, story: 'seat:' + to, minor: false, text: `${by.name} set ${c.name} a job to see what he was made of. ${c.name} handled it.`, district: c.district }, { witnesses: [c.id, by.id] });
+  } else {
+    rec.tries = (rec.tries ?? 0) + 1;
+    repute(w, c, -1, 'trial'); feel(w, by, c.id, 'respect', -0.03);
+  }
+}
 function offerTrial(w: World, p: Character, to: Rank) {
   const boss = w.chars[w.fam[p.familyId!].bossId];
   const sp = to === 'underboss' ? boss : sponsorOf(w, p) ?? boss;

@@ -35,7 +35,7 @@ export function climb(w: World, log: string[] = []) {
   const p = P(w), st = pathState(w);
   for (let step = 0; step < 3; step++) {
     const r0 = p.rank;
-    for (let d = 0; d < 60 && p.rank === r0; d++) {
+    for (let d = 0; d < 400 && p.rank === r0; d++) { // (a man whose road is done still waits for a seat: career.noticeTick)
       p.lifetimeKick = 1e6; st.deeds = 999; st.kills = 9; p.standing = 90; p.heat = 0;
       for (const c of Object.values(w.chars)) if (c.alive && c.familyId === p.familyId && c.id !== p.id) { rel(c, p.id).trust = 0.9; rel(c, p.id).respect = 0.8; }
       advance(w, (Math.floor(w.now / DAY) + 1) * DAY + 13 * 60);

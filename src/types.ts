@@ -156,7 +156,8 @@ export interface Character {
   job?: DayJob;
   problem?: Problem;
   hustle?: Hustle; // (before Stage 4: his own line of work, now an enterprise in w.ops; read only to bring an older save across)
-  career?: { done: number; failed: number; log: { t: number; text: string }[] }; // what he has done for you and what has happened to him
+  career?: { done: number; failed: number; log: { t: number; text: string }[]; led?: number; rough?: number; hard?: number; latch?: string; proved?: string; tries?: number }; // what he has done for you and what has happened to him
+  // (Stage 4: work his own men did on his orders, rough work and the family's hard work he did himself, and the rank whose road he has finished: career.ts)
   prospect?: boolean; // a hanger-on who might be taken on
   cars: number; // stolen cars on hand
   goods: number; // value of stolen goods on hand
@@ -233,6 +234,7 @@ export interface Family {
   lastPromo?: number;
   watch?: Record<Id, number>; // weeks a man has kept up the pace with no chair free for him
   capBonus?: Record<string, number>; // seats the boss has opened beyond the usual number
+  ubSince?: number; // (Stage 4) since when the chair beside the boss has stood empty
   seatNo?: Record<string, number>; // until when he won't hear another request for a seat
   hunt?: { target: Id; since: number; sev: number; why: string }; // the family has put out word on someone
 }

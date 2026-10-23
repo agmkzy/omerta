@@ -602,6 +602,7 @@ ASKS.protect = {
       tension(w, a, pc, 2);
       return `${t.name} will pay ${money(fee)} a week, to ${a.isPlayer ? 'you' : first(a)} now. ${pc.name} will hear of it.`;
     }
+    const rec = (a.career ??= { done: 0, failed: 0, log: [] }); rec.rough = (rec.rough ?? 0) + 1; // (rough work of his own: career.ts reads it as proof of him)
     addFact(w, { kind: 'protection_started', actor: a.id, victim: t.id, business: b.id, amount: fee, story: 'sit:' + s.id, text: `${a.name} now collects ${money(fee)} a week from ${b.name}.`, district: b.district }, { witnesses: witnessesAt(w, b.district, [a.id, t.id], 2) });
     return `${t.name} agrees to ${money(fee)} a week.`;
   },

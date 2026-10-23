@@ -463,3 +463,56 @@ The daily scan in which every associate and soldier considered every open shop i
 - **Consistency and ledger problems:** 0.
 - **Saves:** 8.1–8.8 MB.
 - **Most of what comes to nothing is collection from men with nothing to pay,** whose debts then run on to default. That's believable, and the repeat visits are fixed.
+
+### Increment 5: one career rulebook
+
+This closes the inconsistency left open since step 2. The player's road (`path.ts`) and the NPC rule of thumb (`career.npcReadiness`) were two different rulebooks. One asked $15,000 passed up and 20 jobs to be made; the other asked $1,500 and nothing else. Now **one road for every man** (`path.pathInfo`), read by the player's screens and by the family deciding on an NPC (`career.readiness`).
+
+- **Not negotiable:**
+  - what he has passed up;
+  - a senior man who will speak for him;
+  - before he is made, a test the family sets him once the rest is done. The player chooses how to go about it; another man goes about it his best way, at the same odds (`path.npcTrial`).
+- **Weighed together** (three-quarters is enough, so a man strong in most and short in one is still in the running):
+  - the breadth of his backing (three made men for a soldier; the boss and the underboss for a captain);
+  - the work he has done for the family, his own and what his men finished on his orders;
+  - a name worth having;
+  - for the underboss's chair, the family's hard work.
+- **The numbers come from what men in this world actually do.** Over two years an associate passes up about $2,000 (the best $10,000), a soldier about $8,000, a captain about $11,000, and a superior hands a man below him a piece of work every few months.
+
+| Rank | Passed up | Work | Name |
+|---|---|---|---|
+| Soldier | $3,000 | 2 | 30 |
+| Captain | $10,000 | 3 | 40 |
+| Underboss | $20,000 | 6 (and 1 hard job) | 50 |
+
+- **A seat is the family's.** It's open, or the boss opens one for a record he has been hearing about for weeks (`career.noticeTick`). That's now true for the player too: his finished road no longer opens a seat on the spot.
+- **The chair beside the boss** goes to a captain whose road is done:
+  - into an empty chair;
+  - or in place of the man in it, if the boss rates him well above that man. The man moved aside holds it against him.
+
+  The same rule applies to the player. If the chair stands empty a season and nobody's road is done, the boss names the captain he rates most: an empty seat the structure needs, not a reward for waiting.
+- **The record** (`Character.career`) is kept where every job ends (`work.noteWork`): his own work, his men's work for him, rough work, hard work, and the test passed.
+
+**Deleted:**
+- the NPC formula and its "old family / new family" weighting;
+- `familyHit`, which invented a name and a reason ("has been taking what isn't his on your ground") so the player could tick off a kill. The family's hard work is now real work: a man who hurt one of ours, dealt with because a superior asked (`work.needsOf` 'handle').
+
+**First attempt, measured and corrected.** Taking the player's road as it stood, every goal a hard gate, cut promotions from 33–55 to 6–15 per world, and captains fell from 13 to 7–11. The organisation's life cycle from step 2 would have stopped. The reasons, counted man by man:
+- two senior men's trust at 0.5 (trust in a boss averages 0.45 since step 3);
+- job counts that superiors rarely hand out below captain;
+- a kill for every captain.
+
+The gates are now only what can't be negotiated, the rest is weighed, and proof is the same test for everyone.
+
+**Tests** (`hierarchy/promotion.test.ts`):
+- the player and an NPC are measured on the same things;
+- a man isn't made because time has passed;
+- a man whose road is done is made when there's a seat, and not before passing his test;
+- finished work is on the right records.
+
+The climb-to-boss tests now let the player wait for a seat.
+
+**Two years, four worlds:**
+- **Promotions:** 29–35 (associate → soldier 16–25, soldier → captain 8–12, a few to the top). Before: 33–55.
+- **Captains:** 13 → 18–21 as families grow.
+- **Consistency and ledger problems:** 0.
