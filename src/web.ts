@@ -698,7 +698,8 @@ function handle(a: string, v: string) {
       }
       const lines = typeof res.meeting === 'string' ? [...res.lines, res.meeting] : res.lines;
       const keep = isNavCode(picked.code) && !res.lines.length && !!res.convo;
-      return pass(res.minutes, res.convo ? [] : lines, res.convo ? (keep ? { t: 'talk', convo: res.convo, lines: tv.lines, q: tv.q, history: tv.history } : { t: 'talk', convo: res.convo, lines, q: res.q ?? (isNavCode(picked.code) ? undefined : picked.label), history }) : { t: 'tab', name: 'today' });
+      // (a conversation that ends stays on the page: the last thing said, and how you left it)
+      return pass(res.minutes, [], res.convo ? (keep ? { t: 'talk', convo: res.convo, lines: tv.lines, q: tv.q, history: tv.history } : { t: 'talk', convo: res.convo, lines, q: res.q ?? (isNavCode(picked.code) ? undefined : picked.label), history }) : { t: 'talk', convo: tv.convo, lines, q: res.q ?? picked.label, history, ended: true });
     }
     case 'cmove': {
       const r = performMove(w, S.moves[Number(v)]);

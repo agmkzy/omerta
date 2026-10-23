@@ -32,7 +32,7 @@ export type View =
   | { t: 'books'; id: Id; lines: string[] }
   | { t: 'meeting'; m: Meeting; lines: string[] }
   | { t: 'guests'; picked: Id[] }
-  | { t: 'talk'; convo: Convo; lines: string[]; q?: string; history?: { q?: string; lines: string[] }[] }
+  | { t: 'talk'; convo: Convo; lines: string[]; q?: string; history?: { q?: string; lines: string[] }[]; ended?: boolean }
   | { t: 'people' }
   | { t: 'brief' }
   | { t: 'sunday' }

@@ -128,15 +128,28 @@ export function talkView(v: TalkV): string {
   let out = back('Leave');
   // who he is, where you are; on a phone, what you know of him opens from here
   const panel = aboutHim(w, p, t);
-  out += `<header class="cv-head">${avatar(t)}<div><h1>${pl(t)}</h1><div class="sub">${chip(t)} ${esc(b && t.rank === 'civilian' ? b.name : t.district)} &middot; ${esc(BAND(w.now))}</div><details class="cv-drawer"><summary>What you know about him</summary><div class="cv-panel">${panel}</div></details></div></header>`;
+  out += `<header class="cv-head">${avatar(t)}<div><h1>${pl(t)}</h1><div class="sub">${chip(t)} ${esc(b && t.rank === 'civilian' ? b.name : t.district)} &middot; ${esc(BAND(w.now))}</div><p class="cv-mood">${esc(moodOf(w, p, t))}</p><details class="cv-drawer"><summary>What you know about him</summary><div class="cv-panel">${panel}</div></details></div></header>`;
   toSide(`<div class="cv-panel cv-side">${panel}</div>`);
-  // what was said before: the last two exchanges stay readable, older ones fold away
+  // the conversation so far, as it was said: the last several exchanges stay on the page, older ones fold away
   const hist = v.history ?? [];
-  if (hist.length > 2) out += `<details class="cv-older"><summary>Earlier (${hist.length - 2})</summary>${hist.slice(0, -2).map((h) => exchange(h.q, h.lines, false, t)).join('')}</details>`;
-  out += hist.slice(-2).map((h) => exchange(h.q, h.lines, false, t)).join('');
+  out += `<div class="cv-log">`;
+  if (hist.length > 6) out += `<details class="cv-older"><summary>Earlier (${hist.length - 6})</summary>${hist.slice(0, -6).map((h) => exchange(h.q, h.lines, false, t)).join('')}</details>`;
+  out += hist.slice(-6).map((h) => exchange(h.q, h.lines, false, t)).join('');
   if (v.lines.length || v.q) out += exchange(v.q, v.lines, true, t);
-  out += choices(v, w, p, t);
+  out += `</div>`;
+  // (a conversation that has come to its end says so, and where you can go from it)
+  if (v.ended) return out + `<div class="cv-end"><div class="cv-endrow"><button class="btn primary" data-a="back:">Go on</button><button class="btn" data-a="ent:${t.id}">His page</button></div></div>`;
+  out += terms(v, w, p, t) + choices(v, w, p, t);
   return out;
+}
+
+// What is on the table, while a negotiation is the subject: what you have put to him and where he stands on it.
+function terms(v: TalkV, w: World, p: Character, t: Character): string {
+  const f = v.convo.ctx.focus;
+  if (!f?.startsWith('m:')) return '';
+  const o = openBetween(w, p, t).find((x) => x.key === f.slice(2));
+  if (!o) return '';
+  return `<div class="cv-table"><div class="cv-table__h"><b>${esc(o.title)}</b><span>${esc(o.stage)}</span></div>${o.body.slice(0, 2).map((x) => `<p>${esc(x)}</p>`).join('')}</div>`;
 }
 
 // Choices (V90). On the hub: what he brings up, what is between you (one row a matter, by name), the four everyday questions and the
@@ -165,5 +178,7 @@ function choices(v: TalkV, w: World, p: Character, t: Character): string {
   const g = (name: string) => all.filter((x) => x.o.group === name);
   const sec = (h: string, xs: typeof all, kind: 'reply' | 'topic' | 'quiet') => (xs.length ? `<h2 class="cv-g">${h}</h2><div class="cv-list">${xs.map((x) => btn(x, kind)).join('')}</div>` : '');
   // (Stage 5C: what he raises, what is real and pending between you, then the five ways into the rest, then leaving)
-  return sec('He brings it up', g('He brings it up'), 'reply') + sec('On his mind', g('On his mind'), 'topic') + sec('On your mind', g('Between you'), 'topic') + sec('Other subjects', g('Other subjects'), 'topic') + quiet(all.filter((x) => !x.o.group));
+  const ways = g('Other subjects');
+  const waysRow = ways.length ? `<h2 class="cv-g">${g('Between you').length || g('On his mind').length ? 'Or' : 'You could say'}</h2><div class="cv-ways">${ways.map(({ o, i }) => `<button class="cv-way" data-a="say:${i}">${lk(o.label)}</button>`).join('')}</div>` : '';
+  return sec('He brings it up', g('He brings it up'), 'reply') + sec('On your mind', g('Between you'), 'topic') + sec('On his mind', g('On his mind'), 'topic') + waysRow + quiet(all.filter((x) => !x.o.group));
 }
