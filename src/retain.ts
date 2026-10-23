@@ -30,17 +30,22 @@ export const SIGNIFICANT_DAYS = 150;
 export const PLAYER_SIGNIFICANT_DAYS = 365;
 export const BYSTANDER_DAYS = 60; // bystanders forget significant facts after this long
 
-export const tierOf = (k: FactKind): 'permanent' | 'routine' | 'significant' =>
-  PERMANENT.has(k) ? 'permanent' : ROUTINE.has(k) ? 'routine' : 'significant';
+// A small raid or a small default is local news, not history: it travels a little and fades like any significant fact, unless
+// something still points at it. Since every enterprise faces the police (Stage 4), a police fine on a numbers spot would
+// otherwise travel the whole city and be kept for ever. The federal sweep and big defaults carry no fine or a large sum, and stay.
+export const SMALL_MATTER = 1000;
+export const tierOf = (f: Pick<Fact, 'kind' | 'amount'>): 'permanent' | 'routine' | 'significant' =>
+  (f.kind === 'raid' || f.kind === 'debt_default') && f.amount !== undefined && f.amount < SMALL_MATTER ? 'significant'
+    : PERMANENT.has(f.kind) ? 'permanent' : ROUTINE.has(f.kind) ? 'routine' : 'significant';
 
 // How far a fact may travel by gossip: routine news barely leaves the room.
 export function gossipCap(f: Fact): number {
   if (!RETENTION.on) return 1e9;
-  const t = tierOf(f.kind);
+  const t = tierOf(f);
   return t === 'permanent' ? 1e9 : t === 'significant' ? 14 : 3;
 }
 export function gossipFresh(w: World, f: Fact): boolean {
-  return !RETENTION.on || tierOf(f.kind) === 'permanent' || w.now - f.t < (tierOf(f.kind) === 'routine' ? 10 : 45) * DAY;
+  return !RETENTION.on || tierOf(f) === 'permanent' || w.now - f.t < (tierOf(f) === 'routine' ? 10 : 45) * DAY;
 }
 
 const FACT_ID = /^f\d+$/;
@@ -93,7 +98,7 @@ export function sweep(w: World): SweepStats {
   };
   const drop: Id[] = [];
   for (const f of Object.values(w.facts)) {
-    const tier = tierOf(f.kind);
+    const tier = tierOf(f);
     const age = (w.now - f.t) / DAY;
     const mine = !!p && (f.actor === p.id || f.victim === p.id);
     const live = refs.has(f.id) || (f.story ? openStory.has(f.story) : false);
@@ -112,7 +117,7 @@ export function sweep(w: World): SweepStats {
         if (FACT_ID.test(id)) { delete c.known[id]; known++; } // fact is gone
         continue; // non-fact keys ('leave:...') belong to other systems
       }
-      if (tierOf(f.kind) === 'permanent' || c.isPlayer) continue;
+      if (tierOf(f) === 'permanent' || c.isPlayer) continue;
       const involved = f.actor === c.id || f.victim === c.id;
       const old = (w.now - f.t) / DAY > BYSTANDER_DAYS;
       if (!involved && !refs.has(id) && (old || deadLong)) { delete c.known[id]; known++; }

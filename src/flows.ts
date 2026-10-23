@@ -1,6 +1,7 @@
 // Conversations about standing, pressure and the crew: being backed, being promoted, leaning on a man, a rival's ear, taking a man on,
 // orders that meet resistance, and the lead-up to a sit-down. Each one is a short negotiation: he answers from his own position, you
 // choose how to respond, and the result goes through the records that already exist (favours, memos, facts, relationships, tension).
+import { lineOf } from './rackets';
 import { temper, viewOf } from './temper';
 import type { Convo, FollowOpt, Said } from './dialogue';
 import { readiness } from './career';
@@ -193,7 +194,7 @@ export function flow(w: World, p: Character, t: Character, c: Convo, code: strin
       return said(lines, c, [{ code: 'fl:th_ease', label: '“I’d sooner settle this with a good week.”', hint: 'Takes the edge off. He’ll try to earn it back.' }, drop], 10);
     }
     if (mood === 'plead') {
-      const why = t.problem ? PROBLEM_LABEL[t.problem.kind] : t.hustle?.cause ?? 'a bad stretch';
+      const why = t.problem ? PROBLEM_LABEL[t.problem.kind] : lineOf(w, t)?.cause ?? 'a bad stretch';
       lines.push(`He goes pale and keeps his voice low. “It isn’t what you think. It’s ${why}. Give me a little time and I’ll put it right.”`);
       tweak(-0.02, -0.02, -0.01);
       return said(lines, c, [{ code: 'fl:th_hear', label: '“Go on. I’m listening.”', hint: 'He may tell you what is really wrong.' }, { code: 'fl:th_hold', label: '“It stands. I’m not changing it.”', hint: 'Fear works, for a while.' }], 15);

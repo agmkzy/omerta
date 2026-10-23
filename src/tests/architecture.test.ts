@@ -35,6 +35,15 @@ describe('architecture', { tags: ['architecture'] }, () => {
     }
     assert.deepEqual(bad, []);
   });
+  ok('debts have their doors: no source line sets a debt\'s balance or terms outside core.ts', () => {
+    // (core.createDebt, payDebt, accrueVig, restructure, writeDown keep the principal, the arrears and the balance agreeing)
+    const bad: string[] = [];
+    const dir = fileURLToPath(new URL('../', import.meta.url));
+    for (const f of readdirSync(dir).filter((x) => x.endsWith('.ts') && !['core.ts', 'cli.ts'].includes(x))) {
+      readFileSync(dir + f, 'utf8').split('\n').forEach((l, i) => { if (/\.(balance|weeklyRate|weeklyPayment|owed|arrears|principal)\s*[-+*]?=[^=]/.test(l) && /\bd\b|debt/i.test(l)) bad.push(`${f}:${i + 1}`); });
+    }
+    assert.deepEqual(bad, []);
+  });
   ok('grudges and reputation have one door each: no source line sets .grudge or .standing outside core.ts', () => {
     // (core.bear/ease for grudges, which keep the reason with them; core.repute for anyone's standing. world.ts sets the first value.)
     const bad: string[] = [];

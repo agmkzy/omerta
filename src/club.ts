@@ -1,6 +1,7 @@
 // The social club, as conversations. A man has something to say because something in the world gives him a reason,
 // and you have a few things you can raise with him yourself. Each conversation is a short scene that changes real state
 // (books, debts, favours, quarrels, situations, jobs, careers) and then ends. The scene is kept in the world so a reload resumes it.
+import { lineOf } from './rackets';
 import { pass, versionOf } from './rumour';
 import { fp } from './voice';
 import { amends, callSitdown, ignoreDispute, mineAgainst, againstMe, playerActed } from './disputes';
@@ -62,7 +63,7 @@ export function topicsFor(w: World, p: Character, cl: Club, c: Character): Topic
   if (ds) add({ key: 'debtor', sig: ds.id + ':' + ds.balance + ':me', label: 'Bring up what he owes you', cue: `${money(ds.balance)} outstanding`, by: 'me', prio: 3 });
   if (!out.some((t) => t.key === 'creditor') && debtsOf(w, c.id, p.id)[0] === undefined) { const d = w.debts.find((x) => x.status === 'active' && x.creditor === c.id && x.debtor === p.id); if (d) add({ key: 'creditor', sig: d.id + ':' + d.balance + ':me', label: 'Settle what you owe him', cue: `${money(d.balance)}`, by: 'me', prio: 3 }); }
   if (crew && rk(p) >= 1 && c.rank === 'associate' && recommendable(w, p).some((x) => x.id === c.id)) add({ key: 'sponsor', sig: c.id + ':me', label: 'Tell him you will put his name forward', cue: '', by: 'me', prio: 2 });
-  if (crew || sitOf(w, c.id) || c.hustle) add({ key: 'biz', sig: String(Math.floor(w.now / DAY)), label: 'Ask how business is', cue: '', by: 'me', prio: 2 });
+  if (crew || sitOf(w, c.id) || lineOf(w, c)) add({ key: 'biz', sig: String(Math.floor(w.now / DAY)), label: 'Ask how business is', cue: '', by: 'me', prio: 2 });
   if (c.id === p.bossId || rk(c) > rk(p) && rk(c) >= 2) add({ key: 'ask_work', sig: String(Math.floor(w.now / (3 * DAY))), label: 'Ask if there’s anything for you', cue: '', by: 'me', prio: 2 });
   add({ key: 'heard', sig: String(Math.floor(w.now / (2 * DAY))), label: 'Ask what he’s heard', cue: '', by: 'me', prio: 1 });
   add({ key: 'drink', sig: String(Math.floor(w.now / DAY)), label: 'Buy him a drink ($20)', cue: '', by: 'me', prio: 1 });
@@ -250,7 +251,7 @@ function script(w: World, p: Character, cl: Club, c: Character, s: Scene): Node 
       const st = statement(w, c);
       const ls: string[] = [];
       if (c.bossId === p.id && st.has) ls.push(`${f} gives you the short version. Last week he made ${money(st.own)}${st.crew ? ` and his own men passed up ${money(st.crew)}` : ''}, and handed up ${money(st.handed)} of ${money(st.due)}.`);
-      else if (c.hustle) ls.push(`${f} shrugs. "It goes. ${c.hustle.net > 0 ? 'I can’t complain.' : 'Quiet.'}"`);
+      else if (lineOf(w, c)) ls.push(`${f} shrugs. "It goes. ${lineOf(w, c)!.last > 0 ? 'I can’t complain.' : 'Quiet.'}"`);
       else ls.push(`"Same as always," says ${f}.`);
       if (sit && sit.kind !== 'ambition' && (!sit.told || s.data.L_ask)) { ls.push(...once('ask', () => askAbout(w, p, c))); s.data.L_ask = 1; return { lines: ls, opts: [o('help', 'Ask what would help', '', () => { s.topic = 'trouble'; return { say: [], next: 'help' }; }), o('x', 'Leave it there', '', () => END([], 10))] }; }
       return { lines: ls, opts: [o('x', 'Good', '', () => END([], 10))] };

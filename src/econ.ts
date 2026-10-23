@@ -13,7 +13,7 @@
 //
 // Nothing here knows about the screen. Only the simulation knows why a payment was short (`protection.why`); everyone else works
 // it out from evidence() - what a visitor could actually see.
-import { addFact, clamp, earn, money, ownersChanged, rel } from './core';
+import { addFact, clamp, earn, money, ownersChanged, rel, writeDown } from './core';
 import { spawnCivilian } from './world';
 import { Business, Character, Id, Stake, TxKind, Txn, WeekAcct, WEEK, DAY, World } from './types';
 
@@ -339,8 +339,7 @@ function payStake(w: World, b: Business, s: Stake) {
   if (s.how.startsWith('debt:')) {
     const d = w.debts.find((x) => x.id === s.how.slice(5));
     if (d && (d.status === 'active' || d.status === 'defaulted')) {
-      d.balance = Math.max(0, d.balance - pay);
-      if (d.balance <= 0) { d.status = 'paid'; b.stakes = (b.stakes ?? []).filter((x) => x !== s); if (!b.stakes.length) delete b.stakes; }
+      if (writeDown(w, d, pay)) { b.stakes = (b.stakes ?? []).filter((x) => x !== s); if (!b.stakes.length) delete b.stakes; } // (paid off by the share: core.writeDown)
     }
   }
 }
@@ -399,6 +398,38 @@ export function setCollector(w: World, b: Business, collectorId: Id, familyId: I
   if (collectorId === b.ownerId) return; // a man cannot collect from himself; callers that pick a taker exclude the owner, this is the last line
   const old = b.protection;
   b.protection = { collectorId, familyId, fee: o.fee ?? old?.fee ?? 0, since: w.now, ...(o.keepOwed && old?.owed ? { owed: old.owed, late: old.late, why: old.why } : {}) };
+}
+
+// ------------------------------------------------------------------ a crew's ground (Stage 4)
+// Read from the records, not a territory system: a crew is a captain and the men under him; its ground is the districts where
+// its men already collect, in its family's districts. A crew that collects nowhere yet starts where its captain lives.
+export function crewHead(w: World, c: Character): Character {
+  let h = c;
+  for (let i = 0; i < 6 && h.bossId && !['capo', 'underboss', 'boss'].includes(h.rank); i++) { const up = w.chars[h.bossId]; if (!up) break; h = up; }
+  return h;
+}
+export function crewGround(w: World, c: Character): Set<string> {
+  const fam = c.familyId ? w.fam[c.familyId] : undefined, out = new Set<string>();
+  if (!fam) return out;
+  const head = crewHead(w, c).id;
+  for (const b of Object.values(w.biz)) {
+    const x = b.open && b.protection?.familyId === fam.id ? w.chars[b.protection.collectorId] : undefined;
+    if (x && fam.districts.includes(b.district) && crewHead(w, x).id === head) out.add(b.district);
+  }
+  if (!out.size) { const h = w.chars[head]; out.add(fam.districts.includes(h.district) ? h.district : fam.districts.includes(c.district) ? c.district : fam.districts[0]); }
+  return out;
+}
+// A shop remembers who it turned away. The same door opens to him again only when something has changed: he stands higher than
+// he did, he has a different captain behind him, or the shop has had trouble since.
+export function noteRefusal(w: World, b: Business, a: Character) {
+  b.refused ??= {};
+  for (const id of Object.keys(b.refused)) if (!w.chars[id]?.alive) delete b.refused[id];
+  b.refused[a.id] = { t: w.now, st: Math.round(a.standing), head: crewHead(w, a).id };
+}
+export function changedSince(w: World, b: Business, a: Character): boolean {
+  const r = b.refused?.[a.id];
+  if (!r) return true;
+  return a.standing >= r.st + 5 || crewHead(w, a).id !== r.head || b.damaged > 0 || b.distress > 0;
 }
 
 // ------------------------------------------------------------------ what a visitor can see

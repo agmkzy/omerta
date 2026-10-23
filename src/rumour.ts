@@ -33,7 +33,7 @@ export function salience(w: World, to: Character, f: Fact): number {
   const touch = Math.max(near(f.actor), near(f.victim), f.business && w.biz[f.business]?.ownerId === to.id ? 1 : 0);
   // a stranger's bad night at cards is nobody's business unless it was a fortune
   if (f.kind === 'gambling_loss' && touch < 0.45 && (f.amount ?? 0) < 1000) return -1;
-  const tier = tierOf(f.kind);
+  const tier = tierOf(f);
   const weight = tier === 'permanent' ? 0.6 : tier === 'significant' ? 0.4 : 0.1;
   const street = f.district === to.district ? 0.1 : 0;
   return touch + weight + street;

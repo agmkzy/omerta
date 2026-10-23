@@ -2,9 +2,12 @@ import { hasPerk } from './specs';
 // Ongoing operations. Each one has a runner, a weekly take, and a way to go wrong. Money from these comes through the books
 // like everything else, so what your superiors can see is a choice with consequences.
 import { aptitude, grow } from './people';
-import { addFact, bearOn, clamp, earn, feel, feelOn, handleDeath, money, newId, rel } from './core';
+import { addFact, bearOn, clamp, createDebt, earn, feel, feelOn, money, newId, ownerBiz, rel } from './core';
+import { move, openAsk } from './asks';
+import { askToInvest } from './reports';
+import { temper } from './temper';
 import { addEnc } from './encounters';
-import { Character, DAY, Id, Op, OpKind, World } from './types';
+import { Character, DAY, Id, Op, OpKind, WEEK, World } from './types';
 import { arch, pick } from './voice';
 
 export interface OpDef {
@@ -18,19 +21,24 @@ export interface OpDef {
   districts?: string[];
   blurb: string;
   skill: string;
+  src?: string; // how its money shows in a man's books (books.SOURCE_LABEL), when not its own kind
+  bad?: string[]; good?: string[]; // what a bad week and a good one look like
 }
-export const OPS: Record<Exclude<OpKind, 'hijack'>, OpDef> = {
-  numbers: { label: 'Numbers bank', group: 'Betting', cost: 600, base: 340, risk: 0.05, heat: 0.03, rank: 'associate', skill: 'numbers', blurb: 'Runners take nickel and dime bets in bars and barbershops. You pay the hits. Steady money, steady attention.' },
-  bookie: { label: 'Bookmaking', group: 'Betting', cost: 400, base: 260, risk: 0.04, heat: 0.025, rank: 'associate', skill: 'numbers', blurb: 'Sports and the horses. Wonderful until a favourite comes in.' },
-  vending: { label: 'Jukeboxes and vending', group: 'Street trades', cost: 800, base: 190, risk: 0.015, heat: 0.01, rank: 'associate', skill: 'lean', blurb: 'Machines in every bar in the district, and every owner agrees they’re yours.' },
+export type OpKey = Exclude<OpKind, 'hijack'>;
+export const OPS: Record<OpKey, OpDef> = {
+  numbers: { label: 'Numbers bank', group: 'Betting', cost: 600, base: 420, risk: 0.05, heat: 0.03, rank: 'associate', skill: 'numbers', blurb: 'Runners take nickel and dime bets in bars and barbershops. You pay the hits. Steady money, steady attention.', bad: ['a runner skipped town with the slips', 'a big hit came in and he had to pay out', 'two of his corner shops stopped taking bets after a police visit'], good: ['the corner is busy and the slips are thick'] },
+  bookie: { label: 'Bookmaking', group: 'Betting', cost: 400, base: 450, risk: 0.04, heat: 0.025, rank: 'associate', skill: 'numbers', blurb: 'Sports and the horses. Wonderful until a favourite comes in.', bad: ['the favourite came in and the book took a beating', 'a regular welshed on a big bet', 'he laid off too much and ate it'], good: ['the book fell his way'] },
+  vending: { label: 'Jukeboxes and vending', group: 'Street trades', cost: 800, base: 380, risk: 0.015, heat: 0.01, rank: 'associate', skill: 'lean', blurb: 'Machines in every bar in the district, and every owner agrees they’re yours.', bad: ['a machine was smashed and the repair cost him', 'a bar owner dropped him for a rival route'], good: ['the bars were full'] },
   dock: { label: 'Pier loading racket', group: 'Waterfront and unions', cost: 0, base: 620, risk: 0.05, heat: 0.04, rank: 'soldier', districts: ['Red Hook', 'Staten Island'], skill: 'collect', blurb: 'Every crate that moves pays a toll. The foremen know who to give it to.' },
   union: { label: 'Union local', group: 'Waterfront and unions', cost: 1500, base: 520, risk: 0.03, heat: 0.03, rank: 'soldier', districts: ["Hell's Kitchen", 'The Bronx', 'Astoria'], skill: 'lean', blurb: 'Dues, a pension fund and jobs for sale. Quiet and very profitable. The first month is a bribe.' },
-  shylock: { label: 'Street loans', group: 'Street trades', cost: 1200, base: 300, risk: 0.04, heat: 0.015, rank: 'associate', skill: 'collect', blurb: 'Cash lent at a weekly rate to people the banks won’t see. It pays well until someone can’t. Then it pays in other ways.' },
+  shylock: { label: 'Street loans', group: 'Street trades', cost: 1200, base: 300, risk: 0.04, heat: 0.015, rank: 'associate', skill: 'collect', blurb: 'Cash lent at a weekly rate to people the banks won’t see. It pays well until someone can’t. Then it pays in other ways.', bad: ['two borrowers went quiet and he couldn’t find them', 'one customer lost his job and paid nothing'], good: ['everybody paid on time'] },
   cigarettes: { label: 'Bootleg cigarettes', group: 'Street trades', cost: 900, base: 230, risk: 0.03, heat: 0.02, rank: 'associate', skill: 'handle', blurb: 'Untaxed cartons from the south, sold from the back of every corner store. The state taxes are the profit.' },
   nightclub: { label: 'A nightclub stake', group: 'Fronts', cost: 4000, base: 330, risk: 0.02, heat: 0.01, rank: 'associate', skill: 'charm', blurb: 'Your name behind the bar of a place everyone wants to be seen. The cash register does the laundering.' },
   carting: { label: 'Private carting', group: 'Waterfront and unions', cost: 1800, base: 440, risk: 0.025, heat: 0.02, rank: 'soldier', districts: ['Bensonhurst', 'The Bronx', 'Staten Island'], skill: 'lean', blurb: 'Every restaurant and shop pays for its rubbish to go, and nobody else is allowed to take it. Dull, steady, vicious if you cross it.' },
   construction: { label: 'Construction kickbacks', group: 'Waterfront and unions', cost: 2500, base: 560, risk: 0.035, heat: 0.03, rank: 'soldier', districts: ["Hell's Kitchen", 'Astoria', 'Little Italy'], skill: 'fix', blurb: 'Concrete, cranes and building inspectors. Every contractor pays to keep the site moving.' },
   trucking: { label: 'Trucking and cargo', group: 'Waterfront and unions', cost: 2200, base: 480, risk: 0.05, heat: 0.035, rank: 'soldier', districts: ['Red Hook', 'Staten Island', 'The Bronx'], skill: 'handle', blurb: 'Control the drivers and you control what gets delivered, what gets lost, and who is told about it.' },
+  chop: { label: 'A car-stealing outfit', group: 'Street trades', cost: 0, base: 480, risk: 0.05, heat: 0.04, rank: 'associate', skill: 'boost', src: 'boost', blurb: 'Cars taken to order and run to a chop shop. Quick money, and a cop’s car is a very bad night.', bad: ['the chop shop was shut for a week', 'a car turned out to be a cop’s', 'the buyer cut his price'], good: ['a good run of cars'] },
+  fencing: { label: 'Fencing stolen goods', group: 'Street trades', cost: 300, base: 400, risk: 0.025, heat: 0.02, rank: 'associate', skill: 'scam', src: 'scam', blurb: 'Whatever comes off a truck, moved on at a third of what it cost somebody.', bad: ['his supplier dried up', 'a load turned out to be junk'], good: ['a rich shipment moved fast'] },
   front: { label: 'A front business', group: 'Fronts', cost: 3000, base: 150, risk: 0.01, heat: -0.04, rank: 'associate', skill: 'numbers', blurb: 'A laundromat or a restaurant on paper. Clean money and a reason to be seen.' },
 };
 export const OP_GROUPS = ['Betting', 'Street trades', 'Waterfront and unions', 'Fronts'] as const;
@@ -155,45 +163,60 @@ function resolveHijack(w: World, op: Op) {
 }
 const gross0 = (w: World) => w.rng.int(1800, 3800);
 
-export function opsWeek(w: World) {
-  const p = PL(w);
-  if (!p) return;
+// Stage 4 (Oct 2026): one weekly pass for every enterprise, whoever owns it. What used to be the player's operations and NPCs'
+// hustles are the same records under the same rules: a take that depends on the man doing the work, how far the owner has grown it,
+// how crowded the trade is in the district and what his family wants this month; bad weeks and good ones; police raids; a runner
+// who may skim. Street loans are real loans (shylockWeek); a betting book's heavy losers run up real markers (marker). NPC owners
+// also decide for themselves: grow it, or after a run of bad weeks change course (npcTend), and men without one start one, by the
+// same rules the player's Rackets tab uses (startEnterprises, canStart).
+export function enterpriseWeek(w: World) {
+  startEnterprises(w);
   for (const op of w.ops) {
     if (op.state === 'closed' || op.kind === 'hijack' || op.state === 'done') continue;
-    const d = OPS[op.kind as Exclude<OpKind, 'hijack'>];
+    const d = OPS[op.kind as OpKey];
     const owner = w.chars[op.owner];
     const runner = op.runner ? w.chars[op.runner] : undefined;
     if (!owner?.alive) { op.state = 'closed'; continue; }
-    if (runner && (!runner.alive)) { op.runner = null; }
+    if (runner && !runner.alive) op.runner = null;
     op.weeks++;
     if (op.state === 'raided') { op.last = 0; continue; }
+    if ((op.lull ?? 0) > w.now) { op.last = 0; continue; }
     const doer = runner && runner.alive ? runner : owner;
-    if (runner && runner.jailedUntil > w.now) { op.last = Math.round(op.last * 0.3); continue; }
-    const ap = aptitude(doer, d.skill);
-    let take = d.base * (0.55 + ap * 0.9) * w.rng.range(0.8, 1.25);
-    if (owner.isPlayer && hasPerk(w, owner, 'earner')) take *= 1.12;
-    if (op.kind === 'bookie' && w.rng.chance(0.18)) take = -w.rng.int(150, 500); // the favourite came in
-    if (op.kind === 'front') take = d.base * w.rng.range(0.8, 1.2);
+    if (doer.jailedUntil > w.now) { op.last = Math.round(op.last * 0.3); continue; }
+    if (!owner.isPlayer && npcTend(w, op, owner, d)) continue;
+    const lvl = op.level ?? 1;
+    if (op.kind === 'shylock') { shylockWeek(w, op, owner, lvl); continue; }
     const fam = owner.familyId ? w.fam[owner.familyId] : undefined;
-    const hot = Object.values(fam?.tension ?? {}).reduce((a, b) => Math.max(a, b), 0);
+    let take = d.base * (0.55 + aptitude(doer, d.skill) * 0.9) * (1 + (lvl - 1) * 0.55) * w.rng.range(0.8, 1.25) * crowding(w, op);
+    if (owner.isPlayer && hasPerk(w, owner, 'earner')) take *= 1.12;
+    const dir = fam?.directive && fam.directive.until > w.now ? fam.directive.kind : undefined;
+    if (dir) take *= dir === 'push' ? 1.25 : 0.85;
+    let cause = d.good?.length ? pick(d.good, op.id + ':' + w.now) : '';
+    if (op.kind === 'bookie' && w.rng.chance(0.18)) { take = -w.rng.int(150, 500) * lvl; cause = d.bad?.length ? pick(d.bad, op.id + ':' + w.now) : 'the favourite came in'; op.bad = (op.bad ?? 0) + 1; }
+    else if (w.rng.chance(0.12)) { take *= w.rng.range(0.15, 0.55); cause = d.bad?.length ? pick(d.bad, op.id + ':' + w.now) : 'a bad week'; op.bad = (op.bad ?? 0) + 1; }
+    else op.bad = Math.max(0, (op.bad ?? 0) - 1);
+    if (op.kind === 'front') take = d.base * w.rng.range(0.8, 1.2);
     if (!fam?.districts.includes(op.district)) take *= 0.7;
+    const hot = Object.values(fam?.tension ?? {}).reduce((a, b) => Math.max(a, b), 0);
     // police
-    if (d.risk > 0 && w.rng.chance(d.risk + owner.heat * 0.06)) {
+    if (d.risk > 0 && w.rng.chance((d.risk + owner.heat * 0.06) * (owner.isPlayer ? 1 : 1.2 - temper(owner).caution * 0.6) * (dir === 'push' ? 1.5 : dir === 'quiet' ? 0.4 : 1))) {
       op.state = 'raided';
       op.until = w.now + w.rng.int(2, 4) * DAY * 7;
       const fine = w.rng.int(150, 450);
       owner.cash = Math.max(0, owner.cash - fine);
-      if (runner && w.rng.chance(0.6)) { runner.jailedUntil = w.now + w.rng.int(7, 21) * DAY; runner.heat = clamp(runner.heat + 0.4, 0, 1.5); }
-      addFact(w, { kind: 'raid', actor: doer.id, text: `Police raided the ${d.label.toLowerCase()} in ${op.district}${runner?.jailedUntil && runner.jailedUntil > w.now ? ` and took ${runner.name}` : ''}. It costs ${money(fine)} to get moving again.`, district: op.district }, { witnesses: owner.isPlayer ? [owner.id] : [], broadcast: [doer.id] });
-      op.last = 0;
+      if (w.rng.chance(runner ? 0.6 : 0.4)) { doer.jailedUntil = w.now + w.rng.int(7, 21) * DAY; doer.heat = clamp(doer.heat + 0.4, 0, 1.5); }
+      addFact(w, { kind: 'raid', actor: doer.id, text: `Police raided the ${d.label.toLowerCase()} in ${op.district}${doer.jailedUntil > w.now ? ` and took ${doer.name}` : ''}. It costs ${owner.name} ${money(fine)} and some weeks.`, amount: fine, district: op.district }, { witnesses: [owner.id] });
+      op.last = 0; op.bad = (op.bad ?? 0) + 1;
       continue;
     }
+    // a heavy loser on a betting book owes it: a marker, a real debt with a man's name on it
+    if ((op.kind === 'bookie' || op.kind === 'numbers') && w.rng.chance(0.04 * lvl)) marker(w, op, owner);
     // squeeze from a rival
     if (owner.isPlayer && hot >= 3 && w.rng.chance(0.07) && !w.enc.some((e) => e.status === 'open' && e.kind === 'squeeze')) {
       const rf = Object.entries(fam!.tension).sort((a, b) => b[1] - a[1])[0];
       const rb = rf ? w.chars[w.fam[rf[0]].bossId] : undefined;
       const rc = Object.values(w.chars).find((c) => c.alive && c.familyId === rf?.[0] && c.rank === 'capo');
-      if (rc && rb) addEnc(w, { kind: 'squeeze', from: rc.id, title: `${rc.name} wants a piece`, lines: [`${rc.name} of the ${w.fam[rc.familyId!].name} family sends a man to say it nicely.`, `"We hear you have a ${d.label.toLowerCase()} in ${op.district}. That’s a neighbourhood we have an interest in. A weekly gesture would keep everyone friendly."`], opts: [{ code: 'pay', label: 'Pay a $300 gesture, and keep your hands clean', hint: 'It will come again.' }, { code: 'boss', label: 'Say you’ll take it to your boss' }, { code: 'refuse', label: 'Tell him no', hint: 'They won’t take it quietly.' }], data: { op: op.id }, days: 4 });
+      if (rc && rb) addEnc(w, { kind: 'squeeze', from: rc.id, title: `${rc.name} wants a piece`, lines: [`${rc.name} of the ${w.fam[rc.familyId!].name} family sends a man to say it nicely.`, `"We hear you have a ${d.label.toLowerCase()} in ${op.district}. ${op.district} is busy. Busy places need friends. A tenth of the take, and everyone stays friends."`], opts: [{ code: 'pay', label: 'Pay the tenth', hint: 'Peace, at a price.' }, { code: 'no', label: 'Tell him no', hint: 'His family will remember.' }], data: { op: op.id, fam: rc.familyId! }, days: 5 });
     }
     // the runner
     let skim = 0;
@@ -210,10 +233,95 @@ export function opsWeek(w: World) {
     const net = Math.round(take - skim);
     op.last = net;
     op.total += net;
-    if (net > 0) earn(owner, net, op.kind);
+    op.cause = cause;
+    if (net > 0) earn(owner, net, d.src ?? op.kind);
     else owner.cash += net;
     owner.heat = clamp(owner.heat + d.heat, 0, 1.5);
-    if (owner.isPlayer && Math.abs(net) >= 1) addFact(w, { kind: 'report', actor: doer.id, minor: true, text: net < 0 ? `A bad week on the ${d.label.toLowerCase()} in ${op.district}: a favourite came in, and ${money(-net)} had to be paid out.` : `The ${d.label.toLowerCase()} in ${op.district} brought in ${money(net)}.`, district: op.district }, { witnesses: [owner.id] });
+    if (owner.isPlayer && Math.abs(net) >= 1) addFact(w, { kind: 'report', actor: doer.id, minor: true, text: net < 0 ? `A bad week on the ${d.label.toLowerCase()} in ${op.district}: ${cause || 'a favourite came in'}, and ${money(-net)} went out.` : `The ${d.label.toLowerCase()} in ${op.district} brought in ${money(net)}.`, district: op.district }, { witnesses: [owner.id] });
   }
-  void handleDeath;
+}
+// (the trade is thinner where many work it: one more of the same kind in the district than two takes a little off everyone's)
+function crowding(w: World, op: Op): number {
+  const n = w.ops.filter((o) => o !== op && o.kind === op.kind && o.district === op.district && o.state === 'running').length;
+  return 1 / (1 + Math.max(0, n - 2) * 0.12);
+}
+// An NPC owner's own decisions: a run of bad weeks and he gives it up (he will start something else when he can); spare money and
+// ambition and he grows it, asking his superior to put money in if his superior is the player and has said he wants asking.
+function npcTend(w: World, op: Op, owner: Character, d: OpDef): boolean {
+  if ((op.bad ?? 0) >= 3) { op.state = 'closed'; owner.cooldown.ent = w.now + 2 * WEEK; return true; }
+  const lvl = op.level ?? 1;
+  if (lvl < 3 && owner.cash > 1200 * lvl + d.cost && owner.traits.ambition > 0.45 && !(op.bad ?? 0) && w.rng.chance(0.07)) {
+    const cost = 600 * lvl, boss = owner.bossId ? w.chars[owner.bossId] : undefined;
+    if (boss?.isPlayer && (w.expect?.invest ?? 'ask') === 'ask') askToInvest(w, owner, cost, d.label.toLowerCase());
+    else { owner.cash -= cost; op.stake = (op.stake ?? d.cost) + cost; op.level = lvl + 1; owner.books.expenses += cost; }
+  }
+  return false;
+}
+// Street loans are a book of real loans: each week the owner lends some of his capital to a man who needs it, on his terms, through
+// the one way a loan is made (asks 'lend'); what it earns is the vig and the principal paid back to him (core.payDebt credits it).
+function shylockWeek(w: World, op: Op, owner: Character, lvl: number) {
+  const book = w.debts.filter((x) => x.status === 'active' && x.creditor === owner.id);
+  op.last = book.filter((x) => x.missed === 0).reduce((a, x) => a + Math.min(x.weeklyPayment, x.balance), 0);
+  op.total += op.last;
+  op.bad = book.some((x) => x.missed >= 2) ? (op.bad ?? 0) + 1 : Math.max(0, (op.bad ?? 0) - 1);
+  op.cause = op.bad ? 'a couple of borrowers went quiet' : book.length ? 'the money came back on time' : 'nobody in need this week';
+  const capital = Math.min(owner.cash * 0.6, 1200 * lvl);
+  if (book.length >= 2 + lvl * 2 || capital < 150) return;
+  const fam = owner.familyId ? w.fam[owner.familyId] : undefined;
+  const near = (c: Character) => c.district === op.district || !!fam?.districts.includes(c.district);
+  const m = Object.values(w.chars).filter((c) => c.alive && !c.isPlayer && c.id !== owner.id && c.rank !== 'boss' && near(c) && (c.cash < 150 || (ownerBiz(w, c.id)?.distress ?? 0) >= 1) && !book.some((x) => x.debtor === c.id))
+    .sort((a, b) => a.cash - b.cash || (a.id < b.id ? -1 : 1))[0];
+  if (!m) return;
+  const s = openAsk(w, 'lend', owner, m, { amt: Math.max(150, Math.round(Math.min(capital, w.rng.int(200, 600)) / 50) * 50), biz: ownerBiz(w, m.id)?.id, why: `${owner.name} offered ${m.name} a loan from his book` });
+  if (s) move(w, s, 'ask');
+}
+// A bettor who lost more than he had: the book carries him, and now he owes it.
+// Like the casino (actions.ts 'gamble'), a book gives no credit to a man already in it for a marker, or who stiffed it before.
+function marker(w: World, op: Op, owner: Character) {
+  const fam = owner.familyId ? w.fam[owner.familyId] : undefined;
+  const g = Object.values(w.chars).filter((c) => c.alive && !c.isPlayer && c.id !== owner.id && c.traits.vice >= 0.6 && c.cash < 300 && (c.district === op.district || !!fam?.districts.includes(c.district)) && !w.debts.some((x) => (x.status === 'active' || x.status === 'defaulted') && x.creditor === owner.id && x.debtor === c.id))
+    .sort((a, b) => (a.id < b.id ? -1 : 1));
+  if (!g.length) return;
+  const c = w.rng.pick(g), amt = Math.round(w.rng.int(100, 400) * (op.level ?? 1) / 50) * 50;
+  const f = addFact(w, { kind: 'loan', actor: owner.id, victim: c.id, amount: amt, text: `${c.name} ran up a ${money(amt)} marker on ${owner.name}'s book.`, district: op.district }, { witnesses: [owner.id, c.id] });
+  createDebt(w, owner.id, c.id, amt, 0.1, 'a marker on the book', f.id);
+}
+// Men in the life without an enterprise start one when they can, choosing by what it would pay a man like him, how crowded the
+// trade is where he lives, the heat it would bring and how careful he is: the same kinds and the same rules as the player's
+// (canStart: made men's kinds need rank, the right district and a captain who trusts him; and the money to start it).
+function startEnterprises(w: World) {
+  for (const c of Object.values(w.chars)) {
+    if (!c.alive || c.isPlayer || !c.familyId || (c.rank !== 'associate' && c.rank !== 'soldier') || c.jailedUntil > w.now || (c.cooldown.ent ?? 0) > w.now) continue;
+    // (one enterprise to begin with; a man doing well, with money put by and the ambition, adds a second of another kind: the way a
+    // young man moves on from stealing cars to a numbers bank or a book of loans)
+    const mine = w.ops.filter((o) => o.owner === c.id && o.kind !== 'hijack' && (o.state === 'running' || o.state === 'raided'));
+    if (mine.length >= 2 || (mine.length === 1 && !(c.cash > 2500 && c.traits.ambition > 0.5 && w.rng.chance(0.05)))) continue;
+    const fam = w.fam[c.familyId];
+    // (he weighs them all and leans to what suits him best, but men are not all alike in what they reach for: a weighted choice,
+    // not every man taking the single best-paying trade)
+    const opts: { k: OpKey; d: string; s: number }[] = [];
+    for (const k of Object.keys(OPS) as OpKey[]) {
+      const d = OPS[k];
+      const where = d.districts ? d.districts.find((x) => fam.districts.includes(x)) ?? d.districts[0] : c.district;
+      if (canStart(w, c, k, where) || mine.some((o) => o.kind === k)) continue;
+      const heatPen = 1 - clamp(c.heat, 0, 1) * d.risk * 8, carePen = 1 - temper(c).caution * d.risk * 6;
+      const want = k === 'chop' ? 0.7 + c.traits.violence * 0.6 : k === 'bookie' || k === 'shylock' || k === 'numbers' ? 0.7 + c.traits.greed * 0.5 : 1;
+      const sc = d.base * (0.55 + aptitude(c, d.skill) * 0.9) * heatPen * carePen * want * w.rng.range(0.85, 1.15) / (1 + Math.max(0, w.ops.filter((o) => o.kind === k && o.district === where && o.state === 'running').length - 2) * 0.12);
+      if (sc > 0) opts.push({ k, d: where, s: sc });
+    }
+    if (!opts.length) continue;
+    let r = w.rng.next() * opts.reduce((a, o) => a + o.s, 0);
+    const pickd = opts.find((o) => (r -= o.s) <= 0) ?? opts[opts.length - 1];
+    startOp(w, c, pickd.k, pickd.d, null);
+  }
+}
+// The enterprise a man is known for: his biggest running one (what conversation, Sunday and the crew screens ask about).
+export function lineOf(w: World, c: Character): Op | undefined {
+  return w.ops.filter((o) => o.owner === c.id && o.kind !== 'hijack' && (o.state === 'running' || o.state === 'raided')).sort((a, b) => (b.level ?? 1) - (a.level ?? 1) || b.total - a.total)[0];
+}
+export function enterpriseLine(w: World, c: Character): string | undefined {
+  const op = lineOf(w, c);
+  if (!op) return undefined;
+  const l = OPS[op.kind as OpKey]?.label ?? op.kind;
+  return `${l[0].toLowerCase()}${l.slice(1)}${(op.level ?? 1) > 1 ? ', grown to a real business' : ''}`;
 }

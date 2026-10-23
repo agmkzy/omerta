@@ -1,3 +1,4 @@
+import { lineOf } from './rackets';
 import { hasPerk } from './specs';
 // Opportunities: work that turns up because of what is going on around you, not because a list says it's time.
 // Each one is tied to real people and real places (a shop owner, a truck going to a real address, a bookie's actual bag),
@@ -110,10 +111,10 @@ function escortGig(w: World, p: Character): boolean {
 }
 function courierGig(w: World, p: Character): boolean {
   if (open(w, 'courier')) return false;
-  const books = Object.values(w.chars).filter((c) => c.alive && !c.isPlayer && c.hustle && (c.hustle.kind === 'numbers' || c.hustle.kind === 'bookie') && c.familyId === p.familyId && c.hustle.gross > 200);
+  const books = Object.values(w.chars).filter((c) => c.alive && !c.isPlayer && c.familyId === p.familyId && (() => { const o = lineOf(w, c); return !!o && (o.kind === 'numbers' || o.kind === 'bookie') && o.last > 200; })());
   if (!books.length) return false;
   const bk = pick(w, books);
-  const bag = Math.round(Math.min(2400, Math.max(500, bk.hustle!.gross * 0.8)) / 50) * 50;
+  const bag = Math.round(Math.min(2400, Math.max(500, (lineOf(w, bk)?.last ?? 0) * 0.8)) / 50) * 50;
   const pay = Math.round(bag * 0.08 / 10) * 10;
   mkJob(w, {
     kind: 'gig', title: `${first(bk)} has a bag that needs to move`, giver: bk.id, via: 'opportunity', assignee: p.id, pay, days: 4,
@@ -336,7 +337,7 @@ export function gigStale(w: World, j: Job): string | null {
   const p = PL(w);
   if ((g === 'shipment') && b?.protection?.familyId === p.familyId && b.protection.collectorId === p.id) return `${b.name} is yours now. You wouldn’t rob your own shop.`;
   if (g === 'inspector' && b && b.distress === 0 && b.damaged === 0 && j.status === 'offered' && w.now - j.created > 3 * DAY) return 'It was sorted without you.';
-  if (g === 'courier' && j.giver && !w.chars[j.giver]?.hustle) return 'He’s not running the book any more.';
+  if (g === 'courier' && j.giver && !(w.chars[j.giver] && lineOf(w, w.chars[j.giver]))) return 'He’s not running the book any more.';
   void ownerBiz; void ({} as Id);
   return null;
 }

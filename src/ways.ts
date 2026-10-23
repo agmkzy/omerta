@@ -25,6 +25,20 @@ export type Sheet = Omit<Way, 'id' | 'kind' | 'op'>;
 // Every racket in rackets.ts OPS needs a sheet here: this is a Record over OpKey, so a racket added to OPS without one does not compile,
 // and the list of ways below is generated from OPS rather than typed out a second time.
 export const OP_SHEETS: Record<OpKey, Sheet> = {
+  chop: {
+    name: 'A car-stealing outfit', cat: 'Stealing', icon: 'car', tone: 'a',
+    pitch: 'Cars taken to order and run to a chop shop, week in, week out.',
+    how: ['You or your men take cars off the street, at night, to a garage that strips them for parts.', 'It pays quickly and it needs no money to start, only nerve and someone who can drive.'],
+    pays: 'Around $300 to $650 a week in a good stretch.', needs: 'Nothing up front. Men who can drive and keep their nerve.',
+    risks: 'The most arrests of any street trade. Take the wrong car and it is a very bad night.', tip: 'Keep your own hands off it once it is running: let a driver take the risk.',
+  },
+  fencing: {
+    name: 'A fencing operation', cat: 'Stealing', icon: 'cash', tone: 'a',
+    pitch: 'Move what comes off the trucks, at a third of what it cost somebody.',
+    how: ['Stolen goods come to you and go out again to people who ask no questions.', 'The money is in knowing buyers, and in not being holding the goods when the police call.'],
+    pays: 'Usually $300 to $600 a week.', needs: '$300 to have cash ready for the first load.',
+    risks: 'A load that turns out to be junk, a supplier who dries up, and the police.', tip: 'A man with charm and a head for figures does best at it.',
+  },
   numbers: {
     name: 'Numbers racket', cat: 'Standing rackets', icon: 'cash', tone: 'a',
     pitch: 'Daily lottery on the street. Small bets, steady money.',
@@ -36,14 +50,14 @@ export const OP_SHEETS: Record<OpKey, Sheet> = {
     name: 'Bookmaking', cat: 'Standing rackets', icon: 'cash', tone: 'a',
     pitch: 'Take bets on horses and ball games. Dangerous when a favourite wins.',
     how: ['You take bets and lay off nothing, so you are the house. Most weeks the losers pay for everything.', 'Some weeks a big favourite comes in and you pay out more than you took.'],
-    pays: 'Usually $150 to $400 a week, with the odd ugly week where you lose money.', needs: '$400 to set up. A runner with a head for odds.',
+    pays: 'Usually $250 to $550 a week, with the odd ugly week where you lose money.', needs: '$400 to set up. A runner with a head for odds.',
     risks: 'A bad week can cost you hundreds. Raids, and runners who skim.', tip: 'Keep a cushion in your pocket. One bad Sunday can eat a week of takings.',
   },
   vending: {
     name: 'Jukeboxes and vending', cat: 'Standing rackets', icon: 'shop', tone: 'g',
     pitch: 'Put your machines in every bar in the district.',
     how: ['Jukeboxes, cigarette machines, pinball. The bar owners take them because the alternative is a lot of trouble.', 'Nobody gets rich, but it never stops.'],
-    pays: 'Around $100 to $250 a week.', needs: '$800 for the machines. A runner who can talk to bar owners.',
+    pays: 'Around $200 to $500 a week.', needs: '$800 for the machines. A runner who can talk to bar owners.',
     risks: 'Very low. A rival crew may try to muscle in.', tip: 'A good start for a man with a little capital and no appetite for risk.',
   },
   dock: {

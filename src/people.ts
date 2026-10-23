@@ -1,6 +1,7 @@
 // People: what they are good at, what is going wrong in their lives, and how that leaks into their work.
 // A man who is late with his envelope has a reason. The reason is usually not the one he gives.
-import { addFact, clamp, createDebt, feelOn, money, ownerBiz, witnessesAt } from './core';
+import { move, openAsk } from './asks';
+import { addFact, clamp, feelOn, money, ownerBiz, witnessesAt } from './core';
 import { spawnCivilian } from './world';
 import { FEMALE, rollFirst } from './names';
 import { interestsOf } from './orgs';
@@ -73,9 +74,10 @@ function crisis(w: World, c: Character) {
   const shark = w.rng.pick(sharks);
   const amt = Math.round((1500 + p.sev * 3000) / 250) * 250;
   if (w.debts.some((d) => d.debtor === c.id && d.status === 'active')) return;
-  createDebt(w, shark.id, c.id, amt, 0.07, 'a loan from the wrong man');
-  c.cash += Math.round(amt * 0.4); // a little of it still around
-  addFact(w, { kind: 'loan', actor: shark.id, victim: c.id, amount: amt, text: `${c.name} owes ${money(amt)} to ${shark.name} of the ${w.fam[shark.familyId!].name} family.`, district: c.district }, { witnesses: [] });
+  // (the shark offers at his price, and a desperate man takes it or not: asks 'lend', the one way a loan is made)
+  if (shark.cash < amt) return;
+  const s = openAsk(w, 'lend', shark, c, { amt, rate: 0.07, why: `${shark.name} of the ${w.fam[shark.familyId!].name} family offered ${c.name} money` });
+  if (s) move(w, s, 'ask');
 }
 
 export function peopleWeek(w: World) {

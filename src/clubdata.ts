@@ -1,6 +1,7 @@
 // The social club as a place in the world: it belongs to a family, has an owner and hours, remembers who comes in,
 // and knows who is there at any moment. Who is there is a pure function of the clock and each man's circumstances,
 // so every screen that asks gets the same answer. Nothing here talks; see club.ts for the scenes.
+import { lineOf } from './rackets';
 import { travelTime } from './core';
 import { hash } from './voice';
 import { Character, DAY, Id, World } from './types';
@@ -73,7 +74,7 @@ export function clubPresent(w: World, cl: Club): Here[] {
     let pr = ({ associate: 0.14, soldier: 0.2, capo: 0.26, underboss: 0.12, boss: 0.05 } as Record<string, number>)[c.rank] ?? 0.3;
     if (c.rank === 'boss' || c.rank === 'underboss') { if (evening && (dow === 3 || dow === 6)) pr = 0.85; }
     if (c.job && !evening && dow < 5) pr *= 0.2; // working a day job
-    if (c.hustle && !evening) pr *= 0.6;
+    if (lineOf(w, c) && !evening) pr *= 0.6;
     if (c.problem?.kind === 'gambling' && evening) pr += 0.3;
     if (c.bossId === cl.ownerId) pr += 0.15;
     const seat = p && cl.hostId === p.id && p.familyId === cl.familyId; // the club is the player's seat: the men who matter come to pay respects

@@ -31,6 +31,9 @@ export interface WeekRow {
   week: number; t: number;
   pop: Record<string, number>; jailed: number; deaths: number;
   cash: Record<string, number>; treasury: number; debts: number; debtBal: number; hustles: number; hustleNet: number;
+  loans?: { principal: number; arrears: number; worst: number; made: number; defaults: number };
+  prot?: { paying: number; started: number; refused: number; poached: number; smashed: number };
+  ent?: { running: number; byKind: Record<string, number>; byRank: Record<string, number>; take: number; markers: number; started: number };
   kickPaid: Record<string, number>; kickReceived: Record<string, number>;
   standing: Record<string, number>; standing45: number; standingSpread: { sd: number; min: number; max: number; boss: number }; respectFalls: number;
   goals: Record<string, number>; wants: Record<string, number>; problems: number;
@@ -42,6 +45,14 @@ export interface WeekRow {
 }
 
 const npc = (c?: Character) => !!c && c.alive && !c.isPlayer;
+// a man's own enterprise: the enterprise record (Stage 4) or, on older versions, the hustle it replaced
+type Ent = { kind: string; level: number; net: number };
+function entOf(w: World, c: Character): Ent | undefined {
+  const o = (w.ops ?? []).filter((x) => x.owner === c.id && x.kind !== 'hijack' && (x.state === 'running' || x.state === 'raided')).sort((a, b) => (b.level ?? 1) - (a.level ?? 1) || b.total - a.total)[0];
+  if (o) return { kind: o.kind, level: o.level ?? 1, net: o.last };
+  const h = (c as unknown as { hustle?: { kind: string; level: number; net: number } }).hustle;
+  return h ? { kind: h.kind, level: h.level, net: h.net } : undefined;
+}
 const nm = (w: World, id?: string | null) => (id && w.chars[id] ? w.chars[id].name : '—');
 const famName = (w: World, id?: string | null) => (id && w.fam[id] ? w.fam[id].name : 'no family');
 
@@ -98,7 +109,7 @@ export class Observer {
     // ---- people
     for (const c of Object.values(w.chars)) {
       if (c.isPlayer) continue;
-      const s: Snap = { name: c.name, rank: c.rank, boss: c.bossId, fam: c.familyId, alive: c.alive, jailed: c.jailedUntil > now, standing: Math.round(c.standing), want: c.want?.kind, problem: c.problem?.kind, hustle: c.hustle ? `${c.hustle.kind}:${c.hustle.level}` : undefined, informant: !!c.informant };
+      const s: Snap = { name: c.name, rank: c.rank, boss: c.bossId, fam: c.familyId, alive: c.alive, jailed: c.jailedUntil > now, standing: Math.round(c.standing), want: c.want?.kind, problem: c.problem?.kind, hustle: (() => { const e = entOf(w, c); return e ? `${e.kind}:${e.level}` : undefined; })(), informant: !!c.informant };
       const p = this.prev.get(c.id);
       if (!this.firstSnap.has(c.id)) this.firstSnap.set(c.id, s);
       if (p) {
@@ -231,7 +242,15 @@ export class Observer {
       pop: by(() => 1, (xs) => xs.length), jailed: alive.filter((c) => c.jailedUntil > now).length, deaths: this.deaths,
       cash: by((c) => c.cash, mean), treasury: sum(Object.values(w.fam).map((f) => f.treasury ?? 0)),
       debts: w.debts.filter((d) => d.status === 'active').length, debtBal: sum(w.debts.filter((d) => d.status === 'active').map((d) => d.balance)),
-      hustles: life.filter((c) => c.hustle).length, hustleNet: sum(life.map((c) => c.hustle?.net ?? 0)),
+      loans: (() => { const act = w.debts.filter((d) => d.status === 'active'); const left = (d: typeof act[0]) => d.owed ?? d.balance - (d.arrears ?? 0);
+        return { principal: sum(act.map(left)), arrears: sum(act.map((d) => d.arrears ?? 0)), worst: r2(Math.max(0, ...act.map((d) => d.balance / Math.max(1, d.principal)))), made: w.debts.length, defaults: w.debts.filter((d) => d.status === 'defaulted').length }; })(),
+      prot: (() => { const n = (k: string) => this.facts.filter((f) => f.kind === k).length;
+        return { paying: Object.values(w.biz).filter((b) => b.open && b.protection).length, started: n('protection_started'), refused: n('protection_refused'), poached: n('poach'), smashed: this.facts.filter((f) => f.kind === 'vandalism' && /refused to pay/.test(f.text)).length }; })(),
+      ent: (() => { const run = (w.ops ?? []).filter((o) => o.kind !== 'hijack' && (o.state === 'running' || o.state === 'raided'));
+        const byKind: Record<string, number> = {}, byRank: Record<string, number> = {};
+        for (const o of run) { byKind[o.kind] = (byKind[o.kind] ?? 0) + 1; const r = w.chars[o.owner]?.rank ?? '?'; byRank[r] = (byRank[r] ?? 0) + 1; }
+        return { running: run.length, byKind, byRank, take: sum(run.map((o) => o.last)), markers: w.debts.filter((d) => d.reason === 'a marker on the book').length, started: (w.ops ?? []).filter((o) => o.kind !== 'hijack').length }; })(),
+      hustles: life.filter((c) => entOf(w, c)).length, hustleNet: sum(life.map((c) => entOf(w, c)?.net ?? 0)),
       kickPaid: by((c) => lastBook(c)?.paid ?? 0, sum), kickReceived: by((c) => lastBook(c)?.received ?? 0, sum),
       standing: by((c) => c.standing, mean), standing45: life.filter((c) => c.standing >= 45).length,
       standingSpread: (() => { const xs = life.map((c) => c.standing), m = mean(xs); return { sd: r2(Math.sqrt(mean(xs.map((x) => (x - m) ** 2)))), min: Math.round(Math.min(...xs)), max: Math.round(Math.max(...xs)), boss: mean(life.filter((c) => c.rank === 'boss').map((c) => c.standing)) }; })(), respectFalls,
@@ -281,7 +300,11 @@ export function report(o: Observer, seed: number): { md: string; json: unknown }
     row('Mean cash: associate / soldier / capo', (r) => `$${Math.round(r.cash.associate)} / $${Math.round(r.cash.soldier)} / $${Math.round(r.cash.capo)}`),
     row('Family treasuries (total)', (r) => `$${r.treasury.toLocaleString('en-US')}`),
     row('Active debts (count / balance)', (r) => `${r.debts} / $${r.debtBal.toLocaleString('en-US')}`),
+    row('Loans: principal out / unpaid vig / worst owed÷lent / ever made / defaulted', (r) => (r.loans ? `$${r.loans.principal.toLocaleString('en-US')} / $${r.loans.arrears.toLocaleString('en-US')} / ${r.loans.worst}× / ${r.loans.made} / ${r.loans.defaults}` : '–')),
     row('Men with a side business / its weekly net', (r) => `${r.hustles} / $${r.hustleNet.toLocaleString('en-US')}`),
+    row('Protection: shops paying / deals / refusals / taken from another / smashed after refusing (to date)', (r) => (r.prot ? `${r.prot.paying} / ${r.prot.started} / ${r.prot.refused} / ${r.prot.poached} / ${r.prot.smashed}` : '–')),
+    row('Enterprises running / ever started / weekly take / betting markers', (r) => (r.ent ? `${r.ent.running} / ${r.ent.started} / $${r.ent.take.toLocaleString('en-US')} / ${r.ent.markers}` : '–')),
+    row('Enterprises by kind', (r) => (r.ent ? Object.entries(r.ent.byKind).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(', ') : '–')),
     row('Kick-ups paid this week: assoc / sold / capo / under', (r) => `$${r.kickPaid.associate} / $${r.kickPaid.soldier} / $${r.kickPaid.capo} / $${r.kickPaid.underboss}`),
     row('Kick-ups received: sold / capo / under / boss', (r) => `$${r.kickReceived.soldier} / $${r.kickReceived.capo} / $${r.kickReceived.underboss} / $${r.kickReceived.boss}`),
     row('Mean standing: assoc / sold / capo', (r) => `${Math.round(r.standing.associate)} / ${Math.round(r.standing.soldier)} / ${Math.round(r.standing.capo)}`),

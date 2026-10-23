@@ -7,7 +7,7 @@
 // (his boss, his crew, his family), so it travels by gossip like anything else. A plan that needs another man goes through the
 // shared asks engine (asks.ts: borrow, lend, join), so men negotiate instead of rolling once; and when the player is plausibly the
 // man to ask (his boss, his creditor, kin, a trusted friend, someone who knows the owner), the man comes to the player, rarely.
-import { addFact, bear, bearOn, clamp, createDebt, feel, feelAtLeast, feelAtLeastOn, feelOn, learn, money, ownerBiz, payDebt, rel, repute } from './core';
+import { addFact, bear, bearOn, clamp, createDebt, feel, feelAtLeast, feelAtLeastOn, feelOn, learn, money, ownerBiz, payDebt, rel, repute, restructure } from './core';
 import { INVEST_CAP, addStake, bizMove, transferBusiness, trade } from './econ';
 import { LADDER, leaveCrew } from './rank';
 import { isRunner, members, readiness, recommend } from './career';
@@ -645,10 +645,8 @@ function wealthStep(w: World, g: Goal, c: Character) {
     bump(w, 'inter.loan');
     // he offers; the other man weighs it and may haggle or say no (asks.ts)
     if (amt >= 100 && putAsk(w, g, c, 'lend', m, { amt, why: `${c.name} offered ${m.name} a loan` })) return;
-    if (amt < 100 || !(m.cash < 80 || w.rng.chance(0.4))) { g.tries++; bump(w, 'refused.loan'); return later(w, g, 2); }
-    const shy = t.greed > 0.65 || t.violence > 0.6;
-    if (give(c, m, amt)) { createDebt(w, c.id, m.id, amt, shy ? 0.05 : 0.02, 'a loan to tide him over'); bump(w, 'loans'); g.next = 'collect what he is owed'; }
-    return later(w, g, 2.5);
+    // (Stage 4: a loan is only ever made by the other man's agreement, asks 'lend'; there is no taking it for granted)
+    g.tries++; bump(w, 'refused.loan'); return later(w, g, 2);
   }
   return later(w, g, 2);
 }
@@ -852,7 +850,7 @@ function debtStep(w: World, g: Goal, c: Character) {
   if (pick === 'terms' && cr) {
     g.n = (g.n ?? 0) + 1; bump(w, 'inter.terms');
     if (cr.isPlayer) return later(w, g, 3);
-    if (w.rng.chance(0.15 + rel(cr, c.id).trust * 0.35 + (cr.traits.greed < 0.4 ? 0.1 : 0))) { d.weeklyRate = Math.max(0.01, Math.round(d.weeklyRate * 0.7 * 1000) / 1000); bump(w, 'renegotiated'); }
+    if (w.rng.chance(0.15 + rel(cr, c.id).trust * 0.35 + (cr.traits.greed < 0.4 ? 0.1 : 0))) { restructure(d, { rate: Math.max(0.01, d.weeklyRate * 0.7) }); bump(w, 'renegotiated'); }
     else bump(w, 'refused.terms');
     return later(w, g, 3);
   }

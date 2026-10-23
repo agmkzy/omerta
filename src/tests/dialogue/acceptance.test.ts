@@ -10,7 +10,7 @@ import { addFact, ownerBiz, rel } from '../../core';
 import { characterWords, conductOf, noteHard, temper, viewOf } from '../../temper';
 import { whereIs } from '../../where';
 import { world60 } from './fixtures';
-import { P } from '../helpers';
+import { newWorld, P } from '../helpers';
 
 const shop = (w: World, n = 0) => Object.values(w.chars).filter((c) => c.alive && !c.isPlayer && c.rank === 'civilian' && ownerBiz(w, c.id)?.open).sort((a, b) => (a.id < b.id ? -1 : 1))[n];
 const meet = (w: World, t: Character): Convo => { const p = P(w); (p.intro ??= {})[t.id] ??= w.now; return arrive(w, p, t, { lines: [] }, whereIs(w, p, t), t.rels[p.id]?.lastMet ?? -1e9).convo; };
@@ -18,8 +18,9 @@ const codes = (w: World, t: Character, c: Convo) => options(w, P(w), t, c).map((
 
 describe('the player’s temperament and reputation', () => {
   ok('it is not chosen: a new man has none to speak of, and it grows from what he does, in context', { tags: ['scenario'] }, () => {
-    const w = world60(), p = P(w);
-    assert.match(characterWords(p).join(' '), /haven’t shown/, 'nothing shown yet');
+    // a man just arrived has shown nothing (sixty days in he may already have: ignoring a summons is something shown)
+    assert.match(characterWords(P(newWorld(7))).join(' '), /haven’t shown/, 'nothing shown yet');
+    const w = world60();
     const bully = deserialize(serialize(w)), avenger = deserialize(serialize(w)), dealer = deserialize(serialize(w)), giver = deserialize(serialize(w));
     const victim = (x: World) => Object.values(x.chars).find((c) => c.alive && c.rank === 'civilian')!;
     for (let i = 0; i < 8; i++) noteHard(bully, P(bully), victim(bully), 'force');

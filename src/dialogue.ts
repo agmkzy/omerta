@@ -1,3 +1,4 @@
+import { enterpriseLine, lineOf } from './rackets';
 import { matterAct, matterTitle, topicsWith } from './matters';
 import { addr, nudgeOf, subjectRows, talkAbout } from './talk';
 import { amendsAsk, askBetween, callFavour, rateAsk, openAsk, openAsks as openMatters, playerMove, playerMoves, read as mRead, titleOf as mTitle, type AskMove } from './asks';
@@ -8,7 +9,7 @@ import { askAbout, helpWith, sitOf } from './situations';
 import { readiness } from './career';
 import { share, confide } from './actions';
 import { react, envelopeDue, handOver, kickWindow, envelopeText, rateView } from './books';
-import { addFact, bear, bearOn, clamp, createDebt, earn, ease, factText, famName, feel, feelAtLeast, feelOn, feelToOn, flavour, isResolved, learn, money, ownerBiz, payDebt, rel, repute, shortTime } from './core';
+import { addFact, bear, bearOn, clamp, createDebt, earn, ease, factText, famName, feel, feelAtLeast, feelOn, feelToOn, flavour, isResolved, learn, money, ownerBiz, payDebt, rel, repute, restructure, shortTime, writeDown } from './core';
 import { standingWord, mkJob, oppFrom, tipFrom, bossOffer, traitWords, jobSaid, takeJob, declineJob } from './jobs';
 import { openSitdown, Meeting } from './meetings';
 import { helpMan, lateOf, PROBLEM_LABEL } from './people';
@@ -24,7 +25,6 @@ import { recall } from './memory';
 import { flow, sitdownTalk, brokenWord } from './flows';
 import { feePosition, loanPosition, goodFaith, r5 } from './negotiate';
 import { WANT_LINE, wantFor, knows, learnAbout, repLines, crewEnvelopesWaiting } from './crewlife';
-import { hustleLine } from './hustle';
 import { pathInfo } from './path';
 import { amends, playerActed, touchDispute } from './disputes';
 import { Character, DAY, Fact, Grievance, Id, Job, World } from './types';
@@ -579,7 +579,7 @@ function talkRows(w: World, p: Character, t: Character, c: Convo, g = gather(w, 
   const subj = subjectRows(w, p, t, 6).find((x) => BIZ_SUBJ.test(x.code));
   const asked = (c.used ?? []).map((u) => u.slice(u.indexOf('|') + 1)).find((u) => BIZ_SUBJ.test(u) || ['sit_ask', 'sh_how', 'op', 'earn', 'biz_none'].includes(u)); // (asked already, however: it stays asked)
   const biz = asked ? asked : subj ? subj.code : sit && sit.kind !== 'ambition' && !sit.told && !sit.knows && (p.cooldown[`sitask:${t.id}`] ?? 0) <= w.now ? 'sit_ask'
-    : b?.protection?.collectorId === p.id ? 'sh_how' : (b || t.hustle) ? 'op' : g.crewMan && g.items.some((x) => x.o.code === 'earn') ? 'earn' : 'biz_none'; // (your own man's business is what he brings you)
+    : b?.protection?.collectorId === p.id ? 'sh_how' : (b || lineOf(w, t)) ? 'op' : g.crewMan && g.items.some((x) => x.o.code === 'earn') ? 'earn' : 'biz_none'; // (your own man's business is what he brings you)
   const rows: DOpt[] = [
     { code: 'how', label: QUESTIONS[0], hint: 'How he really is.', fixed: true },
     { code: biz, label: QUESTIONS[1], hint: 'His trade, his racket, his money.', fixed: true },
@@ -2012,7 +2012,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
     }
     case 'cr_drop': {
       c.ctx.asked.push('cr_drop');
-      const h = t.hustle;
+      const h = lineOf(w, t);
       const st = arch(t);
       const owedMe = w.debts.find((d) => d.status === 'active' && d.creditor === t.id && d.missed >= 1);
       const recentArrest = t.career?.log.find((e) => /Arrested/.test(e.text) && w.now - e.t < 21 * DAY);
@@ -2029,8 +2029,8 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
         lines.push(`${t.name}: "I was inside part of that. You know that. It cost me the week, and the lawyer cost me more."`);
       } else if (owedMe) {
         lines.push(`${t.name}: "${w.chars[owedMe.debtor]?.name ?? 'A man'} stopped paying me. I’m out ${money(owedMe.balance)} and I’ve got your share to find from somewhere."`);
-      } else if (h && h.bad >= 1 && h.cause) {
-        lines.push(`${t.name}: "It’s the ${h.kind === 'loans' ? 'loans' : 'business'}. ${h.cause.charAt(0).toUpperCase() + h.cause.slice(1)}. It’ll come back."`);
+      } else if (h && (h.bad ?? 0) >= 1 && h.cause) {
+        lines.push(`${t.name}: "It’s the ${h.kind === 'shylock' ? 'loans' : 'business'}. ${h.cause.charAt(0).toUpperCase() + h.cause.slice(1)}. It’ll come back."`);
       } else {
         lines.push(`${t.name} spreads his hands. "Nothing I can point to. Some weeks are thin."`);
       }
@@ -2038,7 +2038,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
     }
     case 'cr_look': {
       c.ctx.asked.push('cr_look');
-      const h = t.hustle;
+      const h = lineOf(w, t);
       if (t.problem && !t.problem.revealed) {
         t.problem.revealed = true;
         lines.push(`Asking round his patch, the answer comes fast: it’s ${PROBLEM_LABEL[t.problem.kind]}. He didn’t want to say, and now you know why.`);
@@ -2057,9 +2057,9 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
         : t.cash > 2500
           ? rng.pick([`${t.name} shrugs, a man with more than he wants to explain. "I get by."`, `${t.name} smiles with half his mouth. "Don’t worry about me."`])
           : rng.pick([`${t.name}: "All right. Not great, not terrible."`, `${t.name} tips a hand side to side. "So-so. Rent gets paid."`]));
-      if (t.hustle) {
-        const h = t.hustle;
-        lines.push(`He works ${hustleLine(t)}. ${h.net > 0 ? `Last week it left him about ${money(h.net)} after costs` : 'Last week it cost him'}${h.cause ? `: ${h.cause}` : ''}.`);
+      if (lineOf(w, t)) {
+        const h = lineOf(w, t)!;
+        lines.push(`He works ${enterpriseLine(w, t)}. ${h.last > 0 ? `Last week it left him about ${money(h.last)} after costs` : 'Last week it cost him'}${h.cause ? `: ${h.cause}` : ''}.`);
       }
       return stay('crew', 10);
     }
@@ -2163,7 +2163,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
     case 'd_half': {
       c.ctx.asked.push(c0);
       const d = w.debts.find((x) => x.status === 'active' && x.creditor === p.id && x.debtor === t.id);
-      if (d) d.weeklyPayment = Math.max(25, Math.round(d.weeklyPayment / 2 / 5) * 5);
+      if (d) restructure(d, { payment: Math.max(25, d.weeklyPayment / 2) });
       lines.push(`You cut ${t.name}’s weekly payment in half. He says thank you the way a drowning man says it.`);
       tweak(0.06, 0.04);
       return stay('debt', 10);
@@ -2171,7 +2171,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
     case 'd_favour': {
       c.ctx.asked.push(c0);
       const d = w.debts.find((x) => x.status === 'active' && x.creditor === p.id && x.debtor === t.id);
-      if (d) { d.balance = Math.max(0, d.balance - 300); addFavour(w, p.id, t.id, 2, `wiped $300 of his debt`); }
+      if (d) { writeDown(w, d, 300); addFavour(w, p.id, t.id, 2, `wiped $300 of his debt`); }
       lines.push(`"Three hundred comes off," you tell ${t.name}. "One day I’ll come asking." He doesn’t ask what for. He knows better.`);
       tweak(0.05, 0.02, 0.02);
       return stay('debt', 10);
@@ -2179,7 +2179,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
     case 'd_forgive': {
       c.ctx.asked.push(c0);
       const d = w.debts.find((x) => x.status === 'active' && x.creditor === p.id && x.debtor === t.id);
-      if (d) d.balance = Math.round(d.balance * 0.75);
+      if (d) writeDown(w, d, d.balance * 0.25);
       lines.push(`You knock a quarter off what ${t.name} owes. He looks at you like he’s waiting for the catch.`);
       tweak(0.07, 0.05, -0.01);
       repute(w, p, -0.5, 'gave way');

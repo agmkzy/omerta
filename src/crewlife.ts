@@ -1,3 +1,4 @@
+import { move, openAsk } from './asks';
 import { agendaChoose } from './powers2';
 import { goalChoose, joinChoose } from './goals';
 import { sitChoose75 } from './situ';
@@ -93,8 +94,9 @@ export function crewTick(w: World) {
       } else if (roll < 0.82 && gr > 0.9) {
         const borrower = a.cash < b.cash ? a : b, lender = borrower === a ? b : a;
         if (lender.cash > 400 && !w.debts.some((d) => d.status === 'active' && d.debtor === borrower.id && d.creditor === lender.id)) {
-          createDebt(w, lender.id, borrower.id, rng.pick([200, 300, 500]), 0.05, 'a private loan between friends');
-          tells.push({ who: lender.id, text: `${first(lender)} mentions, as if it were nothing, that ${first(borrower)} owes him a few hundred.`, learn: `loan:${borrower.id}` });
+          // (between friends, on a friend's terms, and the other man takes it or not: asks 'lend', the one way a loan is made)
+          const o = openAsk(w, 'lend', lender, borrower, { amt: rng.pick([200, 300, 500]), rate: 0.03, why: `${lender.name} offered ${borrower.name} a loan` });
+          if (o && move(w, o, 'ask').answer === 'yes') tells.push({ who: lender.id, text: `${first(lender)} mentions, as if it were nothing, that ${first(borrower)} owes him a few hundred.`, learn: `loan:${borrower.id}` });
         }
       } else {
         a.books.side = (a.books.side ?? 0) + 60; b.books.side = (b.books.side ?? 0) + 60;

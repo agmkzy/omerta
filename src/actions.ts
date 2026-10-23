@@ -11,7 +11,7 @@ import { Action, Character, DAY, Fact, Id, Kind, World } from './types';
 import { say as vsay } from './voicesheet';
 
 import { gossipCap, gossipFresh, tierOf } from './retain';
-import { bizMove, setCollector } from './econ';
+import { bizMove, changedSince, crewGround, setCollector } from './econ';
 const SENSITIVE = new Set(['beating', 'vandalism', 'murder', 'robbery', 'poach']);
 const PRIVATE = new Set(['loan', 'debt_missed', 'debt_paid']);
 
@@ -94,8 +94,13 @@ export function generate(w: World, c: Character, kind: Kind): Action[] {
       break;
     }
     case 'shakedown': {
+      // Stage 4: an approach has a purpose. A man grows his own book in his crew's ground (econ.crewGround); he doesn't go back to
+      // a door that closed on him unless something has changed (econ.changedSince), unless he is the kind to press; and another
+      // family's shop is taken only for a reason: its man is gone or inside, a grudge against him, or bad blood between the families.
+      // A shop of his own family's is never his to lean on (an internal matter, not a daily choice).
       if (!c.familyId || !(c.rank === 'associate' || c.rank === 'soldier')) break;
-      const fam = w.fam[c.familyId];
+      const fam = w.fam[c.familyId], ground = crewGround(w, c), tp = temper(c);
+      const presses = T.violence > 0.6 && tp.volatility > 0.6;
       for (const b of Object.values(w.biz)) {
         if (!b.open || b.kind === 'casino' || b.protection?.familyId === c.familyId || cd('shake:' + b.id) || shopInPlay(w, b.id)) continue; // a shop somebody is already working on is left to him
         // Word gets round: nobody else leans on a shop for a week after someone has.
@@ -104,9 +109,18 @@ export function generate(w: World, c: Character, kind: Kind): Action[] {
         if (!o || !o.alive) continue;
         const rival = !!b.protection;
         const home = fam.districts.includes(b.district);
-        const s = T.greed * 0.45 + T.ambition * 0.3 + (home ? 0.15 : -0.1) - T.caution * (rival ? 0.6 : 0.25) - (rival ? 0.15 : 0) + (b.district === c.district ? 0.05 : 0) + b.income / 10000 - crime;
-        const who = rival ? ` - pays ${w.chars[b.protection!.collectorId]?.name ?? 'someone'} (${w.fam[b.protection!.familyId].name})` : ' - unprotected';
-        push({ kind: 'shakedown', target: o.id, biz: b.id, label: `Lean on ${o.name} at ${b.name} (${b.district})${who}`, score: s });
+        let why = '';
+        if (!rival) { if (!ground.has(b.district)) continue; }
+        else {
+          const x = w.chars[b.protection!.collectorId];
+          why = !x?.alive ? 'its man is dead' : x.jailedUntil > now ? 'its man is inside' : (c.rels[x.id]?.grudge ?? 0) >= 0.4 ? `a grudge against ${x.name}` : (fam.tension[b.protection!.familyId] ?? 0) >= 2 ? `bad blood with the ${w.fam[b.protection!.familyId].name}` : '';
+          if (!why || !(home || (c.rels[x?.id ?? '']?.grudge ?? 0) >= 0.4)) continue;
+        }
+        const again = !changedSince(w, b, c);
+        if (again && !presses) continue;
+        const s = T.greed * 0.45 + T.ambition * 0.3 + (home ? 0.15 : -0.1) - T.caution * (rival ? 0.6 : 0.25) - (rival ? 0.15 : 0) - (again ? 0.15 : 0) + (b.district === c.district ? 0.05 : 0) + b.income / 10000 - crime;
+        const who = rival ? ` - pays ${w.chars[b.protection!.collectorId]?.name ?? 'someone'} (${w.fam[b.protection!.familyId].name}); ${why}` : ' - unprotected';
+        push({ kind: 'shakedown', target: o.id, biz: b.id, approach: again ? 'hard' : undefined, label: `Lean on ${o.name} at ${b.name} (${b.district})${who}`, score: s });
       }
       break;
     }
@@ -173,7 +187,7 @@ export function share(w: World, from: Character, to: Character, lines: string[],
     .filter(({ f }) => f && !f.minor && !to.known[f.id] && !(f.actor === from.id && SENSITIVE.has(f.kind)) && (!PRIVATE.has(f.kind) || r.trust > 0.5) && !(opt?.avoidActor && f.actor === opt.avoidActor) && !opt?.exclude?.(f) && (to.isPlayer || (gossipFresh(w, f) && (f.heard ?? 0) < gossipCap(f))))
     // V89: an NPC passes on what matters to the man he is talking to (rumour.ts salience); a stranger's bad night at cards is dropped
     .filter(({ f }) => to.isPlayer || salience(w, to, f) >= 0)
-    .sort((a, b) => (to.isPlayer ? Number(own(b.f)) - Number(own(a.f)) : salience(w, to, b.f) - salience(w, to, a.f)) || Number(tierOf(a.f.kind) === 'routine') - Number(tierOf(b.f.kind) === 'routine') || b.f.t - a.f.t)
+    .sort((a, b) => (to.isPlayer ? Number(own(b.f)) - Number(own(a.f)) : salience(w, to, b.f) - salience(w, to, a.f)) || Number(tierOf(a.f) === 'routine') - Number(tierOf(b.f) === 'routine') || b.f.t - a.f.t)
     .slice(0, to.isPlayer ? 1 : 2); // you are told one thing at a time; the rest comes up if you ask
   const told: Fact[] = [];
   let spoken = 0;
@@ -349,7 +363,10 @@ export function perform(w: World, a: Action): { minutes: number; lines: string[]
         c.cash -= stake;
         bizMove(w, b, stake, 'gamble');
         lines.push(`The cards turn on you. ${money(stake)} gone at ${b.name}, and the house doesn’t even look up.`);
-        if (stake >= 250) addFact(w, { kind: 'gambling_loss', actor: c.id, business: b.id, amount: stake, text: `${c.name} dropped ${money(stake)} at ${b.name}.`, minor: stake < 350, district: b.district }, { witnesses: witnessesAt(w, b.district, [c.id], 2) });
+        // (Stage 4: a loss is recorded when it matters: a heavy one, one that leaves him close to broke, or the player's own. An
+        // ordinary night's losing moves the money, which is the consequence; it is not a lasting event for the whole city to repeat.)
+        const matters = stake >= 500 || c.cash < 100 || c.isPlayer;
+        if (stake >= 250 && matters) addFact(w, { kind: 'gambling_loss', actor: c.id, business: b.id, amount: stake, text: `${c.name} dropped ${money(stake)} at ${b.name}${c.cash < 100 ? ', and it was most of what he had' : ''}.`, minor: stake < 350 && c.cash >= 100, district: b.district }, { witnesses: witnessesAt(w, b.district, [c.id], 2) });
       }
       return { minutes: m, lines };
     }

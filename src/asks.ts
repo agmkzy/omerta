@@ -9,7 +9,7 @@ import { ASKS } from './askkinds'; // first: the registry must exist before anyt
 import { addFact, bear, bearOn, clamp, createDebt, ease, easeOn, famName, feel, feelOn, money, notifyProtector, ownerBiz, payDebt, peek, regard, rel, repute, witnessesAt } from './core';
 import { loanPosition } from './negotiate';
 import { say as vsay } from './voicesheet';
-import { bizMove, giveTime, setCollector } from './econ';
+import { bizMove, changedSince, giveTime, noteRefusal, setCollector } from './econ';
 import { tension } from './actions';
 import { addEnc, addFavour } from './encounters';
 import { closeKin, kinOf, kinTie, madeKin } from './kin';
@@ -117,7 +117,7 @@ const tried = (x: Stance, k: string) => x.tried?.[k] ?? 0;
 export function mayAsk(w: World, ak: string, a: Character, t: Character, biz?: Id): boolean {
   return !!askBetween(w, ak, a.id, t.id, biz) || (w.sitcool?.[`ask:${ak}:${a.id}:${t.id}:${biz ?? ''}`] ?? 0) <= w.now;
 }
-export function openAsk(w: World, ak: string, a: Character, t: Character, o: { biz?: Id; amt?: number; what?: string; about?: Id; why?: string; depth?: number; parent?: Id; m?: Situation['m'] } = {}): Situation | undefined {
+export function openAsk(w: World, ak: string, a: Character, t: Character, o: { biz?: Id; amt?: number; what?: string; about?: Id; why?: string; depth?: number; parent?: Id; m?: Situation['m']; rate?: number } = {}): Situation | undefined {
   const K = ASKS[ak];
   if (!K || a.id === t.id) return undefined;
   const existing = askBetween(w, ak, a.id, t.id, o.biz);
@@ -135,7 +135,7 @@ export function openAsk(w: World, ak: string, a: Character, t: Character, o: { b
   if (!s) return undefined;
   { const st = ((w.sitpace ??= { lastMajor: -1e9, lastVisible: -1e9, weekVis: 0, wk: 0 }).stats ??= {}); const k = `open.${ak}${a.isPlayer || t.isPlayer ? '.player' : ''}`; st[k] = (st[k] ?? 0) + 1; } // (V89: counted by kind, for the record)
   s.ak = ak;
-  s.terms = { by: a.id, of: t.id, amt: o.amt, first: o.amt, what: o.what };
+  s.terms = { by: a.id, of: t.id, amt: o.amt, first: o.amt, what: o.what, ...(o.rate !== undefined ? { rate: o.rate } : {}) };
   if (o.about) s.m = { ...(s.m ?? {}), about: o.about };
   if (o.depth) s.m = { ...(s.m ?? {}), depth: o.depth };
   if (o.parent) s.m = { ...(s.m ?? {}), parent: o.parent };
@@ -588,10 +588,12 @@ ASKS.protect = {
     const afford = clamp(1 - fee / Math.max(20, b.income * 0.15), -1, 1); // can he carry it
     const covered = b.protection && b.protection.collectorId !== a.id ? -0.45 : 0; // he already pays someone
     const street = Object.keys(t.known).filter((id) => { const f = w.facts[id]; return f && f.kind === 'vandalism' && f.district === b.district && w.now - f.t < 21 * DAY; }).length;
-    return afford * 0.35 + covered + Math.min(0.25, street * 0.06) - 0.2;
+    const before = changedSince(w, b, a) ? 0 : -0.1; // he has sent this man away before, and nothing has changed since
+    return afford * 0.35 + covered + Math.min(0.25, street * 0.06) + before - 0.2;
   },
   yes: (w, s, a, t) => {
     const b = w.biz[s.biz!], fee = s.terms?.amt ?? feeOf(b), prev = b.protection;
+    if (b.refused?.[a.id]) delete b.refused[a.id];
     setCollector(w, b, a.id, a.familyId!, { fee });
     if (prev && prev.collectorId !== a.id && w.chars[prev.collectorId]) {
       const pc = w.chars[prev.collectorId];
@@ -626,6 +628,7 @@ ASKS.protect = {
   onNo: (w, s, a, t) => {
     const b = w.biz[s.biz!];
     const f = tell(w, s, `${t.name} told ${a.name} to get out of ${b.name}.`, { kind: s.m?.refusal ? 'rumour' : 'protection_refused', actor: t.id, victim: a.id, witnesses: witnessesAt(w, b.district, [a.id, t.id], 2), minor: !!s.m?.refusal });
+    if (!s.m?.refusal) noteRefusal(w, b, a); // the shop remembers whom it turned away
     s.m = { ...(s.m ?? {}), refusal: s.m?.refusal ?? f.id };
     return undefined;
   },
@@ -765,6 +768,12 @@ ASKS.borrow = {
   },
 };
 // ---------------------------------------------------------------- offering a man a loan
+// Stage 4: the weekly rate is a term of the offer. Named by the lender when he makes it; otherwise his own: a greedy, hard man asks
+// more, a friend less.
+export function lendRate(s: Situation, a: Character): number {
+  if (s.terms?.rate !== undefined) return s.terms.rate;
+  return Math.round((0.03 + a.traits.greed * 0.03 + a.traits.violence * 0.01) * 100) / 100;
+}
 ASKS.lend = {
   id: 'lend', sev: 0.12, roles: ['lender', 'borrower'], cool: 2, ttl: 7, max: 8,
   moves: ['take', 'ask', 'persuade', 'wait', 'drop'],
@@ -773,19 +782,23 @@ ASKS.lend = {
   lean: (w, s, a, t) => {
     const b = ownerBiz(w, t.id);
     const need = b && (b.cash < 250 || b.distress > 0) ? 0.35 : t.cash < 150 ? 0.25 : 0.05;
-    return need + (1 - t.traits.caution) * 0.15 + 0.4; // (V89 health: was -0.3, which turned nearly every offer down; V88 took about half)
+    // Stage 4: the price of the money is part of the offer: dear money puts off a man who doesn't need it, less one who does
+    const dear = Math.max(0, lendRate(s, a) - 0.04) * (need >= 0.25 ? 2 : 6);
+    return need + (1 - t.traits.caution) * 0.15 + 0.4 - dear; // (V89 health: was -0.3, which turned nearly every offer down; V88 took about half)
   },
   counter: (w, s, a, t) => { const amt = s.terms?.amt ?? 0, b = ownerBiz(w, t.id); return amt >= 1000 && !(b && b.distress > 0) ? { amt: 500, why: 'I don’t need more than that' } : undefined; },
   yes: (w, s, a, t) => {
-    const amt = s.terms?.amt ?? 0;
-    a.cash -= amt; t.cash += amt;
-    const d = createDebt(w, a.id, t.id, amt, 0.05, 'business loan');
+    const amt = s.terms?.amt ?? 0, rate = lendRate(s, a), b = s.biz ? w.biz[s.biz] : undefined;
+    a.cash -= amt;
+    // (money lent for a business goes into the business: econ.bizMove keeps its books)
+    if (b && b.open && b.ownerId === t.id) { bizMove(w, b, amt, 'aid', a.id); b.distress = 0; } else t.cash += amt;
+    const d = createDebt(w, a.id, t.id, amt, rate, b ? 'business loan' : 'a private loan');
     const f = addFact(w, { kind: 'loan', actor: a.id, victim: t.id, amount: amt, story: 'sit:' + s.id, text: `${a.name} lent ${t.name} ${money(amt)}.`, district: t.district });
     d.cause = f.id;
-    return `${t.name} takes the ${money(amt)}. ${money(d.weeklyPayment)} a week, five percent on top. He shakes on it and holds ${a.isPlayer ? 'your' : 'his'} hand a second too long.`;
+    return `${t.name} takes the ${money(amt)}. ${money(d.weeklyPayment)} a week, ${Math.round(rate * 100)} percent on top. He shakes on it and holds ${a.isPlayer ? 'your' : 'his'} hand a second too long.`;
   },
   phrase: {
-    ask: (w, s) => `${money(s.terms?.amt ?? 0)}, if he needs it. Five percent a week.`,
+    ask: (w, s) => `${money(s.terms?.amt ?? 0)}, if he needs it. ${Math.round((s.terms?.rate ?? 0.05) * 100)} percent a week.`,
     yes: 'He takes it.', no: '“Thanks. I’d rather not owe anybody.”', counter: '“{amt} would do it. {why}.”', stall: '“Let me think about it.”',
   },
 };

@@ -27,7 +27,7 @@ import { treeView } from './views_a';
 import { toSide } from './layout';
 import { whereIs } from '../where';
 import { kinWord, stageWord, warmthWord, DATES, datingPool } from '../life';
-import { OPS, OP_GROUPS, canStart } from '../rackets';
+import { canStart, lineOf, OP_GROUPS, OPS } from '../rackets';
 import { isMade, sanctioned } from '../politics';
 import { settleOptions } from '../revenge';
 import { clubView } from './clubview';
@@ -605,8 +605,8 @@ function crewOverview(w: World, p: Character, crew: Character[]): string {
   const rows = crew.map((c) => {
     const h = wk(c);
     const act = activityOf(w, c);
-    const opsN = w.ops.filter((o) => o.runner === c.id && (o.state === 'running' || o.state === 'out')).length + (c.hustle && c.bossId === p.id ? 1 : 0);
-    const line = c.hustle ? (c.hustle.level > 1 ? 'a growing business' : 'a line of his own') : '';
+    const opsN = w.ops.filter((o) => o.runner === c.id && (o.state === 'running' || o.state === 'out')).length + (lineOf(w, c) && c.bossId === p.id && lineOf(w, c)!.runner !== c.id ? 1 : 0);
+    const line = lineOf(w, c) ? ((lineOf(w, c)!.level ?? 1) > 1 ? 'a growing business' : 'a line of his own') : '';
     return `<tr><td><a href="#" class="nm" data-a="ent:${c.id}" style="text-decoration:none">${esc(c.name.split(' ')[0])}</a><small>${c.nick ? '“' + esc(c.nick) + '” · ' : ''}${act ? esc(act.why) : 'free'}</small></td><td>${h.length ? money(h.at(-1)!.declared) : '–'}</td><td>${h.length ? money(avg(h.map((x) => x.declared))) : '–'}</td><td>${h.length ? money(h.at(-1)!.paid) : '–'}</td><td>${reliab(c)}</td><td>${c.career && c.career.done + c.career.failed > 0 ? `${c.career.done}/${c.career.done + c.career.failed}` : '–'}</td><td title="${esc(line)}">${opsN}</td></tr>`;
   }).join('');
   out += `<h2 class="sect">Side by side<small>declared figures</small></h2><div class="card tbl"><table class="crewt"><thead><tr><th>Man</th><th>Week</th><th>4-wk avg</th><th>Kick-up</th><th>Pays</th><th>Jobs</th><th>Lines</th></tr></thead><tbody>${rows}</tbody></table><p class="muted" style="margin:8px 0 0;font-size:12.5px">These are the numbers they hand you. Tap a name for the full picture.</p></div>`;

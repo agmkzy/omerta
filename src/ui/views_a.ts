@@ -1,3 +1,4 @@
+import { enterpriseLine, lineOf } from '../rackets';
 import { personTexture } from '../sitmoves';
 import { viewOf } from '../temper';
 import { clubOf, clubOpen, clubPresent } from '../clubdata';
@@ -23,7 +24,6 @@ import { isFemale, isPartner, kinOf, kinWord, stageWord, warmthWord } from '../l
 import { dangerLevel, LADDER_WORDS } from '../danger';
 import { favourWord, owedTo, owing } from '../encounters';
 import { timeBar } from './views_b';
-import { hustleLine } from '../hustle';
 import { myDisputes, playerMoved } from './views_c';
 import { storiesTab, storiesOf, storyKnown, type Story } from './stories';
 import { ambitionCard } from './ambview';
@@ -351,7 +351,7 @@ export function personView(id: Id): string {
       const o = w.chars[d.creditor === c.id ? d.debtor : d.creditor];
       out += `<li><span>${d.creditor === c.id ? 'Is owed by' : 'Owes'}</span><span class="v">${pl(o)} ${money(d.balance)}</span></li>`;
     }
-    if (c.bossId === p.id && c.hustle) out += `<li><span>His line</span><span class="v">${esc(hustleLine(c)!)}</span></li>`;
+    if (c.bossId === p.id && lineOf(w, c)) out += `<li><span>His line</span><span class="v">${esc(enterpriseLine(w, c)!)}</span></li>`;
     if (c.rank !== 'civilian' && c.bossId === p.id) out += `<li><span>Skills</span><span class="v">${esc(skillLine(c))}</span></li><li><span>Passes up</span><span class="v">${Math.round(effectiveRate(w, c) * 100)}%</span></li>`;
     out += `</ul></div>`;
   }
@@ -557,7 +557,7 @@ function recordCard(w: World, p: Character, c: Character): string {
   rows.push(`<li><span>Passed up to you</span><span class="v">${money(h.reduce((a, x) => a + x.paid, 0))}</span></li>`);
   if (c.books.arrears > 0) rows.push(`<li><span>Owes</span><span class="v">${money(c.books.arrears)}</span></li>`);
   if (srcs.size) rows.push(`<li><span>Income he reports from</span><span class="v">${[...srcs].map(esc).join(', ')}</span></li>`);
-  if (c.hustle) rows.push(`<li><span>His own line</span><span class="v">${esc(hustleLine(c)!)}</span></li>`);
+  if (lineOf(w, c)) rows.push(`<li><span>His own line</span><span class="v">${esc(enterpriseLine(w, c)!)}</span></li>`);
   if (ops.length || shops) rows.push(`<li><span>Running for you</span><span class="v">${[ops.length ? `${ops.length} racket${ops.length > 1 ? 's' : ''}` : '', shops ? `${shops} shop${shops > 1 ? 's' : ''}` : ''].filter(Boolean).join(', ')}</span></li>`);
   rows.push(`<li><span>Jobs for you</span><span class="v">${k ? `${k.done} done, ${k.failed} botched` : 'none yet'}</span></li>`);
   const ev = k?.log.slice(-5).reverse() ?? [];

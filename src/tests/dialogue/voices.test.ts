@@ -77,6 +77,8 @@ describe('voices', { tags: ['unit'] }, () => {
   ok('the speaker is addressed differently by rank: up, down and level read differently', () => {
     const w = world60(), p = P(w);
     const boss = w.chars[p.bossId!], man = men(w).find((x) => x.bossId === p.id) ?? men(w).find((x) => x.rank === 'associate' && x.familyId === p.familyId && x.id !== p.id)!;
+    // with nothing between them (a grudge makes it wary, tested above), a man speaks up to his superior
+    if (p.rels[boss.id]) { p.rels[boss.id].grudge = 0; delete p.rels[boss.id].why; }
     assert.equal(regOf(w, p, boss), 'up');
     const a = speak(w, p, boss, 'how', 'Ask how he’s holding up');
     const b = speak(w, p, { ...man, bossId: p.id } as Character, 'how', 'Ask how he’s holding up');

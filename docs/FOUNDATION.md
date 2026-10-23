@@ -263,3 +263,144 @@ Judged against what the men experienced, yes. Some examples:
 - **Most friendships rest on time together, and favours rarely become the bond.** A favour's bond is recorded at a modest weight, so time spent usually outweighs it. When the conversation rebuild reads bonds, favours may deserve more weight.
 - **Promotions fall back towards the baseline** (41–56). Bosses now trust their men more slowly, and promotion needs a boss's trust. That's the expected consequence of earned trust. It also makes the **outstanding promotion-rule inconsistency** more pressing: how a boss judges readiness is still the old NPC formula, separate from the player's road. It remains open for the next step.
 - **The protection-demand storm is untouched,** as instructed. It still dominates many men's histories (Marty Leone was turned away by sixteen shops in three days), and family growth still rests on it.
+
+---
+
+## Stage 4: the criminal economy and work
+
+*Approved October 2026.* Design and reasoning in [STAGE4_ECONOMY.md](STAGE4_ECONOMY.md).
+
+**Order of increments:**
+1. loans;
+2. one enterprise record;
+3. protection by crew ground;
+4. work down the hierarchy;
+5. one career rulebook;
+6. money circulation;
+7. the player names his figures.
+
+Player access to the economy is built into each increment where it belongs, and is an acceptance criterion for the stage.
+
+### Audit: can the player actually take part? (read-only, before any change)
+
+| What a player might want to do | Underneath | How a player finds it today |
+|---|---|---|
+| **Buy a business** | NPCs only. Every way a business changes hands is an NPC plan, a takeover over arrears, a buyout between partners, or inheritance. | **Impossible.** No route exists. |
+| **Sell a business** | NPCs only | Impossible |
+| **Buy a stake** | One fixed offer: $2,000 for a quarter of a business in trouble | Hidden among rank powers ("Back a struggling business"), and only for shops already losing money |
+| **Offer to invest in a shop** | A fixed $500 loan offer | One conversation option, only when he talks about his business |
+| **Start a racket** | Works, through the player-only operations system | **Discoverable:** the Rackets tab, at associate level for most kinds (made men's kinds need rank). The income is abstract. |
+| **Partnership** | A chop shop with a garage owner (fixed $2,000), or moving goods through a pawnbroker | Conversation options with those two kinds of owner only |
+| **Borrow / lend** | Real debts, but each of about 17 routes sets its own amount and rate | Scattered conversation options and chance encounters; no amount of his own choosing |
+| **Name a protection figure** | The negotiation accepts any amount | The code fixes it at 7–8% of income; no amount control exists anywhere in the interface |
+| **Delegate management** | Operations can have a runner; businesses have a manager field | A runner can be named for the player's own operations; nothing for businesses |
+| **Run another man's operation** | No such arrangement | Impossible |
+
+**Conclusion:** the simulation supports more than the player can reach. Buying and selling businesses, choosing figures and running another man's operation have no player route at all. Stakes and partnerships exist only as fixed, narrow offers. Each Stage 4 increment adds the player's way in through the same rules and records NPCs use, and the eight player flows listed in the approval are tested as gameplay.
+
+### Increment 1: loans
+
+- **A loan now keeps its terms apart.**
+  - **The principal** still owed (`owed`).
+  - **Arrears:** interest charged and not yet paid.
+  - **The weekly rate.**
+  - **The weekly payment** both sides agreed.
+- **Interest doesn't compound into the principal any more.**
+  - Lending $1,000 at 5% a week charges $50 each week.
+  - A payment clears arrears first, then principal.
+  - A man who pays only the interest still owes $1,000.
+  - Missed weeks pile up as arrears, in a straight line, not a balloon.
+- **Renegotiating is its own act** (`core.restructure`): a new rate or a new payment. **Forgiving part of a debt** is another (`core.writeDown`). Both are recorded on the debt.
+- **One way to lend.** Every NPC loan now goes through the same lend negotiation the player uses (`asks` "lend"). The lender names a rate from his greed and temperament; the borrower can refuse it as too dear. Situations, people in crisis and crew members all use it.
+- **Save compatibility.** Old saves load: a debt without the new fields reads its whole balance as principal.
+
+### Increment 2: one enterprise record
+
+- **One record for every enterprise,** the player's and every NPC's (`w.ops`, `rackets.ts`).
+  - NPC "hustles" and the player's "operations" were two systems with different rules. The hustle system is deleted (`hustle.ts`).
+  - Old saves convert an NPC's hustle into an enterprise when they load.
+- **Same rules for everyone.** An NPC starts an enterprise with the player's starting rules (`canStart`): money to start it, rank for the made men's kinds, the right district.
+  - He chooses by what it would pay a man like him, how crowded the trade is where he lives, the heat it brings and how careful he is.
+  - He closes it after a run of bad weeks, and may expand a good one.
+- **Enterprises produce real things.**
+  - A loan book makes real loans, through the lend negotiation.
+  - A betting book's heavy losers run up real markers: debts with a man's name on them.
+  - Police raids fine the owner and may take the man running it.
+- **Two new kinds for NPCs who used to have abstract hustles:** a car-stealing outfit (`chop`) and a fencing operation (`fencing`), with the player's sheets.
+- **Less noise from gambling.** A loss is recorded only when it matters: a large stake, a man left nearly broke, or the player.
+
+### Found and fixed along the way
+
+- **Saves grew to 10–11 MB.**
+  - **Cause:** raids and defaults were "permanent" facts. Gossip carried them to everyone and they were never dropped. That was right when raids were rare. Once every enterprise faced the police, a fine on a numbers spot was known to half the city for ever.
+  - **Fix:** a raid with a fine, or a default, under $1,000 is now local news. It travels a little and fades unless something still refers to it (`retain.tierOf`). The federal sweep and large defaults stay permanent.
+  - **Result:** saves are back to 7.7–8.8 MB, slightly smaller than step 3.
+- **A betting book gave credit to a man who had already stiffed it.** The casino never did. A book now follows the casino's rule.
+- **Two dialogue tests relied on accidents of a 60-day world.** One assumed the idle player had done nothing worth noticing; in the new history, his superior has him beaten for ignoring a summons. The other assumed he held no grudge against his boss. Both now test their rule directly.
+
+### Results: two years, four worlds (after increments 1 and 2)
+
+"Before" is the unchanged game (`baseline/rerun/`) and "Step 3" is commit `24c2beb`.
+
+| Measure | Before | Step 3 | After |
+|---|---|---|---|
+| Active debts at the end (count / balance) | 35–56 / $25,576–$157,299 | — | 75–109 / $17,537–$32,807 |
+| Worst debt as a multiple of what was lent | — (seed 7's book went from $34k to $157k in six months) | — | 1.97–3.15× |
+| Loans ever made / defaulted | not measured | — | 627–729 / 56–73 |
+| Men with an enterprise of their own / weekly net | 54–66 / $46,284–$58,101 (abstract) | — | 88–108 / $33,157–$36,672 (real records) |
+| Enterprises running at the end | — | — | 122–154 |
+| Gambling losses recorded | 1,527–4,237 | — | 15–40 |
+| Protection deals / refusals | 29–40 / 548–1,113 | — | 28–38 / 687–1,187 |
+| Promotions | 39–50 | 41–56 | 37–49 |
+| Consistency and ledger problems | 0 | 0 | 0 |
+| Save size at 2 years | 4.9–5.0 MB | 8.2–9.3 MB | 7.7–8.8 MB |
+
+- **The enterprise mix:**
+  - car theft 46–59 and fencing 16–33 (the entry trades, which need no rank);
+  - numbers 10–13, vending 8–13, bookmaking 6–10;
+  - the made men's trades in single figures;
+  - loan books 1–3.
+- **Defaults come from three places:** private loans, casino markers and book markers, each at about 20–30% default. Business loans never default. Markers go, by design, to poor men with a strong vice, so many defaults are a believable consequence and not a fault. I haven't tuned it.
+
+### Open, for the owner
+
+- **Loan books are rare (1–3 per world).** They cost $1,200 to start and pay modestly, so few men choose them. Lending still happens all the time person to person; a loan book only makes a business of it. Increment 6, money circulation, is where it belongs if it should be commoner.
+- **Protection refusals were still 20–40 per deal.** That was increment 3's job, below.
+
+### Increment 3: protection by crew ground and purpose
+
+The daily scan in which every associate and soldier considered every open shop in the city is deleted. No cap was added; an approach now needs a reason.
+
+- **A crew's ground** (`econ.crewGround`). A crew is a captain and the men under him; its ground is the districts of its family where its men already collect. A crew that collects nowhere yet starts where its captain lives. It is read from the protection records, not a new territory system.
+- **A man grows his own book there.** An unprotected shop outside his crew's ground isn't his business.
+- **A shop remembers whom it turned away** (`Business.refused`, set at the first refusal in a negotiation, cleared by a deal).
+  - The man doesn't go back unless something has changed (`econ.changedSince`): he stands higher than he did, he has a different captain, or the shop has had trouble since.
+  - A violent, volatile man may go back anyway, and then he goes back hard.
+  - A shopkeeper who has already sent a man away, with nothing changed, is a little firmer the second time. That holds for the player as well.
+- **Another family's shop is a decision with a reason:** its man is dead or inside, a grudge against him, or bad blood between the families. The reason is part of the choice. A shop of his own family's is never a daily choice.
+- **Captains sending men to a shop** belongs to increment 4, where one assignment mechanic serves NPC captains and the player alike.
+
+**Tests** (`economy/protection.test.ts`):
+- a man's choices stay in his crew's ground and never touch his own family's shops;
+- another family's shop is left alone until he has a grudge against its man;
+- a refused man doesn't go back until his standing rises.
+
+**One test had relied on chance.** A matters test assumed that ten days in, someone would be leaning on a shop the player hadn't heard about. With fewer demands, sometimes nobody is, so the test now has a soldier make one.
+
+### Results: two years, four worlds (after increment 3)
+
+| Measure | Increments 1–2 | After increment 3 |
+|---|---|---|
+| Protection deals (two years) | 28–38 | 29–42 |
+| Refusals | 687–1,187 | 340–454 |
+| Refusals per deal | 20–40 | 10–13 |
+| Shops taken from another man | 76–109 | 63–86 |
+| Shops smashed or vandalised | 207–282 | 120–232 |
+| Beatings | 435–574 | 398–535 |
+| Shops paying protection at the end | — | 54–62 |
+| Promotions | 37–49 | 35–49 |
+| Consistency and ledger problems | 0 | 0 |
+| Save size at 2 years | 7.7–8.8 MB | 7.5–8.9 MB |
+
+- **Refusals halved, with the same number of deals.** Less violence followed: fewer smashed shops, fewer shops taken from another man, fewer beatings. Nothing was capped.
+- **Still 10–13 refusals per deal.** A first approach to a shop that won't pay is still the commonest way a book grows, and refusing is still what most shopkeepers do first. Increment 4 adds the other purpose, a captain sending a man, and with it the record of who was sent where.

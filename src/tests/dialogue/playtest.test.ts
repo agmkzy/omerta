@@ -51,7 +51,8 @@ class Talk {
   }
   has(m: RegExp) { return this.opts().some((x) => !x.done && m.test(x.label)); }
   // back out of whatever is in hand, and go
-  leave() { for (let i = 0; i < 4 && this.c; i++) this.pick(this.has(/Take your leave/) ? /Take your leave/ : /Talk about something else/); }
+  // (a follow-up may offer only its own way out, "Let's leave it": the way out is always there, not always in the same words)
+  leave() { for (let i = 0; i < 4 && this.c; i++) this.pick(this.has(/Take your leave/) ? /Take your leave/ : this.has(/Talk about something else/) ? /Talk about something else/ : /leave it/i); }
   note(s: string) { this.log.push(`*${s}*`, ''); }
   done() { OUT.push(...this.log, '---', ''); }
 }

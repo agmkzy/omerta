@@ -454,6 +454,7 @@ export function createDebt(
   rate: number,
   reason: string,
   cause?: Id,
+  terms: { payment?: number } = {},
 ): Debt {
   const d: Debt = {
     id: newId(w, 'd'),
@@ -461,8 +462,12 @@ export function createDebt(
     debtor,
     principal,
     balance: principal,
+    owed: principal,
+    arrears: 0,
     weeklyRate: rate,
-    weeklyPayment: Math.round((principal * 0.12) / 5) * 5,
+    // (the agreed weekly payment: by default the vig and a little of the principal; a man who agrees to pay only the vig owes the
+    // principal until he pays it some other way)
+    weeklyPayment: terms.payment ?? Math.round((principal * 0.12) / 5) * 5,
     nextDue: w.now + 7 * DAY,
     missed: 0,
     status: 'active',
@@ -475,6 +480,36 @@ export function createDebt(
 }
 
 // Debtor pays from pocket first, then from their business till.
+// Stage 4 (Oct 2026): one record of what is owed, and what each week does to it. The principal still out (`owed`) and the vig
+// that fell due and went unpaid (`arrears`) are kept apart: a payment clears the arrears first, then the principal; the vig is
+// charged on the principal alone, so a man who misses weeks falls further behind by the vig, not by interest on interest.
+export const principalLeft = (d: Debt) => d.owed ?? Math.max(0, d.balance - (d.arrears ?? 0));
+function syncBalance(d: Debt) { d.balance = Math.round(principalLeft(d) + (d.arrears ?? 0)); }
+function applyToDebt(d: Debt, amount: number) {
+  const arr = d.arrears ?? 0, toArr = Math.min(arr, amount);
+  d.owed = Math.max(0, Math.round(principalLeft(d) - (amount - toArr)));
+  d.arrears = Math.round(arr - toArr);
+  syncBalance(d);
+}
+// the week's vig falls due (engine's weekly settlement), on the principal still out
+export function accrueVig(d: Debt): number {
+  const vig = Math.round(principalLeft(d) * d.weeklyRate);
+  d.owed = principalLeft(d);
+  d.arrears = (d.arrears ?? 0) + vig;
+  syncBalance(d);
+  return vig;
+}
+// renegotiated terms: a lower rate, a smaller (or larger) weekly payment, agreed between the two (asks, situ, goals, conversation)
+export function restructure(d: Debt, o: { rate?: number; payment?: number }) {
+  if (o.rate !== undefined) d.weeklyRate = Math.max(0, Math.round(o.rate * 1000) / 1000);
+  if (o.payment !== undefined) d.weeklyPayment = Math.max(5, Math.round(o.payment / 5) * 5);
+}
+// some of it written off or settled in kind (forgiven, paid out of a share): arrears first, then principal. True when it is cleared.
+export function writeDown(w: World, d: Debt, amount: number): boolean {
+  applyToDebt(d, Math.max(0, Math.round(amount)));
+  if (d.balance <= 0 && (d.status === 'active' || d.status === 'defaulted')) { d.status = 'paid'; onDebtCleared(w, d); return true; }
+  return false;
+}
 export function payDebt(w: World, d: Debt, amount: number) {
   const debtor = w.chars[d.debtor];
   const creditor = w.chars[d.creditor];
@@ -489,7 +524,7 @@ export function payDebt(w: World, d: Debt, amount: number) {
   earn(creditor, amount, 'loans');
   post(w, { from: debtor.id, to: creditor.id, amt: amount, flow: 'repay', note: d.reason });
   d.paid = (d.paid ?? 0) + amount;
-  d.balance = Math.round(d.balance - amount);
+  applyToDebt(d, amount);
   if (amount >= d.weeklyPayment || d.balance <= 0) d.missed = 0;
   if (d.balance <= 0) {
     d.status = 'paid';
@@ -553,7 +588,7 @@ export function onDebtCleared(w: World, d: Debt) {
     for (const m of c.memos) if (!m.done && m.ref && w.facts[m.ref]?.cause === d.cause && w.facts[m.ref]?.kind.startsWith('debt')) m.done = true;
   }
   const deb = w.chars[d.debtor], cre = w.chars[d.creditor];
-  if (deb && cre) { rel(cre, deb.id).grudge = clamp(rel(cre, deb.id).grudge - 0.15); rel(cre, deb.id).trust = clamp(rel(cre, deb.id).trust + 0.05); }
+  if (deb && cre) { bear(w, cre, deb.id, -0.15, 'paid'); feel(w, cre, deb.id, 'trust', 0.05, `${deb.name} paid what he owed`); }
   for (const e of w.enc) if (e.status === 'open' && e.data?.debt === d.id) e.status = 'lapsed';
 }
 

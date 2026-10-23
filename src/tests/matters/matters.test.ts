@@ -301,7 +301,15 @@ ok('what you already know opens a man up, and standing up for him is a promise a
   const p = P(w);
   // (a matter the player has not already heard of: with nothing to go on, the wary man says nothing)
   const heardOf = (sid: string) => Object.keys(p.known).some((id) => w.facts[id]?.story === 'sit:' + sid);
-  const s = openAsks(w).find((x) => x.ak === 'protect' && x.terms?.by !== p.id && x.terms?.of !== p.id && !heardOf(x.id))!;
+  // (if nobody happens to be leaning on a shop just now, a soldier does, through the same negotiation)
+  const byId = (x: { id: string }, y: { id: string }) => (x.id < y.id ? -1 : 1);
+  const s = openAsks(w).find((x) => x.ak === 'protect' && x.terms?.by !== p.id && x.terms?.of !== p.id && !heardOf(x.id)) ?? (() => {
+    const man = Object.values(w.chars).filter((c) => c.alive && !c.isPlayer && c.rank === 'soldier').sort(byId)[0];
+    const shop = Object.values(w.biz).filter((b) => b.open && b.kind !== 'casino' && !b.protection && w.chars[b.ownerId]?.alive && !w.chars[b.ownerId].isPlayer).sort(byId)[0];
+    const sit = openAsk(w, 'protect', man, w.chars[shop.ownerId], { biz: shop.id, amt: 40 })!;
+    move(w, sit, 'ask');
+    return sit;
+  })();
   const t = w.chars[s.terms!.of], a = w.chars[s.terms!.by];
   rel(t, p.id).trust = 0.2;
   let b = talkAbout(w, p, t, 'tk:pressed:' + s.id)!;

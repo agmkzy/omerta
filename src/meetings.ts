@@ -8,7 +8,7 @@ import { RULINGS, effectiveRate, influence, react, rule, subordinates } from './
 import { addFact, bear, bearOn, clamp, createDebt, ease, famName, feel, feelOn, isAwake, learn, money, recordCareer, rel, repute, shortTime } from './core';
 import { mkJob, tipFrom, traitWords } from './jobs';
 import { share } from './actions';
-import { HUSTLES } from './hustle';
+import { enterpriseLine, lineOf } from './rackets';
 import { callSitdown, settleDispute } from './disputes';
 import { addFavour } from './encounters';
 import { Character, DAY, Grievance, Id, Job, MeetingKind, Rank, World } from './types';
@@ -292,12 +292,12 @@ export function openCrewMeeting(w: World, p: Character, focus?: Grievance): Meet
   const ds = (w.disputes ?? []).filter((d) => (d.status === 'open' || d.status === 'violated') && here.some((c) => c.id === d.a));
   for (const c of pickN(w, here, here.length)) {
     if (raised.length >= 2) break;
-    const h = c.hustle;
+    const h = lineOf(w, c);
     const name = c.name;
     const dd = ds.find((d) => d.a === c.id);
     if (dd) raised.push(mkItem('concern', `${name} reports interference`, [`${name}: "${w.chars[dd.b].name} of the ${famName(w, w.chars[dd.b])} family has been leaning on me${dd.biz ? ' over ' + w.biz[dd.biz]?.name : ''}. I haven’t answered. I wanted you to know first."`], [], { who: c.id, type: 'rival', dispute: dd.id }));
     else if (c.cash < 120 || c.books.arrears > 0 || c.problem?.revealed) raised.push(mkItem('concern', `${name} asks for help`, [`${name} looks at the table. "I’m short. ${h?.cause ? 'It was ' + h.cause + '. ' : ''}${c.books.arrears > 0 ? 'I owe you from before. ' : ''}If I can get through this month, I’ll be fine."`], [], { who: c.id, type: 'struggling' }));
-    else if (h && (h.level >= 2 || h.total > 1500) && c.traits.ambition > 0.4) raised.push(mkItem('concern', `${name} wants more room`, [`${name}: "I’ve built something with ${HUSTLES[h.kind].label}. I pay what I’m supposed to. I’d like to be trusted to run it without a man looking over my shoulder."`], [], { who: c.id, type: 'earner' }));
+    else if (h && ((h.level ?? 1) >= 2 || h.total > 1500) && c.traits.ambition > 0.4) raised.push(mkItem('concern', `${name} wants more room`, [`${name}: "I’ve built something with ${enterpriseLine(w, c)}. I pay what I’m supposed to. I’d like to be trusted to run it without a man looking over my shoulder."`], [], { who: c.id, type: 'earner' }));
     else if (c.heat > 0.55) raised.push(mkItem('concern', `${name} is being watched`, [`${name}: "There’s a car outside my place most mornings. I think it’s the law. I don’t know whether to carry on or keep my head down."`], [], { who: c.id, type: 'heat' }));
   }
   items.push(...raised);
@@ -620,7 +620,7 @@ export function choose(w: World, p: Character, m: Meeting, code: string): string
         if (c0 === 'trust') { who.kickRate = Math.max(0.05, who.kickRate - 0.03); feelOn(w, r, 'trust', 0.06); feelOn(w, r, 'respect', 0.04); lines.push(`${who.name} straightens in his chair. "You won’t regret it." The others notice, and some of them start thinking about what they could build.`); for (const o of m.attendees) if (o !== who.id) w.chars[o].traits.ambition = clamp(w.chars[o].traits.ambition + 0.01); }
         else { who.traits.ambition = clamp(who.traits.ambition + 0.02); feelOn(w, r, 'trust', -0.01); lines.push(`"Not yet," you tell ${who.name}. He says he understands, in the voice of a man doing sums.`); }
       } else if (t === 'heat') {
-        if (c0 === 'lie') { who.heat = clamp(who.heat - 0.25, 0, 1.5); if (who.hustle) who.hustle.lull = w.now + 7 * DAY; feelOn(w, r, 'trust', 0.03); lines.push(`${who.name} will keep clear of his business for a week. It costs him money and keeps him out of a cell, maybe.`); }
+        if (c0 === 'lie') { who.heat = clamp(who.heat - 0.25, 0, 1.5); { const o = lineOf(w, who); if (o) o.lull = w.now + 7 * DAY; } feelOn(w, r, 'trust', 0.03); lines.push(`${who.name} will keep clear of his business for a week. It costs him money and keeps him out of a cell, maybe.`); }
         else { feelOn(w, r, 'trust', -0.01); lines.push(`${who.name} shrugs. "Your call." He’ll carry on, and keep checking the mirror.`); }
       } else {
         const d = (w.disputes ?? []).find((x) => x.id === it.data.dispute);

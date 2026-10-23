@@ -1,5 +1,6 @@
 // Jobs, tip-offs, schemes, ventures and conversations: everything that starts from the player.
 // All state is plain data (Job, Venture) so it saves and loads with the world.
+import { lineOf } from './rackets';
 import { temper } from './temper';
 import { bizMove } from './econ';
 import { ERRAND_KINDS, bossErrand, resolveErrand, runCrewJob } from './orders';
@@ -376,7 +377,7 @@ export function activityOf(w: World, c: Character): { why: string; until: number
   if (c.hurtUntil > w.now) return { why: 'laid up', until: c.hurtUntil };
   const j = w.jobs.find((q) => q.status === 'active' && q.assignee === c.id && q.kind !== 'summons');
   if (j) return { why: `on a job: ${j.title.replace(/^(.)/, (m) => m.toLowerCase())}`, until: j.due ?? j.expires };
-  if (c.hustle?.lull && c.hustle.lull > w.now) return { why: 'keeping his head down', until: c.hustle.lull };
+  { const o = lineOf(w, c); if (o?.lull && o.lull > w.now) return { why: 'keeping his head down', until: o.lull }; }
   return undefined;
 }
 export const JOB_STATE: Record<Job['status'], string> = { offered: 'Available', active: 'In progress', done: 'Completed', failed: 'Failed', declined: 'Cancelled', expired: 'Cancelled' };

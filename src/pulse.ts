@@ -1,6 +1,7 @@
 // The world's own pulse: things that happen between other people whether or not the player is involved,
 // the shifts in what men want, and the two kinds of situation that come from the shape of the organisation
 // itself: a border dispute over a shop, and work or advancement that the family hands out.
+import { lineOf } from './rackets';
 import { clearArrears, setCollector } from './econ';
 import { leaveCrew } from './rank';
 import { addFact, bear, bearOn, clamp, feel, feelOn, money, rel, repute } from './core';
@@ -375,7 +376,7 @@ function lifeChoose(w: World, p: Character, e: Enc, code: string): string[] {
   }
   if (life === 'rate' && c?.alive) {
     const r = rel(c, p.id);
-    if (code === 'agree') { c.kickRate = Math.max(0.05, c.kickRate - 0.05); feelOn(w, r, 'trust', 0.1); feelOn(w, r, 'affection', 0.06); if (c.hustle) c.hustle.level = Math.min(3, c.hustle.level + (w.rng.chance(0.3) ? 1 : 0)); return [`${first(c)} shakes your hand. "You won't regret it." From now on he passes up ${Math.round(c.kickRate * 100)}%.`]; }
+    if (code === 'agree') { c.kickRate = Math.max(0.05, c.kickRate - 0.05); feelOn(w, r, 'trust', 0.1); feelOn(w, r, 'affection', 0.06); { const o = lineOf(w, c); if (o) o.level = Math.min(3, (o.level ?? 1) + (w.rng.chance(0.3) ? 1 : 0)); } return [`${first(c)} shakes your hand. "You won't regret it." From now on he passes up ${Math.round(c.kickRate * 100)}%.`]; }
     if (code === 'counter') { c.kickRate = Math.max(0.05, c.kickRate - 0.02); feelOn(w, r, 'trust', 0.04); return [`"Fine," says ${first(c)}. He passes up ${Math.round(c.kickRate * 100)}% from now on.`]; }
     feelOn(w, r, 'trust', -0.04); feelOn(w, r, 'respect', -0.02);
     return [`${first(c)} nods and says that’s fine. He doesn’t say it’s fine.`];

@@ -7,6 +7,7 @@
 // something real: it moves how he feels about you, it teaches you what he knows, and it can put something new in the world: a
 // loan, a favour owed, a promise you will be held to, an introduction, an offer for his shop, a rival made by a careless word.
 // He remembers how it went, and the next time you raise it he picks up where you left off.
+import { lineOf } from './rackets';
 import { FEMALE } from './names';
 import { noteConduct, temper } from './temper';
 import { askBetween, mayAsk, openAsk, openAsks, stance } from './asks';
@@ -239,11 +240,11 @@ function shop(x: X): Subject | undefined {
 }
 
 // ================================================================== his racket
-const HUSTLE_ASK: Record<string, string> = { numbers: '“How are the numbers doing?”', bookie: '“How’s the book?”', loans: '“How are your loans doing?”', cars: '“How’s the car business?”', fence: '“What’s moving through the back room?”', vending: '“How are the machines doing?”', shakedown: '“How are the collections going?”', odd: '“What are you doing for money these days?”' };
+const HUSTLE_ASK: Record<string, string> = { numbers: '“How are the numbers doing?”', bookie: '“How’s the book?”', shylock: '“How are your loans doing?”', cars: '“How’s the car business?”', fence: '“What’s moving through the back room?”', vending: '“How are the machines doing?”', shakedown: '“How are the collections going?”', odd: '“What are you doing for money these days?”' };
 const HUSTLE_TALK: Record<string, { name: string; good: string; bad: string }> = {
   numbers: { name: 'the numbers', good: 'Everybody plays a number. Some weeks it feels like everybody plays mine.', bad: 'A man hit for big money last week. I’m still paying it out.' },
   bookie: { name: 'his book', good: 'The favourites keep losing. God bless the favourites.', bad: 'Too many winners. Something’s not right, and I mean to find out what.' },
-  loans: { name: 'his loans', good: 'Money goes out, more money comes back. That’s the trick of it.', bad: 'Half of them are late, and the other half are lying to me.' },
+  shylock: { name: 'his loans', good: 'Money goes out, more money comes back. That’s the trick of it.', bad: 'Half of them are late, and the other half are lying to me.' },
   cars: { name: 'the cars', good: 'Buyers are lining up. Good cars, no questions.', bad: 'The cops are watching the chop shops. I’m sitting on metal.' },
   fence: { name: 'what he moves', good: 'Things come in, things go out. People always want a bargain.', bad: 'Nobody’s buying. I’ve got a back room full of television sets.' },
   vending: { name: 'the machines', good: 'Cigarettes, jukeboxes. Pennies, but pennies add up.', bad: 'Somebody keeps putting their machines in my places.' },
@@ -251,20 +252,20 @@ const HUSTLE_TALK: Record<string, { name: string; good: string; bad: string }> =
   odd: { name: 'what he’s doing', good: 'A bit of this, a bit of that. It pays the rent.', bad: 'Odd jobs, and fewer of them.' },
 };
 function racket(x: X): Subject | undefined {
-  const { w, p, t } = x, h = t.hustle;
+  const { w, p, t } = x, h = lineOf(w, t);
   if (!h || t.bossId === p.id) return undefined; // your own men's earnings are a matter for Sunday
   const H = HUSTLE_TALK[h.kind] ?? HUSTLE_TALK.odd;
   const key = 'racket';
-  const good = h.gross > 150 * h.level;
+  const good = h.last > 150 * (h.level ?? 1);
   const late = w.debts.filter((d) => d.status === 'active' && d.creditor === t.id && d.missed > 0).map((d) => live(w, d.debtor)).filter((c): c is Character => !!c && !c.isPlayer)[0];
   return {
-    key, sig: `${h.kind}:${good}:${late?.id ?? ''}`, weight: 0.25 + h.level * 0.08 + (late ? 0.1 : 0),
+    key, sig: `${h.kind}:${good}:${late?.id ?? ''}`, weight: 0.25 + (h.level ?? 1) * 0.08 + (late ? 0.1 : 0),
     label: HUSTLE_ASK[h.kind] ?? HUSTLE_ASK.odd, hint: trust(x) >= 0.4 ? 'He may tell you more than he tells most.' : 'He may not tell you much.',
     open: () => {
       if (trust(x) < 0.3) return { lines: [q(t, 'It goes. Why do you ask?')], choices: [] };
       const cs: Choice[] = [];
-      if (late && (h.kind === 'loans' || h.kind === 'bookie' || h.kind === 'numbers')) cs.push(ch(key, 'late', '“Who’s been slow to pay?”', 'Someone always is.'));
-      if (h.kind === 'loans' && !w.debts.some((d) => d.status === 'active' && d.creditor === t.id && d.debtor === p.id)) cs.push(ch(key, 'borrow', '“What would you lend me?”', 'His rate, his terms. It becomes a matter between you.'));
+      if (late && (h.kind === 'shylock' || h.kind === 'bookie' || h.kind === 'numbers')) cs.push(ch(key, 'late', '“Who’s been slow to pay?”', 'Someone always is.'));
+      if (h.kind === 'shylock' && !w.debts.some((d) => d.status === 'active' && d.creditor === t.id && d.debtor === p.id)) cs.push(ch(key, 'borrow', '“What would you lend me?”', 'His rate, his terms. It becomes a matter between you.'));
       if (!(p.notes?.[t.id]?.tags ?? []).includes('ears')) cs.push(ch(key, 'ears', '“Keep your ears open for me, will you?”', 'A man in his line hears things. You would owe him the courtesy.'));
       cs.push(done(key));
       return { lines: [q(t, good ? H.good : H.bad)], choices: cs };

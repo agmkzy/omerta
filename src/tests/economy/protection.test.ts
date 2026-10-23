@@ -3,8 +3,10 @@
 import assert from 'node:assert';
 import { describe, test as ok } from 'vitest';
 import { advance } from '../../engine';
-import { DAY, WEEK } from '../../types';
-import { bizBetween, bizMove, businessWeek, evidence, owedOf, setCollector, takeFromBiz } from '../../econ';
+import { DAY, WEEK, type Character, type World } from '../../types';
+import { generate } from '../../actions';
+import { rel } from '../../core';
+import { bizBetween, bizMove, businessWeek, changedSince, crewGround, evidence, noteRefusal, owedOf, setCollector, takeFromBiz } from '../../econ';
 import { newWorld, P } from '../helpers';
 import { shop, week } from './fixtures';
 
@@ -61,5 +63,43 @@ describe('protection money', () => {
     b.protection!.owed = 300; b.protection!.late = 2;
     setCollector(w, b, other.id, other.familyId!, { keepOwed: true }); assert.equal(owedOf(b), 300); assert.equal(b.protection!.collectorId, other.id);
     setCollector(w, b, other.id, other.familyId!); assert.equal(owedOf(b), 0);
+  });
+});
+
+// Stage 4: who leans on a shop, and why. Nobody scans the city for shops to lean on; each approach has a purpose.
+describe('who leans on a shop, and why', () => {
+  const soldier = (w: World) => Object.values(w.chars).filter((c) => c.alive && !c.isPlayer && c.rank === 'soldier').sort((a, b) => (a.id < b.id ? -1 : 1))[0];
+  const leans = (w: World, c: Character) => generate(w, c, 'shakedown').map((a) => w.biz[a.biz!]);
+  ok('a man grows his own book in his crew\'s ground, and never leans on his own family\'s shops', { tags: ['unit'] }, () => {
+    const w = newWorld(7), c = soldier(w), ground = crewGround(w, c);
+    c.cooldown = {};
+    const shops = leans(w, c);
+    assert.ok(shops.length > 0, 'he has somewhere to grow');
+    for (const b of shops) {
+      assert.notEqual(b.protection?.familyId, c.familyId, 'his own family\'s shop is not his to lean on');
+      if (!b.protection) assert.ok(ground.has(b.district), `${b.name} in ${b.district} is outside his crew's ground (${[...ground].join(', ')})`);
+    }
+  });
+  ok('another family\'s shop is taken only for a reason: a grudge against its man is one', { tags: ['unit'] }, () => {
+    const w = newWorld(7), c = soldier(w), fam = w.fam[c.familyId!];
+    // a man of another family has put a shop in this family's district on his book
+    const b = Object.values(w.biz).filter((y) => y.open && y.kind !== 'casino' && fam.districts.includes(y.district) && w.chars[y.ownerId]?.alive).sort((a, b) => (a.id < b.id ? -1 : 1))[0];
+    const x = Object.values(w.chars).filter((y) => y.alive && !y.isPlayer && y.familyId && y.familyId !== c.familyId && y.rank === 'soldier').sort((a, b) => (a.id < b.id ? -1 : 1))[0];
+    setCollector(w, b, x.id, x.familyId!, { fee: 40 });
+    for (const k of Object.keys(fam.tension)) fam.tension[k] = 0;
+    x.jailedUntil = 0; delete c.rels[x.id]; c.cooldown = {}; b.lastApproach = undefined;
+    assert.ok(!leans(w, c).includes(b), 'with nothing against its man, another family\'s shop is left alone');
+    rel(c, x.id).grudge = 0.6;
+    assert.ok(leans(w, c).includes(b), 'with a grudge against him, it becomes a decision he may take');
+  });
+  ok('a shop remembers who it turned away: he does not go back until something has changed', { tags: ['unit'] }, () => {
+    const w = newWorld(7), c = soldier(w);
+    c.cooldown = {}; c.traits.violence = 0.2;
+    const b = leans(w, c).find((x) => !x.protection)!;
+    noteRefusal(w, b, c);
+    assert.ok(!leans(w, c).includes(b), 'the door that closed on him stays closed');
+    assert.ok(!changedSince(w, b, c));
+    c.standing += 6;
+    assert.ok(changedSince(w, b, c) && leans(w, c).includes(b), 'he stands higher than he did: worth another try');
   });
 });

@@ -155,7 +155,7 @@ export interface Character {
   skills: Skills;
   job?: DayJob;
   problem?: Problem;
-  hustle?: Hustle; // his own line of work, independent of orders
+  hustle?: Hustle; // (before Stage 4: his own line of work, now an enterprise in w.ops; read only to bring an older save across)
   career?: { done: number; failed: number; log: { t: number; text: string }[] }; // what he has done for you and what has happened to him
   prospect?: boolean; // a hanger-on who might be taken on
   cars: number; // stolen cars on hand
@@ -181,6 +181,7 @@ export interface Business {
   // `late` counts the weeks missed in a row), and `why` is the true reason the last payment was short (see econ.ts).
   protection?: { collectorId: Id; familyId: Id; fee: number; late?: number; total?: number; since?: number; owed?: number; why?: PayWhy; hold?: number };
   guardedUntil?: number;
+  refused?: Record<Id, { t: number; st: number; head?: Id }>; // Stage 4: who this shop has turned away, and how things stood for him then
   informPrev?: { who: Id; fact: Id };
   // V73: who the place belongs to, who runs it, and who else has a claim on it. `ownerId` stays the actual owner.
   managerId?: Id; // runs it day to day; absent means the owner does
@@ -271,6 +272,11 @@ export interface Debt {
   reason: string;
   cause?: Id;
   paid?: number; // everything the creditor has had back so far
+  // Stage 4 (Oct 2026): the terms the street keeps. `owed` is the principal still outstanding; `arrears` is the vig that fell due and
+  // was not paid. The vig is charged each week on `owed` only, never on the arrears, and a payment clears the arrears before it
+  // touches the principal. `balance` is always owed + arrears (core keeps it so). Older saves have neither: their balance is principal.
+  owed?: number;
+  arrears?: number;
 }
 
 export type FactKind =
@@ -502,7 +508,7 @@ export interface Situation {
   m?: Record<string, number | string>; // kind-specific scratch (bounded, plain values)
   // V89: an ask (kind 'ask'): somebody wants something from somebody, on terms, and both sides have a stance (matters.ts).
   ak?: string; // which kind of ask ('protect', 'collect', 'warn', ...)
-  terms?: { by: Id; of: Id; amt?: number; first?: number; what?: string }; // who asks whom; the amount on the table; the opening amount
+  terms?: { by: Id; of: Id; amt?: number; first?: number; what?: string; rate?: number }; // who asks whom; the amount on the table; the opening amount; for a loan, the weekly rate
   st?: Record<Id, Stance>;
 }
 export interface World {
@@ -580,7 +586,7 @@ export interface PromoCase {
   result?: 'chosen' | 'passed';
 }
 
-export type OpKind = 'numbers' | 'bookie' | 'vending' | 'dock' | 'union' | 'front' | 'hijack' | 'shylock' | 'carting' | 'construction' | 'nightclub' | 'trucking' | 'cigarettes';
+export type OpKind = 'numbers' | 'bookie' | 'vending' | 'dock' | 'union' | 'front' | 'hijack' | 'shylock' | 'carting' | 'construction' | 'nightclub' | 'trucking' | 'cigarettes' | 'chop' | 'fencing';
 export interface Op {
   id: Id;
   kind: OpKind;
@@ -597,6 +603,13 @@ export interface Op {
   due?: number;
   note?: string;
   weeks: number;
+  // Stage 4: one enterprise record for everyone (the player's operations and what were NPCs' hustles). How far he has grown it,
+  // his run of bad weeks, why last week went as it did, the capital tied up in it, and when he is keeping his head down until.
+  level?: number;
+  bad?: number;
+  cause?: string;
+  stake?: number;
+  lull?: number;
 }
 
 // Someone comes to you. A small scene with its own options; closes when you answer or it lapses.

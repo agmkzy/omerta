@@ -6,7 +6,7 @@
 // what the simulation knows to be true (`truth`) is never shown to anybody.
 import { temper } from './temper';
 import { discipline, influence } from './books';
-import { addFact, bear, clamp, createDebt, ease, feel, feelOn, feelTo, ownerBiz, payDebt, rel, repute } from './core';
+import { addFact, bear, clamp, createDebt, ease, feel, feelOn, feelTo, ownerBiz, payDebt, rel, repute, restructure, writeDown } from './core';
 import { addStake, clearArrears, evidence, giveTime, seizeShare, transferBusiness } from './econ';
 import { LADDER, leaveCrew } from './rank';
 import { begin as beginGoal, goalsOf, priceOf } from './goals';
@@ -594,8 +594,8 @@ KITS.debt = {
   apply: (w, s, code, chair) => {
     const d = w.debts.find((x) => x.id === s.link?.debt)!, cr = w.chars[d.creditor], db = w.chars[d.debtor];
     if (code === 'extend') { d.nextDue += 14 * DAY; d.missed = 0; closeSit(w, s, 'extended', [], 5); return `${chair.name} gave ${db.name} two more weeks.`; }
-    if (code === 'restructure') { d.weeklyPayment = Math.max(10, Math.round(d.weeklyPayment * 0.5 / 5) * 5); d.weeklyRate = Math.max(0.005, Math.round(d.weeklyRate * 0.7 * 1000) / 1000); d.missed = 0; closeSit(w, s, 'restructured', [], 8); return `${chair.name} cut what ${db.name} pays each week and what it costs him.`; }
-    if (code === 'writedown') { d.balance = Math.round(d.balance * 0.6); d.missed = 0; closeSit(w, s, 'written down', [`${first(cr)} took a loss`], 10); feel(w, cr, chair.id, 'respect', -0.03); return `${chair.name} told ${cr.name} to take a loss. ${db.name} owes ${d.balance} now.`; }
+    if (code === 'restructure') { restructure(d, { payment: Math.max(10, d.weeklyPayment * 0.5), rate: Math.max(0.005, d.weeklyRate * 0.7) }); d.missed = 0; closeSit(w, s, 'restructured', [], 8); return `${chair.name} cut what ${db.name} pays each week and what it costs him.`; }
+    if (code === 'writedown') { writeDown(w, d, d.balance * 0.4); d.missed = 0; closeSit(w, s, 'written down', [`${first(cr)} took a loss`], 10); feel(w, cr, chair.id, 'respect', -0.03); return `${chair.name} told ${cr.name} to take a loss. ${db.name} owes ${d.balance} now.`; }
     if (code === 'share' && ownerBiz(w, db.id)) { seizeShare(w, d); d.missed = 0; closeSit(w, s, 'share', [`${first(cr)} has a piece of ${first(db)}’s business`], 12); return `${chair.name} let ${cr.name} take a piece of ${db.name}’s business against the debt.`; }
     const pay = Math.min(Math.round(db.cash * 0.6), d.balance);
     if (pay > 0) payDebt(w, d, pay);

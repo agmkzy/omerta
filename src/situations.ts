@@ -1,6 +1,7 @@
 // A situation is something going on in the world that has consequences whether or not the player is involved.
 // It emerges from real state (a business losing money, a man in trouble), the people involved respond on their own,
 // and it reaches the player through a believable channel: a conversation, a request for help, or a report.
+import { move, openAsk } from './asks';
 import { temper } from './temper';
 import { addFact, bear, clamp, createDebt, feel, feelOn, money, ownerBiz, rel } from './core';
 import { bizMove } from './econ';
@@ -77,7 +78,9 @@ export function situationTick(w: World) {
         // He goes to someone he trusts more. The situation moves on without you.
         const friend = Object.values(w.chars).filter((x) => x.alive && x.id !== c.id && x.id !== p.id && x.cash > 800 && (c.rels[x.id]?.trust ?? 0) > 0.3).sort((a, b) => b.cash - a.cash)[0];
         // (a friend who already has money out to him does not lend again on top of it)
-        if (friend && !w.debts.some((d) => d.status === 'active' && d.creditor === friend.id && d.debtor === c.id)) { const g = Math.min(500, Math.round(friend.cash * 0.2)); friend.cash -= g; const b = s.biz ? w.biz[s.biz] : undefined; if (b) { bizMove(w, b, g, 'aid', friend.id); b.distress = 0; } else c.cash += g; createDebt(w, friend.id, c.id, g, 0.05, 'a loan'); feel(w, c, friend.id, 'trust', 0.1); s.weeks = 0; }
+        if (friend && !w.debts.some((d) => d.status === 'active' && d.creditor === friend.id && d.debtor === c.id)) { // (the friend offers, on a friend's terms, and he takes it or not: asks 'lend', the one way a loan is made)
+          const o = openAsk(w, 'lend', friend, c, { amt: Math.min(500, Math.round(friend.cash * 0.2)), biz: s.biz, rate: 0.03, why: `${friend.name} offered ${c.name} a loan` });
+          if (o && move(w, o, 'ask').answer === 'yes') { feel(w, c, friend.id, 'trust', 0.1, `${friend.name} lent him money when he needed it`); s.weeks = 0; } }
       }
     }
     // Left to rot, a business gives out (the economy engine closes it); the situation records it.

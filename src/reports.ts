@@ -1,4 +1,5 @@
 // What reaches the player, and how. The world records everything; each man decides what to tell you, and the game decides how loudly to say it.
+import { lineOf } from './rackets';
 import { temper } from './temper';
 import { addEnc } from './encounters';
 import { addFact, clamp, feelOn, learn, money, rel } from './core';
@@ -114,11 +115,12 @@ export function askToInvest(w: World, c: Character, cost: number, line: string) 
 export function investChoose(w: World, p: Character, e: Enc, code: string): string[] {
   const c = e.from ? w.chars[e.from] : undefined;
   const cost = Number(e.data?.cost ?? 350);
-  if (!c?.alive || !c.hustle) return ['It no longer matters.'];
+  const op = c?.alive ? lineOf(w, c) : undefined;
+  if (!c || !op) return ['It no longer matters.'];
   const r = rel(c, p.id);
   if (code === 'no') {
     feelOn(w, r, 'trust', -0.02);
-    c.hustle.bad = 0;
+    op.bad = 0;
     return [`${c.name} nods. "Whatever you say." He doesn’t sound convinced.`];
   }
   if (code === 'back') {
@@ -127,8 +129,8 @@ export function investChoose(w: World, p: Character, e: Enc, code: string): stri
     p.cash -= half; c.cash += half;
   }
   c.cash -= Math.min(c.cash, code === 'back' ? Math.round(cost / 2) : cost);
-  c.hustle.level = Math.min(3, c.hustle.level + 1);
-  c.hustle.stake += cost;
+  op.level = Math.min(3, (op.level ?? 1) + 1);
+  op.stake = (op.stake ?? 0) + cost;
   feelOn(w, r, 'trust', (code === 'back' ? 0.1 : 0.04));
   feelOn(w, r, 'affection', (code === 'back' ? 0.05 : 0.01));
   return [code === 'back' ? `You put your own money in beside his. ${c.name} won’t forget that.` : `${c.name} thanks you and goes off to find a bigger room for it.`];

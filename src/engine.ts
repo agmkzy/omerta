@@ -10,18 +10,17 @@ import { rankWeek } from './powers2';
 import { situationTick } from './situations';
 import { peopleWeek, rollSkills } from './people';
 import { chooseAction, perform } from './actions';
-import { addFact, clamp, earn, easeOn, famName, feelingsWeek, isAwake, learn, money, nextWake, notifyProtector, ownerBiz, payDebt, schedule, shortTime, witnessesAt } from './core';
+import { accrueVig, addFact, clamp, earn, easeOn, famName, feelingsWeek, isAwake, learn, money, nextWake, notifyProtector, ownerBiz, payDebt, schedule, shortTime, witnessesAt } from './core';
 import { BASE_RATE, emptyBooks, settleWeek } from './books';
 import { addStake, bizMove, businessWeek, seizeShare } from './econ';
 import { daily, ventureWeek } from './jobs';
 import { pendingTick, purge } from './consequences';
 import { memoTick } from './dialogue';
 import { encounterTick, eventTick } from './encounters';
-import { opsWeek, opsDaily } from './rackets';
+import { enterpriseWeek, opsDaily } from './rackets';
 import { commissionTick, politicsCoup, politicsWeek } from './politics';
 import { lifeDaily, christeningDue } from './life';
 import { ambitionTick } from './ambition';
-import { hustleWeek } from './hustle';
 import { reportTick } from './reports';
 import { disputeScan, disputeTick } from './disputes';
 import { reconcile } from './consistency';
@@ -32,7 +31,7 @@ import { Rng } from './rng';
 import { addShops } from './world';
 import { paperTick } from './news';
 import { crewTick, lapsedAsks } from './crewlife';
-import { DAY, Fact, Id, WEEK, World, SCHEMA } from './types';
+import { DAY, Fact, Id, OpKind, WEEK, World, SCHEMA } from './types';
 
 // ------------------------------------------------------------------ the loop
 
@@ -45,7 +44,6 @@ export function advance(w: World, until: number) {
       sweep(w);
       repairAll(w);
       ventureWeek(w);
-      opsWeek(w);
       politicsWeek(w);
       schedule(w, w.now + WEEK, 'weekly');
     } else if (ev.kind === 'daily') {
@@ -133,7 +131,7 @@ function weekly(w: World) {
       d.status = 'void';
       continue;
     }
-    d.balance = Math.round(d.balance * (1 + d.weeklyRate));
+    accrueVig(d); // (the week's vig falls due on the principal still out: core.accrueVig)
     const pay = Math.min(d.weeklyPayment, d.balance);
     const b = ownerBiz(w, debtor.id);
     const avail = debtor.cash + (b ? Math.max(0, b.cash - 100) : 0);
@@ -150,7 +148,7 @@ function weekly(w: World) {
     d.nextDue += WEEK;
   }
 
-  hustleWeek(w);
+  enterpriseWeek(w); // (Stage 4: everyone's enterprises, one pass: rackets.ts)
   turfWeek(w);
   orgWeek(w);
   rankWeek(w);
@@ -269,6 +267,15 @@ export function deserialize(s: string): World {
   if (v < 2) {
     // v2: hustles, seat quotas and dispute processes are optional fields that fill in as the world runs.
     for (const fam of Object.values(w.fam)) { fam.capBonus ??= {}; fam.seatNo ??= {}; }
+  }
+  // Stage 4: a man's hustle became an enterprise in w.ops (rackets.ts), the one record for everyone's. Loans become a book of street
+  // loans; protection is real arrangements now (econ.ts) and odd jobs are not an enterprise, so those two are left behind.
+  for (const c of Object.values(w.chars)) {
+    const h = c.hustle;
+    if (!h) continue;
+    const kind = ({ loans: 'shylock', numbers: 'numbers', bookie: 'bookie', cars: 'chop', fence: 'fencing', vending: 'vending' } as Record<string, OpKind | undefined>)[h.kind];
+    if (kind && c.alive) w.ops.push({ id: 'op' + w.nextId++, kind, owner: c.id, runner: null, district: c.district, since: h.since, state: 'running', last: h.net, total: h.total, skimmed: 0, weeks: 0, level: h.level, bad: h.bad, cause: h.cause, stake: h.stake, lull: h.lull });
+    delete c.hustle;
   }
   w.schema = SCHEMA;
   if (Object.keys(w.biz).length < 34) addShops(w, 14);

@@ -1,5 +1,6 @@
 // What each rank can do, cumulatively. Promotions never take an ability away; they widen what the ones before can reach.
 // Also: the ledger of who made whom, the way a man of rank lives, the underboss's agenda and the Commission.
+import { lineOf } from './rackets';
 import { temper } from './temper';
 import { noteDeal } from './orgs';
 import { addStake, bizMove, stakesOf } from './econ';
@@ -122,7 +123,7 @@ export function powerOptions(w: World, p: Character): Power2[] {
   const out: Power2[] = [];
   const crew = Object.values(w.chars).filter((c) => c.alive && c.bossId === p.id && c.rank !== 'civilian');
   const caps = members(w, p.familyId).filter((c) => c.rank === 'capo' && c.id !== p.id);
-  const grow = crew.filter((c) => c.hustle && c.hustle.level < 3);
+  const grow = crew.filter((c) => !!lineOf(w, c) && (lineOf(w, c)!.level ?? 1) < 3);
   const turf = st.turf ?? [];
   const book = st.book ?? 0;
   const at = (min: Rank) => ri(p.rank) >= ri(min);
@@ -360,7 +361,7 @@ export function usePower2(w: World, p: Character, codeIn: string): string[] | un
       if (rel(boss, p.id).trust < 0.4) return [`${boss.name} won’t release it. “Not on your say.”`];
       const amt = Math.min(3000, Math.max(0, boss.cash));
       boss.cash -= amt; c.cash += amt; feel(w, c, p.id, 'trust', 0.1);
-      for (const x of Object.values(w.chars)) if (x.alive && x.bossId === c.id && x.hustle) x.cash += Math.round(amt / 8);
+      for (const x of Object.values(w.chars)) if (x.alive && x.bossId === c.id && lineOf(w, x)) x.cash += Math.round(amt / 8);
       const k = (st.favs ??= {}); k[c.id] = (k[c.id] ?? 0) + 1; noticeFavour(w, p, c);
       set(10);
       return [`${money(amt)} of the family’s money goes to ${c.name}’s crew, and it goes with your name on it.`];

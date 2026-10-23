@@ -1,3 +1,4 @@
+import { lineOf } from './rackets';
 import { ledgerAdd } from './powers2';
 import { bizMove } from './econ';
 import { powerOptions as powerOptions2, usePower2 } from './powers2';
@@ -103,7 +104,7 @@ export function pathTick(w: World) {
     st.guar = st.guar!.filter((x) => x !== g);
     const c = w.chars[g.who];
     if (!c?.alive) { p.cash = Math.max(0, p.cash - g.amt); continue; }
-    const good = (c.hustle?.total ?? 0) > g.amt * 0.2 && c.hustle?.bad !== undefined && c.hustle.bad < 3;
+    const o = lineOf(w, c); const good = !!o && o.total > g.amt * 0.2 && (o.bad ?? 0) < 3;
     if (good) {
       earn(p, Math.round(g.amt * 0.25), 'cut'); feel(w, c, p.id, 'trust', 0.1);
       addFact(w, { kind: 'report', actor: c.id, minor: false, text: `${c.name} paid back what ${p.name} stood for, with something on top. ${p.name}’s word held.`, district: c.district }, { witnesses: [p.id] });
@@ -465,19 +466,19 @@ export function usePower(w: World, p: Character, code: string): string[] {
   }
   if (code === 'stand') {
     const st = pathState(w);
-    const c = Object.values(w.chars).filter((x) => x.alive && x.bossId === p.id && x.hustle && x.hustle.level < 3).sort((a, b) => rel(b, p.id).trust - rel(a, p.id).trust)[0];
+    const c = Object.values(w.chars).filter((x) => x.alive && x.bossId === p.id && (lineOf(w, x)?.level ?? 1) < 3 && !!lineOf(w, x)).sort((a, b) => rel(b, p.id).trust - rel(a, p.id).trust)[0];
     if (!c) return ['There’s nobody who could use it.'];
-    const amt = 3000 * c.hustle!.level;
-    c.hustle!.level++; c.hustle!.stake += amt; c.cash += Math.round(amt * 0.2);
+    const op = lineOf(w, c)!, amt = 3000 * (op.level ?? 1);
+    op.level = (op.level ?? 1) + 1; op.stake = (op.stake ?? 0) + amt; c.cash += Math.round(amt * 0.2);
     (st.guar ??= []).push({ who: c.id, amt, due: w.now + 90 * DAY });
     feel(w, c, p.id, 'trust', 0.15); feel(w, c, p.id, 'affection', 0.05);
     set(14);
     return [`You tell the lender you’ll stand for ${c.name}. ${money(amt)} goes into his operation on your word alone.`, 'In about three months it’ll be paid back, or it will be yours to pay. A made man’s word is a promissory note.'];
   }
   if (code === 'award') {
-    const c = Object.values(w.chars).filter((x) => x.alive && x.bossId === p.id && x.hustle && x.hustle.level < 3).sort((a, b) => (b.hustle!.total ?? 0) - (a.hustle!.total ?? 0))[0];
+    const c = Object.values(w.chars).filter((x) => x.alive && x.bossId === p.id && !!lineOf(w, x) && (lineOf(w, x)!.level ?? 1) < 3).sort((a, b) => (lineOf(w, b)!.total) - (lineOf(w, a)!.total))[0];
     if (!c) return ['There’s nobody who has earned it.'];
-    c.hustle!.level++;
+    { const op = lineOf(w, c)!; op.level = (op.level ?? 1) + 1; }
     feel(w, c, p.id, 'trust', 0.15); feel(w, c, p.id, 'affection', 0.08);
     c.traits.ambition = clamp(c.traits.ambition + 0.07);
     repute(w, p, 1, 'trial'); set(14);
