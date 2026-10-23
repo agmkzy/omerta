@@ -5,7 +5,7 @@
 //
 // And a man passes on what matters to the man he is talking to: what touched him, his family, his crew, his street, before what
 // some stranger lost at cards.
-import { bear, clamp, factText, learn, money, peek, rel } from './core';
+import { bear, clamp, factText, learn, money, ownerBiz, peek, rel } from './core';
 import { closeKin, kinTie } from './kin';
 import { tierOf } from './retain';
 import type { Character, Fact, Id, Knowledge, World } from './types';
@@ -37,6 +37,32 @@ export function salience(w: World, to: Character, f: Fact): number {
   const weight = tier === 'permanent' ? 0.6 : tier === 'significant' ? 0.4 : 0.1;
   const street = f.district === to.district ? 0.1 : 0;
   return touch + weight + street;
+}
+
+// Stage 5B: how a man knows a thing, which is how he will speak of it and how far he will act on it. Seen (he was there), told (by
+// a man who was), rumour (from the street, or from a man who had it from someone else), suspected (he believes a name he never
+// saw), or stale (it was true when he heard it, and the world has moved on since: the debt was paid, the shop came round, the man
+// is out, the business is back on its feet). What happened never changes; what he holds of it can be out of date.
+export type Knowing = 'seen' | 'told' | 'rumour' | 'suspected' | 'stale';
+export function knowing(w: World, c: Character, f: Fact): Knowing | undefined {
+  const k = claim(c, f.id);
+  if (!k) return undefined;
+  if (stale(w, f)) return 'stale';
+  if (!k.knowsActor && k.blame) return 'suspected';
+  if (k.from === 'self' || k.from === 'witness') return 'seen';
+  return k.how === 't' ? 'told' : 'rumour';
+}
+// Whether what a fact says no longer holds, read from the world as it is now.
+export function stale(w: World, f: Fact): boolean {
+  const a = f.actor ? w.chars[f.actor] : undefined, b = f.business ? w.biz[f.business] : undefined;
+  switch (f.kind) {
+    case 'debt_missed': return !!f.actor && !!f.victim && !w.debts.some((d) => d.debtor === f.actor && d.creditor === f.victim && d.status === 'active' && d.missed > 0);
+    case 'protection_refused': { const v = f.actor ? ownerBiz(w, f.actor) : undefined; return !!v?.protection && v.protection.collectorId === f.victim; }
+    case 'arrest': return !!a && a.jailedUntil <= w.now;
+    case 'raid': return !!a && w.ops.some((o) => (o.runner === a.id || o.owner === a.id) && o.state === 'running');
+    case 'business_struggling': return !!b && b.open && b.distress === 0;
+    default: return false;
+  }
 }
 
 // One man tells another. Returns whether the listener now believes he knows who did it.
@@ -87,6 +113,7 @@ export function versionOf(w: World, viewer: Character, f: Fact): string {
   let s = factText(f, !!k?.knowsActor);
   if (k?.big && f.amount) s = s.split(money(f.amount)).join(money(Math.round(f.amount * 1.6 / 50) * 50));
   if (k && !k.knowsActor && k.blame && w.chars[k.blame]) s = s.replace(/\.$/, '') + `. ${k.how === 't' ? 'He says' : 'People say'} it was ${w.chars[k.blame].name}.`;
+  if (k && stale(w, f)) s = s.replace(/\.$/, '') + '. That was a while back; things may have moved on since.';
   return youText(viewer, s);
 }
 // Where he had it from, in words.

@@ -2,7 +2,7 @@ import { menace } from './danger';
 import { temper } from './temper';
 import { noteGrievance } from './orgs';
 import { sanctioned } from './politics';
-import { pass, salience, versionOf } from './rumour';
+import { knowing, pass, salience, versionOf } from './rumour';
 import { fp } from './voice';
 import { askBetween, collectAsk, move as askMove, openAsk, shopInPlay } from './asks';
 import { addFact, bearOn, clamp, compat, createDebt, factText, famName, feelOn, handleDeath, knowMore, learn, money, notifyProtector, ownerBiz, payDebt, regard, rel, travelTime, witnessesAt } from './core';
@@ -200,7 +200,9 @@ export function share(w: World, from: Character, to: Character, lines: string[],
       const again = f.amount && told.some((g) => g.actor === f.actor && g.amount === f.amount);
       told.push(f);
       if (again) continue;
-      lines.push(`${spoken++ ? vsay(w, from, to, 'lead2') : vsay(w, from, to, 'lead')} “${opt?.say ? opt.say(f, knows) : fp(versionOf(w, to, f), from)}”`);
+      // (Stage 5B: he says how he knows it: seen, from a man who was there, or only what the street says)
+      const how = knowing(w, from, f), frame = how === 'seen' ? 'I saw it myself. ' : how === 'told' ? 'I had it from a man who was there. ' : how === 'rumour' ? 'Word is: ' : '';
+      lines.push(`${spoken++ ? vsay(w, from, to, 'lead2') : vsay(w, from, to, 'lead')} “${opt?.say ? opt.say(f, knows) : frame + fp(versionOf(w, to, f), from)}”`);
     }
   }
   return told;

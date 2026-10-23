@@ -14,6 +14,7 @@ import { askBetween, move, openAsk } from './asks';
 import { menOf, needsOf, giveWork, pickMan } from './work';
 import { activityOf } from './jobs';
 import { askToIntercede, makeLoan } from './encounters';
+import { stale } from './rumour';
 import { Character, DAY, Fact, World } from './types';
 
 export type IntentKind = 'time' | 'intercede' | 'help' | 'report' | 'amends' | 'confront' | 'work';
@@ -83,7 +84,7 @@ export function intentsOf(w: World, c: Character): Intent[] {
   // he saw or was told. He passes it up, and with it whatever he knows of who did it.
   const sup = c.bossId ? w.chars[c.bossId] : undefined;
   if (sup?.alive && c.familyId && !cool(w, c, 'report')) {
-    const f = Object.entries(c.known).map(([id, k]) => ({ f: w.facts[id], k })).filter(({ f }) => f && HOSTILE.has(f.kind) && w.now - f.t < 10 * DAY && !sup.known[f.id] && concerns(w, f, c.familyId!)).sort((p, q) => q.f.t - p.f.t)[0];
+    const f = Object.entries(c.known).map(([id, k]) => ({ f: w.facts[id], k })).filter(({ f }) => f && HOSTILE.has(f.kind) && w.now - f.t < 10 * DAY && !sup.known[f.id] && concerns(w, f, c.familyId!) && !stale(w, f)).sort((p, q) => q.f.t - p.f.t)[0];
     if (f) out.push({ kind: 'report', to: sup, why: 'his superior should hear it from him', score: 0.45 + rel(c, sup.id).trust * 0.3 + tp.caution * 0.1, act: () => {
       c.cooldown['int:report'] = w.now + 5 * DAY;
       learn(w, sup.id, f.f, c.id, f.k.knowsActor);

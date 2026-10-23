@@ -730,3 +730,26 @@ Much of what Stage 5 asks for already exists from V89 and V90. The work is to ma
 - **Consistency and ledger problems:** 0.
 - **Saves:** 7.3–8.9 MB.
 - **None went to the player.** The harness player does nothing, so nobody trusts him enough to come to him. The tests cover that path.
+
+### Increment 5B: knowledge and social memory
+
+**Most of this was already there,** and was kept: facts and per-man knowledge with their source; rumour versions (a man may hold back a name he means to protect, pin a thing on a man he hates, or make a sum bigger); retention; grudges with their reasons; remembered refusals (`Business.refused`); denials to the player (`Character.denied`); remembered negotiations (`sitcool`, the point in hand); broken words; favours.
+
+**Added:**
+- **How a man knows a thing** (`rumour.knowing`): seen, told by a man who was there, rumour, suspected (he believes a name he never saw), or **stale**.
+- **Stale** is read from the world as it is now (`rumour.stale`), never stored: a missed payment since made up, a refusal since turned into an arrangement, an arrest since released, a raided enterprise running again, a struggling shop back on its feet.
+- **It changes behaviour, not only words:**
+  - a man passing news to the player says how he knows it ("I saw it myself", "I had it from a man who was there", "Word is");
+  - stale news is told as possibly settled;
+  - a man doesn't report stale news up to his superior.
+- **News climbs the hierarchy deliberately** (5A, reporting up). A shopkeeper's refusal reaches the collector, the collector tells his captain, and the player knows nothing of it unless someone tells him.
+
+**Misinformation never touches what happened.** A wrong name lives on the believer's claim (`Claim.blame`) and in the grudges it causes, while the fact keeps its true actor. A test proves it.
+
+**Save size:** no new stored records. Staleness is computed when read, and reports add one knowledge entry, which fades like any other.
+
+**Tests** (`social/knowledge.test.ts`):
+- the refusal-to-captain chain, with the player left out;
+- the five kinds of knowing, including a believed name that leaves the truth unchanged;
+- a missed payment going stale once paid;
+- a witness telling the player he saw it.
