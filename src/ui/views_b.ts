@@ -269,7 +269,7 @@ export function reportView(j: Job, lines: string[]): string {
   let out = back() + `<div class="pers">${avatar(m)}<div><h1>${esc(m.name)} reports</h1><div class="sub">${lk(j.title)}</div></div></div>`;
   out += `<div class="card"><p class="say">${lk(rep.text)}</p>${lines.map((l) => `<div class="note">${lk(l)}</div>`).join('')}</div>`;
   if (rep.found) out += `<div class="callout info">You got the truth out of him.</div>`;
-  out += `<div class="list">${rep.found ? '' : `<button class="opt" data-a="qrep:${j.id}"><b>Question him</b><span class="because">He may be telling you everything. He may not.</span></button>`}<button class="opt" data-a="ack:${j.id}"><b>That’s all</b></button></div>`;
+  out += `<div class="list">${rep.found ? '' : `<button class="opt" data-a="qrep:${j.id}"><b>Question him</b><span class="because">He may be telling you everything. He may not.</span></button>`}${w.chars[j.assignee]?.alive && !w.chars[j.assignee].isPlayer ? `<button class="opt" data-a="talk:${j.assignee}|tk:job:${j.id}"><b>Talk it over with him</b><span class="because">Face to face: who else was there, how it went, and what you make of it.</span></button>` : ''}<button class="opt" data-a="ack:${j.id}"><b>That’s all</b></button></div>`;
   return out;
 }
 
@@ -295,7 +295,10 @@ export function crewView(): string {
     if (c.problem && c.problem.revealed) flags.push(`<span class="tag amber">${esc(PROBLEM_LABEL[c.problem.kind])}</span>`);
     else if (c.problem && c.problem.sev > 0.45) flags.push(`<span class="tag amber">not himself</span>`);
     if (act) flags.push(`<span class="tag blue">${esc(act.why)}</span>`);
-    return `<button class="need" data-a="ent:${c.id}"><span class="dot ${st.dot}"></span><span><span class="t">${esc(c.name)}</span><span class="s" style="display:block">${esc(skillLine(c))} &middot; passes up ${Math.round(effectiveRate(w, c) * 100)}%</span>${flags.length ? `<span style="display:block;margin-top:4px">${flags.join(' ')}</span>` : ''}</span></button>`;
+    // (the overhaul: a man's row leads to what you would do about him: his money, face to face; his books; work)
+    const short = c.books.arrears > 0 || c.books.missed > 0 || (fl_?.amt ?? 0) > 0;
+    const acts = [short ? `<button class="go" data-a="talk:${c.id}|tk:earn">His money</button>` : `<button class="go" data-a="talk:${c.id}">See him</button>`, `<button class="go" data-a="books:${c.id}">His books</button>`, `<button class="go" data-a="orders:">Give him work</button>`];
+    return `<div class="crewrow"><button class="need" data-a="ent:${c.id}"><span class="dot ${st.dot}"></span><span><span class="t">${esc(c.name)}</span><span class="s" style="display:block">${esc(skillLine(c))} &middot; passes up ${Math.round(effectiveRate(w, c) * 100)}%</span>${flags.length ? `<span style="display:block;margin-top:4px">${flags.join(' ')}</span>` : ''}</span></button><div class="crewrow__acts">${acts.join('')}</div></div>`;
   }).join('') || '<p class="muted pad">Nobody takes your orders. Yet.</p>';
 
   const env = crew.map((c) => ({ c, h: c.books.history[c.books.history.length - 1] })).filter((x) => x.h);
@@ -547,6 +550,7 @@ export function opView(id: Id, lines: string[], found?: number): string {
   out += `<div class="card"><ul class="rows"><li><span>Where</span><span class="v">${esc(op.district)}</span></li><li><span>Run by</span><span class="v">${r ? pl(r) : 'you'}</span></li><li><span>Last week</span><span class="v ${op.last < 0 ? 'warn' : 'good'}">${money(op.last)}</span></li><li><span>Since you started</span><span class="v">${money(op.total)} in ${op.weeks} weeks</span></li><li><span>Status</span><span class="v ${op.state === 'raided' ? 'warn' : ''}">${op.state === 'raided' ? 'shut down by police' : op.state === 'closed' ? 'closed' : 'running'}</span></li></ul>${lines.map((l) => `<div class="note">${lk(l)}</div>`).join('')}</div>`;
   if (op.state === 'closed') return out;
   out += `<div class="list">`;
+  if (r?.alive && !r.isPlayer) out += `<button class="opt" data-a="talk:${r.id}|tk:earn"><b>Talk to ${esc(r.name.split(' ')[0])} about the take</b><span class="because">He runs it. Ask him how it’s going, face to face.</span></button>`;
   if (r) out += `<button class="opt" data-a="opcount:${op.id}"><b>Go through the count</b><span class="because">An hour with the figures. He may not like being checked.</span></button>`;
   if (found !== undefined && found > 30 && r) out += `<button class="opt" data-a="oprule:${op.id}|repay|${found}"><b>Make him pay it back</b></button><button class="opt" data-a="oprule:${op.id}|warn|${found}"><b>Tell him it stops</b></button><button class="opt" data-a="oprule:${op.id}|fire|${found}"><b>Take it off him</b></button>`;
   out += `<button class="opt danger" data-a="opclose:${op.id}"><b>Shut it down</b></button></div>`;

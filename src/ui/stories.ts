@@ -202,7 +202,7 @@ function debtStories(w: World, p: Character): Story[] {
       timeline: tl, people: [{ id: other.id, role: mine ? 'owes you' : 'is owed' }],
       blurb: `${mine ? 'You lent' : 'You borrowed'} ${money(d.principal)} (${d.reason}).`,
       terms: [['Still owing', money(d.balance)], ['Each week', money(d.weeklyPayment)], ['Next due', fmtDay(d.nextDue)]],
-      actions: [{ a: `talk:${other.id}`, label: `Go and see ${first(other)}`, hint: mine ? 'Remind him, give him time, or lean on him.' : 'Talk terms before it gets worse.' }],
+      actions: [{ a: `talk:${other.id}|tk:debt:${d.id}`, label: `Go and see ${first(other)}`, hint: mine ? 'Remind him, give him time, or lean on him.' : 'Talk terms before it gets worse.' }],
     });
   }
   return out;
@@ -231,7 +231,7 @@ function crewStories(w: World, p: Character): Story[] {
       last: tl[0]?.learned ?? (prob?.since ?? w.now), lastText: tl[0]?.text ?? bits[0] ?? '', timeline: tl, blurb: bits.join(' '),
       people: [{ id: c.id, role: 'one of your men' }],
       unknown: flag?.amt ? ['You don’t know where the money went.'] : [],
-      actions: [{ a: `talk:${c.id}`, label: `Talk to ${first(c)}`, hint: 'Face to face. How you handle it sets what he does next.' }, ...(flag?.amt ? [{ a: `books:${c.id}`, label: 'Go through his books', hint: 'See what he handed up, week by week.' }] : [])],
+      actions: [{ a: `talk:${c.id}|tk:earn`, label: `Talk to ${first(c)}`, hint: 'Face to face. How you handle it sets what he does next.' }, ...(flag?.amt ? [{ a: `books:${c.id}`, label: 'Go through his books', hint: 'See what he handed up, week by week.' }] : [])],
     });
   }
   return out;

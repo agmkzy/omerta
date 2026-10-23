@@ -453,7 +453,7 @@ grp('social', ['how', 'old_times', 'drink', 'help_gift', 'help_loan', 'welcome',
 grp('ask', ['chat', 'f:think', 'ask_around', 'ask_history', 'pick_member', 'leaders', 'ask_want', 'ask_crew', 'ask_rep', 'pick_incident', 'suspect', 'about', 'rv_ears', 'rv_mood', 'a_ask', 'cr_ask', 'inc']);
 grp('org', ['b_stand', 'b_need', 'b_more', 'promo', 'recommend', 'rk_back', 'rk_back_ask', 'work', 'cr_duties', 'assign_low', 'recruit_offer', 'intro', 'intro_via', 'pick_concern', 'report']);
 grp('settle', ['demand', 'mediate', 'mediate2', 'challenge', 'refuse', 'a_own', 'a_start', 'a_defy', 'a_pay', 'd_remind', 'd_time', 'd_half', 'd_favour', 'd_forgive', 'cr_thin', 'cr_drop', 'cr_look', 'sh_lean', 'sh_why', 'rv_warn', 'memo', 'confront', 'word_make', 'favcall', 'sit_cover', 'sit_lend', 'sit_rival', 'sit_leave']);
-function groupOf(code: string, cat = 'root'): Group {
+export function groupOf(code: string, cat = 'root'): Group {
   const k = code.split(':')[0];
   if (k === 'tk') return BIZ_SUBJ.test(code) || /^tk:debt:/.test(code) ? 'business' : /^tk:earn/.test(code) ? 'settle' : /^tk:job:/.test(code) ? 'org' : /^tk:(ev:|hurting)/.test(code) ? 'ask' : 'social';
   if (k === 'f') return code === 'f:think' ? 'ask' : 'settle';

@@ -455,7 +455,9 @@ export function bizView(id: Id): string {
     out += `<div class="card"><h2>Running it</h2><p class="muted">${mgr?.alive ? `${esc(mgr.name)} runs the day-to-day. How well it is run is down to him.` : 'You run it yourself. How well it is run is down to you.'} To sell it, or a piece of it, offer it to a man with money when you talk business.</p><div class="row2">${men.map((c) => `<button class="btn" data-a="bmgr:${b.id}|${c.id}">Put ${esc(c.name.split(' ')[0])} in charge</button>`).join('')}<button class="btn" data-a="bmgr:${b.id}|hire">Hire a manager</button>${mgr ? `<button class="btn" data-a="bmgr:${b.id}|self">Run it yourself</button>` : ''}</div></div>`;
   }
   if (prot && lateOf(b) > 0 && prot.collectorId === p.id) out += `<div class="callout bad">${esc(o.name)} is behind by ${money(owedOf(b))}. You can send a man to shake him, or go yourself.</div><div class="row2"><button class="btn danger" data-a="shake:${b.id}">Shake him myself</button><button class="btn" data-a="orders:">Send a man</button></div>`;
-  out += `<div class="row2"><button class="btn primary" data-a="talk:${o.id}">${esc(whereIs(w, p, o).kind === 'shop' ? 'Walk in and talk to ' + o.name.split(' ')[0] : 'Find ' + o.name.split(' ')[0])}</button>${!prot || prot.familyId !== p.familyId ? `<button class="btn" data-a="plan:lean|${b.id}">Lean on it</button>` : `<button class="btn" data-a="plan:burgle|${b.id}">Other ideas</button>`}</div>`;
+  // (the overhaul: the place leads to its owner, and to the business you could do with him there: buying in, lending, protection)
+  const ofo = o.id !== p.id && o.alive ? `<button class="btn" data-a="talk:${o.id}|g:business">Talk business with ${esc(o.name.split(' ')[0])}</button>` : '';
+  out += `<div class="row2"><button class="btn primary" data-a="talk:${o.id}">${esc(whereIs(w, p, o).kind === 'shop' ? 'Walk in and talk to ' + o.name.split(' ')[0] : 'Find ' + o.name.split(' ')[0])}</button>${ofo}${!prot || prot.familyId !== p.familyId ? `<button class="btn" data-a="plan:lean|${b.id}">Lean on it</button>` : `<button class="btn" data-a="plan:burgle|${b.id}">Other ideas</button>`}</div>`;
   return out;
 }
 

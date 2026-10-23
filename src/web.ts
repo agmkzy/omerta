@@ -17,7 +17,7 @@ import { buyLife, courtBoss, propose, setBoss, setConsigliere, setHeir } from '.
 import { auditMember, checkBooks, envelopeSum, handOver, rule, setStance } from './books';
 import { post } from './ledger';
 import { statement } from './ledger';
-import { say, startConvo, introduced, arrive, isNavCode } from './dialogue';
+import { say, startConvo, introduced, arrive, isNavCode, options, groupOf } from './dialogue';
 import { closeMeeting, choose as meetChoose, current as meetCurrent, openAccountsMeeting, openCrewMeeting, openFamilyMeeting, openGathering, openInduction, openSitdown } from './meetings';
 import { setManager } from './econ';
 import { giveOrder, ownJob, questionReport, recruitProspect, takeDayJob, quitDayJob, workShift } from './orders';
@@ -210,7 +210,48 @@ function doAction(a: import('./types').Action) {
 
 const job = (id: string) => W().jobs.find((j) => j.id === id);
 
-function talkTo(id: string) {
+// Say one thing in the conversation on the page: his answer, and what can follow it.
+function sayIt(picked: { code: string; label: string }) {
+  const w = W();
+  if (S.view.t !== 'talk') return;
+  const t = w.chars[S.view.convo.id];
+  const tv = S.view;
+  const history = [...(tv.history ?? []), ...(tv.lines.length ? [{ q: tv.q, lines: tv.lines }] : [])].slice(-12);
+  const res = say(w, P(), t, tv.convo, picked.code);
+  if (res.meeting && typeof res.meeting !== 'string') {
+    advance(w, w.now + res.minutes);
+    S.view = { t: 'meeting', m: res.meeting, lines: res.lines };
+    save();
+    return;
+  }
+  const lines = typeof res.meeting === 'string' ? [...res.lines, res.meeting] : res.lines;
+  const keep = isNavCode(picked.code) && !res.lines.length && !!res.convo;
+  // (a conversation that ends stays on the page: the last thing said, and how you left it)
+  return pass(res.minutes, [], res.convo ? (keep ? { t: 'talk', convo: res.convo, lines: tv.lines, q: tv.q, history: tv.history } : { t: 'talk', convo: res.convo, lines, q: res.q ?? (isNavCode(picked.code) ? undefined : picked.label), history }) : { t: 'talk', convo: tv.convo, lines, q: res.q ?? picked.label, history, ended: true });
+}
+
+// Go and see a man. With a matter (a code from the conversation: his debt, his money, a job, a place of his), you open on it,
+// so every record that names a man leads to the conversation about it.
+// A man you have never met is met first; the matter waits until you have been introduced, then comes up.
+let matter: { id: string; code: string } | undefined;
+function talkTo(id: string, about?: string) {
+  goSee(id);
+  matter = about ? { id, code: about } : undefined;
+  raiseMatter();
+}
+function raiseMatter() {
+  if (!matter) return;
+  if (S.view.t !== 'talk' || S.view.ended || S.view.convo.id !== matter.id) { matter = undefined; return; }
+  const w = W(), p = P(), x = w.chars[matter.id], about = matter.code;
+  if (!introduced(w, p, x)) return;
+  matter = undefined;
+  // (a way in is offered as f:g:<way>; a matter that lives under one of them opens that way first, as if you had turned the talk to it)
+  const find = (code: string) => S.view.t === 'talk' ? options(w, P(), x, S.view.convo).find((d) => d.code === code || d.code === 'f:' + code) : undefined;
+  if (!find(about) && !about.startsWith('g:')) { const g = find('g:' + groupOf(about)); if (g) sayIt(g); }
+  const o = find(about);
+  if (o) sayIt(o);
+}
+function goSee(id: string) {
   const w = W();
   const p = P();
   const x = w.chars[id];
@@ -466,7 +507,7 @@ function handle(a: string, v: string) {
       return go({ t: 'menu', kind });
     }
     case 'opt': return doAction(S.opts[Number(v)]);
-    case 'talk': return talkTo(v);
+    case 'talk': return talkTo(args[0] ?? v, args[1]);
     case 'settle': return W().chars[v]?.alive ? go({ t: 'settle', id: v, lines: [] }) : undefined;
     case 'sv': {
       const [code, id] = v.split('|');
@@ -693,23 +734,7 @@ function handle(a: string, v: string) {
       }
       return;
     }
-    case 'say': {
-      if (S.view.t !== 'talk') return;
-      const t = w.chars[S.view.convo.id];
-      const tv = S.view, picked = S.dopts[Number(v)];
-      const history = [...(tv.history ?? []), ...(tv.lines.length ? [{ q: tv.q, lines: tv.lines }] : [])].slice(-12);
-      const res = say(w, P(), t, tv.convo, picked.code);
-      if (res.meeting && typeof res.meeting !== 'string') {
-        advance(w, w.now + res.minutes);
-        S.view = { t: 'meeting', m: res.meeting, lines: res.lines };
-        save();
-        return;
-      }
-      const lines = typeof res.meeting === 'string' ? [...res.lines, res.meeting] : res.lines;
-      const keep = isNavCode(picked.code) && !res.lines.length && !!res.convo;
-      // (a conversation that ends stays on the page: the last thing said, and how you left it)
-      return pass(res.minutes, [], res.convo ? (keep ? { t: 'talk', convo: res.convo, lines: tv.lines, q: tv.q, history: tv.history } : { t: 'talk', convo: res.convo, lines, q: res.q ?? (isNavCode(picked.code) ? undefined : picked.label), history }) : { t: 'talk', convo: tv.convo, lines, q: res.q ?? picked.label, history, ended: true });
-    }
+    case 'say': if (S.dopts[Number(v)]) { sayIt(S.dopts[Number(v)]); raiseMatter(); } return;
     case 'cmove': {
       const r = performMove(w, S.moves[Number(v)]);
       return pass(r.minutes, r.lines, { t: 'tab', name: 'crew' });

@@ -245,7 +245,7 @@ export function businessRoom(): string {
     for (const d of debts) {
       const other = w.chars[d.creditor === p.id ? d.debtor : d.creditor];
       if (!other) continue;
-      rows.push(`<li><span>${d.creditor === p.id ? `${pl(other)} owes you` : `You owe ${pl(other)}`}<small class="muted">${money(d.weeklyPayment)} a week${d.missed ? `, ${d.missed} missed` : ''}</small></span><span class="v ${d.debtor === p.id ? 'warn' : ''}">${money(d.balance)}</span></li>`);
+      rows.push(`<li><span>${d.creditor === p.id ? `${pl(other)} owes you` : `You owe ${pl(other)}`}<small class="muted">${money(d.weeklyPayment)} a week${d.missed ? `, ${d.missed} missed` : ''}</small></span><span class="v ${d.debtor === p.id ? 'warn' : ''}">${money(d.balance)}<button class="go" data-a="talk:${other.id}|tk:debt:${d.id}">${d.creditor === p.id ? 'See him' : 'Talk terms'}</button></span></li>`);
     }
     for (const f of mine) if (w.chars[f.to]) rows.push(`<li><span>${pl(w.chars[f.to])} owes you a favour</span><span class="v good">${esc(favourWord(f.size))}</span></li>`);
     for (const f of ours) if (w.chars[f.from]) rows.push(`<li><span>You owe ${pl(w.chars[f.from])} a favour</span><span class="v warn">${esc(favourWord(f.size))}</span></li>`);
@@ -285,7 +285,7 @@ function lendingCard(): string {
     .sort((a, c) => Number(c.b.district === p.district) - Number(a.b.district === p.district) || c.b.distress - a.b.distress)
     .slice(0, 8);
   return sect('Who could use a loan', 'owners with no lender') + (rows.length
-    ? `<ul class="rows">${rows.map(({ b, o }) => `<li><button class="rowbtn lf-row" data-a="talk:${o.id}"><span>${esc(o.name)} <small class="muted">${esc(b.name)}, ${esc(b.district)}</small></span><span class="v ${b.distress > 0.4 ? 'warn' : ''}">${b.distress > 0.6 ? 'struggling' : b.distress > 0.25 ? 'tight' : 'steady'}</span></button></li>`).join('')}</ul><p class="lf-note">Tap a name and go and offer him money. Struggling men take it more readily, and pay back less easily.</p>`
+    ? `<ul class="rows">${rows.map(({ b, o }) => `<li><button class="rowbtn lf-row" data-a="talk:${o.id}|offer_loan"><span>${esc(o.name)} <small class="muted">${esc(b.name)}, ${esc(b.district)}</small></span><span class="v ${b.distress > 0.4 ? 'warn' : ''}">${b.distress > 0.6 ? 'struggling' : b.distress > 0.25 ? 'tight' : 'steady'}</span></button></li>`).join('')}</ul><p class="lf-note">Tap a name and go and offer him money. Struggling men take it more readily, and pay back less easily.</p>`
     : quiet('Everyone around here has a lender already.'));
 }
 

@@ -711,6 +711,13 @@ body.om-open #app { max-width: none; padding: 0; }
 .cv-now .cv-say { font-size: 23px; line-height: 1.42; color: var(--ink); margin: 6px 0; }
 .cv-now .cv-nar { font-size: 15px; color: var(--muted); }
 .cv-now .cv-fx { color: var(--brass-2); }
+/* the overhaul: a record leads to the man it concerns */
+.go { all: unset; box-sizing: border-box; cursor: pointer; display: inline-block; margin-left: 10px; padding: 3px 10px; border: 1px solid rgba(201, 164, 102, .35); border-radius: 999px; font: 600 10.5px/1.4 var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--brass); vertical-align: middle; white-space: nowrap; }
+.go:hover, .go:focus-visible { border-color: var(--brass); color: var(--ink); }
+.crewrow { margin-bottom: 10px; }
+.crewrow .need { margin-bottom: 0; }
+.crewrow__acts { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 0 2px 26px; }
+.crewrow__acts .go { margin-left: 0; }
 /* the overhaul: a conversation reads as an exchange between two men */
 .cv-mood { margin: 6px 0 0; font: italic 400 14px/1.4 var(--body); color: var(--ink-2); }
 .cv-log { margin: 8px 0 4px; }
