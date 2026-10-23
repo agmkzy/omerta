@@ -157,7 +157,7 @@ export function delegate(w: World, g: Character) {
       const m = menOf(w, g).filter((x) => !x.isPlayer && x.jailedUntil <= w.now && !w.ops.some((o) => o.runner === x.id && o.state !== 'closed' && o.state !== 'done'))
         .sort((a, b) => aptitude(b, d.skill) + rel(g, b.id).trust - aptitude(a, d.skill) - rel(g, a.id).trust || byId(a, b))[0];
       if (m) {
-        op.runner = m.id;
+        op.runner = m.id; op.cut = 0.15;
         recordCareer(w, m, `Put in charge of ${g.name}'s ${d.label.toLowerCase()}`, true);
         addFact(w, { kind: 'report', actor: g.id, victim: m.id, text: `${g.name} put ${m.name} in charge of his ${d.label.toLowerCase()} in ${op.district}.`, district: op.district }, { witnesses: [g.id, m.id] });
       }

@@ -510,7 +510,7 @@ export interface Situation {
   m?: Record<string, number | string>; // kind-specific scratch (bounded, plain values)
   // V89: an ask (kind 'ask'): somebody wants something from somebody, on terms, and both sides have a stance (matters.ts).
   ak?: string; // which kind of ask ('protect', 'collect', 'warn', ...)
-  terms?: { by: Id; of: Id; amt?: number; first?: number; what?: string; rate?: number }; // who asks whom; the amount on the table; the opening amount; for a loan, the weekly rate
+  terms?: { by: Id; of: Id; amt?: number; first?: number; what?: string; rate?: number; share?: number }; // who asks whom; the amount on the table; the opening amount; for a loan, the weekly rate; for a piece of a business, how much of it
   st?: Record<Id, Stance>;
 }
 export interface World {
@@ -612,6 +612,7 @@ export interface Op {
   cause?: string;
   stake?: number;
   lull?: number;
+  cut?: number; // (Stage 4) the runner's agreed share of each week's take, paid by the owner
 }
 
 // Someone comes to you. A small scene with its own options; closes when you answer or it lapses.

@@ -551,3 +551,136 @@ Three things were wrong:
 - **Saves:** 7.0–7.7 MB.
 
 **Open: family funds still build up,** to $30,000–55,000 a family at two years. The fund now spends on real needs, but those needs are fewer than the dues coming in. I haven't invented spending. A boss putting fund money behind his captains' enterprises, or into a war, would be the natural next use, and belongs with the leadership decisions of later work.
+
+### Increment 7: the player's way into the economy
+
+The audit at the start of Stage 4 found the simulation could do much more than the player could reach. Each gap, and how it's closed through the same rules NPCs use:
+
+| What the player wants to do | How it now works | Where |
+|---|---|---|
+| **Buy a business** | Find it (the Family tab lists the town's shops and places; a shop's page sends you to its owner), introduce yourself, ask whether he'd sell. He asks what you have in mind; you name a price. He answers from the rules every sale follows (`econ.sellerFloor`): what the place is worth, what trouble he's in (a business in the red, missed debts, jail, an empty pocket), his greed and pride, and what he thinks of you. He accepts, refuses with his reason ("That's not what the place is worth"), or names the least he'd take. The sale is `econ.sellTo`, the same one NPC buyers use. | `asks` 'buy' |
+| **Buy a piece of one** | The same, for a quarter of it: money down for a share of what it makes every week. | `asks` 'buy' with a share |
+| **Sell your business, or a piece** | Offer it to a man with money when you talk business. He weighs what it's worth to a man like him, whether he has the money and how many places he has, then accepts, refuses or counters. **NPCs also make offers for the player's places** through their own business plans (`goals.ts`): he's put the offer, and can accept, refuse or ask more. | `asks` 'sell'; `goals.ts` |
+| **Name a figure** | Wherever a negotiation is about money, the conversation shows a field to name your own figure, and for a loan the weekly rate too. The other man answers that figure from his own position. One figure a day: he has heard your number. | `asks.nameFigure`; `dialogue.ts` 'nm:'; `ui/talkview.ts` |
+| **Protection at a fee you choose** | The shopkeeper weighs your figure against what his business can carry, who protects him already, what has happened on his street and whether he has sent you away before. An agreed fee is the arrangement. | `asks` 'protect' |
+| **Lend on your own terms** | Amount and weekly rate. The man takes it if he needs it and the price of the money is fair to him. The debt carries the terms. | `asks` 'lend' |
+| **Borrow** | You name the amount; he decides what he can spare. | `asks` 'borrow' |
+| **Run another man's enterprise** | Offer to run it for a cut of the take, which you name. The owner weighs what he thinks of you, what you're good at and whether he has a man on it already. A runner is paid his agreed cut each good week; NPC captains who delegate pay their men 15%. | `asks` 'run'; `rackets.ts` |
+| **Delegate the running of your place** | Your business's page: put one of your men in charge, hire a manager in as NPC owners do, or run it yourself. A manager's brains and care decide how well it's run. | `econ.setManager` |
+| **Start an enterprise** | Already open from associate level on the Rackets tab (increment 2); the same starting rules as NPCs. No captain has to give it to you as a job. | `rackets.canStart` |
+
+**Consolidated along the way:**
+- **Five fixed-sum loan routes** in conversations wrote debts directly and skipped the negotiation. Two became the lend negotiation; one unreachable follow-up was deleted. ("Offer him $500" and "lend him $300" now go through the negotiation; you name the amount.) Responses to a man who came asking for a specific sum remain as they were: his request set the terms.
+- **Deals have their own voice.** The conversation's speech had treated a purchase like someone asking for a loan ("I haven't got it to spare"). Buying, selling and running an enterprise are now their own kind of exchange, with reasons that fit and replies that fit ("Then name your price").
+- **When the player is asked and counters,** the counter goes the right way: more, when an NPC is offering him money for his business.
+
+**Tests** (`economy/player.test.ts`). The eight approved player flows, as gameplay through the real conversation and screens:
+1. an associate finds a business from its page and asks the owner;
+2. a low offer is refused or countered, and a better one named;
+3. he owns it, the money went to the seller, and it's on the record;
+4. and 5. he starts a racket himself, earns from it and owes his share upstairs;
+6. he names a protection figure and the man answers that figure;
+7. he lends at an amount and rate he names, and the debt carries them;
+8. he decides who runs his place.
+
+The menus snapshot test was updated for three loan hints that now say the player names the figure.
+
+**Checked in the browser** (a new game in the dev build):
+- An associate with $1,250 found Moretti's Laundromat on the Family tab, walked over and introduced himself, and offered to buy a piece.
+- Freddie asked what he had in mind. The player named $900 for a quarter, and Freddie "thinks it over, then nods". Cash went from $1,250 to $350, and the history reads "You bought 25% of Moretti's Laundromat from Freddie Moretti for $900."
+- An earlier attempt at the whole of a tavern for $1,000 was refused.
+
+### Stage 4: final validation
+
+**Two years, four worlds, with all seven increments** (seeds 3, 7, 11, 19; "Before" is the unchanged game in `baseline/rerun/`):
+
+| Measure | Before | Stage 4 |
+|---|---|---|
+| Worst debt as a multiple of what was lent | seed 7's loan book: $34k → $157k in six months | 2.1–3.1× |
+| Loans made / defaulted | not measured | 648–798 / 41–65 |
+| Enterprises running at the end | abstract hustles (54–66 men) | 105–139 real enterprises |
+| Protection refusals | 548–1,113 | 418–536 |
+| Work handed down by NPC superiors | none | 637–883 pieces; 14–45 refused; 18–32 lies caught |
+| Enterprises delegated to a runner | none | 15–20 |
+| Lawyers paid for by a family fund / outside debts it cleared | none | 8–13 / 3–13 |
+| Promotions | 39–50 | 29–37 |
+| Men in the life (associate / soldier / captain) at two years | about 30 / 35 / 13 | 34–50 / 31–44 / 14–21 |
+| Gambling losses recorded | 1,527–4,237 | about 15–40 |
+| Consistency and ledger problems | 0 | 0 |
+| Save size at two years | 4.9–5.0 MB | 7.2–9.1 MB |
+
+**What the checks covered:**
+- **Economic stability.** Debts no longer balloon. Average cash at two years is about $3,500–4,400 for associates, $7,900–9,100 for soldiers and $13,000–21,000 for captains: growing, not exploding. Family funds hold $30,000–55,000 each (open item, increment 6).
+- **NPC autonomy.** NPCs start, grow, delegate and close enterprises; lend through negotiation; lean on shops in their crews' ground; hand out and refuse work; catch lies; get lawyers; buy businesses (from each other and from the player); and rise by the shared road.
+- **Organisation.** Captains grow with the families (13 → 14–21). Promotions keep flowing and go to men whose road is done.
+- **Repetition.** Gambling-loss noise is gone. Protection refusals are down by half. Repeat collections from the same broke debtor are fixed.
+- **Save size and persistence.** 7.2–9.1 MB at two years, within IndexedDB's comfort, but still the open question it was at step 3. Every new field is optional. Old saves load (the `compat` tests and the schema-2 fixture pass), and NPC hustles are migrated into enterprises.
+- **The player's economic interactions.** Tested as gameplay in `economy/player.test.ts`, and checked in the browser.
+- **Obsolete systems removed:**
+  - `hustle.ts`;
+  - the daily citywide shakedown scan;
+  - `bossErrand`'s random errands;
+  - the "rights" grant;
+  - `familyHit`;
+  - the NPC career formula;
+  - the player's random obligations;
+  - three fixed-sum loan routes.
+
+**The test suite:** 317 pass. The 13 opt-in long tests (180-day runs, save round trips, save growth, ledger stability, succession, the full conversation audit) were run with `SLOW=1`: all pass. The conversation audit found one old fault, "I’ll look into it myself" leaving no record of what was found, which is fixed: what you find is kept with what you know about the man.
+
+**Open items carried forward:**
+- **Family funds build up.** A boss putting the fund behind his captains' enterprises, or into a war, belongs with leadership decisions.
+- **Loan books stay rare** (1–3 per world).
+- **Save size** is 7–9 MB at two years. Trimming faded acquaintances is the next lever.
+- **Some loans the player makes on request keep their fixed sums.** Where a man comes asking for a particular amount, the player answers his request; it isn't yet a negotiation.
+
+## Stage 5: the social simulation
+
+### Audit of the existing social architecture (before any change)
+
+Much of what Stage 5 asks for already exists from V89 and V90. The work is to make it one system, fill the gaps, and remove the parallel paths.
+
+**Authoritative, and kept:**
+
+| What | Where | What it does |
+|---|---|---|
+| Knowledge | `core.addFact`/`learn`, `Character.known` | Every event is a fact. A man knows only what he witnessed or was told, with its source (witness, himself, the street, or a named man) and whether he knows who did it. |
+| Rumour | `rumour.ts`, `actions.share` | A man's version of a fact, shaped by who told him. Gossip travels by trust and sociability; serious news travels further. |
+| Forgetting | `retain.ts` | Routine facts fade; bystanders forget; whatever something still points at is kept. |
+| Relationships | `core` (steps 1–3) | Trust, respect, affection, fear and grudge, each with its doors. Grudges carry their reason; familiarity and bonds grow from experience. |
+| Temperament | `temper.ts` | Why two men answer the same thing differently; how one man sees another. |
+| Negotiation | `asks.ts`, `exchange.ts`, `react.ts` | One framework for NPCs and the player: terms, moves, stance, answers with reasons, counters, the point in hand, and his words. |
+| Matters | `situ.ts` (the record), `matters.ts` (kinds) | Anything unresolved between people, who knows of it, its history and how it ends. The player sees only what he has been told (`sitmoves.ts`). |
+| What a man has on his mind | `talk.ts` | His shop, his racket, his wants, his family, his boss, his troubles. |
+| The conversation | `dialogue.ts` | The hub (what he brings up, what is between you, the everyday questions, proposals), subjects in hand, the used-option rule, no repeated lines. |
+| NPC plans | `goals.ts` | Wealth, business, recruiting, advancement, debt, independence. |
+| Work and money | Stage 4 | `work.ts`, `asks` buy/sell/run/lend/protect, `orgs.treasuryWeek`. |
+| Family disputes | `disputes.ts` | Quarrels between families: grievances, sit-downs, terms kept and broken. |
+
+**Duplicates and obsolete parts:**
+
+| What | Why | What happens to it |
+|---|---|---|
+| The club's conversation scenes (`club.ts` script engine) | Retired as small talk in V90 (sitting down with a man at the club opens the ordinary conversation); kept only to finish a scene in an old save. Its reasons a man "wants a word" are computed separately from the hub's. | Deleted. An old save's scene is closed on load. The club keeps its identity (owner, hours, who is in, who wants a word), and "wants a word" reads the same source as the conversation. |
+| `situations.ts`'s "money trouble" | A man in trouble near the player only ever asks the player. | Replaced by the shared intention to ask for help: he goes to whoever he trusts and can help, player or not. |
+| `situations.ts`'s "ambition" | Duplicates the NPC advancement plan, which already asks a man's superior, the player included. | Deleted. |
+| Encounters as a separate way to reach the player | NPC requests reach him either as matters put to him or as separate encounter scenes. | NPC-initiated approaches go through one door: he comes to you with something real, and you answer him in the conversation. |
+| The hub's arrangement | The everyday questions and "put something to him" are close to, but not, the five consistent groups the brief asks for. | Rebuilt as on your mind, then the five groups, then leave. |
+
+**Gaps:**
+- **No single place where an NPC decides to go and see someone.** Plans, matters, daily actions and Stage 4's work each start interactions on their own terms.
+- **Missing reasons to go and see someone:**
+  - a debtor asking for more time;
+  - a man reporting something up to his superior;
+  - a man in trouble asking for help (beyond the player);
+  - a man repairing a relationship;
+  - a superior confronting misconduct he has heard of.
+- **News doesn't climb the hierarchy deliberately.** A shopkeeper's protection demand reaches the collector, but the collector doesn't tell his captain.
+- **NPCs never open a conversation the way the brief describes** ("Got a minute?"), with the player choosing how to receive him.
+- **Stage 4's records** (assignments, deals, the family fund) aren't yet among the conversation's contextual shortcuts.
+
+### Plan
+1. **5A, intentions** (`intent.ts`). One weekly-and-daily mechanism through which a man decides whom to go and see and why. Each intention comes from real state, chooses a partner by relationship, authority, access, benefit and risk, and acts through the existing doors (asks, matters, gossip, favours, the order model).
+2. **5B, knowledge.** Reporting up the hierarchy. Each claim keeps what kind of knowing it is (seen, told, rumour, suspected, out of date). Denials and claims are remembered for later confrontation. Routine talk stays bounded.
+3. **5C, the conversation.** On your mind, then the five groups with natural, context-dependent openings and replies, then leave. Negotiation controls in place (Stage 4). NPC-initiated conversations. The club's engine deleted.
+4. **5D, situations.** Stage 4's work and deals as matters, with the player's history readable from the records.

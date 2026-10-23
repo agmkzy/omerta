@@ -265,6 +265,18 @@ function payProtection(w: World, b: Business, o: Character, col: Character) {
   } else if (!p.owed) { p.late = 0; delete p.why; }
 }
 
+// Stage 4: the owner decides who runs his place, the player as any owner: one of his own men, a man hired in (as NPC owners hire),
+// or himself. A manager's brains and care decide how well it is run (mgmtQuality).
+export function setManager(w: World, b: Business, by: Character, who: Id | 'hire' | null): string {
+  if (b.ownerId !== by.id || !b.open) return 'It isn’t yours to decide.';
+  if (who === null) { const m = b.managerId ? w.chars[b.managerId] : undefined; delete b.managerId; if (m) addFact(w, { kind: 'ownership', actor: by.id, victim: m.id, business: b.id, minor: true, text: `${by.name} took the running of ${b.name} back from ${m.name}.`, district: b.district }, { witnesses: [by.id, m.id] }); return `You run ${b.name} yourself from now on.`; }
+  if (who === 'hire') { appointManager(w, b, by, 'to run it for him'); return `${w.chars[b.managerId!].name} runs the day-to-day at ${b.name} now.`; }
+  const m = w.chars[who];
+  if (!m?.alive || m.id === by.id) return 'He isn’t around.';
+  b.managerId = m.id;
+  addFact(w, { kind: 'ownership', actor: by.id, victim: m.id, business: b.id, minor: true, text: `${by.name} put ${m.name} in charge of the day-to-day at ${b.name}.`, district: b.district }, { witnesses: [by.id, m.id] });
+  return `${m.name} runs ${b.name} for you now.`;
+}
 function appointManager(w: World, b: Business, o: Character, why: string) {
   const last = o.name.split(' ').slice(-1)[0];
   const first = w.rng.pick(['Sal', 'Gino', 'Paulie', 'Dom', 'Lou', 'Vinnie', 'Angie', 'Rosa', 'Nick', 'Carmine']);
@@ -398,6 +410,38 @@ export function setCollector(w: World, b: Business, collectorId: Id, familyId: I
   if (collectorId === b.ownerId) return; // a man cannot collect from himself; callers that pick a taker exclude the owner, this is the last line
   const old = b.protection;
   b.protection = { collectorId, familyId, fee: o.fee ?? old?.fee ?? 0, since: w.now, ...(o.keepOwed && old?.owed ? { owed: old.owed, late: old.late, why: old.why } : {}) };
+}
+
+// ------------------------------------------------------------------ buying and selling a business (Stage 4)
+// One set of rules for every buyer and seller, the player included (asks 'buy' and 'sell', goals.ts businessStep): what a place is
+// worth, the least its owner will take for it, and the sale itself.
+export function priceOf(w: World, b: Business): number {
+  const t = trade(w, b);
+  const weekly = t.weeks >= 2 ? t.profit : b.income - b.expense;
+  return Math.max(1200, Math.round((Math.max(0, weekly) * 30 + Math.max(0, b.cash) * 0.5) / 50) * 50);
+}
+export const stakeRoom = (b: Business) => 0.6 - (b.stakes ?? []).reduce((a, s) => a + s.share, 0);
+// The lowest fraction of the asking price he would take: lower when he is in trouble (a business in the red, debts he is missing,
+// in jail, broke), higher when he is greedy or proud; a piece of it comes cheaper than the whole. A man he holds a grudge against
+// pays more; one he trusts, a little less.
+export function sellerFloor(w: World, b: Business, o: Character, buyer: Character | undefined, mode: 'buy' | 'stake'): number {
+  const missed = w.debts.some((d) => d.debtor === o.id && d.status === 'active' && d.missed > 0);
+  let thr = 1.08 - Math.min(0.35, b.distress * 0.1) - (o.jailedUntil > w.now ? 0.12 : 0) - (missed ? 0.12 : 0) + o.traits.greed * 0.1 + o.traits.ambition * 0.05 - (o.cash < 200 ? 0.05 : 0);
+  if (mode === 'stake') thr -= 0.12;
+  if (buyer) { const r = o.rels[buyer.id]; thr += (r?.grudge ?? 0) * 0.2 - (r?.trust ?? 0) * 0.08; }
+  return thr;
+}
+// The sale: the money changes hands and the place (or a share of it) with it, on the record. Returns false if it can't go through.
+export function sellTo(w: World, buyer: Character, b: Business, price: number, share?: number): boolean {
+  const o = w.chars[b.ownerId];
+  if (!o || buyer.id === o.id || buyer.cash < price || !b.open) return false;
+  if (share !== undefined && stakeRoom(b) < share - 1e-9) return false;
+  buyer.cash -= price; o.cash += price;
+  if (share !== undefined) {
+    addStake(w, b, buyer.id, share, 'bought in');
+    addFact(w, { kind: 'ownership', actor: buyer.id, victim: o.id, business: b.id, amount: price, text: `${buyer.name} bought ${Math.round(share * 100)}% of ${b.name} from ${o.name} for ${money(price)}.`, district: b.district }, { witnesses: [buyer.id, o.id] });
+  } else if (!transferBusiness(w, b, buyer.id, 'bought', `${buyer.name} bought ${b.name} from ${o.name} for ${money(price)}.`)) { o.cash -= price; buyer.cash += price; return false; }
+  return true;
 }
 
 // ------------------------------------------------------------------ a crew's ground (Stage 4)

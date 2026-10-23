@@ -15,8 +15,8 @@ import type { Character, Situation, World } from './types';
 export type Claim = 'money' | 'taken' | 'you' | 'pride' | 'doubt' | 'time';
 // What kind of thing is being asked of him decides what his reasons and your answers to them can be: a demand (pay me, back off),
 // a request (lend me, cut my share, let me), an offer (a loan, a place, amends) or a claim on something owed (the favour, the pay).
-export type AskClass = 'demand' | 'request' | 'offer' | 'claim';
-const CLS: Record<string, AskClass> = { protect: 'demand', collect: 'demand', warn: 'demand', layoff: 'demand', borrow: 'request', rate: 'request', permit: 'request', help: 'request', lend: 'offer', recruit: 'offer', amends: 'offer', join: 'offer', favour: 'claim', jobpay: 'claim' };
+export type AskClass = 'demand' | 'request' | 'offer' | 'claim' | 'trade'; // (Stage 4: a deal, buying or selling a place or a share, or running a man's enterprise for a cut)
+const CLS: Record<string, AskClass> = { protect: 'demand', collect: 'demand', warn: 'demand', layoff: 'demand', borrow: 'request', rate: 'request', permit: 'request', help: 'request', lend: 'offer', recruit: 'offer', amends: 'offer', join: 'offer', favour: 'claim', jobpay: 'claim', buy: 'trade', sell: 'trade', run: 'trade' };
 export const classOf = (s: Situation): AskClass => CLS[s.ak ?? ''] ?? 'request';
 const first = (c: Character) => c.name.split(' ')[0];
 const pick = (w: World, s: Situation, k: string, xs: string[]) => { let h = 7; for (const ch of s.id + k + Math.floor(w.now / 1440)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return xs[h % xs.length]; };
@@ -58,6 +58,14 @@ function reasonWords(cls: AskClass, ak: string, c: Claim, hot: boolean, above: b
       doubt: ['“What’s the catch?”', '“Nobody offers something for nothing.”'],
       time: ['“I need to think it over.”', '“Let me sleep on it.”'],
     } as Record<Claim, string[]>)[c];
+    case 'trade': return ({
+      money: ak === 'buy' ? ['“That’s not what the place is worth.”', '“For that? I’d rather keep it.”'] : ak === 'sell' ? ['“It isn’t worth that to me.”', '“I haven’t got that kind of money lying around.”'] : ['“That cut? It’s my money you’re talking about.”', '“For that, I’d run it myself.”'],
+      taken: ak === 'run' ? ['“I’ve already got a man on it.”'] : ['“It’s not for sale.”'],
+      you: hot ? ['“Not to you. Not at any price.”'] : ['“I’d rather not do business with you.”'],
+      pride: ak === 'buy' ? ['“I built this place. It isn’t for sale to just anybody.”'] : ak === 'run' ? ['“I run my own business.”'] : ['“I don’t buy what I haven’t looked at.”'],
+      doubt: ['“I don’t know you well enough for this.”', '“How do I know it’s straight?”'],
+      time: ak === 'sell' ? ['“Let me look at the books first.”'] : ['“Let me think about it. It’s my living.”'],
+    } as Record<Claim, string[]>)[c];
     case 'claim': return ({
       money: ['“I haven’t got it right now.”', '“Not this week. I’m short.”'],
       taken: ['“It’s spoken for.”'],
@@ -76,6 +84,13 @@ export function giveReason(w: World, s: Situation, a: Character, t: Character, a
   const b = s.biz ? w.biz[s.biz] : undefined;
   const money0 = !!(s.terms?.amt || s.m?.offer) && !['warn', 'layoff', 'join', 'rate', 'permit'].includes(K?.id ?? '');
   const taken = s.ak === 'protect' && !!b?.protection && b.protection.collectorId !== a.id;
+  if (cls === 'trade') { // (a deal: the price is usually the point, unless it is you, or the place is spoken for)
+    const o = s.ak === 'run' ? w.ops.find((x) => x.id === s.terms?.what) : undefined;
+    const real: Claim = ans === 'stall' ? 'time' : v.resent > 0.35 || S.anger > 0.45 ? 'you' : o?.runner && w.chars[o.runner]?.alive ? 'taken' : ans !== 'counter' && v.trust < 0.15 && S.good < 0.2 ? 'doubt' : 'money';
+    s.m = { ...(s.m ?? {}), beat: 'claim', claim: real, claimT: 1 };
+    if (ans === 'counter') return undefined; // (a counter already gives its reason)
+    return pick(w, s, 'r' + real, reasonWords(cls, s.ak ?? '', real, tp.volatility + tp.pride > 1.15, rk(t) > rk(a), true));
+  }
   // (what weighs most: someone else's claim on him, bad blood, the money, then whether he knows you at all, then his pride)
   const real: Claim = ans === 'stall' ? 'time' : taken ? 'taken' : v.resent > 0.35 || S.anger > 0.45 ? 'you' : money0 && cls !== 'offer' && !canPay(w, s, t) ? 'money' : v.trust < 0.2 && S.good < 0.25 ? 'doubt' : tp.pride > 0.55 || rk(t) > rk(a) ? 'pride' : money0 && cls !== 'offer' ? 'money' : 'doubt';
   // what he says: a man who would rather not say "it's you" or "it's my pride" talks about money, if money is in it
@@ -119,6 +134,14 @@ function repliesTo(w: World, p: Character, s: Situation, t: Character): Reply[] 
       case 'doubt': return [{ k: 'word', label: s.ak === 'borrow' ? 'You’ll have it back. My word on it.' : 'Ask around. I keep my word.', hint: 'Only as good as what people say about you.' }, ...(above ? [] : boss ? [{ k: 'name', label: `${boss.name} will vouch for me.`, hint: 'Bring your boss’s name into it.' }] : [])];
       case 'you': return [{ k: 'past', label: 'Whatever happened, that’s behind us.', hint: 'A man with a heart may meet you halfway. A proud one won’t.' }];
       case 'pride': return above ? [{ k: 'respect', label: 'I’m only asking.', hint: 'Let it lie with grace. He will remember that you asked well.' }] : [{ k: 'asking', label: 'I wouldn’t ask if I didn’t need it.', hint: 'Swallow a little pride of your own.' }];
+      case 'time': return [{ k: 'give', label: 'Take your time.', hint: 'He’ll remember you gave it.' }, { k: 'now', label: 'I need to know now.', hint: 'Push. He may give one you don’t like.' }];
+      default: return [];
+    }
+    if (cls === 'trade') switch (claim) {
+      case 'money': return [{ k: 'manage', label: s.ak === 'sell' ? 'Then what would you pay?' : s.ak === 'run' ? 'Then what would you give a man?' : 'Then name your price.', hint: 'Let him put a figure on it.' }];
+      case 'doubt': return [{ k: 'word', label: 'Ask around. I keep my word.', hint: 'Only as good as what people say about you.' }, ...(boss ? [{ k: 'name', label: `I’m with ${boss.name}.`, hint: 'Say whose man you are. It carries weight, and it travels.' }] : [])];
+      case 'you': return [{ k: 'past', label: 'Whatever happened, this is business.', hint: 'A man with a heart may meet you halfway. A proud one won’t.' }];
+      case 'pride': return [{ k: 'asking', label: 'I’m making you an offer, that’s all.', hint: 'Give him his dignity back.' }];
       case 'time': return [{ k: 'give', label: 'Take your time.', hint: 'He’ll remember you gave it.' }, { k: 'now', label: 'I need to know now.', hint: 'Push. He may give one you don’t like.' }];
       default: return [];
     }

@@ -1,7 +1,7 @@
-import { enterpriseLine, lineOf } from './rackets';
+import { OPS, enterpriseLine, lineOf } from './rackets';
 import { matterAct, matterTitle, topicsWith } from './matters';
-import { addr, nudgeOf, subjectRows, talkAbout } from './talk';
-import { amendsAsk, askBetween, callFavour, rateAsk, openAsk, openAsks as openMatters, playerMove, playerMoves, read as mRead, titleOf as mTitle, type AskMove } from './asks';
+import { addr, note, nudgeOf, subjectRows, talkAbout } from './talk';
+import { ASKS, amendsAsk, askBetween, callFavour, nameFigure, rateAsk, openAsk, openAsks as openMatters, playerMove, playerMoves, read as mRead, titleOf as mTitle, type AskMove } from './asks';
 import { historyLines } from './powers2';
 import { askAbout, helpWith, sitOf } from './situations';
 // Conversations. Options are generated from what the other man knows, how he feels about you and what has happened.
@@ -13,12 +13,12 @@ import { addFact, bear, bearOn, clamp, createDebt, earn, ease, factText, famName
 import { standingWord, mkJob, oppFrom, tipFrom, bossOffer, traitWords, jobSaid, takeJob, declineJob } from './jobs';
 import { openSitdown, Meeting } from './meetings';
 import { helpMan, lateOf, PROBLEM_LABEL } from './people';
-import { bizMove, clearArrears, evidence, giveTime, owedOf, setCollector, takeFromBiz } from './econ';
+import { bizMove, clearArrears, evidence, giveTime, owedOf, priceOf, setCollector, stakeRoom, takeFromBiz } from './econ';
 import { addFavour } from './encounters';
 import { arch } from './voice';
 import { noteConduct, temper, viewOf } from './temper';
 const rk0 = (c: Character) => ['civilian', 'associate', 'soldier', 'capo', 'underboss', 'boss'].indexOf(c.rank);
-import { replies as exReplies, reply as exReply } from './exchange';
+import { classOf, replies as exReplies, reply as exReply } from './exchange';
 import { say as vsay, speak, surname } from './voicesheet';
 import { choose as encChoose } from './encounters';
 import { recall } from './memory';
@@ -39,6 +39,8 @@ export interface DOpt {
   nav?: boolean; // moves around the menu, does not act
   done?: boolean; // already used in this conversation: shown greyed, cannot be used again, and pays nothing if forced
   fixed?: boolean; // V90: worded the same every time (the four everyday questions), not put into his idiom
+  // Stage 4: a figure the player names himself: the screen shows a field (and, for a loan, the weekly rate) and sends it with the code
+  amount?: { value: number; min: number; max: number; step: number; rate?: { value: number; min: number; max: number } };
 }
 // The next things he has just made it natural to say. They come from the answer he gave, not from a fixed menu.
 export interface FollowOpt { code: string; label: string; hint?: string; big?: boolean }
@@ -381,8 +383,8 @@ export const INTENTS = ['Ask him about something', 'Do something for him', 'Ask 
 const INTENT: Record<string, number> = {};
 const intentList = (i: number, codes: string[]) => codes.forEach((c) => { INTENT[c] = i; });
 intentList(0, ['ask_around', 'ask_history', 'pick_member', 'leaders', 'ask_want', 'ask_crew', 'ask_rep', 'pick_incident', 'suspect', 'sit_ask', 'how', 'old_times', 'chat', 'cr_money', 'sh_how', 'sh_ears', 'rv_ears', 'rv_mood', 'a_ask', 'cr_ask', 'b_stand', 'about']);
-intentList(1, ['recruit_offer', 'help_gift', 'help_loan', 'welcome', 'congrats', 'drink', 'offer_loan', 'sit_cover', 'sit_lend', 'sit_rival', 'cr_cash', 'cr_duties', 'a_gift', 'rv_drink', 'rv_favour', 'sh_time', 'sh_back', 'terms_cut', 'pick_concern', 'd_time', 'd_half', 'd_favour', 'd_forgive', 'b_tribute']);
-intentList(2, ['borrow', 'work', 'recommend', 'rk_back', 'rk_back_ask', 'promo', 'rate_ask', 'partner_chop', 'partner_fence', 'd_ask', 'b_need', 'b_more', 'sit_leave', 'intro', 'intro_via']);
+intentList(1, ['sell_ask', 'recruit_offer', 'help_gift', 'help_loan', 'welcome', 'congrats', 'drink', 'offer_loan', 'sit_cover', 'sit_lend', 'sit_rival', 'cr_cash', 'cr_duties', 'a_gift', 'rv_drink', 'rv_favour', 'sh_time', 'sh_back', 'terms_cut', 'pick_concern', 'd_time', 'd_half', 'd_favour', 'd_forgive', 'b_tribute']);
+intentList(2, ['buy_ask', 'stake_ask', 'run_ask', 'borrow', 'work', 'recommend', 'rk_back', 'rk_back_ask', 'promo', 'rate_ask', 'partner_chop', 'partner_fence', 'd_ask', 'b_need', 'b_more', 'sit_leave', 'intro', 'intro_via']);
 intentList(3, ['demand', 'mediate', 'mediate2', 'challenge', 'refuse', 'a_own', 'a_start', 'a_defy', 'a_pay', 'd_remind', 'cr_thin', 'cr_drop', 'cr_look', 'sh_lean', 'sh_why', 'rv_warn', 'terms_raise', 'suggest', 'memo', 'report']);
 intentList(4, ['b_envelope', 'b_extra', 'b_extra2', 'd_pay', 'd_all', 'earn', 'op', 'assign_low', 'assign_hustle', 'rate_ask']);
 const AUTO: Record<string, string> = {
@@ -603,6 +605,12 @@ function focused(w: World, p: Character, t: Character, c: Convo): DOpt[] | undef
     rows = rs.map((x) => ({ code: `x:${s.id}:${x.k}`, label: x.label, hint: x.hint, big: x.big, story: 'go' as const }));
     const keep = rs.length ? new Set(['take', 'pressure', 'wait', 'drop']) : undefined;
     rows.push(...playerMoves(w, p, s).filter((m) => !keep || keep.has(m.move)).map((m) => ({ code: `mv:${s.id}:${m.move}`, label: m.label, hint: m.off ?? m.hint, story: (m.move === 'drop' || m.move === 'take' ? 'end' : 'go') as 'end' | 'go', big: !m.off && ['force', 'pressure', 'leverage', 'take'].includes(m.move), done: !!m.off })));
+    // (Stage 4: the figure is his to name, in a matter about money)
+    const K0 = ASKS[s.ak ?? ''], fig0 = K0?.figure?.(w, s);
+    // (where the figure is money he puts up, the field goes no higher than he has; if even the least is beyond him, it says so)
+    const fig = fig0 && K0?.short ? { ...fig0, max: Math.min(fig0.max, Math.floor(p.cash / fig0.step) * fig0.step) } : fig0;
+    if (fig && fig.max < fig.min) rows.splice(Math.min(1, rows.length), 0, { code: `nm:${s.id}`, label: 'Name your own figure', hint: 'You haven’t the money to put a figure to him.', done: true });
+    else if (fig && fig.max >= fig.min) rows.splice(Math.min(1, rows.length), 0, { code: `nm:${s.id}`, label: 'Name your own figure', done: (p.cooldown[`askmv:${s.id}:name`] ?? -1) >= Math.floor(w.now / DAY) /* one figure a day: he has heard your number */, hint: fig.rate ? 'How much, and how much a week on top. He answers what you put to him.' : 'Put a number to him. He answers it from what he has and what it is worth to him.', big: true, story: 'go', amount: { value: Math.round(clamp(s.terms?.amt ?? fig.min, fig.min, fig.max) / fig.step) * fig.step, min: fig.min, max: fig.max, step: fig.step, ...(fig.rate ? { rate: { value: s.terms?.rate ?? 0.05, min: fig.rate.min, max: fig.rate.max } } : {}) } });
   } }
   else if (k === 'enc') { const e = asksOf(w, t).find((x) => x.id === id); if (e) rows = e.opts.map((o) => ({ code: `enc:${e.id}:${o.code}`, label: o.label, hint: o.hint, story: 'go' as const, big: true })); }
   else if (k === 'mt') rows = topicsWith(w, p, t).filter((x) => x.s.id === id).map(({ s, o }) => ({ code: `mt:${s.id}:${o.code}`, label: o.label, hint: o.hint, story: 'go' as const, big: o.big }));
@@ -665,6 +673,8 @@ function openSubject(w: World, p: Character, t: Character, c: Convo, focus: stri
     const you = matterOpen(w, s, last);
     // the point he left it on, if he left it on one: he says it again, so what you answer is in front of you
     const RESTATE: Record<string, string> = { money: hot ? '“Like I said. I haven’t got it.”' : '“Like I told you, I can’t afford it.”', doubt: '“Like I said, I don’t know you, or who you’re with.”', taken: '“I told you. I already pay someone.”', you: hot ? '“You know how I feel about you.”' : '“I told you how things are between us.”', pride: '“I told you. I stand on my own feet.”', time: '“I’m still thinking it over.”' };
+    // (a deal: the point he left it on is the price, the place, or you: asks 'buy', 'sell', 'run')
+    if (classOf(s) === 'trade') { const T: Record<string, string> = { money: s.ak === 'sell' ? '“Like I said, it isn’t worth that to me.”' : s.ak === 'run' ? '“Like I said, that cut is too rich for me.”' : '“Like I said, it’s worth more than that.”', taken: s.ak === 'run' ? '“I told you, I’ve got a man on it.”' : '“I told you, it isn’t for sale.”', doubt: RESTATE.doubt, you: RESTATE.you, pride: RESTATE.pride, time: RESTATE.time }; if (s.m?.beat === 'claim' && T[String(s.m.claim)]) return [you, T[String(s.m.claim)]]; }
     if (s.m?.caught && s.m?.claim === 'money') return [you, last === 'counter' ? '“You’ve seen enough. You know what I can do.”' : '“All right. You know I can pay something.”']; // (what was found out stays found out)
     if (s.m?.beat === 'claim' && RESTATE[String(s.m.claim)]) return [you, RESTATE[String(s.m.claim)]];
     const him = last === 'no' ? (hot ? '“I gave you my answer.”' : soft ? '“I know. I’m sorry, it’s still the same.”' : '“Nothing’s changed.”')
@@ -766,7 +776,7 @@ export function optionsRaw(w: World, p: Character, t: Character, c: Convo): DOpt
       const b = ownerBiz(w, t.id);
       if (t.cash < 300 || (b && (b.cash < 250 || b.distress > 0))) {
         add('help_gift', 'Slip him $200, no questions', 'He won’t forget it.');
-        if (t.rank === 'civilian' || t.rank === 'associate') add('help_loan', 'Offer to lend him $300', '5% a week.');
+        if (t.rank === 'civilian' || t.rank === 'associate') add('help_loan', 'Offer to lend him money', 'At a friend’s rate. You can change the amount and the rate.');
       }
       const back2 = Object.values(w.facts).find((f) => f.kind === 'arrest' && f.actor === t.id && w.now - f.t < 40 * DAY && t.jailedUntil <= w.now);
       if (back2) add('welcome', 'Welcome him back', 'He has been away.');
@@ -789,8 +799,15 @@ export function optionsRaw(w: World, p: Character, t: Character, c: Convo): DOpt
         add('terms_cut', "Offer to cut his protection fee 25%", 'Buys goodwill, costs money.');
         add('terms_raise', 'Tell him the fee is going up 25%');
       } else if (b && b.protection?.familyId !== p.familyId && t.rank === 'civilian' && !askBetween(w, 'protect', p.id, t.id, b.id)) add('suggest', 'Suggest he could use some friends', 'Opens the protection conversation.');
-      if (t.rank !== 'civilian' && t.cash >= 1500 && (t.rels[p.id]?.trust ?? 0) >= 0.4) add('borrow', 'Ask to borrow $1,000', '5% a week.');
-      if (b && t.rank === 'civilian' && p.cash >= 900 && !w.debts.some((d) => d.status === 'active' && d.debtor === t.id)) add('offer_loan', 'Offer him a loan ($500)');
+      if (t.rank !== 'civilian' && t.cash >= 1500 && (t.rels[p.id]?.trust ?? 0) >= 0.4) add('borrow', 'Ask to borrow money', 'You name the figure. He decides what he can spare, and on what terms.');
+      if (b && t.rank === 'civilian' && p.cash >= 200 && !w.debts.some((d) => d.status === 'active' && d.debtor === t.id)) add('offer_loan', 'Offer him a loan', 'You name the amount and the weekly rate. He takes it if he needs it and the terms are fair.');
+      // Stage 4: a business is bought and sold the way NPCs buy and sell (asks 'buy' and 'sell', econ.sellTo)
+      if (b && b.open && b.kind !== 'casino' && b.ownerId === t.id && !askBetween(w, 'buy', p.id, t.id, b.id)) {
+        add('buy_ask', 'Ask whether he would sell the place', 'You name a price. He answers from what it is worth and what trouble he is in.');
+        if (stakeRoom(b) >= 0.25) add('stake_ask', 'Offer to buy a piece of it', 'A quarter of the place for money down: a share of what it makes every week.');
+      }
+      { const op = w.ops.find((o) => o.owner === t.id && o.kind !== 'hijack' && o.state === 'running' && o.runner !== p.id); if (op && !t.isPlayer && t.id !== p.id && !askBetween(w, 'run', p.id, t.id)) add('run_ask', `Offer to run his ${OPS[op.kind as keyof typeof OPS]?.label.toLowerCase() ?? 'operation'}`, 'You name your cut of the take. He weighs what he thinks of you and whether he has a man on it.'); }
+      { const mine = Object.values(w.biz).find((x) => x.open && x.ownerId === p.id && x.kind !== 'casino'); if (mine && t.cash >= 1000 && !t.isPlayer && !askBetween(w, 'sell', p.id, t.id, mine.id)) add('sell_ask', `Offer him ${mine.name}`, 'You name a price. He weighs what it is worth to him and whether he has the money.'); }
       back();
       break;
     }
@@ -1185,6 +1202,11 @@ function sayOne(w: World, p: Character, t: Character, c: Convo, code: string): S
     const lines = exReply(w, p, s, k).map((l) => speechFor(w, p, t, l));
     return fresh({ lines: lines.length ? lines : [vsay(w, t, p, 'already')], minutes: 15, convo: { ...c, node: 'root', used: [...(c.used ?? []), usedKey(c, code)] } });
   }
+  if (code.startsWith('nm:')) { // a figure he has named: nm:<matter>:<amount>[:<weekly rate>]
+    const [, sid, amt, rate] = code.split(':');
+    const r = nameFigure(w, p, sid, Number(amt), rate !== undefined ? Number(rate) : undefined);
+    return fresh({ lines: ack(w, t, p, r.lines.map((l) => speechFor(w, p, t, l))), minutes: r.minutes, convo: { ...c, node: 'root' } });
+  }
   if (code.startsWith('mv:')) {
     const [, sid, mv] = code.split(':');
     const r = playerMove(w, p, sid, mv as AskMove);
@@ -1377,7 +1399,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
       lines.push(`${t.name} hesitates, then says it plainly. “Some help wouldn’t hurt.”`);
       const rows: FollowOpt[] = [];
       if (p.cash >= 200) rows.push({ code: 'help_gift', label: 'Here. $200. No questions', hint: 'He won’t forget it.', big: true });
-      if (p.cash >= 300 && (t.rank === 'civilian' || t.rank === 'associate')) rows.push({ code: 'help_loan', label: 'I can lend you $300', hint: '5% a week.', big: true });
+      if (p.cash >= 300 && (t.rank === 'civilian' || t.rank === 'associate')) rows.push({ code: 'help_loan', label: 'I can lend you something', hint: 'At a friend’s rate. You can change the amount and the rate.', big: true });
       rows.push({ code: 'deal:drop', label: 'It’ll keep. Let me think about it' });
       c.ctx.follow = rows;
       return stay('follow', 10);
@@ -1392,15 +1414,13 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
       }
       return stay('personal', 15);
     case 'help_loan': {
-      if (p.cash < 300) lines.push('You can’t spare it.');
-      else {
-        p.cash -= 300;
-        t.cash += 300;
-        const dbt = createDebt(w, p.id, t.id, 300, 0.05, 'a favour');
-        tweak(0.05, 0.03);
-        lines.push(`${t.name} takes it and shakes your hand. “${money(dbt.weeklyPayment)} a week, then, and I’ll be good for it.”`);
-      }
-      return stay('personal', 15);
+      // Stage 4: one way to lend (asks 'lend'): a friend's terms, which he can change
+      if (p.cash < 100) { lines.push('You can’t spare it.'); return stay('personal', 5); }
+      const s = openAsk(w, 'lend', p, t, { amt: Math.min(300, Math.floor(p.cash / 50) * 50), rate: 0.03, why: `${p.name} offered ${t.name} a loan as a friend` });
+      if (!s) { lines.push(`${t.name}: “Not now. But thank you.”`); return stay('personal', 5); }
+      lines.push(`You tell ${t.name.split(' ')[0]} you could lend him something, at a friend’s rate.`);
+      lines.push(`${t.name}: “How much are we talking?”`);
+      return { lines, minutes: 15, convo: { id: c.id, node: 'root', ctx: c.ctx } };
     }
     case 'welcome':
       tweak(0.06, 0.05);
@@ -1583,26 +1603,41 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
       lines.push(...playerMove(w, p, s.id, 'ask').lines);
       return { lines, minutes: 25, convo: { id: c.id, node: 'root', ctx: c.ctx } };
     }
+    case 'buy_ask': case 'stake_ask': {
+      const b = ownerBiz(w, t.id)!, share = code === 'stake_ask' ? 0.25 : undefined, full = priceOf(w, b), first = Math.round((share ? full * share : full) * 0.85 / 50) * 50;
+      const s = openAsk(w, 'buy', p, t, { biz: b.id, amt: first, share, why: `${p.name} wants to buy ${share ? 'a piece of ' : ''}${b.name}` });
+      if (!s) { lines.push(`${t.name.split(' ')[0]} has too much on his mind for that today.`); return stay('business', 10); }
+      lines.push(share ? `You ask ${t.name.split(' ')[0]} whether he would sell a quarter of ${b.name}.` : `You ask ${t.name.split(' ')[0]} whether he would sell ${b.name}.`);
+      lines.push(`${t.name}: “${share ? 'A piece? What did you have in mind?' : 'Depends what you’re offering.'}”`); // (the figure is yours to name: nm:)
+      return { lines, minutes: 25, convo: { id: c.id, node: 'root', ctx: c.ctx } };
+    }
+    case 'run_ask': {
+      const op = w.ops.find((o) => o.owner === t.id && o.kind !== 'hijack' && o.state === 'running' && o.runner !== p.id);
+      if (!op) return stay('business', 5);
+      const s = openAsk(w, 'run', p, t, { what: op.id, about: op.id, amt: 15, why: `${p.name} offered to run ${t.name}'s operation` });
+      if (!s) { lines.push(`${t.name.split(' ')[0]} has too much on his mind for that today.`); return stay('business', 10); }
+      lines.push(`You tell ${t.name.split(' ')[0]} you could run it for him.`);
+      lines.push(`${t.name}: “And what would you want for it?”`);
+      return { lines, minutes: 20, convo: { id: c.id, node: 'root', ctx: c.ctx } };
+    }
+    case 'sell_ask': {
+      const b = Object.values(w.biz).find((x) => x.open && x.ownerId === p.id && x.kind !== 'casino');
+      if (!b) return stay('business', 5);
+      const s = openAsk(w, 'sell', p, t, { biz: b.id, amt: Math.round(priceOf(w, b) * 1.1 / 50) * 50, why: `${p.name} offered ${t.name} ${b.name}` });
+      if (!s) { lines.push(`${t.name.split(' ')[0]} has too much on his mind for that today.`); return stay('business', 10); }
+      lines.push(`You tell ${t.name.split(' ')[0]} ${b.name} could be his, for the right money.`);
+      lines.push(`${t.name}: “What are you asking?”`);
+      return { lines, minutes: 25, convo: { id: c.id, node: 'root', ctx: c.ctx } };
+    }
     case 'offer_loan': {
+      // Stage 4: one way to lend (asks 'lend'): he names the amount and the rate, and the man answers from his own need
       const b = ownerBiz(w, t.id)!;
-      // He asks for what he needs, not for what you offered: a man who isn't short won't borrow, and one who is short says by how much.
-      const need = Math.max(0, Math.round((b.expense * 1.5 - b.cash) / 50) * 50);
-      const give = Math.min(500, Math.max(0, Math.round(need / 50) * 50));
-      lines.push(`You tell ${t.name.split(' ')[0]} you could lend him $500, if it would help.`);
-      if (give < 100) { lines.push(`${t.name}: “I appreciate it. I’m all right. I’d rather not owe anyone.”`); return stay('business', 15); }
-      if (give >= 500) {
-        p.cash -= 500; t.cash += 500; createDebt(w, p.id, t.id, 500, 0.05, 'a business loan');
-        lines.push(`${t.name} accepts. $100 a week, 5% interest. He shakes your hand.`);
-        tweak(0.04);
-        return stay('business', 30);
-      }
-      lines.push(`${t.name}: “That’s generous. I only need ${money(give)}. I wouldn’t take more than I need.”`);
-      c.ctx.deal = { kind: 'loan', ask: 500, offer: give, rate: 0.05 };
-      c.ctx.follow = [
-        { code: 'deal:lend', label: `Lend him ${money(give)}`, hint: '5% a week, on the book.', big: true },
-        { code: 'deal:drop', label: 'Leave it. The offer stands' },
-      ];
-      return stay('follow', 15);
+      const need = Math.max(100, Math.min(p.cash, Math.round(Math.max(500, b.expense * 1.5 - b.cash) / 50) * 50));
+      const s = openAsk(w, 'lend', p, t, { biz: b.id, amt: need, rate: 0.05, why: `${p.name} offered ${t.name} a loan` });
+      if (!s) { lines.push(`${t.name}: “I appreciate it. Not now.”`); return stay('business', 10); }
+      lines.push(`You tell ${t.name.split(' ')[0]} you could lend him something, if it would help.`);
+      lines.push(`${t.name}: “What kind of terms?”`);
+      return { lines, minutes: 20, convo: { id: c.id, node: 'root', ctx: c.ctx } };
     }
     case 'deal': {
       const dl = c.ctx.deal;
@@ -1639,21 +1674,6 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
           addFact(w, { kind: 'protection_refused', actor: t.id, victim: p.id, business: b.id, text: `${t.name} refused to pay ${p.name} more for ${b.name}.`, district: b.district }, { witnesses: [p.id] });
         }
         return stay('business', 15);
-      }
-      if (dl.kind === 'loan') {
-        if (what === 'hold') {
-          tweak(-0.03, 0, -0.02); lines.push(vsay(w, t, p, 'loan_cash'));
-          // pushing does not make him richer: the offer he made is still on the table, once
-          c.ctx.deal = dl;
-          c.ctx.follow = [{ code: 'deal:take', label: `All right, I’ll take the ${money(dl.offer!)}`, hint: `${Math.round((dl.rate ?? 0.05) * 100)}% a week. He’ll want it back on time.`, big: true }, { code: 'deal:drop', label: 'Forget it' }];
-          return stay('follow', 10);
-        }
-        const amt = dl.offer!;
-        if (what === 'lend') { p.cash -= amt; t.cash += amt; createDebt(w, p.id, t.id, amt, dl.rate ?? 0.05, 'a business loan'); lines.push(`${t.name} takes ${money(amt)} with both hands. “I’ll have it back to you, with the interest. On time.”`); tweak(0.05, 0.02, 0.01); return stay('business', 20); }
-        t.cash -= amt; p.cash += amt; createDebt(w, t.id, p.id, amt, dl.rate ?? 0.05, 'a loan to you');
-        t.memos.push({ id: 'm' + w.nextId++, t: w.now, other: p.id, kind: 'agreement', text: `You borrowed ${money(amt)} from him at ${Math.round((dl.rate ?? 0.05) * 100)}% a week.` });
-        lines.push(`${t.name} counts out ${money(amt)}. “${Math.round((dl.rate ?? 0.05) * 100)}% a week. I expect it on time.”`);
-        return stay('business', 20);
       }
       if (dl.kind === 'ext') {
         const debt = w.debts.find((x) => x.id === dl.debt && x.status === 'active');
@@ -2039,15 +2059,19 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
     case 'cr_look': {
       c.ctx.asked.push('cr_look');
       const h = lineOf(w, t);
+      // (what you found is kept with what you know about him: talk.note)
       if (t.problem && !t.problem.revealed) {
         t.problem.revealed = true;
         lines.push(`Asking round his patch, the answer comes fast: it’s ${PROBLEM_LABEL[t.problem.kind]}. He didn’t want to say, and now you know why.`);
+        note(p, t, `You looked into it: he is ${PROBLEM_LABEL[t.problem.kind]}.`);
       } else if ((p.books.flags[t.id]?.amt ?? 0) > 0) {
         lines.push(`You go through what you can see of his business. It doesn’t add up: about ${money(Math.round(p.books.flags[t.id].amt))} you can’t account for.`);
+        note(p, t, `You looked into it: about ${money(Math.round(p.books.flags[t.id].amt))} of his doesn’t add up.`);
       } else if (h) {
         lines.push(`Nobody has a bad word for him. ${h.cause ? `It checks out: ${h.cause}.` : 'The business is just thin.'}`);
+        note(p, t, `You looked into it: his business checks out${h.cause ? ` (${h.cause})` : ''}.`);
         tweak(0.02);
-      } else lines.push('Nothing turns up. He’s just having a bad run.');
+      } else { lines.push('Nothing turns up. He’s just having a bad run.'); note(p, t, 'You looked into it: nothing turned up. A bad run.'); }
       return { lines, minutes: 120, convo: { ...c } };
     }
     case 'cr_money': {

@@ -143,10 +143,15 @@ export function talkView(v: TalkV): string {
 // door to proposals, then leaving. In a subject: its name, only the answers that belong to it, and the way back. Nothing needs a
 // legend: an answer with consequences says what they are.
 function choices(v: TalkV, w: World, p: Character, t: Character): string {
-  const all = S.dopts.map((o, i) => ({ o, i })).filter((x) => !x.o.done || x.o.code.startsWith('mv:'));
+  const all = S.dopts.map((o, i) => ({ o, i })).filter((x) => !x.o.done || x.o.code.startsWith('mv:') || x.o.code.startsWith('nm:'));
   const btn = ({ o, i }: { o: DOpt; i: number }, kind: 'reply' | 'topic' | 'quiet') => {
     const tag = ''; // (V90: no labels on what an answer does to a story: what he says next shows it)
     const weight = !o.done && (o.big || (!o.code.startsWith('mv:') && /hold you to it|remember|owe|costs?|notice|risk/i.test(o.hint ?? '')));
+    // (Stage 4: a figure he names himself: the amount, and for a loan the weekly rate, then put to him)
+    if (o.amount && !o.done) {
+      const A = o.amount;
+      return `<div class="cv-c cv-${kind} cv-weight cv-fig"><b>${lk(o.label)}</b>${o.hint ? `<span>${esc(o.hint)}</span>` : ''}<div class="cv-figrow"><label>$ <input type="number" id="fig-${i}" value="${A.value}" min="${A.min}" max="${A.max}" step="${A.step}" inputmode="numeric" aria-label="Amount"></label>${A.rate ? `<label><input type="number" id="figr-${i}" value="${Math.round(A.rate.value * 100)}" min="${Math.round(A.rate.min * 100)}" max="${Math.round(A.rate.max * 100)}" step="1" inputmode="numeric" aria-label="Weekly rate"> % a week</label>` : ''}<button class="btn" data-a="sayamt:${i}">Put it to him</button></div></div>`;
+    }
     return `<button class="cv-c cv-${kind}${weight ? ' cv-weight' : ''}${o.done ? ' cv-off' : ''}" data-a="say:${i}"${o.done ? ' disabled' : ''}><b>${lk(o.label)}</b>${tag ? `<em>${tag}</em>` : ''}${o.hint && !o.fixed && (weight || kind !== 'quiet') ? `<span>${esc(o.hint)}</span>` : ''}</button>`;
   };
   const away = (x: { o: DOpt }) => x.o.code === 'root' || x.o.code === 'f:' || (x.o.nav && /^(sub:back|deal:drop)$/.test(x.o.code));

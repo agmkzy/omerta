@@ -8,7 +8,7 @@
 // shared asks engine (asks.ts: borrow, lend, join), so men negotiate instead of rolling once; and when the player is plausibly the
 // man to ask (his boss, his creditor, kin, a trusted friend, someone who knows the owner), the man comes to the player, rarely.
 import { addFact, bear, bearOn, clamp, createDebt, feel, feelAtLeast, feelAtLeastOn, feelOn, learn, money, ownerBiz, payDebt, rel, repute, restructure } from './core';
-import { INVEST_CAP, addStake, bizMove, transferBusiness, trade } from './econ';
+import { INVEST_CAP, addStake, bizMove, priceOf, sellerFloor, sellTo, stakeRoom, transferBusiness, trade } from './econ';
 import { LADDER, leaveCrew } from './rank';
 import { isRunner, members, readiness, recommend } from './career';
 import { RECRUIT_COST, recruitProspect } from './orders';
@@ -52,12 +52,7 @@ function give(from: Character, to: Character, amt: number): boolean {
   from.cash -= amt; to.cash += amt;
   return true;
 }
-export function priceOf(w: World, b: Business): number {
-  const t = trade(w, b);
-  const weekly = t.weeks >= 2 ? t.profit : b.income - b.expense;
-  return Math.max(1200, Math.round((Math.max(0, weekly) * 30 + Math.max(0, b.cash) * 0.5) / 50) * 50);
-}
-const stakeRoom = (b: Business) => 0.6 - (b.stakes ?? []).reduce((a, s) => a + s.share, 0);
+export { priceOf } from './econ';
 const owned = (w: World, id: Id) => Object.values(w.biz).filter((b) => b.open && b.ownerId === id).length;
 const debtsOf = (w: World, id: Id) => w.debts.filter((d) => d.debtor === id && d.status === 'active' && d.balance > 0);
 
@@ -205,9 +200,9 @@ function dropSit(w: World, g: Goal) {
   delete g.sit;
 }
 // He puts it to someone through the shared engine. Returns false when the engine has no room (or they settled it lately).
-function putAsk(w: World, g: Goal, c: Character, ak: string, t: Character, o: { amt?: number; why: string; line?: string; m?: Situation['m'] }): boolean {
+function putAsk(w: World, g: Goal, c: Character, ak: string, t: Character, o: { amt?: number; why: string; line?: string; m?: Situation['m']; biz?: Id; share?: number }): boolean {
   goalAsks();
-  const s = openAsk(w, ak, c, t, { amt: o.amt, why: o.why, m: { ...(o.m ?? {}), goal: g.id, ...(t.isPlayer ? { once: 1, ...(o.line ? { why: o.line } : {}) } : {}) } });
+  const s = openAsk(w, ak, c, t, { amt: o.amt, why: o.why, biz: o.biz, share: o.share, m: { ...(o.m ?? {}), goal: g.id, ...(t.isPlayer ? { once: 1, ...(o.line ? { why: o.line } : {}) } : {}) } });
   if (!s || s.terms?.by !== c.id || !isOpen(s) || s.m?.goal !== g.id) return false;
   g.sit = s.id;
   bump(w, 'npcask'); bump(w, 'npcask.' + ak);
@@ -391,16 +386,10 @@ export function stepGoal(w: World, g: Goal, c: Character) {
 
 // ---------------------------------------------------------------- business
 
-function willing(w: World, b: Business, o: Character, mode: 'buy' | 'stake'): number {
-  // the lowest fraction of the asking price he would take. Lower when he is in trouble, higher when he is doing well or is proud.
-  const owe = debtsOf(w, o.id), missed = owe.some((d) => d.missed > 0);
-  let thr = 1.08 - Math.min(0.35, b.distress * 0.1) - (o.jailedUntil > w.now ? 0.12 : 0) - (missed ? 0.12 : 0) + o.traits.greed * 0.1 + o.traits.ambition * 0.05 - (o.cash < 200 ? 0.05 : 0);
-  if (mode === 'stake') thr -= 0.12;
-  return thr;
-}
+const willing = (w: World, b: Business, o: Character, mode: 'buy' | 'stake') => sellerFloor(w, b, o, undefined, mode); // (econ.ts: the same for every buyer)
 function sellable(w: World, b: Business, c: Character, g: Goal): boolean {
   const o = w.chars[b.ownerId];
-  return b.open && b.kind !== 'casino' && !!o?.alive && !o.isPlayer && o.id !== c.id && !g.no?.includes(b.id) && !(b.managerId === c.id);
+  return b.open && b.kind !== 'casino' && !!o?.alive && o.id !== c.id && !g.no?.includes(b.id) && !(b.managerId === c.id); // (Stage 4: the player's own places too: he is asked, asks 'buy')
 }
 function reach(w: World, c: Character, o: Character): boolean {
   if (o.familyId && o.familyId === c.familyId) return true;
@@ -504,6 +493,13 @@ function businessStep(w: World, g: Goal, c: Character) {
     const style = t.greed > 0.6 ? 0.82 : t.ambition > 0.7 && t.violence > 0.5 ? 0.85 : t.caution > 0.6 ? 0.95 : 0.9;
     let offer = g.offer && g.n ? g.offer : Math.round(full * style / 50) * 50;
     if (c.cash - RESERVE < offer * 0.5) { g.stage = 'save'; g.n = 0; return later(w, g, 1); }
+    // Stage 4: the player's own place is bought the way any is sold: he is put the offer (asks 'buy') and answers it
+    if (o.isPlayer) {
+      if (g.sit) { const h = heard(w, g); if (!h) return; g.progress = h.yes ? 1 : g.progress; return h.yes ? endGoal(w, g, 'done', g.mode === 'stake' ? 'bought in' : 'bought it') : endGoal(w, g, 'failed', 'he would not sell'); }
+      if (c.cash - RESERVE < offer || !askOk(w)) { g.stage = 'save'; g.n = 0; return later(w, g, 2); }
+      if (putAsk(w, g, c, 'buy', o, { amt: offer, biz: b.id, share: g.mode === 'stake' ? g.share ?? 0.2 : undefined, why: `${c.name} wants to buy ${g.mode === 'stake' ? 'a piece of ' : ''}${b.name}`, line: `${c.name} comes to see you about ${b.name}.` })) return;
+      return endGoal(w, g, 'dropped', 'could not get to him');
+    }
     const thr = willing(w, b, o, g.mode ?? 'buy') + (rel(o, c.id).grudge * 0.2) - rel(o, c.id).trust * 0.08 + w.rng.range(-0.04, 0.04);
     bump(w, 'inter.offer');
     if (offer >= full * thr) {
@@ -570,13 +566,9 @@ function businessStep(w: World, g: Goal, c: Character) {
     const offer = g.offer ?? price;
     if (c.cash < offer || owned(w, c.id) >= MAX_OWNED && g.mode === 'buy') { g.stage = 'save'; g.n = 0; refund(w, g); return later(w, g, 1); }
     if (g.mode === 'stake' && stakeRoom(b) < (g.share ?? 0.2) - 1e-9) { g.stage = 'scout'; delete g.target; delete g.owner; return later(w, g, 1); }
-    give(c, o, offer);
-    if (g.mode === 'stake') {
-      addStake(w, b, c.id, g.share ?? 0.2, 'bought in');
-      addFact(w, { kind: 'ownership', actor: c.id, victim: o.id, business: b.id, text: `${c.name} bought a share of ${b.name} from ${o.name}.`, district: b.district }, { witnesses: [] });
-      bump(w, 'stake');
-    } else {
-      if (!transferBusiness(w, b, c.id, 'bought', `${c.name} bought ${b.name} from ${o.name}.`)) { give(o, c, offer); return endGoal(w, g, 'failed', 'the deal fell through'); }
+    if (!sellTo(w, c, b, offer, g.mode === 'stake' ? g.share ?? 0.2 : undefined)) return endGoal(w, g, 'failed', 'the deal fell through'); // (econ.ts: the one sale)
+    if (g.mode === 'stake') bump(w, 'stake');
+    else {
       if (g.fin) addStake(w, b, g.fin.by, Math.min(0.4, Math.max(0.1, Math.round(g.fin.amt / Math.max(1, offer) * 20) / 20)), 'financed');
       bump(w, 'acq');
     }

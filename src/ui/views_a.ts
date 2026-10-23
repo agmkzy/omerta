@@ -447,6 +447,12 @@ export function bizView(id: Id): string {
   if ((b.owners ?? []).length) out += `<li><span>Before that</span><span class="v">${b.owners!.map((x) => esc(w.chars[x.id]?.name ?? '?')).join(', ')}</span></li>`;
   if (known(w, o)) { const tr = trade(w, b); out += `<li><span>Trade</span><span class="v">about ${money(Math.round(tr.weeks ? tr.revenue : b.income))} a week</span></li>`; const pf = perf(w, b).notes; if (pf.length) out += `<li><span>People say</span><span class="v">${esc(pf.join(', '))}</span></li>`; }
   out += `</ul></div>`;
+  // Stage 4: your own place: who runs it (econ.setManager), and how it is sold (a price you name to a man with money)
+  if (b.ownerId === p.id && b.open) {
+    const mgr = b.managerId ? w.chars[b.managerId] : undefined;
+    const men = Object.values(w.chars).filter((c) => c.alive && c.bossId === p.id && c.id !== b.managerId).slice(0, 3);
+    out += `<div class="card"><h2>Running it</h2><p class="muted">${mgr?.alive ? `${esc(mgr.name)} runs the day-to-day. How well it is run is down to him.` : 'You run it yourself. How well it is run is down to you.'} To sell it, or a piece of it, offer it to a man with money when you talk business.</p><div class="row2">${men.map((c) => `<button class="btn" data-a="bmgr:${b.id}|${c.id}">Put ${esc(c.name.split(' ')[0])} in charge</button>`).join('')}<button class="btn" data-a="bmgr:${b.id}|hire">Hire a manager</button>${mgr ? `<button class="btn" data-a="bmgr:${b.id}|self">Run it yourself</button>` : ''}</div></div>`;
+  }
   if (prot && lateOf(b) > 0 && prot.collectorId === p.id) out += `<div class="callout bad">${esc(o.name)} is behind by ${money(owedOf(b))}. You can send a man to shake him, or go yourself.</div><div class="row2"><button class="btn danger" data-a="shake:${b.id}">Shake him myself</button><button class="btn" data-a="orders:">Send a man</button></div>`;
   out += `<div class="row2"><button class="btn primary" data-a="talk:${o.id}">${esc(whereIs(w, p, o).kind === 'shop' ? 'Walk in and talk to ' + o.name.split(' ')[0] : 'Find ' + o.name.split(' ')[0])}</button>${!prot || prot.familyId !== p.familyId ? `<button class="btn" data-a="plan:lean|${b.id}">Lean on it</button>` : `<button class="btn" data-a="plan:burgle|${b.id}">Other ideas</button>`}</div>`;
   return out;

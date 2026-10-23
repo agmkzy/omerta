@@ -1,4 +1,5 @@
 // Fixtures for the organisation and succession checks (from the V76 suite).
+import { openSeatFor, readiness } from '../../career';
 import assert from 'node:assert';
 import { advance, deserialize, serialize } from '../../engine';
 import { createWorld, EXTRA_ORGS, STANDARD_ORGS } from '../../world';
@@ -37,6 +38,8 @@ export function climb(w: World, log: string[] = []) {
     const r0 = p.rank;
     for (let d = 0; d < 400 && p.rank === r0; d++) { // (a man whose road is done still waits for a seat: career.noticeTick)
       p.lifetimeKick = 1e6; st.deeds = 999; st.kills = 9; p.standing = 90; p.heat = 0;
+      // (this is about the ceremonies, not about how long a seat takes: after two months' wait the boss makes the room he can make)
+      { const r = readiness(w, p); if (d >= 60 && r?.ready && !r.openSeat && r.to !== 'underboss' && r.to !== 'boss') { const f = w.fam[p.familyId!]; f.capBonus = { ...(f.capBonus ?? {}), [r.to]: 0 }; openSeatFor(w, f.id, r.to); } }
       for (const c of Object.values(w.chars)) if (c.alive && c.familyId === p.familyId && c.id !== p.id) { rel(c, p.id).trust = 0.9; rel(c, p.id).respect = 0.8; }
       advance(w, (Math.floor(w.now / DAY) + 1) * DAY + 13 * 60);
       for (const e of w.enc.filter((e) => e.status === 'open' && e.kind === 'promo')) { e.data?.stage === 'trial' ? trialChoose(w, p, e, e.opts![0].code) : promoChoose(w, p, e, e.opts![0].code); e.status = 'done'; }

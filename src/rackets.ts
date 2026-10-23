@@ -236,6 +236,8 @@ export function enterpriseWeek(w: World) {
     op.cause = cause;
     if (net > 0) earn(owner, net, d.src ?? op.kind);
     else owner.cash += net;
+    // the runner's agreed cut of a good week, out of the owner's pocket (Stage 4: asks 'run', work.delegate)
+    if (runner?.alive && runner.id !== owner.id && op.cut && net > 0) { const pay = Math.min(Math.max(0, owner.cash), Math.round(net * op.cut)); owner.cash -= pay; earn(runner, pay, 'cut'); }
     owner.heat = clamp(owner.heat + d.heat, 0, 1.5);
     if (owner.isPlayer && Math.abs(net) >= 1) addFact(w, { kind: 'report', actor: doer.id, minor: true, text: net < 0 ? `A bad week on the ${d.label.toLowerCase()} in ${op.district}: ${cause || 'a favourite came in'}, and ${money(-net)} went out.` : `The ${d.label.toLowerCase()} in ${op.district} brought in ${money(net)}.`, district: op.district }, { witnesses: [owner.id] });
   }

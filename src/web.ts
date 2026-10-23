@@ -20,6 +20,7 @@ import { post } from './ledger';
 import { statement } from './ledger';
 import { say, startConvo, introduced, arrive, isNavCode } from './dialogue';
 import { closeMeeting, choose as meetChoose, current as meetCurrent, openAccountsMeeting, openCrewMeeting, openFamilyMeeting, openGathering, openInduction, openSitdown } from './meetings';
+import { setManager } from './econ';
 import { giveOrder, ownJob, questionReport, recruitProspect, takeDayJob, quitDayJob, workShift } from './orders';
 import { helpMan } from './people';
 import { drinkAt, shave, sitAtClub } from './places';
@@ -325,6 +326,15 @@ function startMeeting(m: ReturnType<typeof openCrewMeeting>, fail: View = { t: '
 }
 
 function handle(a: string, v: string) {
+  // Stage 4: a figure named in a conversation goes with the choice it belongs to (dialogue.ts 'nm:')
+  if (a === 'sayamt') {
+    const o = S.dopts[Number(v)];
+    const amt = Number((document.getElementById('fig-' + v) as HTMLInputElement | null)?.value);
+    const rateEl = document.getElementById('figr-' + v) as HTMLInputElement | null;
+    if (!o || !Number.isFinite(amt)) return;
+    S.dopts[Number(v)] = { ...o, code: `${o.code}:${Math.round(amt)}${rateEl ? `:${Number(rateEl.value) / 100}` : ''}` };
+    return handle('say', v);
+  }
   const w = S.w;
   const args = v.split('|');
   if (a === 'om') return openingAct(v);
@@ -647,6 +657,12 @@ function handle(a: string, v: string) {
       if (who) return go({ t: 'plan', idx: Number(i), who });
       if (S.view.t === 'tab' && Number.isNaN(Number(i))) return;
       return go({ t: 'plan', idx: Number(i) });
+    }
+    case 'bmgr': { // Stage 4: who runs your place
+      const b = w.biz[args[0]];
+      if (!b) return;
+      const r = setManager(w, b, P(), args[1] === 'self' ? null : args[1] === 'hire' ? 'hire' : args[1]);
+      return pass(20, [r], { t: 'biz', id: b.id });
     }
     case 'doplan': {
       const o = S.planOpts[Number(args[0])];

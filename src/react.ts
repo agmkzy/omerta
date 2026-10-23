@@ -16,7 +16,7 @@ export interface Turn {
   coerced?: boolean; // a yes given out of fear
   reason?: string; // why, in his words (said the first time he refuses or puts you off)
   terms?: string; // his own terms, in his words (a counter)
-  cls?: 'demand' | 'request' | 'offer' | 'claim'; // what was asked of him (exchange.classOf)
+  cls?: 'demand' | 'request' | 'offer' | 'claim' | 'trade'; // what was asked of him (exchange.classOf)
   kind?: string; // the kind of matter (asks.ts), where it changes what a refusal sounds like
   above?: boolean; // he outranks the man asking
   claim?: string; // the reason in hand, if any (exchange.ts)
@@ -84,6 +84,8 @@ function special(turn: Turn, m: Mood): string[] | undefined {
   if (turn.ap === 'sweeten' && turn.claim && turn.claim !== 'money') return ['“It isn’t the money.”', '“You’re not listening. It isn’t about the money.”'];
   // an apology refused is not an offer declined
   if (turn.kind === 'amends') return m === 'flare' || m === 'defiant' ? ['“Sorry doesn’t cover it.”', '“That’s a start. It isn’t enough.”'] : m === 'cold' ? ['He hears you out, and says nothing for a while.'] : ['“I believe you mean it.”', '“I know you’re trying.”'];
+  // a deal turned down is a price turned down: no one is being thrown out
+  if (turn.cls === 'trade') return m === 'flare' ? ['“No. Not at that.”'] : m === 'sorry' || m === 'hurt' ? ['“I can’t do it. Not at that.”'] : ['“No.”', '“Not at that.”'];
   if (turn.cls === 'offer') return m === 'flare' ? ['“I don’t want anything from you.”'] : m === 'defiant' ? ['“I don’t need it.”', '“No.”'] : m === 'sorry' || m === 'hurt' ? ['“That’s good of you. But no.”', '“Thank you. No.”'] : ['“No, thanks.”'];
   if (turn.above) return m === 'flare' || m === 'defiant' ? ['“Don’t push your luck.”', '“Watch yourself.”'] : m === 'sorry' || m === 'hurt' ? ['“Not now.”', '“No. Not this time.”'] : ['“No.”'];
   if (turn.cls === 'request' || turn.cls === 'claim') return m === 'flare' ? ['“No. And don’t ask me again.”'] : m === 'sorry' || m === 'hurt' ? ['“I’m sorry.”', '“I wish I could.”'] : ['“No.”'];
