@@ -101,3 +101,70 @@ What the player can do, the mechanic that does it, where it lived, and where it 
   - help remembered;
   - a low offer answered with its terms, with the share changed by reply.
 - **Updated:** the debt is a conversation now, not a sub-menu (menus and conversation tests), and the "quiet man" in the subjects test is a man with something of his own.
+
+## C. The conversation screen
+
+The screen reads as an exchange between two men, not a menu with a log above it:
+- **Who said what.** What you say sits on the right, set apart and marked *You*. What he says sits under his name. Narration (what he does, where you are) is quieter than both.
+- **The thread stays in view.** The last six exchanges stay on the page; older ones fold away. A conversation never resets to an empty menu after each line.
+- **His mood under his name** ("He mostly trusts you."), from the relationship, in words.
+- **The terms on the table.** While a negotiation is the subject, the terms stand above the choices, with where he stands on them.
+- **The choices, most real first:**
+  1. what he brought up;
+  2. the matters between you (*On your mind*);
+  3. what is on his mind;
+  4. then the five ways in, as a quiet row of things you could say.
+- **Leaving stays on the page.** When a conversation ends, the last thing said stays. You go on, or open his page. You are not thrown back to the street.
+
+## D. Five sections
+
+| Section | Holds | Was |
+|---|---|---|
+| **World** | What wants you, what has happened, time passing, where you can go | Today |
+| **People** | The people at home; everyone you know, by family, pinned | Life → People |
+| **Family** | *Your men* (the crew, envelopes, orders, meetings, recruiting); *The family* (the tree, the families, the shops) | Crew; Family |
+| **Business** | *Rackets* (what is running, ways to earn); *Money* (the envelope, what is owed either way, who could use a loan, your books) | Rackets; Life → Business |
+| **Journal** | *Stories* (what you are following); *What you know* (disputes, everything seen or told) | Stories; Life → What you know |
+
+**Your page** (who you are, standing, the road, saves) opens from your portrait, in the bar on a phone and in the rail on a desktop.
+
+**Old routes still work.** A link or back-stack entry that names an old tab (rackets, crew, stories, any Life room) lands in the section and room that now holds it (`ui/sections.ts`, `LEGACY`). Lines in the game that named old tabs ("on your Today screen", "from the Crew tab") now name the new sections.
+
+## E. Every record leads to the man it concerns
+
+`talk:<id>|<matter>` goes and sees the man and opens on the matter. If the matter lives under one of the ways in, that way opens first, as if you had turned the talk to it. A man you have never met is met first, and the matter comes up once you've been introduced.
+
+| Where | Leads to |
+|---|---|
+| A business page | "Talk business with X": selling, a piece of it, a loan, protection |
+| A debt (Business → Money, and its story) | The debt conversation, either way |
+| A man who could use a loan | The offer |
+| One of your men (Family → Your men, and his story) | His money when he is short, otherwise him; his books; work |
+| A job report | "Talk it over with him" |
+| An enterprise someone runs for you | "Talk to X about the take" |
+
+## F. Noir, New York, 1970
+
+- **Type:** Franklin Gothic (Libre Franklin) for the interface, the face of the subway and the Daily News; Garamond for speech and for what you say; a typewriter (Courier Prime) for money and dates.
+- **Surfaces:** charcoal with a faint grain and a vignette; brass hairline rules after headings; a hairline frame inside cards; a darker strip for the tabs and the rail.
+- **Faces** are toned like old photographs. The masthead is set in blackletter.
+- **No gameplay changes.** Grain is off for reduced motion.
+
+## G. Acceptance
+
+| Scenario | Played in |
+|---|---|
+| 1. Financial confrontation: short envelope, why, which places, the missing money, a dated promise kept or broken | `social/threads.test.ts` |
+| 2. Business acquisition: find it, offer, countered, a better figure, own it | `economy/player.test.ts`, `social/threads.test.ts` (terms said back, replies change them) |
+| 3. Information: what happened, how he knows, who told him, who did it | `social/threads.test.ts` |
+| 4. NPC initiative: he asks for a minute, you take it how you like | `social/conversation.test.ts`, `dialogue/regressions.test.ts` |
+| 5. Relationship continuity: help remembered; a claim held to | `social/threads.test.ts` |
+| 6. Organisational work: a job's report as a conversation | `social/acceptance.test.ts` |
+| 7. Contextual discovery: every link on the crew, money and business screens leads to an option in his conversation | `social/acceptance.test.ts` |
+
+**Played in the browser at desktop (1280) and phone (375) widths:**
+- **Ending a conversation:** it stayed on the page. A duplicated closing line was found and removed.
+- **The five sections:** each opens, and each room is reachable.
+- **Money → a debt → "See him":** opened on the debt with its sums and its eight replies.
+- **A business page → "Talk business" with a stranger:** introduced first, then business, with buying and a piece of the place offered. That path was broken before this pass, so the matter now waits for the introduction.
+- **No horizontal scroll** on a phone.
