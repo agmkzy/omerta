@@ -22,6 +22,7 @@ import { addEnc, addFavour } from './encounters';
 import { agencyOf, goalHooks } from './goals';
 import { closeKin, kinTie, madeKin } from './kin';
 import { LADDER } from './rank';
+import { treasuryMove } from './orgs';
 import { claim, closeSit, commonSuper, isOpen, know, registerStep, spawn, tell } from './situ';
 import { Character, DAY, Enc, Fact, Id, Situation, SitKind, WEEK, World } from './types';
 
@@ -341,10 +342,11 @@ function arrestStep(w: World, s: Situation) {
   const c = live(w, role(s, 'held')), boss = live(w, role(s, 'boss'));
   if (!c || !boss) return closeSit(w, s, 'gone', [], 8);
   if (s.phase === 'held') {
+    if (c.jailedUntil > w.now && !num(s, 'lawyer')) lawyer(w, s, c, boss);
     if (c.jailedUntil > w.now) return at(w, s, 'held', Math.max(1, (c.jailedUntil - w.now) / DAY));
     tell(w, s, `${c.name} is back on the street.`, { actor: c.id, broadcast: [boss.id], minor: true });
-    // out too quickly is a question in itself
-    M(s).quick = w.now - s.since < 6 * DAY ? 1 : 0;
+    // out too quickly is a question in itself (unless everyone knows the family's lawyer got him out)
+    M(s).quick = w.now - s.since < 6 * DAY && !num(s, 'lawyer') ? 1 : 0;
     return at(w, s, 'out', 2);
   }
   const talked = s.truth === 'talked';
@@ -383,6 +385,19 @@ function arrestStep(w: World, s: Situation) {
   if (s.phase === 'questioned') { // the player did not answer: silence reads badly
     M(s).doubted = 1; return at(w, s, 'doubt', 2);
   }
+}
+// Stage 4 (money with a purpose): a made man inside is the family's to look after. The fund pays a lawyer, and the lawyer earns his
+// money: the time is cut. An associate isn't the family's yet; a fund that can't cover it can't.
+const LAWYER: Record<string, number> = { soldier: 400, capo: 800, underboss: 1500, boss: 2500 };
+function lawyer(w: World, s: Situation, c: Character, boss: Character) {
+  M(s).lawyer = 1;
+  const fee = LAWYER[c.rank], fam = c.familyId ? w.fam[c.familyId] : undefined, left = c.jailedUntil - w.now;
+  if (!fee || !fam || (fam.treasury ?? 0) < fee || left < 4 * DAY) return;
+  const payer = live(w, fam.bossId) ?? boss;
+  if (-treasuryMove(w, fam.id, payer, -fee, `a lawyer for ${c.name}`) < fee) return; // (out of the fund comes back negative; the fund was checked above)
+  payer.cash -= fee; payer.books.expenses += fee;
+  c.jailedUntil = w.now + Math.round(left * 0.5);
+  tell(w, s, `The family's lawyer took ${c.name}'s case. ${money(fee)} out of the fund, and half his time off.`, { actor: payer.id, victim: c.id, broadcast: [c.id, boss.id, payer.id], minor: false });
 }
 function clear(w: World, s: Situation, c: Character, boss: Character) {
   if (c.isPlayer) { regard(w, boss, c, 'respect', 0.06, 'kept-quiet'); repute(w, c, 2, 'kept-quiet'); }

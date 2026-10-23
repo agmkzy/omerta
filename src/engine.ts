@@ -185,26 +185,8 @@ function weekly(w: World) {
     c.books.expenses += LIVING[c.rank] + lux;
   }
 
-  // obligations: the life asks for money. Nobody in the family is ever just left alone with his cash.
-  const pl = w.playerId ? w.chars[w.playerId] : null;
-  if (pl && pl.alive && rng.chance(0.3)) {
-    const scale = { civilian: 1, associate: 1, soldier: 1.6, capo: 3, underboss: 5, boss: 8 }[pl.rank] ?? 1;
-    const O = [
-      ['A wedding. You give the envelope, and it had better be thick.', 150],
-      ['A wake. Somebody’s father. You pay for the flowers and a Mass card.', 120],
-      ['A lawyer’s retainer for a friend of the family who got pinched.', 250],
-      ['A christening. The godfather wasn’t you, but you’re expected.', 100],
-      ['A feast-day collection for the parish. The old men watch who gives what.', 80],
-      ['A man you know needs bail money and has nobody else.', 300],
-    ] as const;
-    const [txt, base] = rng.pick(O as unknown as [string, number][]);
-    const amt = Math.round(base * scale / 10) * 10;
-    if (pl.cash >= amt) {
-      pl.cash -= amt;
-      pl.books.expenses += amt;
-      addFact(w, { kind: 'report', actor: pl.id, minor: true, text: `${txt} It cost ${money(amt)}.` }, { witnesses: [pl.id] });
-    }
-  }
+  // (Stage 4: the player's random weekly "obligations" are gone. What the life asks of him is what it asks of every made man: dues to
+  // the family fund (orgs.treasuryWeek), which pays for lawyers (matters.ts), men inside, and debts it clears for men it trusts.)
 
   // kick-ups: everyone declares, passes a share up, and superiors compare notes (see books.ts)
   peopleWeek(w);

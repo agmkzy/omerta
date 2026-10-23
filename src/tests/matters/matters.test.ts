@@ -241,7 +241,7 @@ ok('the player can raise a matter in conversation in its own terms, and doing so
 
 ok('anyone can be worth talking to: ordinary men have things on their minds, and they differ from man to man', () => {
   const w = createWorld(3, 'Tony Marino'); advance(w, w.now + 20 * DAY);
-  const p = P(w), men = Object.values(w.chars).filter((c) => c.alive && !c.isPlayer).slice(0, 80);
+  const p = P(w), men = Object.values(w.chars).filter((c) => c.alive && !c.isPlayer); // (everyone in town: shopkeepers as well as the men of the families)
   for (const m of men) { rel(m, p.id).trust = Math.max(rel(m, p.id).trust, 0.5); (p.intro ??= {})[m.id] = w.now; }
   const keys = new Set<string>(); let withSome = 0;
   for (const m of men) { const ss = subjectsOf(w, p, m); if (ss.length) withSome++; for (const s of ss) keys.add(s.key.split(':')[0]); }

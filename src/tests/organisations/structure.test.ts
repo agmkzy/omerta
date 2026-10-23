@@ -6,7 +6,8 @@ import { DAYS, SEEDS } from '../modes';
 import { advance, deserialize, serialize } from '../../engine';
 import { createWorld } from '../../world';
 import { DAY } from '../../types';
-import { handleDeath } from '../../core';
+import { createDebt, handleDeath, rel } from '../../core';
+import { jail } from '../../jobs';
 import { applyRank } from '../../rank';
 import { moneyTotal } from '../../goals';
 import { promote } from '../../career';
@@ -58,6 +59,36 @@ describe('organisations', () => {
     const ex = rank(w, A.id, 'soldier')[0]; leave(w, ex, 'expel', 'test'); clean(w, 'expel'); assert.equal(ex.rank, 'civilian'); assert.equal(ex.familyId, null);
     const ret = rank(w, A.id, 'capo')[0]; leave(w, ret, 'retire', 'test'); clean(w, 'retire');
     const newbies = Object.values(w.chars).filter((c) => c.alive && c.rank === 'civilian' && !c.familyId).slice(0, 1); assert.ok(newbies.length);
+  });
+  // Stage 4, increment 6: the fund is spent on what the family needs, and the player pays in like any made man
+  ok('the fund clears an outside debt going bad for a made man the boss trusts, and he owes the boss for it; money is conserved', { tags: ['scenario'] }, () => {
+    const w = orgWorld(3, 60, 5), f = other(w), lead = leaderOf(w, f.id)!;
+    const c = rank(w, f.id, 'soldier')[0], out = Object.values(w.chars).find((x) => x.alive && x.familyId !== f.id && x.rank === 'civilian')!;
+    rel(lead, c.id).trust = 0.8; f.treasury = (f.treasury ?? 0) + 5000; f.tin = (f.tin ?? 0) + 5000; c.cash = 0;
+    const d = createDebt(w, out.id, c.id, 600, 0.05, 'a private loan'); d.missed = 2;
+    const m = moneyTotal(w), fav = w.favours.length;
+    treasuryWeek(w);
+    assert.equal(d.status, 'paid', 'the debt is cleared');
+    assert.equal(moneyTotal(w), m, 'only moved'); assert.equal(treasuryCheck(f), 0);
+    assert.ok(w.favours.length > fav && w.favours.at(-1)!.to === c.id && w.favours.at(-1)!.from === lead.id, 'and he owes the boss');
+  });
+  ok('a made man arrested gets the family\'s lawyer when the fund can pay, and his time is cut; an associate does not', { tags: ['scenario'] }, () => {
+    const w = orgWorld(3, 60, 5), f = other(w);
+    f.treasury = (f.treasury ?? 0) + 5000; f.tin = (f.tin ?? 0) + 5000;
+    const c = rank(w, f.id, 'soldier').find((x) => x.jailedUntil <= w.now)!, a = rank(w, f.id, 'associate').find((x) => x.jailedUntil <= w.now && x.bossId)!;
+    jail(w, c, 30); jail(w, a, 30);
+    const t0 = f.treasury!;
+    advance(w, w.now + 3 * DAY);
+    assert.ok(c.jailedUntil < w.now + 26 * DAY, 'his time was cut');
+    assert.ok(f.treasury! <= t0 - 400 || (f.tlog ?? []).some((l) => /lawyer for/.test(l.why)), 'out of the fund');
+    assert.ok(a.jailedUntil > w.now + 25 * DAY, 'an associate is not the family\'s yet');
+  });
+  ok('the player pays dues to the fund like any made man', { tags: ['scenario'] }, () => {
+    const w = orgWorld(3, 60, 5), p = P(w), f = w.fam[p.familyId!];
+    applyRank(w, p, 'soldier'); p.cash = 4500; p.jailedUntil = 0;
+    const t0 = f.treasury ?? 0;
+    treasuryWeek(w);
+    assert.ok((f.treasury ?? 0) > t0 && p.cash < 4500, 'his dues went in');
   });
   ok('5/6. the treasury reconciles, money is conserved, men inside are supported from it', { tags: ['scenario'] }, () => {
     const w = orgWorld(3, 60, 5); for (const f of orgList(w)) assert.equal(treasuryCheck(f), 0, f.name);

@@ -11,8 +11,9 @@
 //   * relations: cooperation / competition / grievance between organisations as persistent state that the world reads back
 // Nothing in here knows how many organisations there are or what any of them is called.
 import { temper } from './temper';
-import { addFact, bear, clamp, feel, feelOn, feelTo, recordCareer, rel, repute } from './core';
-import { applyRank, rankIdx, repairHierarchy, WAGE } from './rank';
+import { addFact, bear, clamp, feel, feelOn, feelTo, money, payDebt, peek, recordCareer, rel, repute } from './core';
+import { addFavour } from './encounters';
+import { applyRank, LADDER, rankIdx, repairHierarchy, WAGE } from './rank';
 import { ensureClubs, clubOf } from './clubdata';
 import { Character, DAY, Family, Id, OrgRel, Rank, WEEK, World } from './types';
 
@@ -90,9 +91,9 @@ export function treasuryWeek(w: World) {
     // income from subordinates: a small tithe on what a made man holds above his floor
     for (const c of ms) {
       const floor = DUES_FLOOR[c.rank];
-      if (!floor || c.isPlayer || c.jailedUntil > w.now) continue;
+      if (!floor || c.jailedUntil > w.now) continue;
       const due = Math.round(Math.min(c.cash - floor, 3000) * 0.03);
-      if (due >= 10) treasuryMove(w, f.id, c, due, `dues from ${c.name}`);
+      if (due >= 10 && treasuryMove(w, f.id, c, due, `dues from ${c.name}`) && c.isPlayer) addFact(w, { kind: 'report', actor: c.id, minor: true, text: `Your dues to the family fund this week: ${money(due)}.`, district: c.district }, { witnesses: [c.id] });
     }
     // a rich boss puts something in of his own
     if (lead && !lead.isPlayer && lead.cash > 20000) treasuryMove(w, f.id, lead, Math.min(1500, Math.round((lead.cash - 20000) * 0.08)), `${lead.name} puts in`);
@@ -108,6 +109,19 @@ export function treasuryWeek(w: World) {
     if (short && lead) {
       for (const c of ms) if (c.id !== lead.id && !c.isPlayer && c.rank !== 'associate') feel(w, c, lead.id, 'trust', -(0.004 * short));
       if (!(f.hist ?? []).some((h) => h.kind === 'fund' && w.now - h.t < 8 * WEEK)) logOrg(w, f.id, 'fund', `The fund could not cover the men inside. Their families noticed.`);
+    }
+    // Stage 4 (money with a purpose): a made man who is going under to someone outside the family is not left to it. If the man at the
+    // top trusts him, the fund clears the debt before it goes bad, and the man owes him for it (a favour, which is called in later).
+    if (lead && !lead.isPlayer) for (const d of w.debts) {
+      if (d.status !== 'active' || d.missed < 2) continue;
+      const c = w.chars[d.debtor], cr = w.chars[d.creditor];
+      if (!c?.alive || c.familyId !== f.id || LADDER.indexOf(c.rank) < 1 || !cr || cr.familyId === f.id || c.id === lead.id) continue;
+      if (d.balance > (f.treasury ?? 0) * 0.25 || peek(lead, c.id).trust < 0.4) continue;
+      const got = -treasuryMove(w, f.id, c, -d.balance, `${c.name}'s debt to ${cr.name}`); // (out of the fund comes back negative)
+      if (got <= 0) continue;
+      payDebt(w, d, got);
+      addFavour(w, lead.id, c.id, 2, `the family cleared his debt to ${cr.name}`);
+      addFact(w, { kind: 'report', actor: lead.id, victim: c.id, amount: got, text: `The ${f.name} family cleared ${money(got)} ${c.name} owed ${cr.name}. He owes ${lead.name} for it.`, district: c.district }, { witnesses: [lead.id, c.id, cr.id] });
     }
     // a greedy NPC leader helps himself when the fund runs fat
     if (lead && !lead.isPlayer && lead.traits.greed > 0.65 && (f.treasury ?? 0) > 15000) {

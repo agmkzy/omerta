@@ -516,3 +516,38 @@ The climb-to-boss tests now let the player wait for a seat.
 - **Promotions:** 29–35 (associate → soldier 16–25, soldier → captain 8–12, a few to the top). Before: 33–55.
 - **Captains:** 13 → 18–21 as families grow.
 - **Consistency and ledger problems:** 0.
+
+### Increment 6: money with a purpose
+
+**Audit of where money comes in and goes out:**
+- **In:** business takings, enterprises, protection, loans repaid, wages.
+- **Out:** living costs and lifestyle, which are charged to everyone each week and are money spent into the wider city.
+- **Through the families:** dues into the family fund; support for men inside out of it.
+
+Three things were wrong:
+1. **The family fund was spent on almost nothing.** Only men inside were supported, and a greedy boss helped himself.
+2. **The player paid no dues** where every other made man did.
+3. **Instead, the player paid random weekly "obligations"** (a wedding, a wake, a lawyer, bail) that came from nothing in the world. That's the invented expense the brief rules out.
+
+**Changes:**
+- **The family lawyer** (`matters.ts`, in the existing arrest matter). While a made man is held, the fund pays a lawyer by rank ($400 for a soldier up to $2,500 for a boss), and the lawyer earns it: the time is cut in half. An early release the family paid for isn't treated as suspicious, the way an unexplained quick release is. An associate isn't the family's yet, and a fund that can't cover it can't.
+- **A trusted man's outside debt** (`orgs.treasuryWeek`). A made man going under to someone outside the family isn't left to it. If the boss trusts him, the fund clears the debt before it defaults, and the man owes the boss a favour for it (`addFavour`), which is called in later. Money is only moved.
+- **Dues are the same for every made man, the player included.** His dues appear in his week.
+- **The random player-only obligations are deleted.**
+
+**Tests** (`organisations/structure.test.ts`):
+- the fund clears a trusted man's outside debt and he owes the boss, with money conserved;
+- an arrested made man gets the lawyer and his time is cut, while an associate doesn't;
+- the player pays dues.
+
+**One test now looks at everyone in town.** A test about ordinary men's conversation subjects had only looked at the first 80 people in the list, all men of the families. With fewer shops under pressure it found too few kinds of subject.
+
+**Two years, four worlds:**
+- **Lawyers paid for:** 9–15 per world.
+- **Outside debts cleared:** 3–13.
+- **Defaults:** 25–54 (increments 1–2: 46–82).
+- **Promotions:** 29–42.
+- **Consistency and ledger problems:** 0.
+- **Saves:** 7.0–7.7 MB.
+
+**Open: family funds still build up,** to $30,000–55,000 a family at two years. The fund now spends on real needs, but those needs are fewer than the dues coming in. I haven't invented spending. A boss putting fund money behind his captains' enterprises, or into a war, would be the natural next use, and belongs with the leadership decisions of later work.
