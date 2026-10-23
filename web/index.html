@@ -2,7 +2,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&family=Old+Standard+TT:ital,wght@0,400;0,700;1,400&family=UnifrakturCook:wght@700&family=Public+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&family=Old+Standard+TT:ital,wght@0,400;0,700;1,400&family=UnifrakturCook:wght@700&family=Public+Sans:wght@400;500;600;700&family=Libre+Franklin:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Courier+Prime:wght@400;700&display=swap">
 <style>
 /* ===================================================================== the game
    One dark identity from the V86 opening (--om-* tokens, defined below). The in-game palette is expressed in those terms;
@@ -17,8 +17,9 @@
   --f0: #7fb0cf; --f1: #d3a06a; --f2: #b09ad6; --f3: #7fc0a3; --f4: #d68c9a; --fx: #a0978a;
   --accent: var(--brass-2);
   --display: "Cormorant Garamond", "Cormorant", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
-  --body: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --body: "Libre Franklin", "Franklin Gothic Book", "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --r: 4px;
+  --type: "Courier Prime", "Courier New", ui-monospace, monospace; /* the overhaul: typewritten figures, as on a ledger or a police file */
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -956,6 +957,43 @@ body.om-open #app { max-width: none; padding: 0; }
 @media (min-width: 900px) { .lf-phone { display: none !important; } } /* the rail says these on desktop */
 .lf-tags { font-weight: 400 !important; font-size: 12.5px; color: var(--muted) !important; }
 @media (max-width: 420px) { .lf-heard li { flex-direction: column; gap: 2px; } .lf-me .avatar.pt { width: 76px; height: 76px; } .lf-me h1 { font-size: 30px; } }
+
+/* ===================================================================== the overhaul, increment F: noir, New York, 1970
+   Franklin Gothic for the street (the subway, the Daily News), Garamond for what men say, a typewriter for money and dates.
+   Charcoal and smoke, a little grain, a vignette at the edges; brass hairlines like the frame on a hotel lobby mirror. */
+body { background:
+    radial-gradient(ellipse 120% 90% at 50% 0%, rgba(201, 164, 102, .055), transparent 60%),
+    radial-gradient(ellipse 140% 120% at 50% 50%, transparent 55%, rgba(0, 0, 0, .55) 100%),
+    var(--bg); background-attachment: fixed; }
+body::before { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: .07; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+#app { position: relative; z-index: 1; }
+/* headings: a brass rule after the words, like a menu at the Copa */
+h2.sect { font-weight: 500; letter-spacing: .01em; }
+h2.sect::after { content: ''; flex: 1; order: 1; height: 1px; margin: 0 2px; align-self: center; background: linear-gradient(90deg, rgba(201, 164, 102, .45), transparent); }
+h2.sect small { order: 2; }
+.card h2, .lf-h small, h2.sect small, .st-h small { font-family: var(--body); }
+/* cards: a hairline inside the edge */
+.card { background: linear-gradient(180deg, rgba(255, 244, 222, .018), transparent 40%), var(--card); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .35), inset 0 0 0 4px var(--card), inset 0 0 0 5px rgba(201, 164, 102, .07); }
+.opt { box-shadow: inset 0 1px 0 rgba(255, 244, 222, .03); }
+.opt:hover { border-color: rgba(201, 164, 102, .35); }
+/* figures: typed */
+.g-cash, .g-status__cash { font-family: var(--type); font-weight: 700; letter-spacing: -.01em; }
+.g-status__cash { font-size: 30px; }
+.g-cash { font-size: 19px; }
+.g-when, .g-status__when { font-family: var(--type); font-weight: 400; letter-spacing: 0; }
+/* faces: old photographs */
+.avatar.pt svg { filter: sepia(.28) saturate(.82) contrast(1.04); }
+.g-brand { font-family: "UnifrakturCook", var(--display); letter-spacing: .02em; text-transform: none; font-size: 26px; color: var(--brass-2); }
+/* speech is set in the book face; narration stays quiet */
+.cv-you { font-family: var(--display); font-size: 17px; font-weight: 500; }
+.cv-way { font-family: var(--display); font-size: 16.5px; }
+/* the bottom tabs and the rail: a darker strip with a brass hairline */
+.tabs { background: linear-gradient(180deg, rgba(18, 17, 16, .96), #0b0a09); border-top: 1px solid rgba(201, 164, 102, .18); }
+.g-rail { background: linear-gradient(180deg, #0f0e0d, #0b0a09); border-right: 1px solid rgba(201, 164, 102, .12); }
+.g-nav__item.on, .tabs button.on { color: var(--brass-2); }
+.btn.primary { background: linear-gradient(180deg, var(--wine-2), var(--wine)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 1px 0 rgba(0, 0, 0, .4); }
+@media (prefers-reduced-motion: reduce) { body::before { display: none; } }
 </style>
 <div id="app"></div>
 <script type="module" src="./main.ts"></script>
