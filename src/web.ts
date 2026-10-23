@@ -20,7 +20,7 @@ import { post } from './ledger';
 import { statement } from './ledger';
 import { say, startConvo, introduced, arrive, isNavCode } from './dialogue';
 import { closeMeeting, choose as meetChoose, current as meetCurrent, openAccountsMeeting, openCrewMeeting, openFamilyMeeting, openGathering, openInduction, openSitdown } from './meetings';
-import { giveOrder, questionReport, recruitProspect, takeDayJob, quitDayJob, workShift } from './orders';
+import { giveOrder, ownJob, questionReport, recruitProspect, takeDayJob, quitDayJob, workShift } from './orders';
 import { helpMan } from './people';
 import { drinkAt, shave, sitAtClub } from './places';
 import { toggleTag, togglePin } from './notebook';
@@ -652,9 +652,7 @@ function handle(a: string, v: string) {
       const o = S.planOpts[Number(args[0])];
       if (!o) return;
       if (args[1] === 'me') {
-        const j = o.make(w.playerId!);
-        j.status = 'active';
-        j.assignee = w.playerId!;
+        const j = ownJob(w, P(), o);
         S.stack = [];
         S.view = { t: 'approach', id: j.id };
         S.stack.push({ t: 'tab', name: 'rackets' });
@@ -670,8 +668,7 @@ function handle(a: string, v: string) {
       const list = require_plan();
       const i = list.findIndex((o) => o.label.startsWith('Shake') && o.label.includes(w.chars[b.ownerId].name));
       if (i >= 0) {
-        const j = list[i].make(w.playerId!);
-        j.status = 'active';
+        const j = ownJob(w, P(), list[i]);
         S.view = { t: 'approach', id: j.id };
       }
       return;

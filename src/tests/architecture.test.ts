@@ -44,6 +44,16 @@ describe('architecture', { tags: ['architecture'] }, () => {
     }
     assert.deepEqual(bad, []);
   });
+  ok('work has one door: orders, and a superior\'s routine work, are given only through work.ts', () => {
+    // (work.giveWork for every superior, the player's own orders included; orders.ownJob is the player doing a piece of it himself.
+    // Summonses, a sit-down's verdict and a boss's private matter are other business, and a deal between equals goes 'tip'.)
+    const bad: string[] = [];
+    const dir = fileURLToPath(new URL('../', import.meta.url));
+    for (const f of readdirSync(dir).filter((x) => x.endsWith('.ts') && !['work.ts', 'orders.ts', 'types.ts'].includes(x))) {
+      readFileSync(dir + f, 'utf8').split('\n').forEach((l, i) => { if (/mkJob\(/.test(l) && (/via: 'order'/.test(l) || (/via: 'boss'/.test(l) && /kind: '(collect|shake|lean|guard|fix)'/.test(l)))) bad.push(`${f}:${i + 1}`); });
+    }
+    assert.deepEqual(bad, []);
+  });
   ok('grudges and reputation have one door each: no source line sets .grudge or .standing outside core.ts', () => {
     // (core.bear/ease for grudges, which keep the reason with them; core.repute for anyone's standing. world.ts sets the first value.)
     const bad: string[] = [];

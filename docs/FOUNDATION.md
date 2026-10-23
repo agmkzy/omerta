@@ -404,3 +404,62 @@ The daily scan in which every associate and soldier considered every open shop i
 
 - **Refusals halved, with the same number of deals.** Less violence followed: fewer smashed shops, fewer shops taken from another man, fewer beatings. Nothing was capped.
 - **Still 10–13 refusals per deal.** A first approach to a shop that won't pay is still the commonest way a book grows, and refusing is still what most shopkeepers do first. Increment 4 adds the other purpose, a captain sending a man, and with it the record of who was sent where.
+
+### Increment 4: work down the hierarchy
+
+**One way for a superior to give a man work** (`work.ts`), for an NPC captain sending a soldier, the player's boss sending the player, and the player sending his own crew.
+
+- **What a superior needs done is read from his affairs** (`work.needsOf`), most pressing first:
+  - money owed him that has stopped coming;
+  - shops on his book that are behind;
+  - one of his men inside;
+  - a man who hurt him or one of his men, that he knows of;
+  - an unpaid shop in his crew's ground (the captain's instruction that increment 3 left for this one);
+  - a shop of his that has had trouble.
+
+  No need, no job. Nothing is made up to keep men busy.
+- **He gives it to one of his men** (`work.pickMan`, `work.giveWork`): someone free, suited to the work and trusted with it.
+  - The player is one of his superior's men like any other. He gets the work as an offer he can take or turn down.
+  - An NPC may refuse a superior he holds something against or doesn't rate, or rough work that isn't in him. A refusal is recorded, and his superior holds it against him, with the reason.
+- **The work runs through the order model** (`orders.ts`), as the player's orders always did. A man may do it well, botch it, skim, gamble the money away, show mercy, start a fight, or come back with a story that isn't true. Money collected goes to the man who sent him, less the man's cut.
+- **The superior weighs the report** (`work.judge`). A careful man checks, and he can see money owed him that didn't arrive. A lie found out is:
+  - a grudge with its reason;
+  - a fall in trust;
+  - a disciplinary event the world hears of;
+  - money taken back.
+
+  An honest report is taken as it comes. (The player questions his own men himself, as before.)
+- **Delegated management** (`work.delegate`). A captain or above puts one of his men in charge of his enterprises. Now and then he counts the take, more often if he's careful or the take has fallen. A runner found skimming is fired, made to pay it back, or warned, by the owner's temperament, and it's on the record.
+- **Whose business it is.** Work NPCs give each other uses the same records but never appears in the player's lists (`jobs.playerSide`).
+
+**What was deleted or replaced:**
+- **The boss's player-only lists.** `bossOffer` had its own debts and shops; it now offers the boss's real needs, or a private matter of his own.
+- **`bossErrand`'s random envelopes, messages and tails:** work made up to fill time.
+- **`pulse.ts`'s "rights" offer,** which handed the player protection over shops without asking their owners.
+- **The boss's slot in the random daily offers.** A superior's work now comes through the same weekly hand-out as everyone's, or when the player asks.
+
+**Found and fixed along the way:**
+- **Money collected on a shake was also charged to the man who gave the order.** It went unnoticed because only the player gave orders.
+- **Collections repeated weekly.** A superior kept sending a man every week to a debtor with nothing. After sending someone, he now waits three weeks.
+- **A quiet word was counted as a failure.** For the man sent, it's done once said; the answer is the other man's to give.
+- **Two enterprise labels read "the a car-stealing outfit".**
+
+**Tests** (`hierarchy/work.test.ts`, and one in `architecture.test.ts`):
+- needs come from a superior's affairs;
+- a captain gives work, which is carried out and reported;
+- the player is offered what his boss really needs;
+- a man who hates his captain often refuses, on the record;
+- a careful superior catches lies;
+- enterprises are delegated and a short count is found out;
+- the player's orders come from the same list;
+- orders and a superior's routine work have one door.
+
+**Two years, four worlds:**
+- **Work handed down by NPC superiors:** 800–1,000 pieces per world.
+- **Refusals:** 17–79.
+- **Lies caught:** 36–52.
+- **Enterprises delegated:** 16–36.
+- **Promotions:** 33–55.
+- **Consistency and ledger problems:** 0.
+- **Saves:** 8.1–8.8 MB.
+- **Most of what comes to nothing is collection from men with nothing to pay,** whose debts then run on to default. That's believable, and the repeat visits are fixed.

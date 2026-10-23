@@ -3,7 +3,8 @@
 import { lineOf } from './rackets';
 import { temper } from './temper';
 import { bizMove } from './econ';
-import { ERRAND_KINDS, bossErrand, resolveErrand, runCrewJob } from './orders';
+import { ERRAND_KINDS, resolveErrand, runCrewJob } from './orders';
+import { giveWork, judge, needsOf } from './work';
 import { aptitude, grow, lateOf } from './people';
 import { arch, bossWhy, dodge, injury, pitch, whyOf } from './voice';
 import { confide, perform, share, tension } from './actions';
@@ -118,8 +119,9 @@ export function jail(w: World, c: Character, days: number) {
   addFact(w, { kind: 'arrest', actor: c.id, text: `${c.name} was arrested.`, district: c.district }, { broadcast: kin });
 }
 
-// Pays the doer (the player keeps all of it; a crew man keeps 35% and the rest comes to you).
-export function paid(w: World, doer: Character, amount: number, from?: Character, src = 'scheme'): number {
+// Pays the doer (the player keeps all of it; a man sent by someone keeps 35% and the rest goes to the man who sent him: you, or an
+// NPC superior who gave the order).
+export function paid(w: World, doer: Character, amount: number, from?: Character, src = 'scheme', boss?: Character): number {
   let amt = Math.max(0, Math.round(amount));
   if (from) {
     const b = ownerBiz(w, from.id);
@@ -134,7 +136,7 @@ export function paid(w: World, doer: Character, amount: number, from?: Character
   else {
     const mine = Math.round(amt * 0.35);
     earn(doer, mine, 'cut');
-    earn(p, amt - mine, 'delegated');
+    earn(boss ?? p, amt - mine, 'delegated');
   }
   return amt;
 }
@@ -143,41 +145,17 @@ export function paid(w: World, doer: Character, amount: number, from?: Character
 
 const hasOpenFrom = (w: World, giver: Id, kind: Job['kind']) => w.jobs.some((j) => j.giver === giver && j.kind === kind && (j.status === 'offered' || j.status === 'active'));
 
+// The player asks his superior for work, or his superior has some for him: what is offered is what the superior actually needs done
+// (work.needsOf, the same list every superior hands out from), or a matter of his own he wants handled.
 export function bossOffer(w: World, force = false): boolean {
   const p = PL(w);
   const boss = p.bossId ? w.chars[p.bossId] : undefined;
   if (!boss || !boss.alive || !p.familyId) return false;
   if (!force && w.jobs.some((j) => j.via === 'boss' && (j.status === 'offered' || j.status === 'active'))) return false;
   if (force && w.jobs.some((j) => j.via === 'boss' && j.status === 'offered')) return false;
-  const fam = w.fam[p.familyId];
   const options: (() => void)[] = [];
-
-  const debts = w.debts.filter((d) => d.status === 'active' && d.creditor === boss.id && d.missed >= 1 && w.chars[d.debtor]?.alive && d.debtor !== p.id && !w.jobs.some((j) => j.debt === d.id && (j.status === 'offered' || j.status === 'active')));
-  if (debts.length)
-    options.push(() => {
-      const d = w.rng.pick(debts);
-      const t = w.chars[d.debtor];
-      mkJob(w, { kind: 'collect', title: `Collect from ${t.name}`, brief: `${boss.name} is owed ${money(d.balance)} by ${t.name}, who has missed ${d.missed} payment${d.missed > 1 ? 's' : ''}. Get the money. You keep a quarter of whatever you bring in.`, giver: boss.id, via: 'boss', assignee: p.id, target: t.id, debt: d.id, pay: 0 });
-    });
-
-  const shops = Object.values(w.biz).filter((b) => b.open && b.kind !== 'casino' && b.protection?.familyId !== p.familyId && fam.districts.includes(b.district) && (b.lastApproach === undefined || w.now - b.lastApproach > 7 * DAY) && w.chars[b.ownerId]?.alive);
-  if (shops.length)
-    options.push(() => {
-      const b = w.rng.pick(shops);
-      const o = w.chars[b.ownerId];
-      const rival = b.protection ? ` It pays ${w.chars[b.protection.collectorId]?.name ?? 'someone'} of the ${w.fam[b.protection.familyId].name} family today, and that won’t go unnoticed.` : ' Nobody’s looking after it yet.';
-      mkJob(w, { kind: 'lean', title: `Bring ${b.name} under the family`, brief: `${boss.name} wants ${b.name} in ${b.district} paying the ${fam.name} family. ${o.name} owns it.${rival}`, giver: boss.id, via: 'boss', assignee: p.id, target: o.id, biz: b.id, pay: 120 + Math.round(b.income / 200) * 10 });
-    });
-
-  const wronged = Object.keys(boss.known)
-    .map((id) => ({ f: w.facts[id], k: boss.known[id] }))
-    .filter(({ f, k }) => f && ['beating', 'vandalism', 'robbery', 'poach'].includes(f.kind) && w.now - f.t < 20 * DAY && f.victim && w.chars[f.victim]?.familyId === p.familyId && f.actor && k.knowsActor && w.chars[f.actor]?.alive && w.chars[f.actor].familyId !== p.familyId && f.actor !== p.id && !w.jobs.some((j) => j.cause === f.id));
-  if (wronged.length)
-    options.push(() => {
-      const { f } = wronged[wronged.length - 1];
-      const t = w.chars[f.actor!];
-      mkJob(w, { kind: 'handle', title: `${boss.name} wants ${t.name} dealt with`, brief: `"${f.text}" ${boss.name} won't let that stand. Handle ${t.name} for the family.`, giver: boss.id, via: 'boss', assignee: p.id, target: t.id, cause: f.id, pay: 400, reason: f.text, why: bossWhy(w, boss, t, 'wrong', true, ''), claimTrue: true, subject: 'wrong' });
-    });
+  const need = needsOf(w, boss).filter((n) => n.target !== p.id).sort((a, b) => b.weight - a.weight)[0];
+  if (need) options.push(() => void giveWork(w, boss, p, need));
 
   // He wants someone in his own house gone, and says it is for the family's sake. Whether that is true is another matter.
   const rankOrder = ['associate', 'soldier', 'capo', 'underboss', 'boss'];
@@ -204,10 +182,8 @@ export function bossOffer(w: World, force = false): boolean {
       });
     });
 
-  // most of what a boss asks is not violence
-  for (let i = 0; i < 3; i++) options.push(() => void bossErrand(w, p, boss));
   if (!options.length) return false;
-  w.rng.pick(options)();
+  options[0]();
   return true;
 }
 export const forceBossOffer = (w: World) => bossOffer(w, true);
@@ -332,7 +308,7 @@ function oppOffer(w: World): boolean {
 }
 
 export function newOffer(w: World) {
-  const bag = ['boss', 'boss', 'tip', 'opp', 'opp', 'gig', 'gig', 'gig', 'contract'];
+  const bag = ['tip', 'opp', 'opp', 'gig', 'gig', 'gig', 'contract']; // (a superior's work comes through work.ts, the same for every man)
   for (let i = 0; i < 6 && bag.length; i++) {
     const k = bag.splice(w.rng.int(0, bag.length - 1), 1)[0];
     const ok = k === 'boss' ? bossOffer(w) : k === 'tip' ? tipOffer(w) : k === 'opp' ? oppOffer(w) : k === 'gig' ? gigOffer(w) : contractOffer(w);
@@ -473,14 +449,16 @@ function conclude(w: World, j: Job, res: Result): Result {
   j.status = res.ok ? 'done' : 'failed';
   if (j.assignee !== p.id) recordCareer(w, w.chars[j.assignee], `${res.ok ? 'Finished' : 'Botched'}: ${j.title}`, res.ok);
   if (w.chars[j.assignee]) grow(w.chars[j.assignee], j.kind, res.ok ? 0.02 : 0.008);
-  if (giver && giver.id !== p.id) {
+  const doer = w.chars[j.assignee];
+  if (giver && doer && giver.id !== doer.id && doer.isPlayer) {
     // V89: earned at a believable pace (core.regard): the tenth errand in a month is not worth what the first one was.
+    // (A man an NPC superior sent is judged on his report, which may not be the truth: work.ts judge.)
     if (res.ok) {
-      regard(w, giver, p, 'trust', 0.08, 'job');
-      regard(w, giver, p, 'respect', 0.05, 'job');
-    } else regard(w, giver, p, 'trust', -0.06, 'job');
+      regard(w, giver, doer, 'trust', 0.08, 'job');
+      regard(w, giver, doer, 'respect', 0.05, 'job');
+    } else regard(w, giver, doer, 'trust', -0.06, 'job');
   }
-  if (j.via === 'boss' && giver) {
+  if (j.via === 'boss' && giver && doer?.isPlayer) {
     const d = repute(w, p, res.ok ? 4 : -5, 'bossjob');
     res.lines.push(res.ok ? (d >= 2 ? `${giver.name} will hear it went well. That does your name some good.` : `${giver.name} will hear it went well, for what one more errand is worth.`) : `${giver.name} won’t like this. It costs you.`);
   } else if (res.ok && giver && (j.via === 'tip' || j.via === 'contract')) res.lines.push(`${giver.name} owes you one now. In this life that’s worth more than cash.`);
@@ -492,7 +470,7 @@ export function finishJob(w: World, j: Job, ok: boolean, lines: string[] = []): 
   if (j.status !== 'active') return { lines, minutes: 0, ok: false };
   const doer = w.chars[j.assignee], giver = j.giver ? w.chars[j.giver] : undefined;
   let gained = 0;
-  if (ok && doer && j.pay > 0) { gained = paid(w, doer, j.pay, giver, 'handle'); if (gained > 0 && doer.isPlayer) lines.push(`${giver?.name ?? 'He'} pays you ${money(gained)}.`); }
+  if (ok && doer && j.pay > 0) { gained = paid(w, doer, j.pay, giver, 'handle', j.via === 'order' && giver && !doer.isPlayer ? giver : undefined); if (gained > 0 && doer.isPlayer) lines.push(`${giver?.name ?? 'He'} pays you ${money(gained)}.`); }
   return conclude(w, j, { lines, minutes: 0, ok, money: gained || undefined });
 }
 
@@ -503,6 +481,7 @@ export function resolve(w: World, j: Job, code: string): Result {
   const p = PL(w);
   const rng = w.rng;
   const giver = j.giver ? w.chars[j.giver] : undefined;
+  const boss = !doer.isPlayer && j.via === 'order' && giver ? giver : p; // whom a man sent on this works for
   let minutes = 120;
   let ok = false;
   let gained = 0;
@@ -521,7 +500,7 @@ export function resolve(w: World, j: Job, code: string): Result {
       minutes = er.minutes;
       ok = er.ok;
       if (ok && er.money) {
-        gained = paid(w, doer, er.money, giver, 'handle');
+        gained = paid(w, doer, er.money, j.kind === 'shake' ? undefined : giver, 'handle', boss);
       }
       return done();
     }
@@ -547,7 +526,7 @@ export function resolve(w: World, j: Job, code: string): Result {
       if (ok && giver) {
         const cut = Math.round(got * 0.25);
         giver.cash -= cut;
-        gained = paid(w, doer, cut, undefined, 'loans');
+        gained = paid(w, doer, cut, undefined, 'loans', boss);
         lines.push(`${giver.name} gets ${money(got)}. Your cut is ${money(cut)}.`);
         note = `Brought in ${money(got)} for ${giver.name}.`;
       } else lines.push(`${giver?.name ?? 'The boss'} gets nothing out of this.`);
@@ -563,7 +542,7 @@ export function resolve(w: World, j: Job, code: string): Result {
       minutes = r.minutes;
       ok = b.protection?.collectorId === doer.id;
       if (ok && giver) {
-        gained = paid(w, doer, j.pay, giver, 'protection');
+        gained = paid(w, doer, j.pay, giver, 'protection', boss);
         lines.push(`${giver.name} pays you ${money(gained)} for the shop.`);
       }
       break;
@@ -584,7 +563,8 @@ export function resolve(w: World, j: Job, code: string): Result {
         quiet.m = { ...(quiet.m ?? {}), for: giver.id, ...(j.cause ? { fact: j.cause } : {}) };
         const o = askMove(w, quiet, 'ask');
         lines.push(...o.lines);
-        ok = o.answer === 'yes';
+        // (a man sent to say it has done his part once it is said: the answer is the other man's to give, in his own time)
+        ok = o.answer === 'yes' || (!doer.isPlayer && isOpen(quiet));
         if (!ok && isOpen(quiet)) {
           if (doer.isPlayer) { quiet.m.job = j.id; lines.push(`It isn’t settled. ${t.name.split(' ')[0]} knows what you came for, and you can go back to him.`); return { lines, minutes, ok: false }; }
           if (!guilty) note = `${t.name} swore it wasn't him.`;
@@ -613,7 +593,7 @@ export function resolve(w: World, j: Job, code: string): Result {
           t.cash -= amt;
           const toClient = Math.round(amt * 0.6);
           giver.cash += toClient;
-          paid(w, doer, amt - toClient, undefined, 'handle');
+          paid(w, doer, amt - toClient, undefined, 'handle', boss);
           bump(doer, 0.1);
           addFact(w, { kind: 'robbery', actor: doer.id, victim: t.id, amount: amt, text: `${doer.name} squeezed ${t.name} for ${money(amt)} on ${giver.name}'s behalf.`, district: t.district }, { witnesses: witnessesAt(w, t.district, [doer.id, t.id], 2) });
           lines.push(`${t.name} counts out ${money(amt)} with shaking hands. He knows exactly who sent you.`);
@@ -629,7 +609,7 @@ export function resolve(w: World, j: Job, code: string): Result {
         ok = t.hurtUntil > w.now;
       }
       if (ok) {
-        gained = paid(w, doer, j.pay, giver, 'handle');
+        gained = paid(w, doer, j.pay, giver, 'handle', boss);
         if (gained > 0) lines.push(`${giver.name} pays you ${money(gained)}.`);
         if (!guilty) {
           lines.push(rng.chance(0.5) ? `${t.name} kept insisting it wasn't him. You find yourself wondering.` : `Something about it doesn't sit right.`);
@@ -664,7 +644,7 @@ export function resolve(w: World, j: Job, code: string): Result {
         } else lines.push('The specialist walks away from it. No refund.');
       }
       if (ok && giver) {
-        gained = paid(w, doer, j.pay, giver, 'hit');
+        gained = paid(w, doer, j.pay, giver, 'hit', boss);
         lines.push(`${giver.name} pays ${money(gained)}.`);
         if (!t.familyId) {
           repute(w, p, -3, 'botched');
@@ -688,7 +668,7 @@ export function resolve(w: World, j: Job, code: string): Result {
         addFact(w, { kind: 'theft', actor: doer.id, victim: v?.id, amount: n, hiddenActor: true, text: `${doer.name} stole ${n} cars in ${doer.district}.`, textHidden: `${n} cars were stolen in ${doer.district}.`, district: doer.district }, { witnesses: witnessesAt(w, doer.district, [doer.id], 2).filter(() => rng.chance(0.3)) });
         lines.push(`${n} cars, no questions, and nobody the wiser. For tonight.`);
         if (giver && j.via === 'opportunity') {
-          gained = paid(w, doer, n * j.pay, giver, 'boost');
+          gained = paid(w, doer, n * j.pay, giver, 'boost', boss);
           doer.cars -= n;
           lines.push(`${giver.name} takes them for ${money(gained)}.`);
         } else lines.push('They need selling. Try a garage or a chop shop.');
@@ -736,7 +716,7 @@ export function resolve(w: World, j: Job, code: string): Result {
       lines.push(`You carry out about ${money(value)} in goods. Heavy, hot and not yours.`);
       if (b.protection && b.protection.familyId !== doer.familyId) lines.push(`${b.name} pays ${w.fam[b.protection.familyId].name} protection. They’ll take this personally if they learn who did it.`);
       if (giver && j.via === 'opportunity') {
-        gained = paid(w, doer, Math.round(value * 0.55), giver, 'burgle');
+        gained = paid(w, doer, Math.round(value * 0.55), giver, 'burgle', boss);
         doer.goods -= value;
         lines.push(`${giver.name} takes the lot for ${money(gained)}.`);
       } else lines.push('Pawn it or fence it when things cool down.');
@@ -767,7 +747,7 @@ export function resolve(w: World, j: Job, code: string): Result {
       if (rng.chance(pr)) {
         m.cash -= amt;
         if (code === 'rigged') doer.cash += 300;
-        gained = paid(w, doer, amt, undefined, 'scam');
+        gained = paid(w, doer, amt, undefined, 'scam', boss);
         ok = true;
         lines.push(`${m.name} swallows every word. You leave ${money(amt)} richer and he thanks you for it.`);
         if (code === 'pyramid') {
@@ -796,7 +776,12 @@ export function resolve(w: World, j: Job, code: string): Result {
 
 function autoResolve(w: World, j: Job) {
   runCrewJob(w, j);
+  judge(w, j); // an NPC superior weighs what he was told (work.ts); the player does it himself
 }
+
+// Whether a job is the player's business: his to do, or given by him (his orders carry no giver). Work NPC superiors give their
+// own men runs through the same records but isn't his to see.
+export const playerSide = (w: World, j: Job) => j.assignee === w.playerId || j.giver === w.playerId || (j.giver === null && j.via === 'order');
 
 // A job nobody needs any more should not sit in the inbox: somebody else got there, or the reason went away.
 export function staleReason(w: World, j: Job): string | null {
@@ -835,7 +820,7 @@ export function pruneJobs(w: World) {
     if (!why) continue;
     j.status = 'expired';
     j.notes = [...(j.notes ?? []), why];
-    addFact(w, { kind: 'report', actor: j.giver ?? undefined, minor: true, text: `${j.title}: no longer needed. ${why}`, district: p.district }, { witnesses: [p.id] });
+    if (playerSide(w, j)) addFact(w, { kind: 'report', actor: j.giver ?? undefined, minor: true, text: `${j.title}: no longer needed. ${why}`, district: p.district }, { witnesses: [p.id] });
   }
 }
 

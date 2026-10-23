@@ -12,7 +12,7 @@ import { pathCard, powersCard } from './pathview';
 import { pathInfo } from '../path';
 import { capOf, careerLines, isRunner, members, promoSteps, seats, standingTable, vacancy } from '../career';
 import { factText, famName, money, ownerBiz, shortTime } from '../core';
-import { KIND_LABEL, standingWord, staleReason } from '../jobs';
+import { KIND_LABEL, playerSide, standingWord, staleReason } from '../jobs';
 import { GIG_LABEL } from '../gigs';
 import { lateOf, PROBLEM_LABEL } from '../people';
 import { Character, DAY, Enc, Id, World } from '../types';
@@ -143,10 +143,10 @@ export function needs(): Need[] {
       out.push({ dot: late ? 'red' : 'amber', k: 'Your word', title: `What you told ${c.name}`, sub: `${m.text} ${isFemale(c) ? 'She' : 'He'} ${late ? 'expected it done by now.' : `expects it done ${byWhen(w.now, m.due)}.`}`, a: `talk:${c.id}`, who: c.id });
     }
   }
-  for (const j of w.jobs.filter((x) => x.status === 'offered' && !staleReason(w, x)).sort((a, b) => Number(b.kind === 'summons') - Number(a.kind === 'summons') || Number(b.via === 'boss') - Number(a.via === 'boss'))) {
+  for (const j of w.jobs.filter((x) => x.status === 'offered' && playerSide(w, x) && !staleReason(w, x)).sort((a, b) => Number(b.kind === 'summons') - Number(a.kind === 'summons') || Number(b.via === 'boss') - Number(a.via === 'boss'))) {
     out.push({ dot: j.kind === 'summons' || j.via === 'boss' ? 'amber' : j.via === 'tip' || j.kind === 'gig' ? 'green' : 'green', k: j.kind === 'gig' ? GIG_LABEL[String(j.extra?.gig) as keyof typeof GIG_LABEL] ?? 'Opportunity' : KIND_LABEL[j.kind], title: j.title, sub: `${j.giver ? 'From ' + w.chars[j.giver]?.name : 'A tip'}${j.pay > 0 ? ', about ' + money(j.pay) : ''}. It won’t wait past ${byWhen(w.now, j.expires).replace(/^by /, '')}.`, when: byWhen(w.now, j.expires).replace(/^by /, ''), a: `job:${j.id}` });
   }
-  for (const j of w.jobs.filter((x) => x.rep && !x.acked && (x.status === 'done' || x.status === 'failed')).slice(-3).reverse())
+  for (const j of w.jobs.filter((x) => x.rep && !x.acked && playerSide(w, x) && (x.status === 'done' || x.status === 'failed')).slice(-3).reverse())
     out.push({ dot: 'blue', k: 'Reporting back', title: `${w.chars[j.rep!.by].name} reports back`, sub: j.title, a: `report:${j.id}`, who: j.rep!.by });
   for (const b of Object.values(w.biz).filter((x) => x.open && x.protection && lateOf(x) > 0 && (x.protection.collectorId === p.id || w.chars[x.protection.collectorId]?.bossId === p.id)))
     out.push({ dot: 'amber', k: 'Late paying', title: `${w.chars[b.ownerId].name} is late at ${b.name}`, sub: `${money(owedOf(b))} owed`, a: `biz:${b.id}` });

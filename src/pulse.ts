@@ -196,27 +196,14 @@ function orgOffer(w: World, p: Character) {
   const fam = w.fam[p.familyId];
   const rng = w.rng;
   const kinds: string[] = [];
-  const free = Object.values(w.biz).filter((b) => b.open && b.kind !== 'casino' && !b.protection && b.ownerId !== p.id && fam.districts.includes(b.district) && w.chars[b.ownerId]?.alive);
-  if (boss?.alive && free.length >= 1 && p.standing >= 25) kinds.push('rights');
+  // (Stage 4: a superior's shops for the player to bring in are work like any other, through the negotiation: work.ts 'lean'.)
   const crew = Object.values(w.chars).filter((c) => c.alive && c.bossId === p.id).length;
   const cand = ['soldier', 'capo', 'underboss'].includes(p.rank) ? Object.values(w.chars).filter((c) => c.alive && !c.isPlayer && c.familyId === p.familyId && c.rank === 'associate' && c.bossId && c.bossId !== p.id && (c.rels[p.id]?.trust ?? 0) > 0.25 && c.traits.ambition > 0.4) : [];
   if (cand.length && crew < 6) kinds.push('transfer');
   if (!kinds.length || !rng.chance(0.35)) return;
   p.cooldown.org = w.now + 3 * WEEK;
   const k = rng.pick(kinds);
-  if (k === 'rights' && boss) {
-    const picks = free.sort((a, b) => b.income - a.income).slice(0, 2);
-    addEnc(w, {
-      kind: 'crew', from: boss.id, title: `${first(boss)} has something for you`, days: 8,
-      lines: [`${boss.name} sends for you.`, `"${picks.length > 1 ? `${picks.map((b) => b.name).join(' and ')} are` : `${picks[0].name} is`} in our ground and paying nobody. I want the family’s name on ${picks.length > 1 ? 'them' : 'it'}, and I want a man I trust to carry it. ${picks.length > 1 ? 'I thought of you.' : 'You.'}"`],
-      opts: [
-        { code: 'take', label: picks.length > 1 ? 'Take both' : 'Take it', hint: 'A weekly envelope from each. The owners won’t love you for it.' },
-        ...(picks.length > 1 ? [{ code: 'one', label: `Take just ${picks[0].name}`, hint: 'The bigger one. Less work, less trouble.' }] : []),
-        { code: 'pass', label: 'Let someone else carry it', hint: 'No trouble for you. He’ll remember you didn’t want it.' },
-      ],
-      data: { what: 'sit_org', org: 'rights', biz: picks.map((b) => b.id).join(',') },
-    });
-  } else if (k === 'transfer') {
+  if (k === 'transfer') {
     const a = rng.pick(cand);
     const ob = a.bossId ? w.chars[a.bossId] : undefined;
     addEnc(w, {
@@ -232,24 +219,6 @@ function orgOffer(w: World, p: Character) {
   }
 }
 function orgChoose(w: World, p: Character, e: Enc, code: string): string[] {
-  if (e.data?.org === 'rights') {
-    const boss = e.from ? w.chars[e.from] : undefined;
-    const ids = String(e.data.biz).split(',').filter((id) => w.biz[id]?.open && !w.biz[id].protection);
-    if (!ids.length) return ['Someone beat you to it.'];
-    if (code === 'pass') { if (boss) feel(w, boss, p.id, 'trust', -0.04); return [`${boss ? first(boss) : 'He'} shrugs. "Fine. There’s always somebody hungry." You’ve told him what you’re not.`]; }
-    const take = code === 'one' ? ids.slice(0, 1) : ids;
-    const lines: string[] = [];
-    for (const id of take) {
-      const b = w.biz[id], o = w.chars[b.ownerId];
-      const fee = Math.max(25, Math.round((b.income * 0.08) / 5) * 5);
-      setCollector(w, b, p.id, p.familyId!, { fee });
-      addFact(w, { kind: 'protection_started', actor: p.id, victim: o.id, business: b.id, amount: fee, text: `${p.name} now collects ${money(fee)} a week from ${b.name}.`, district: b.district }, { witnesses: [p.id, o.id] });
-      feel(w, o, p.id, 'trust', -0.05);
-      lines.push(`${b.name} (${o.name}) will pay ${money(fee)} a week. He heard it from ${boss ? first(boss) : 'the family'}, so he doesn’t argue.`);
-    }
-    if (boss) feel(w, boss, p.id, 'trust', 0.06);
-    return lines;
-  }
   if (e.data?.org === 'transfer') {
     const a = w.chars[String(e.data.who)];
     if (!a?.alive) return ['He’s gone.'];

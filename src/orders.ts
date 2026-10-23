@@ -8,7 +8,8 @@ import { addFact, bear, clamp, feel, feelOn, feelTo, learn, money, ownerBiz, rec
 import { aptitude, grow, lateOf, PROBLEM_LABEL } from './people';
 import { bizMove, clearArrears, owedOf, takeFromBiz } from './econ';
 import { arch, admit, excuse, pick } from './voice';
-import { activityOf, approaches, assign, mkJob, resolve } from './jobs';
+import { approaches, mkJob, resolve } from './jobs';
+import { giveWork, needsOf, type Need } from './work';
 import { perform } from './actions';
 import { Behaviour, Character, DAY, Id, Job, JobKind, Report, World } from './types';
 
@@ -17,21 +18,22 @@ const MONEY_KINDS: JobKind[] = ['collect', 'lean', 'scam', 'burgle', 'boost', 'h
 
 // ------------------------------------------------------------- behaviour
 
-export function reliability(w: World, m: Character): number {
-  const p = PL(w);
-  const r = m.rels[p.id];
+// (judged against the man who sent him: the player, or an NPC superior; work.ts)
+const senderOf = (w: World, j?: Job) => (j?.giver && w.chars[j.giver]) || PL(w);
+export function reliability(w: World, m: Character, by: Character = PL(w)): number {
+  const r = m.rels[by.id];
   return clamp(0.5 + (r?.trust ?? 0.4) * 0.3 + (1 - m.traits.vice) * 0.15 + m.traits.caution * 0.1 - (m.problem ? m.problem.sev * 0.35 : 0), 0.15, 0.95);
 }
 
 export function behaviour(w: World, j: Job, m: Character): Behaviour {
   const T = m.traits;
-  const p = PL(w);
+  const p = senderOf(w, j);
   const trust = m.rels[p.id]?.trust ?? 0.4;
   const pr = m.problem;
   const money = MONEY_KINDS.includes(j.kind);
   const apt = aptitude(m, j.kind);
   const weights: [Behaviour, number][] = [
-    ['clean', 1.4 * reliability(w, m)],
+    ['clean', 1.4 * reliability(w, m, p)],
     ['bungle', (1 - apt) * 0.3],
     ['skim', money ? (T.greed * 0.4 + (pr && ['house', 'gambling', 'debt'].includes(pr.kind) ? 0.5 * pr.sev : 0)) * (1 - trust * 0.5) : 0],
     ['gamble', money ? T.vice * 0.35 + (pr?.kind === 'gambling' ? 0.7 * pr.sev : 0) : 0],
@@ -78,7 +80,7 @@ const money$ = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
 
 export function runCrewJob(w: World, j: Job) {
   const m = w.chars[j.assignee];
-  const p = PL(w);
+  const p = senderOf(w, j); // the man he answers to on this job
   if (!m || !m.alive) {
     j.status = 'failed';
     return;
@@ -249,8 +251,9 @@ export function resolveErrand(w: World, j: Job, doer: Character, code: string): 
       lines.push(`${doer.name} watched ${t.name} from morning to night. ${found.map((s) => s[0].toUpperCase() + s.slice(1)).join('. ')}.`);
       if (t.problem) t.problem.revealed = true;
       // anything he knows that was hidden from you, you now know too
-      const f = Object.values(w.facts).filter((q) => q.actor === t.id && !q.minor && t.known[q.id] && !PL(w).known[q.id]).sort((a, b) => b.t - a.t)[0];
-      if (f) learn(w, PL(w).id, f, doer.id, true);
+      const to = senderOf(w, j).id === doer.id ? PL(w) : senderOf(w, j);
+      const f = Object.values(w.facts).filter((q) => q.actor === t.id && !q.minor && t.known[q.id] && !to.known[q.id]).sort((a, b) => b.t - a.t)[0];
+      if (f) learn(w, to.id, f, doer.id, true);
       return { lines, minutes, ok: true };
     }
     case 'deliver': {
@@ -335,58 +338,38 @@ export interface OrderOpt {
   group: 'Money' | 'Cars' | 'Burglary' | 'Scams' | 'Watch' | 'Other';
   label: string;
   hint?: string;
-  make: (doer: Id) => Job;
+  need: Need;
 }
 
-const orderJob = (w: World, doer: Id, o: Omit<Job, 'id' | 'created' | 'expires' | 'status' | 'giver' | 'via' | 'assignee' | 'pay'> & { pay?: number }): Job =>
-  mkJob(w, { giver: null, via: 'order', assignee: doer, pay: 0, ...o, status: 'offered', days: 3 } as any);
-
+// What the player can send his men to do: what his own affairs need (work.needsOf, the same list an NPC superior hands out from:
+// money owed, late shops, his crew's ground, a man inside, a shop in trouble), and work of his own choosing.
 export function orderMenu(w: World, p: Character): OrderOpt[] {
   const out: OrderOpt[] = [];
   const near = (a: { district: string }, b: { district: string }) => Number(b.district === p.district) - Number(a.district === p.district);
-  const mine = (id: Id) => w.chars[id];
-
-  // money owed to you
-  for (const d of w.debts.filter((x) => x.status === 'active' && x.creditor === p.id && x.missed >= 1).slice(0, 3)) {
-    const t = mine(d.debtor);
-    out.push({ group: 'Money', label: `Collect from ${t.name}`, hint: `Owes ${money(d.balance)}, ${d.missed} missed.`, make: (id) => orderJob(w, id, { kind: 'collect', title: `Collect from ${t.name}`, brief: `You want ${money(d.balance)} from ${t.name}.`, target: t.id, debt: d.id }) });
-  }
-  for (const b of Object.values(w.biz).filter((x) => x.open && x.protection?.collectorId === p.id && lateOf(x) > 0).slice(0, 3)) {
-    const o = mine(b.ownerId);
-    out.push({ group: 'Money', label: `Shake ${o.name} at ${b.name}`, hint: `Late ${lateOf(b)} time${lateOf(b) > 1 ? 's' : ''}, owes ${money(Math.max(b.protection!.fee, owedOf(b)))}.`, make: (id) => orderJob(w, id, { kind: 'shake', title: `Shake ${b.name}`, brief: `${o.name} is behind on what he owes.`, biz: b.id, target: o.id }) });
-  }
-  for (const b of Object.values(w.biz).filter((x) => x.open && x.kind !== 'casino' && x.protection?.familyId !== p.familyId && w.chars[x.ownerId]?.alive && (p.known[x.id] || true)).sort(near).slice(0, 3)) {
-    const o = mine(b.ownerId);
-    out.push({ group: 'Money', label: `Lean on ${b.name} (${b.district})`, hint: b.protection ? `Paying ${w.fam[b.protection.familyId].name} already.` : 'Nobody looks after it yet.', make: (id) => orderJob(w, id, { kind: 'lean', title: `Lean on ${b.name}`, brief: `Bring ${b.name} under your wing.`, biz: b.id, target: o.id }) });
-  }
-  out.push({ group: 'Cars', label: 'Boost cars', hint: 'Steal cars to sell or chop.', make: (id) => orderJob(w, id, { kind: 'boost', title: 'Boost some cars', brief: 'Steal cars.' }) });
+  const GROUP: Partial<Record<JobKind, OrderOpt['group']>> = { collect: 'Money', shake: 'Money', lean: 'Money', handle: 'Money', watch: 'Watch' };
+  for (const n of needsOf(w, p)) out.push({ group: GROUP[n.kind] ?? 'Other', label: n.title, hint: n.why, need: n });
+  out.push({ group: 'Cars', label: 'Boost cars', hint: 'Steal cars to sell or chop.', need: { kind: 'boost', title: 'Boost some cars', brief: 'Steal cars.', pay: 0, why: '', weight: 0 } });
   for (const b of Object.values(w.biz).filter((x) => x.open && x.kind !== 'casino' && x.protection?.familyId !== p.familyId && w.chars[x.ownerId]?.alive).sort(near).slice(0, 3))
-    out.push({ group: 'Burglary', label: `Burgle ${b.name}`, hint: b.district, make: (id) => orderJob(w, id, { kind: 'burgle', title: `Burgle ${b.name}`, brief: `Take what’s in ${b.name}.`, biz: b.id }) });
+    out.push({ group: 'Burglary', label: `Burgle ${b.name}`, hint: b.district, need: { kind: 'burgle', title: `Burgle ${b.name}`, brief: `Take what’s in ${b.name}.`, biz: b.id, pay: 0, why: '', weight: 0 } });
   for (const b of Object.values(w.biz).filter((x) => x.open && x.kind !== 'casino' && x.ownerId !== p.id && w.chars[x.ownerId]?.alive).sort(near).slice(0, 4)) {
-    const o = mine(b.ownerId);
-    out.push({ group: 'Scams', label: `Work ${o.name} at ${b.name}`, hint: o.traits.caution > 0.65 ? 'Looks careful with his money.' : 'Looks trusting.', make: (id) => orderJob(w, id, { kind: 'scam', title: `Work ${o.name}`, brief: `Find out how much ${o.name} will give up.`, biz: b.id, target: o.id }) });
+    const o = w.chars[b.ownerId];
+    out.push({ group: 'Scams', label: `Work ${o.name} at ${b.name}`, hint: o.traits.caution > 0.65 ? 'Looks careful with his money.' : 'Looks trusting.', need: { kind: 'scam', title: `Work ${o.name}`, brief: `Find out how much ${o.name} will give up.`, biz: b.id, target: o.id, pay: 0, why: '', weight: 0 } });
   }
   // people worth watching
-  const watch = Object.values(w.chars).filter((x) => x.alive && x.id !== p.id && x.rank !== 'civilian' && (p.rels[x.id]?.grudge ?? 0) > 0.2 || (x.familyId && x.familyId !== p.familyId && x.rank === 'soldier')).slice(0, 4);
-  for (const t of watch) out.push({ group: 'Watch', label: `Watch ${t.name}`, hint: `${t.rank}, ${t.familyId ? w.fam[t.familyId].name : 'independent'}. A day of following him around.`, make: (id) => orderJob(w, id, { kind: 'watch', title: `Watch ${t.name}`, brief: 'Find out what he does and who he sees.', target: t.id }) });
-  for (const t of Object.values(w.chars).filter((x) => x.alive && x.jailedUntil > w.now && x.familyId === p.familyId && x.id !== p.id).slice(0, 2))
-    out.push({ group: 'Other', label: `Get ${t.name} out`, hint: 'A lawyer, a clerk, an envelope. $400.', make: (id) => orderJob(w, id, { kind: 'fix', title: `Get ${t.name} out`, brief: 'Fix it.', target: t.id, pay: 400 }) });
-  for (const b of Object.values(w.biz).filter((x) => x.open && x.protection?.collectorId === p.id).slice(0, 2))
-    out.push({ group: 'Other', label: `Guard ${b.name}`, hint: 'A week of being seen. Quiets trouble.', make: (id) => orderJob(w, id, { kind: 'guard', title: `Guard ${b.name}`, brief: 'Be around.', biz: b.id, pay: 0 }) });
+  const watch = Object.values(w.chars).filter((x) => x.alive && x.id !== p.id && x.rank !== 'civilian' && (p.rels[x.id]?.grudge ?? 0) > 0.2 || (x.familyId && x.familyId !== p.familyId && x.rank === 'soldier')).filter((x) => !out.some((o) => o.need.kind === 'watch' && o.need.target === x.id)).slice(0, 4);
+  for (const t of watch) out.push({ group: 'Watch', label: `Watch ${t.name}`, hint: `${t.rank}, ${t.familyId ? w.fam[t.familyId].name : 'independent'}. A day of following him around.`, need: { kind: 'watch', title: `Watch ${t.name}`, brief: 'Find out what he does and who he sees.', target: t.id, pay: 0, why: '', weight: 0 } });
   return out;
 }
 
-// Give the order and send him.
+// Or he does it himself: the same piece of work, in his own hands.
+export function ownJob(w: World, p: Character, o: OrderOpt): Job {
+  const n = o.need;
+  return mkJob(w, { kind: n.kind, title: n.title, brief: n.brief, target: n.target, biz: n.biz, debt: n.debt, cause: n.cause, pay: n.pay, giver: null, via: 'order', assignee: p.id, status: 'active', days: 3 });
+}
+
+// Give the order and send him: the one way any superior gives a man work (work.giveWork).
 export function giveOrder(w: World, p: Character, m: Character, o: OrderOpt, style: 'quiet' | 'hard'): Job | string {
-  const busy = activityOf(w, m);
-  if (busy) return `${m.name} is ${busy.why} until ${shortTime(busy.until)}. Pick someone else.`;
-  const before = w.jobs.length;
-  const j = o.make(m.id);
-  const err = assign(w, j, m.id, style);
-  if (err) { if (w.jobs.length > before && j.status === 'offered') w.jobs.splice(w.jobs.indexOf(j), 1); return err; }
-  j.due = w.now + w.rng.int(1, 2) * DAY;
-  rel(m, p.id).lastMet = w.now;
-  return j;
+  return giveWork(w, p, m, o.need, style);
 }
 
 // -------------------------------------------------------- recruiting
@@ -503,51 +486,4 @@ export function workShift(w: World, p: Character): { minutes: number; lines: str
     repute(w, p, 3, 'good work');
   }
   return { minutes: j.kind === 'porter' ? 240 : 360, lines };
-}
-
-// ------------------------------------------------- errands from above
-
-// Most of what a boss wants is not violence. Somebody has to carry the envelope, deliver the word, find the man who is not answering.
-export function bossErrand(w: World, p: Character, boss: Character): boolean {
-  const fam = boss.familyId ? w.fam[boss.familyId] : undefined;
-  if (!fam) return false;
-  const ours = Object.values(w.chars).filter((c) => c.alive && c.familyId === fam.id && c.id !== p.id && c.id !== boss.id);
-  const theirs = Object.values(w.chars).filter((c) => c.alive && c.familyId && c.familyId !== fam.id && ['soldier', 'capo'].includes(c.rank));
-  const civ = Object.values(w.chars).filter((c) => c.alive && c.rank === 'civilian' && ownerBiz(w, c.id));
-  const a = arch(boss);
-  const voice = (o: Partial<Record<typeof a, string>> & { _: string }) => o[a] ?? o._;
-  const kinds: string[] = ['deliver', 'message', 'find', 'watch', 'guard', 'fix'];
-  const k = w.rng.pick(kinds);
-  const first = (c: Character) => c.name.split(' ')[0];
-  const mk_ = (job: Parameters<typeof mkJob>[1]) => {
-    mkJob(w, job);
-    return true;
-  };
-  if (k === 'deliver' && (theirs.length || ours.length)) {
-    const t = w.rng.pick([...theirs, ...ours]);
-    return mk_({ kind: 'deliver', title: `Take an envelope to ${t.name}`, brief: voice({ proud: `${boss.name}: "A matter of courtesy between ${t.familyId === fam.id ? 'us' : 'families'}. Put this in ${first(t)}'s hand, and nobody else's."`, cold: `${boss.name} slides it across. "${t.name}. In ${t.district}. Don’t open it."`, jovial: `${boss.name}: "A little something for ${first(t)}. You know how it is. Be charming. Be quick."`, _: `${boss.name} wants this envelope in ${t.name}'s hands, in ${t.district}, and nobody else's.` }), giver: boss.id, via: 'boss', assignee: p.id, target: t.id, pay: 60, days: 3 });
-  }
-  if (k === 'message' && (theirs.length || ours.length)) {
-    const t = w.rng.pick([...theirs, ...ours]);
-    const line = w.rng.pick(['the thing he asked about is settled', 'the favour hasn’t been forgotten, and neither should he', 'the answer is no, and he’ll understand why', 'the man he was worried about is no longer a problem', 'there will be a sit-down when the weather turns'].map((s) => s));
-    return mk_({ kind: 'message', title: `Carry a word to ${t.name}`, brief: voice({ schemer: `${boss.name}: "Tell ${first(t)} ${line}. Watch his face when you say it. Then tell me what you saw."`, cold: `${boss.name}: "Say to ${t.name}: ${line}. Nothing else."`, _: `${boss.name} wants ${t.name} told that ${line}. In person. Not on the phone.` }), giver: boss.id, via: 'boss', assignee: p.id, target: t.id, pay: 40, days: 3 });
-  }
-  if (k === 'find' && civ.length) {
-    const debt = w.debts.find((d) => d.status === 'active' && d.creditor === boss.id && d.missed >= 1 && w.chars[d.debtor]?.alive);
-    const t = debt ? w.chars[debt.debtor] : w.rng.pick(civ);
-    return mk_({ kind: 'find', title: `Find ${t.name}`, brief: `${boss.name}: "${t.name} has stopped answering. ${debt ? `He owes me ${money(debt.balance)}.` : 'Nobody has seen him.'} I don’t want him touched. I want to know where he’s gone and why."`, giver: boss.id, via: 'boss', assignee: p.id, target: t.id, pay: 0, days: 4 });
-  }
-  if (k === 'watch' && theirs.length) {
-    const t = w.rng.pick(theirs);
-    return mk_({ kind: 'watch', title: `Watch ${t.name}`, brief: `${boss.name}: "${t.name} of the ${w.fam[t.familyId!].name} has been seen in places he shouldn’t be. Follow him a day. Tell me who he sees."`, giver: boss.id, via: 'boss', assignee: p.id, target: t.id, pay: 0, days: 4 });
-  }
-  if (k === 'guard') {
-    const b = Object.values(w.biz).find((x) => x.open && x.protection?.familyId === fam.id && w.chars[x.ownerId]?.alive && (w.chars[x.protection!.collectorId]?.rank !== 'associate'));
-    if (b) return mk_({ kind: 'guard', title: `Spend a week at ${b.name}`, brief: `${boss.name}: "${w.chars[b.ownerId].name} is a friend of the family and he’s nervous. Sit in ${b.name} in the evenings. Be seen. Nothing else."`, giver: boss.id, via: 'boss', assignee: p.id, biz: b.id, pay: 0, days: 4 });
-  }
-  if (k === 'fix') {
-    const t = ours.find((c) => c.jailedUntil > w.now);
-    if (t) return mk_({ kind: 'fix', title: `Get ${t.name} out`, brief: `${boss.name}: "${t.name} is inside and I would like him not to be. The lawyer's name is on the card. You’re the one I trust with it."`, giver: boss.id, via: 'boss', assignee: p.id, target: t.id, pay: 0, days: 4 });
-  }
-  return false;
 }

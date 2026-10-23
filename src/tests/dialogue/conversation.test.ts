@@ -34,7 +34,7 @@ describe('what people tell you', () => {
       const b = chatWith(deserialize(serialize(w)), m, { trust: 0.05, affection: 0.05, grudge: 0 });
       if (m.traits.sociability <= 0.65) assert.equal(b.learned.length, 0, `${m.name} told a near-stranger something`);
       else for (const id of b.learned) assert.ok(!w.facts[id].actor || b.p.known[id].knowsActor === false, `${m.name}: a talker gives a rumour, not names`);
-      const f = chatWith(deserialize(serialize(w)), m, { trust: 0.9, affection: 0.9, grudge: 0 }); if (f.learned.length) { friends++; assert.equal(f.r.convo?.node, 'incident'); }
+      const f = chatWith(deserialize(serialize(w)), m, { trust: 0.9, affection: 0.9, grudge: 0 }); if (f.learned.length) { friends++; if (!f.r.lines.some((l) => /something of his own/.test(l))) assert.equal(f.r.convo?.node, 'incident'); } // (unless he turns to a matter of his own)
     }
     assert.equal(hostile, 0, 'a hostile man tells you nothing');
     assert.ok(friends >= 3, `only ${friends} friends had something to tell`);

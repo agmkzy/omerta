@@ -14,7 +14,7 @@ describe('careers', { tags: ['scenario'] }, () => {
     const w = agencyWorld(7, 20); const fam = P(w).familyId!;
     const pro = Object.values(w.chars).find((c) => c.alive && c.prospect && c.rank === 'civilian' && !ownerBiz(w, c.id))!; assert.ok(pro);
     const cap = Object.values(w.chars).find((c) => c.alive && !c.isPlayer && c.rank === 'capo' && c.familyId === fam)!; cap.cash = 5000; cap.jailedUntil = 0;
-    const assoc = Object.values(w.chars).find((c) => c.alive && !c.isPlayer && c.rank === 'associate' && c.familyId === fam)!; assoc.cash = 5000;
+    const assoc = Object.values(w.chars).find((c) => c.alive && !c.isPlayer && c.rank === 'associate' && c.familyId === fam)!; assoc.cash = 5000; assoc.jailedUntil = 0; // (free to act: the rule is about rank, not whether he happens to be inside)
     const g0 = begin(w, assoc, 'recruit', 'x', 0.5, { stage: 'spot' }); stepGoal(w, g0, assoc);
     assert.equal(agencyOf(w).ended.at(-1)!.how, 'dropped'); assert.equal(pro.rank, 'civilian');
     pro.traits.ambition = 0.3; pro.traits.caution = 0; cap.traits.sociability = 1; cap.standing = 100;

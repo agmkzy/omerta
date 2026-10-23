@@ -1,3 +1,4 @@
+import { workWeek } from './work';
 import { mattersWeek } from './matters';
 import { pulseWeek } from './pulse';
 import { careerTick, openSeatFor, promoTick } from './career';
@@ -149,6 +150,7 @@ function weekly(w: World) {
   }
 
   enterpriseWeek(w); // (Stage 4: everyone's enterprises, one pass: rackets.ts)
+  workWeek(w); // (Stage 4: superiors hand out what needs doing: work.ts)
   turfWeek(w);
   orgWeek(w);
   rankWeek(w);

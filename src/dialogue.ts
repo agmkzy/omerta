@@ -126,7 +126,7 @@ export function introduced(w: World, p: Character, t: Character): boolean {
   if (w.enc.some((e) => e.from === t.id)) return true;
   if (ownerBiz(w, t.id)?.protection?.collectorId === p.id) return true;
   if (w.debts.some((x) => (x.creditor === p.id && x.debtor === t.id) || (x.creditor === t.id && x.debtor === p.id))) return true;
-  if (w.jobs.some((j) => j.giver === t.id)) return true;
+  if (w.jobs.some((j) => j.giver === t.id && j.assignee === p.id)) return true;
   // (V90: a man you have put terms to, or who has put terms to you, has met you)
   if ((w.situations ?? []).some((s) => s.kind === 'ask' && ((s.terms?.by === p.id && s.terms?.of === t.id) || (s.terms?.by === t.id && s.terms?.of === p.id)))) return true;
   return false;
@@ -737,7 +737,7 @@ export function optionsRaw(w: World, p: Character, t: Character, c: Convo): DOpt
       add('n:business', 'Business', 'Operations, money, partnerships');
       if (inFamily(p, t)) add('n:family', 'Family business', 'Other members, leadership, your standing');
       if (incidentsOf(w, t).length || grudgeTarget(w, t)) add('n:disputes', 'Grievances', 'Recent incidents, suspicions, grievances');
-      if (inFamily(p, t) || w.jobs.some((j) => j.giver === t.id && (j.status === 'active' || j.status === 'done'))) add('n:orders', 'Work and orders', 'Work, instructions, reporting');
+      if (inFamily(p, t) || w.jobs.some((j) => j.giver === t.id && j.assignee === p.id && (j.status === 'active' || j.status === 'done'))) add('n:orders', 'Work and orders', 'Work, instructions, reporting');
       const memos = t.memos.filter((m) => m.other === p.id && !m.done);
       const asked = Object.values(w.facts).filter((f) => memos.some((m) => m.kind === 'question' && m.ref === f.id) && p.known[f.id]?.knowsActor);
       if (memos.length || asked.length) add('n:memos', 'Unfinished business', `${memos.length + asked.length} thing${memos.length + asked.length > 1 ? 's' : ''} outstanding`);
@@ -1024,7 +1024,7 @@ export function optionsRaw(w: World, p: Character, t: Character, c: Convo): DOpt
         add('assign_low', 'Tell him to keep his head down', 'Heat drops. He earns less.');
         add('assign_hustle', 'Tell him to find some extra income', 'It will show up in the books, and in the heat.');
       }
-      const rep = w.jobs.filter((j) => j.status === 'done' && j.giver === t.id && !j.reported);
+      const rep = w.jobs.filter((j) => j.status === 'done' && j.giver === t.id && j.assignee === p.id && !j.reported);
       if (rep.length) add('report', 'Report on the work you did', `${rep.length} job${rep.length > 1 ? 's' : ''} to report`);
       for (const j of w.jobs.filter((q) => q.status === 'active' && q.giver === t.id && q.assignee === p.id && (q.via === 'boss' || q.via === 'tip')).slice(0, 2)) {
         add('challenge:' + j.id, `Ask why: "${j.title}"`, 'Is it what he says it is?');
@@ -2614,7 +2614,7 @@ function sayRaw(w: World, p: Character, t: Character, c: Convo, code: string): S
       return stay('orders', 15);
     }
     case 'report': {
-      const rep = w.jobs.filter((j) => j.status === 'done' && j.giver === t.id && !j.reported).slice(0, 2);
+      const rep = w.jobs.filter((j) => j.status === 'done' && j.giver === t.id && j.assignee === p.id && !j.reported).slice(0, 2);
       for (const j of rep) j.reported = true;
       tweak(0.03 * rep.length, 0, 0.02 * rep.length);
       repute(w, p, rep.length, 'report');

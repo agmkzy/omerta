@@ -32,6 +32,7 @@ export interface WeekRow {
   pop: Record<string, number>; jailed: number; deaths: number;
   cash: Record<string, number>; treasury: number; debts: number; debtBal: number; hustles: number; hustleNet: number;
   loans?: { principal: number; arrears: number; worst: number; made: number; defaults: number };
+  work?: { given: number; done: number; failed: number; refused: number; caught: number; delegated: number };
   prot?: { paying: number; started: number; refused: number; poached: number; smashed: number };
   ent?: { running: number; byKind: Record<string, number>; byRank: Record<string, number>; take: number; markers: number; started: number };
   kickPaid: Record<string, number>; kickReceived: Record<string, number>;
@@ -93,7 +94,9 @@ export class Observer {
   private flog(id: string, text: string) { let l = this.famLog.get(id); if (!l) this.famLog.set(id, (l = [])); l.push({ t: this.w.now, tag: 'family', text }); }
 
   // Every new event, as it was recorded. Run daily, so that events the world prunes within the week are still counted.
+  jobsSeen = new Map<string, string>(); // work NPC superiors handed down, and how it ended (jobs are pruned, so seen daily)
   scanFacts() {
+    for (const j of this.w.jobs ?? []) if (j.via === 'order' && j.giver && !this.w.chars[j.giver]?.isPlayer) this.jobsSeen.set(j.id, j.status);
     for (const f of Object.values(this.w.facts)) {
       if (this.seen.has(f.id)) continue;
       this.seen.add(f.id);
@@ -244,6 +247,8 @@ export class Observer {
       debts: w.debts.filter((d) => d.status === 'active').length, debtBal: sum(w.debts.filter((d) => d.status === 'active').map((d) => d.balance)),
       loans: (() => { const act = w.debts.filter((d) => d.status === 'active'); const left = (d: typeof act[0]) => d.owed ?? d.balance - (d.arrears ?? 0);
         return { principal: sum(act.map(left)), arrears: sum(act.map((d) => d.arrears ?? 0)), worst: r2(Math.max(0, ...act.map((d) => d.balance / Math.max(1, d.principal)))), made: w.debts.length, defaults: w.debts.filter((d) => d.status === 'defaulted').length }; })(),
+      work: (() => { const st = [...this.jobsSeen.values()]; const n = (re: RegExp, k?: string) => this.facts.filter((f) => (!k || f.kind === k) && re.test(f.text)).length;
+        return { given: st.length, done: st.filter((x) => x === 'done').length, failed: st.filter((x) => x === 'failed').length, refused: n(/ refused when /, 'report'), caught: n(/found out .* on "|had been skimming his/, 'discipline'), delegated: n(/ put .* in charge of his /, 'report') }; })(),
       prot: (() => { const n = (k: string) => this.facts.filter((f) => f.kind === k).length;
         return { paying: Object.values(w.biz).filter((b) => b.open && b.protection).length, started: n('protection_started'), refused: n('protection_refused'), poached: n('poach'), smashed: this.facts.filter((f) => f.kind === 'vandalism' && /refused to pay/.test(f.text)).length }; })(),
       ent: (() => { const run = (w.ops ?? []).filter((o) => o.kind !== 'hijack' && (o.state === 'running' || o.state === 'raided'));
@@ -302,6 +307,7 @@ export function report(o: Observer, seed: number): { md: string; json: unknown }
     row('Active debts (count / balance)', (r) => `${r.debts} / $${r.debtBal.toLocaleString('en-US')}`),
     row('Loans: principal out / unpaid vig / worst owed÷lent / ever made / defaulted', (r) => (r.loans ? `$${r.loans.principal.toLocaleString('en-US')} / $${r.loans.arrears.toLocaleString('en-US')} / ${r.loans.worst}× / ${r.loans.made} / ${r.loans.defaults}` : '–')),
     row('Men with a side business / its weekly net', (r) => `${r.hustles} / $${r.hustleNet.toLocaleString('en-US')}`),
+    row('Work handed down by NPC superiors: given / done / came to nothing / refused / lies caught / enterprises delegated (to date)', (r) => (r.work ? `${r.work.given} / ${r.work.done} / ${r.work.failed} / ${r.work.refused} / ${r.work.caught} / ${r.work.delegated}` : '–')),
     row('Protection: shops paying / deals / refusals / taken from another / smashed after refusing (to date)', (r) => (r.prot ? `${r.prot.paying} / ${r.prot.started} / ${r.prot.refused} / ${r.prot.poached} / ${r.prot.smashed}` : '–')),
     row('Enterprises running / ever started / weekly take / betting markers', (r) => (r.ent ? `${r.ent.running} / ${r.ent.started} / $${r.ent.take.toLocaleString('en-US')} / ${r.ent.markers}` : '–')),
     row('Enterprises by kind', (r) => (r.ent ? Object.entries(r.ent.byKind).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(', ') : '–')),
