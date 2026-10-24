@@ -6,7 +6,8 @@ import { describe, test as ok } from 'vitest';
 import { advance, deserialize, serialize } from '../../engine';
 import { DAY } from '../../types';
 import { createWorld } from '../../world';
-import { addFact, createDebt } from '../../core';
+import { addFact, createDebt, feelingsWeek } from '../../core';
+import { mkJob } from '../../jobs';
 import { promise } from '../../conv/tick';
 import { superiors } from '../../conv/authority';
 import { begin, choose, everything, relationOf, type Visit } from '../../conv/visit';
@@ -317,7 +318,7 @@ describe('a visit, after words', () => {
     const out = social(w).talks?.[man.id]?.topics.find((t) => t.k === 'accuse:' + f.id)?.out;
     advance(w, w.now + 2 * DAY);
     const g = begin(w, man.id).lines.find((l) => l.who === 'him')!;
-    if (out === 'admit') assert.ok(!g.trace?.some((t) => /greet\.since\.slighted/.test(t)));
+    if (out === 'admit' || out === 'amends' || out === 'accepted') assert.ok(!g.trace?.some((t) => /greet\.since\.slighted/.test(t)));
     else assert.ok(g.trace?.some((t) => /greet\.since\.slighted/.test(t)), g.text + ' / ' + g.trace?.join(' '));
   });
 });
@@ -338,6 +339,113 @@ describe('a visit, as the player reads it', () => {
     const c = gcast(3)!, w = c.w, m = c.friend, b = w.chars[m.bossId!];
     (c.henry.insight ??= {})[m.id] = [`n:Can’t stand ${b.name}.`];
     for (const x of screens(w, m.id)) assert.doesNotMatch(x.label, new RegExp(`working for ${b.name.split(' ')[0]}`));
+  });
+});
+// Gate 3 quality pass: the defects found in play, each held to
+describe('a visit, as the world records it', () => {
+  const plain3 = () => { const w = createWorld(3, 'Tony Marino'); social(w); advance(w, w.now + 3 * DAY); return w; };
+  const keyOf = (l?: { trace?: string[] }) => (l?.trace ?? []).map((t) => /meaning (\S+?);/.exec(t)?.[1]).find(Boolean);
+  ok('a visit is a meeting: men the player keeps seeing do not drift as if they never met (Run 2b, Louie’s trust)', { tags: ['scenario'] }, () => {
+    const w = plain3(), p = w.chars[w.playerId!], b = w.chars[p.bossId!];
+    choose(w, begin(w, b.id), 'leave');
+    assert.ok(b.rels[p.id].lastMet === w.now && p.rels[b.id].lastMet === w.now, 'the meeting is on record, both ways');
+    // (the weekly fading of trust between men who have not met in two weeks does not touch a man seen this week; other things may)
+    advance(w, w.now + 3 * DAY); choose(w, begin(w, b.id), 'leave');
+    const t0 = b.rels[p.id].trust; feelingsWeek(w, b);
+    assert.equal(b.rels[p.id].trust, t0, 'seen this week: no fading');
+  });
+  ok('asked where he stands, the captain answers from the family’s actual conditions, and the second time says what has changed or that nothing has', { tags: ['scenario'] }, () => {
+    const w = plain3(), p = w.chars[w.playerId!], b = w.chars[p.bossId!];
+    const ask = () => { const v = begin(w, b.id); choose(w, v, 'u:business'); const x = everything(w, v).find((y) => y.id === 'o:promo'); assert.ok(x, 'he can be asked'); const n = v.lines.length; choose(w, v, x.id); return v.lines.slice(n).filter((l) => l.who === 'him').map(keyOf); };
+    const first = ask();
+    assert.equal(first[0], 'advance.open'); assert.ok(first.some((k) => /^advance\.(gap|ready|noSeat)/.test(k ?? '')), first.join(' '));
+    advance(w, w.now + DAY);
+    assert.equal(ask()[0], 'advance.same', 'nothing changed: he says so');
+    p.standing = Math.min(100, p.standing + 25); p.lifetimeKick += 3000;
+    advance(w, w.now + DAY);
+    assert.equal(ask()[0], 'advance.better', 'he notices what has come on');
+    p.standing = Math.max(0, p.standing - 30);
+    advance(w, w.now + DAY);
+    assert.equal(ask()[0], 'advance.worse', 'and which way it has moved: a name gone down is not "come on"');
+  });
+  ok('work he gave the player comes up when it is over: done (and the report is the first business), failed, or offered and ignored', { tags: ['scenario'] }, () => {
+    const w = plain3(), p = w.chars[w.playerId!], b = w.chars[p.bossId!];
+    const done = mkJob(w, { kind: 'collect', title: 'A small errand', brief: 'x', giver: b.id, via: 'boss', assignee: p.id, pay: 50, status: 'done', days: 7 } as never);
+    let v = begin(w, b.id);
+    assert.ok(v.lines.some((l) => keyOf(l) === 'job.ack.done'), v.lines.map((l) => l.text).join(' / '));
+    choose(w, v, 'u:business');
+    if (everything(w, v).some((x) => x.id === 'o:report')) assert.equal(v.choices[0].label, 'Tell him how the job went');
+    const failed = mkJob(w, { kind: 'deliver', title: 'Another errand', brief: 'x', giver: b.id, via: 'boss', assignee: p.id, pay: 50, status: 'active', days: 7 } as never);
+    failed.status = 'failed'; // (as jobs.ts records a job that went wrong)
+    v = begin(w, b.id);
+    assert.ok(v.lines.some((l) => keyOf(l) === 'job.ack.failed'));
+    assert.ok(!v.lines.some((l) => keyOf(l) === 'job.ack.done'), 'said once, not every visit');
+    void done; void failed;
+  });
+  ok('the same question, the same answer, nothing changed: he says it has not changed, not the same words again', { tags: ['scenario'] }, () => {
+    const w = plain3(), p = w.chars[w.playerId!], b = w.chars[p.bossId!];
+    const ask = () => { const v = begin(w, b.id); choose(w, v, 'u:business'); const x = v.choices.find((y) => /anything you need done/i.test(y.label)); if (!x) return undefined; const n = v.lines.length; choose(w, v, x.id); return v.lines.slice(n).filter((l) => l.who === 'him'); };
+    const a = ask(); advance(w, w.now + DAY); const b2 = ask();
+    if (!a || !b2) return; // (he had work the first time: not the case being tested)
+    if (a.map((l) => l.text).join() !== b2.map((l) => l.text).join()) assert.ok(true); // (something changed: a new answer)
+    assert.ok(!(a.length && b2.length && a.at(-1)!.text === b2.at(-1)!.text), 'not the same words twice: ' + b2.map((l) => l.text).join(' / '));
+  });
+  ok('a confrontation stays on its subject: denied, the player can tell how he knows, press, or let it go; pressing a superior costs his respect', { tags: ['scenario'] }, () => {
+    const c = premise(), w = c.w, cap = c.riz;
+    const f = addFact(w, { kind: 'beating', actor: cap.id, victim: c.henry.id, text: `${cap.name} had ${c.henry.name} beaten.`, district: cap.district });
+    c.henry.known[f.id] = { t: w.now, from: 'self', knowsActor: true };
+    let v = begin(w, cap.id); v = choose(w, v, 'u:confront').v; v = choose(w, v, 'accuse:' + f.id).v;
+    assert.equal(v.topic, 'accuse:' + f.id, 'still on it');
+    const ids = v.choices.map((x) => x.id.split(':').slice(0, 2).join(':'));
+    assert.ok(ids.some((x) => x.startsWith('cf:')), ids.join(' '));
+    const press = v.choices.find((x) => x.id.startsWith('cf:press'));
+    if (press) {
+      assert.match(press.note ?? '', /outranks/);
+      const r0 = cap.rels[c.henry.id].respect;
+      v = choose(w, v, press.id).v;
+      assert.ok(cap.rels[c.henry.id].respect < r0, 'pressing the man above you is remembered');
+      assert.ok(!v.choices.some((x) => x.id.startsWith('cf:press')), 'an approach made is not offered again');
+    }
+  });
+  ok('a man who owned up and was let off is not slighted: the next greeting is not cold', { tags: ['scenario'] }, () => {
+    const c = premise(), w = c.w, man = c.friend;
+    man.bossId = c.henry.id;
+    const f = addFact(w, { kind: 'robbery', actor: man.id, victim: c.henry.id, text: `${man.name} robbed ${c.henry.name}.`, district: man.district });
+    c.henry.known[f.id] = { t: w.now, from: 'witness', knowsActor: true };
+    for (let i = 0; i < 6; i++) {
+      let v = begin(w, man.id); v = choose(w, v, 'u:confront').v; v = choose(w, v, 'accuse:' + f.id).v;
+      const am = v.choices.find((x) => x.id.startsWith('cf:amends'));
+      if (!am) { social(w).talks![man.id].topics = social(w).talks![man.id].topics.filter((t) => !t.k.startsWith('accuse:')); continue; }
+      choose(w, v, am.id);
+      advance(w, w.now + DAY);
+      const g = begin(w, man.id).lines.find((l) => l.who === 'him')!;
+      assert.ok(!g.trace?.some((t) => /greet\.since\.slighted/.test(t)), g.text);
+      return;
+    }
+  });
+  ok('an accusation is said as what it was (to the player himself, not "Henry. That was you."), and a man above the player is not put in his debt', { tags: ['scenario'] }, () => {
+    const c = premise(), w = c.w, cap = c.riz;
+    const f = addFact(w, { kind: 'robbery', actor: cap.id, victim: c.henry.id, text: `${cap.name} robbed ${c.henry.name}.`, district: cap.district });
+    c.henry.known[f.id] = { t: w.now, from: 'witness', knowsActor: true };
+    let v = begin(w, cap.id); v = choose(w, v, 'u:confront').v;
+    const x = v.choices.find((y) => y.id === 'accuse:' + f.id)!;
+    assert.ok(x && !x.label.includes(c.henry.name.split(' ')[0]), x?.label);
+    v = choose(w, v, x.id).v;
+    assert.ok(!v.choices.some((y) => y.id.startsWith('cf:amends')), 'no favour owed by the man above');
+  });
+  ok('"Other business…" is the others: nothing already on the heading’s list is repeated in it', { tags: ['unit'] }, () => {
+    const w = plain3(), p = w.chars[w.playerId!];
+    const v = begin(w, p.bossId!); choose(w, v, 'u:business'); const top = v.choices.filter((x) => !['more', 'leave'].includes(x.group)).map((x) => x.id);
+    if (!v.choices.some((x) => x.id === 'all:business')) return;
+    choose(w, v, 'all:business');
+    for (const id of top) assert.ok(!v.choices.some((x) => x.id === id), 'repeated: ' + id);
+  });
+  ok('a figure goes with its own choice: a suffix on a choice that takes no figure is refused', { tags: ['unit'] }, () => {
+    const w = plain3(), p = w.chars[w.playerId!];
+    const v = begin(w, p.bossId!); choose(w, v, 'u:business'); choose(w, v, 'all:business');
+    const fig = v.choices.find((x) => x.amount), plainC = v.choices.find((x) => !x.amount && x.id.startsWith('o:'));
+    if (plainC) { const n = v.lines.length; choose(w, v, plainC.id + ':500'); assert.equal(v.lines.length, n, 'not a choice with a figure'); }
+    if (fig) { const n = v.lines.length; choose(w, v, `${fig.id}:${fig.amount!.value}`); assert.ok(v.lines.length > n, 'its figure is accepted'); }
   });
 });
 // (the subjects under a heading, as the screen would list them all)

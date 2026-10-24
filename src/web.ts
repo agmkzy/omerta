@@ -535,6 +535,8 @@ function handle(a: string, v: string) {
       const r = chooseVisit(w, S.view.v, v);
       // (what he agreed to sit down over happens there: the meeting screen, as from the old conversation)
       if (r.meeting) { advance(w, w.now + r.minutes); S.view = { t: 'meeting', m: r.meeting, lines: r.v.lines.slice(-3).map((l) => l.text) }; save(); return; }
+      // (settled another way: the existing "take action against him" screen)
+      if (r.settle && w.chars[r.settle]?.alive) return pass(r.minutes, [], { t: 'settle', id: r.settle, lines: [] });
       return pass(r.minutes, [], { t: 'talk2', v: r.v });
     }
     case 't2amt': { // a figure named for a choice: the amount (and for a loan the weekly rate) goes with it

@@ -16,7 +16,9 @@ import { newSession, perceive, type Perception, type Session } from './perceptio
 import { render } from './render';
 import { EncounterMemory } from './encounter';
 import { onAnnouncement, onAnswersTo, onIntervention, onLoanRequest, onPromise, onPromiseSeenBroken, onProtectionDemand, onReport, onReturnToPromisee, onSeekHelp, onUnknownTopic, onWhoQuestion, predictAcceptance, spendTimeAccount, type Reply } from './respond';
-import { HOSTILE, injured, offender, withdraw, type ObType, type Obligation } from './obligations';
+import { HOSTILE, injured, offender, release, withdraw, type ObType, type Obligation } from './obligations';
+import { addFavour } from '../encounters';
+import { bear } from '../core';
 import { note, social, type Request } from './social';
 import { agreement, captaincyOf, promise, request } from './tick';
 import { captainOf, chairFor, may, superiors } from './authority';
@@ -27,6 +29,9 @@ import * as door from './doors';
 import { groupOf, introduced, leadCodes, options as oldOptions, say as oldSay, startConvo, type Convo, type DOpt } from '../dialogue';
 import type { Meeting } from '../meetings';
 import { subjectsOf, withCandour } from '../talk';
+import { pathInfo } from '../path';
+import { readiness } from '../career';
+import { standingWord } from '../jobs';
 
 // ---------------------------------------------------------------- what the engine hands a screen
 export interface Say { who: 'him' | 'you' | 'narr' | 'card'; text: string; trace?: string[] }
@@ -78,7 +83,14 @@ export function relationOf(w: World, h: Character, n: Character): { level: 'stra
   const r = peek(n, h.id);
   if (r.grudge >= 0.3) return { level: 'hostile', words: 'He has no love for you.' };
   if ((r.known ?? 0) > 0.25 && r.trust < 0.06) return { level: 'cold', words: 'He doesn’t trust you.' };
+  // (what he is to the player, said as how he behaves: trust and liking are not the same thing, nor respect and liking, nor knowing
+  // a man and confiding in him)
+  if (r.trust >= 0.5 && r.affection < 0.25) return { level: 'friend', words: 'He trusts you. It isn’t friendship.' };
+  if (r.affection >= 0.35 && r.trust < 0.3) return { level: 'friend', words: 'He likes you. He doesn’t trust you yet.' };
   if (r.affection >= 0.35 || r.trust >= 0.5) return { level: 'friend', words: 'He likes you.' };
+  if ((r.fear ?? 0) >= 0.3) return { level: 'acquaintance', words: 'He’s wary of you.' };
+  if (r.respect >= 0.55 && r.affection < 0.2) return { level: 'acquaintance', words: 'He respects you. He doesn’t much like you.' };
+  if ((r.known ?? 0) >= 0.5 && r.trust < 0.3) return { level: 'acquaintance', words: 'He knows you well, and keeps his own counsel.' };
   const m = talks(w)[n.id];
   return { level: 'acquaintance', words: m?.visits ? `You’ve been to see him ${m.visits === 1 ? 'once before' : m.visits < 5 ? 'a few times' : 'often'}.` : 'You know each other.' };
 }
@@ -126,6 +138,9 @@ export function begin(w: World, npcId: Id, o: { approach?: Id } = {}): Visit {
   open(c, rel0.level);
   const m = memOf(w, n.id); m.visits++; m.last = w.now;
   door.introduce(w, h, n);
+  // (they have met: the world's record of it, which the weekly fading of trust and liking between men who never see each other reads;
+  // the old screen sets it on the way in, and without it every man the player sees here drifted as if they never met)
+  door.met(w, h, n);
   return notNow(w, v);
 }
 // The man's first word: what is on his mind about the player, most pressing first, from his own beliefs; else a greeting that fits.
@@ -155,12 +170,13 @@ function open(c: Ctx, level: string) {
     : last && w.now - last.t < 14 * DAY && last.k.startsWith('intervene:') && last.out === 'refused' ? 'greet.since.refused'
     : mm.topics.some((x) => x.t >= mm.last - DAY && w.now - x.t < 10 * DAY && confided(c, x.k.slice(5), x.sig ?? '')) ? 'greet.since.confided' : undefined;
   // (a slight the last time outweighs anything warmer: he has not forgotten it, and the greeting says so)
-  const slighted = warm && mm.visits && mm.topics.some((x) => x.t >= mm.last - DAY && w.now - x.t < 10 * DAY && SLIGHT.test(x.k) && (!x.k.startsWith('accuse:') || x.out !== 'admit')); // (the last time, he told you something of himself)
+  const slighted = warm && mm.visits && mm.topics.some((x) => x.t >= mm.last - DAY && w.now - x.t < 10 * DAY && SLIGHT.test(x.k) && (!x.k.startsWith('accuse:') || !['admit', 'amends', 'accepted'].includes(x.out))); // (owned up and let off, or taken at his word: no slight) // (the last time, he told you something of himself)
   // (he has heard the player went over his head: that comes first, until it has been said)
   const over = mm.topics.find((x) => x.k === 'overhead' && x.t >= mm.last && w.now - x.t < 21 * DAY), aboveC = over ? w.chars[over.out] : undefined;
   if (over && aboveC) { him(c, plain(n.id, 'greet.since.overhead', { aboveFirst: first(aboveC.name) }, 'cold'), String(mm.visits)); general(c); raiseHis(c); return; }
   const key = slighted ? 'greet.since.slighted' : since ? since : again ? 'greet.again' : level === 'stranger' ? (atShop ? 'greet.customer' : 'greet.stranger') : level === 'hostile' ? 'greet.hostile' : level === 'cold' ? 'greet.cold' : level === 'friend' ? 'greet.friend' : atShop ? 'greet.known' : 'greet.acquaintance';
   him(c, plain(n.id, key, {}, level === 'hostile' || level === 'cold' ? 'cold' : 'polite'), String(mm.visits));
+  jobNews(c);
   general(c);
   raiseHis(c);
   void pn;
@@ -312,6 +328,8 @@ function subjectsNow(c: Ctx, k: Pane, all: boolean): Choice[] {
     // what the player has heard that the man he promised would want to know: how it went with the man he took it to
     const mine = myPromiseTo(c), how = mine ? passOf(c, mine) : undefined;
     if (mine && how) out.push({ id: 'pass:' + mine.id + ':' + how, label: passLine(c, mine, how), group: 'matter' });
+    // (finished work of his, not yet reported to him, comes first: the old engine's report)
+    if (unreported(c)) { const r = oldGroups(c, ['org']).find((x) => x.id === 'o:report'); if (r) out.push({ ...r, label: 'Tell him how the job went', says: line(c, 'report.job') }); }
     out.push(...pending);
     // what a man in your position would naturally put to him: work from your boss, orders to your own man
     out.push(...oldRows(c, 'lead'));
@@ -339,18 +357,21 @@ function subjectsNow(c: Ctx, k: Pane, all: boolean): Choice[] {
   if (k === 'confront') {
     // what the player can put to him from this layer's records: his word, not kept as the player sees it; something he knows he did
     for (const ob of hisWordToMe(c)) { const tg = c.w.chars[(ob.spec as { target?: Id }).target ?? '']; out.push({ id: 'hisword:' + ob.id, label: line(c, tg ? 'confront.hisWord' : 'confront.hisWord.plain', { targetFirst: tg ? first(tg.name) : '' }), group: 'matter' }); }
-    for (const f of knownAgainstMine(c)) { const vic = w.chars[injured(f) ?? '']; out.push({ id: 'accuse:' + f.id, label: line(c, f.business ? 'accuse.act' : 'accuse.act.man', { shop: f.business ? w.biz[f.business]?.name ?? '' : '', victimFirst: vic ? first(vic.name) : '' }), group: 'matter' }); }
+    // (what it was, said as it was: to the player himself, to one of his, or at a place)
+    for (const f of knownAgainstMine(c)) { const vic = w.chars[injured(f) ?? '']; out.push({ id: 'accuse:' + f.id, label: line(c, vic?.id === h.id ? 'accuse.act.me' : f.business ? 'accuse.act' : 'accuse.act.man', { shop: f.business ? w.biz[f.business]?.name ?? '' : '', victimFirst: vic ? first(vic.name) : '' }), group: 'matter' }); }
     out.push(...pending, ...oldGroups(c, ['settle']).filter((x) => paneOf(x.id.slice(2)) === 'confront'));
   }
   return out.filter((x, i) => out.findIndex((y) => y.id === x.id) === i);
 }
 // One heading open: its subjects (at most four), the rest behind "Other…", the way back to the headings, and leaving
 function pane(c: Ctx, k: Pane, all = false) {
-  const rows = subjects(c, k, all), shown = all ? rows : rows.slice(0, 4);
+  // ("Other…" is the others: what is already on the heading's own list is not repeated in it)
+  const top = new Set(subjects(c, k).slice(0, 4).map((x) => x.id));
+  const rows = subjects(c, k, all), shown = all ? rows.filter((x) => !top.has(x.id)) : rows.slice(0, 4);
   const rest = all ? 0 : subjects(c, k, true).filter((x) => !shown.some((y) => y.id === x.id)).length;
   c.v.pane = k; c.v.more = all; c.v.topic = undefined;
   if (!rows.length) return home(c);
-  c.v.choices = [...shown, ...(rest ? [{ id: 'all:' + k, label: PANE_MORE[k], group: 'more' as const }] : []), { id: 'home', label: 'Something else', group: 'more' }, { id: 'leave', label: 'Leave', group: 'leave' }];
+  c.v.choices = [...shown, ...(rest ? [{ id: 'all:' + k, label: PANE_MORE[k], group: 'more' as const }] : []), ...(all ? [{ id: 'u:' + k, label: 'Back', group: 'more' as const }] : []), { id: 'home', label: 'Something else', group: 'more' }, { id: 'leave', label: 'Leave', group: 'leave' }];
 }
 // The headings: what he brings up himself first (answered directly, no heading), then Business, Personal, Confront, and leaving
 function home(c: Ctx) {
@@ -385,10 +406,10 @@ const oldConvo = (c: Ctx): Convo | undefined => (introduced(c.w, c.h, c.n) ? (c.
 // (a hint is shown only where it says what a choice costs or risks, and only if it is short: the rest is for the old screen)
 // (a subject the old engine names as a title, said as what it is: "About his trouble with Lou Santoro", "About what he asked: …")
 function speakable(o: DOpt): string {
-  const l = o.label;
+  const l = o.label.replace(/"([^"]*)"/g, '‘$1’'); // (the old engine's plain quotes inside a label)
   if (/^[“"]/.test(l) || /[?.!]$/.test(l)) return l;
   if (/^f:(enc|job):/.test(o.code)) return `About what he asked: ${l}`;
-  if (/^f:(mt:|m:|disputes|sit|debt|shop|crew|amends|memos)/.test(o.code)) return 'About ' + l.replace(/^(His|Her|The|What|Your)\b/, (x) => x.toLowerCase());
+  if (/^f:(mt:|m:|disputes|sit|debt|shop|crew|amends|memos)/.test(o.code)) return 'About ' + l.replace(/^(His|Her|The|What|Your|Protection|Trouble|Bad|Money|Loan|Debt|Stake|Arrangement|A)\b/, (x) => x.toLowerCase());
   return l;
 }
 // (what the player cannot pay for is not offered: a gift, a fee, an envelope larger than the money in his pocket)
@@ -452,6 +473,7 @@ function doOld(c: Ctx, code: string, label: string): { minutes: number; meeting?
   // (what he says is his; what happens is told; a card is a card. The old engine writes lines as text, so they are sorted by shape)
   const fn = first(c.n.name);
   if (label && res.q && res.q !== label) c.v.lines[c.v.lines.length - 1] = { who: 'you', text: res.q };
+  const from = c.v.lines.length;
   for (const l0 of res.lines) {
     // (the old engine writes plain quotes, puts a speaker's name before his words, and names him in full at the start of what he
     // does; on this screen his words are already under his name, and he is "he")
@@ -460,6 +482,13 @@ function doOld(c: Ctx, code: string, label: string): { minutes: number; meeting?
     // (his words: a line that opens with them, or with him and then them; everything else is what happened, told)
     else c.v.lines.push({ who: /^“/.test(l) || new RegExp(`^(He|His|${fn})\\b[^“]{0,80}“`).test(l) ? 'him' : 'narr', text: l });
   }
+  // (asked the same thing and answered the same way, with nothing changed since: he says that, not the same words again)
+  const said = c.v.lines.slice(from).filter((l) => l.who === 'him').map((l) => l.text).join(' '), ak = 'ans:' + code.split(':').slice(0, 3).join(':'), was = lastOf(c.w, c.n.id, ak);
+  if (label && said && was && was.sig === said.slice(0, 120) && c.w.now - was.t < 21 * DAY && c.w.now - was.t > 60) { // (only what the player asked: a man raising his own matter again says it again)
+    const keep = c.v.lines.slice(from).filter((l) => l.who !== 'him');
+    c.v.lines.splice(from); c.v.lines.push(...keep); him(c, plain(c.n.id, 'again.same', { ago: agoWords(c.w.now, was.t) }, 'flat'));
+  }
+  if (said) remember(c.w, c.n.id, ak, 'said', said.slice(0, 120));
   if (typeof res.meeting === 'string') narr(c, res.meeting);
   if (!res.convo) { c.v.old = startConvo(c.n.id); c.v.ended = true; c.v.choices = []; return { minutes: res.minutes, meeting: typeof res.meeting === 'object' ? res.meeting : undefined }; }
   c.v.old = res.convo;
@@ -468,8 +497,75 @@ function doOld(c: Ctx, code: string, label: string): { minutes: number; meeting?
   // saying a subject has run its course and the everyday questions are next, which here is the heading the talk is under)
   const inSubject = res.convo.node !== 'root' || (!!res.convo.ctx.focus && res.convo.ctx.focus !== 'talk') || !!res.convo.ctx.follow?.length;
   if (inSubject) oldSubject(c); else { c.v.old = { ...res.convo, ctx: { ...res.convo.ctx, focus: undefined } }; general(c); }
+  if (/^tk:(racket|trouble|shop)$/.test(code)) offerHelp(c);
+  guardedCue(c, code);
   return { minutes: res.minutes };
 }
+// When his money has come up and he is short (the old engine offers a gift or a loan only then: less than $300, or his shop in the
+// red), those are what the player can say next, beside whatever the subject itself allows
+function offerHelp(c: Ctx) {
+  const help = oldGroups(c, ['social', 'business']).filter((x) => /^o:(help_gift|help_loan|offer_loan|cr_cash)\b/.test(x.id) && !c.v.choices.some((y) => y.id === x.id)).slice(0, 2);
+  if (!help.length) return;
+  const i = c.v.choices.findIndex((x) => x.group === 'more' || x.group === 'leave' || x.group === 'intent');
+  c.v.choices.splice(i < 0 ? c.v.choices.length : i, 0, ...help.map((x) => ({ ...x, group: 'reply' as const })));
+}
+// What a man holds back, said as what he is to the player (never as numbers): he knows you, but doesn't trust you with it; he likes
+// you, but not that much yet; he respects you without liking you. Once a visit, when a subject about his own life came back guarded.
+function guardedCue(c: Ctx, code: string) {
+  // (each subject's own threshold, talk.ts: below it he gives the guarded answer)
+  const gate = ({ trouble: 0.45, want: 0.4, racket: 0.3, boss: 0.4 } as Record<string, number>)[code.split(':')[1]];
+  if (gate === undefined || code.split(':').length > 2 || c.v.mem.points.includes('cue') || candourOf(c) >= gate) return;
+  const r = peek(c.n, c.h.id), known = r.known ?? 0;
+  const cue = r.respect >= 0.5 && r.affection < 0.2 ? 'He’s civil with you. It’s respect, not friendship.' : r.affection >= 0.3 && r.trust < 0.3 ? 'He likes you well enough. He doesn’t trust you with that, not yet.' : known >= 0.45 ? 'He knows you by now. He keeps that to himself all the same.' : undefined;
+  if (cue) { narr(c, cue); c.v.mem.points.push('cue'); }
+}
+// ---------------------------------------------------------------- work between them, as the world recorded it
+// Work he gave the player that has come to an end since he last saw him: done (and not yet told), failed, or offered and never taken up.
+// He says so, in his own words, once; the record is the job itself (jobs.ts), and what he made of it is the record's own consequence.
+function jobNews(c: Ctx) {
+  const { w, h, n } = c;
+  const xs = w.jobs.filter((j) => j.giver === n.id && j.assignee === h.id && ['done', 'failed', 'expired'].includes(j.status) && w.now - j.created < 45 * DAY && !lastOf(w, n.id, 'job:' + j.id));
+  for (const j of xs.slice(-2)) {
+    const key = j.status === 'done' ? (j.reported ? 'job.ack.thanks' : 'job.ack.done') : j.status === 'failed' ? 'job.ack.failed' : 'job.ack.ignored';
+    him(c, plain(n.id, key, { job: jobPhrase(j.title) }, j.status === 'done' ? 'warm' : 'cold'));
+    remember(w, n.id, 'job:' + j.id, j.status);
+  }
+}
+// a job's title, as a man would refer to it ("the Costa's Deli delivery"), when it reads as a name; otherwise "that job"
+const jobPhrase = (t: string) => (t.length <= 48 ? `‘${t}’` : 'that job');
+// Finished work of his not yet reported to him: the conversation's first business (the old engine's report, which he rewards)
+const unreported = (c: Ctx) => c.w.jobs.some((j) => j.giver === c.n.id && j.assignee === c.h.id && j.status === 'done' && !j.reported);
+
+// ---------------------------------------------------------------- where the player stands with the family
+// What a man who can speak to it says when asked: from the road the family actually holds him to (path.ts: money passed up, work
+// done, the family's hard work, his name, the men who would back him, the proof), the gaps that matter most first, and against what he
+// said the last time: what has come on since, or that nothing has.
+const GOAL_RANK: Record<string, number> = { earn: 0, sponsor: 1, deeds: 2, kills: 3, name: 4, trial: 5 };
+function doAdvance(c: Ctx) {
+  const { w, h, n } = c;
+  const canSay = ['capo', 'underboss', 'boss'].includes(n.rank) || n.id === h.bossId;
+  const info = canSay ? pathInfo(w, h) : undefined, rd = canSay ? readiness(w, h) : undefined;
+  if (!canSay || !info) { him(c, plain(n.id, canSay ? 'advance.top' : 'advance.notMe')); return general(c); }
+  const lvl = (g: { done: boolean; frac: number }) => (g.done ? 4 : Math.floor(g.frac * 4));
+  const sig = info.goals.map((g) => `${g.key}=${lvl(g)}`).join(',') + `|${standingWord(h.standing)}|${Math.round(h.standing)}`;
+  const prev = lastOf(w, n.id, 'advance'), was = Object.fromEntries((prev?.sig ?? '').split('|')[0].split(',').filter(Boolean).map((x) => x.split('=')));
+  const gaps = info.goals.filter((g) => !g.done).sort((a, b) => (GOAL_RANK[a.key] ?? 9) - (GOAL_RANK[b.key] ?? 9) || a.frac - b.frac);
+  const better = prev ? info.goals.filter((g) => was[g.key] !== undefined && lvl(g) > Number(was[g.key])) : [];
+  const worse = prev ? info.goals.filter((g) => was[g.key] !== undefined && lvl(g) < Number(was[g.key])) : [];
+  const word = standingWord(h.standing), wordWas = prev?.sig?.split('|')[1], stWas = Number(prev?.sig?.split('|')[2] ?? h.standing);
+  // (which way his name has moved, by the measure itself, not by whether the word for it changed)
+  const nameUp = wordWas && wordWas !== word && h.standing > stWas, nameDown = wordWas && wordWas !== word && h.standing < stWas;
+  if (prev && (prev.sig ?? '').split('|').slice(0, 2).join('|') === sig.split('|').slice(0, 2).join('|')) him(c, plain(n.id, 'advance.same', { ago: agoWords(w.now, prev.t) }, 'flat'));
+  else if (prev && (worse.length || nameDown) && !better.length && !nameUp) him(c, plain(n.id, 'advance.worse', { ago: agoWords(w.now, prev.t), what: worse.length ? GOAL_WORD[worse[0].key] ?? 'the work' : `people call you ${word} now, not ${wordWas}` }, 'cold'));
+  else if (prev && (better.length || nameUp)) him(c, plain(n.id, 'advance.better', { ago: agoWords(w.now, prev.t), what: better.length ? GOAL_WORD[better[0].key] ?? 'the work' : `people call you ${word} now` }, 'warm'));
+  else him(c, plain(n.id, 'advance.open', { standing: word }, 'flat'));
+  if (!gaps.length) him(c, plain(n.id, rd?.openSeat ? 'advance.ready' : 'advance.noSeat'));
+  for (const g of gaps.slice(0, 2)) him(c, plain(n.id, 'advance.gap.' + (g.key === 'trial' && g.note.startsWith('waiting') ? 'trialOpen' : g.key), { note: g.note, standing: word, label: g.label }, 'flat'));
+  remember(w, n.id, 'advance', 'asked', sig);
+  general(c);
+}
+const GOAL_WORD: Record<string, string> = { earn: 'the money you pass up', deeds: 'the work', kills: 'the hard work', name: 'what people say of you', sponsor: 'the men who would back you', trial: 'your proof' };
+
 const shopOf = (c: Ctx) => { const b = ownerBiz(c.w, c.n.id); return b?.open && c.n.rank === 'civilian' ? b : undefined; };
 const feeOf = (c: Ctx) => { const b = shopOf(c)!; return Math.max(15, Math.round((b.income * 0.08) / 5) * 5); };
 const protectAvailable = (c: Ctx) => { const b = shopOf(c); return !!b && b.protection?.collectorId !== c.h.id && may(c.w, c.h, 'protect', c.n); };
@@ -484,7 +580,7 @@ const mkey = (ob: Obligation) => 'intervene:' + (ob.matter?.for ?? '') + ':' + (
 const interveneSig = (c: Ctx, ob: Obligation) => { const a = ob.matter?.against ?? '', k = captaincyOf(c.w, c.n, c.w.chars[ob.matter?.for ?? ''] ?? c.n, c.w.chars[a] ?? c.n); return `${Object.values(c.w.facts).filter((f) => c.h.known[f.id] && HOSTILE.has(f.kind) && offender(f) === a).length}:${k.knowsTrouble ? 1 : 0}`; };
 
 // ---------------------------------------------------------------- choosing
-export function choose(w: World, v: Visit, id: string): { v: Visit; minutes: number; meeting?: Meeting } { const r = chooseIn(w, v, id); return { ...r, v: notNow(w, r.v) }; }
+export function choose(w: World, v: Visit, id: string): { v: Visit; minutes: number; meeting?: Meeting; settle?: Id } { const r = chooseIn(w, v, id); return { ...r, v: notNow(w, r.v) }; }
 // While a man who came with something is still waiting on an answer, the way out is an answer: "Not now", said, not a silent exit
 // (it puts him off: his request lapses, as it would unanswered, and he knows he was put off). Leaving otherwise is just leaving.
 function notNow(w: World, v: Visit): Visit {
@@ -493,7 +589,7 @@ function notNow(w: World, v: Visit): Visit {
   v.choices = v.choices.map((x) => (x.id === 'leave' ? { ...x, label: open ? 'Not now' : 'Leave' } : x));
   return v;
 }
-function chooseIn(w: World, v: Visit, id: string): { v: Visit; minutes: number; meeting?: Meeting } {
+function chooseIn(w: World, v: Visit, id: string): { v: Visit; minutes: number; meeting?: Meeting; settle?: Id } {
   const c = ctx(w, v), [kind, a1, a2] = id.split(':');
   // moving between the headings is not said aloud and takes no time
   if (kind === 'u' || kind === 'all') { if (PANES.includes(a1 as Pane)) pane(c, a1 as Pane, kind === 'all'); return { v, minutes: 0 }; }
@@ -503,6 +599,8 @@ function chooseIn(w: World, v: Visit, id: string): { v: Visit; minutes: number; 
   // (a figure the player names goes after the choice it belongs to: o:<code>:<amount>[:<rate>])
   const base = [...v.choices, ...everything(w, v)].find((x) => x.id === id || (!!x.amount && id.startsWith(x.id + ':') && /^:\d+(:[\d.]+)?$/.test(id.slice(x.id.length))));
   const label = base?.label;
+  // (where he stands: answered from the family's actual conditions, and against what he was told last time: see doAdvance)
+  if (label && (id === 'o:promo' || id.startsWith('o:fl:promo_'))) { you(c, label); doAdvance(c); return { v, minutes: 15 }; }
   if (label && kind === 'o') { you(c, label); const r = doOld(c, id.slice(2), label); return { v, ...r }; }
   // (an approach is chosen by name and said in words: what the player says is the line it stands for)
   const spoken = base?.says ?? label;
@@ -534,6 +632,8 @@ function chooseIn(w: World, v: Visit, id: string): { v: Visit; minutes: number; 
     case 'thank': him(c, plain(c.n.id, 'react.thanks')); general(c); break;
     case 'pass': doPass(c, a1, a2 as 'done' | 'refused'); break;
     case 'hisword': doHisWord(c, a1); break;
+    case 'hw': doHoldWord(c, a1 as 'hold', a2); break;
+    case 'cf': { const r = doConfrontMove(c, a1, a2); if (r.settle) return { v, minutes, settle: c.n.id }; break; }
     case 'accuse': doAccuse(c, a1); break;
     case 'credit': {
       const ob = social(w).obs.find((o) => o.id === a2);
@@ -718,6 +818,36 @@ function doHisWord(c: Ctx, obId: Id) {
   say(w, n, h, 'ob:' + ob.id, r.says, 'own', r.honest);
   him(c, { ...r, meaning: { ...r.meaning, key: 'answer.word.' + r.says, slots: { targetFirst: tg ? first(tg.name) : 'him' } } });
   remember(w, n.id, 'hisword:' + ob.id, r.says);
+  // (not done, by his own account: the player can hold him to it, or let it go; what he said stands either way)
+  if (r.says === 'done') return general(c);
+  const over = standingOf(c) === 'over';
+  c.v.topic = 'hisword:' + ob.id;
+  c.v.choices = [
+    { id: 'hw:hold:' + ob.id, label: 'Hold him to it', note: over ? 'Politely. He outranks you.' : undefined, says: line(c, over ? 'hold.word.up' : 'hold.word'), group: 'reply' },
+    { id: 'hw:release:' + ob.id, label: 'Let it go', says: line(c, 'release.word'), group: 'reply' },
+    { id: 'back', label: 'Talk about something else', group: 'more' }, { id: 'leave', label: 'Leave', group: 'leave' },
+  ];
+}
+// Who he is to the player in the family's order: a man who answers to him, one he answers to, or neither (what may be said, and
+// what it costs, differ: pressing a man above you is allowed, and remembered)
+function standingOf(c: Ctx): 'under' | 'over' | 'peer' {
+  const { w, h, n } = c;
+  if (n.bossId === h.id || superiors(w, n).some((x) => x.id === h.id)) return 'under';
+  if (h.bossId === n.id || superiors(w, h).some((x) => x.id === n.id)) return 'over';
+  return 'peer';
+}
+function doHoldWord(c: Ctx, how: 'hold' | 'release', obId: Id) {
+  const { w, h, n } = c, ob = social(w).obs.find((o) => o.id === obId);
+  if (!ob) return general(c);
+  if (how === 'release') { release(w, ob, `${h.name} let it go`); door.regard(w, n, h.id, 'affection', 0.02, `${h.name} let him off`); him(c, plain(n.id, 'react.letgo')); remember(w, n.id, 'hisword:' + ob.id, 'released'); c.v.topic = undefined; return general(c); }
+  // (held to it: a few more days to do it, and a man who answers to the player feels it; the man above him notes that he was pressed)
+  ob.by = Math.max(ob.by, w.now + 5 * DAY);
+  const st = standingOf(c);
+  if (st === 'under') door.regard(w, n, h.id, 'fear', 0.04, `${h.name} held him to his word`);
+  if (st === 'over') door.regard(w, n, h.id, 'respect', -0.02, `${h.name} pressed him on his word`);
+  him(c, plain(n.id, st === 'over' ? 'react.held.up' : 'react.held', {}, 'flat'));
+  remember(w, n.id, 'hisword:' + ob.id, 'held');
+  c.v.topic = undefined;
   general(c);
 }
 // Accused of what the player knows he did: he admits, denies or defies, from what he thinks the player has on him and his nature
@@ -726,13 +856,53 @@ function doAccuse(c: Ctx, fid: Id) {
   const { w, h, n } = c, f = w.facts[fid];
   if (!f) return general(c);
   const k = h.known[f.id], strong = k?.from === 'witness' || k?.from === 'self' ? 1 : 0.6; // (he saw it, or was told)
-  const r = onConfrontation(c.pn(), h, true, strong);
+  answerAccusation(c, f, strong);
+}
+// He answers what is put to him (respond.onConfrontation: what he thinks the player has on him, his fear, pride and conscience), and
+// the player answers that: the subject stays open until it is settled, dropped, or taken elsewhere
+function answerAccusation(c: Ctx, f: Fact, evidence: number) {
+  const { w, h, n } = c;
+  const r = onConfrontation(c.pn(), h, true, evidence);
   him(c, { ...r, meaning: { ...r.meaning, key: 'accused.' + r.intent } });
   remember(w, n.id, 'accuse:' + f.id, r.intent);
   if (r.intent === 'admit') door.regard(w, n, h.id, 'fear', 0.03, `${h.name} knew what he did`);
   else if (r.intent === 'deny') (n.denied ??= {})[f.id] = Math.floor(w.now / DAY);
   else door.regard(w, n, h.id, 'affection', -0.04, `${h.name} accused him`);
+  c.v.topic = 'accuse:' + f.id;
+  const used = new Set(c.v.mem.argued), st = standingOf(c), k = h.known[f.id];
+  const ch: Choice[] = [];
+  if (r.intent === 'deny' && !used.has('cf:evidence')) ch.push({ id: 'cf:evidence:' + f.id, label: 'Tell him how you know', note: k?.from === 'witness' || k?.from === 'self' ? 'You saw it.' : `You heard it from ${w.chars[k?.from ?? '']?.name.split(' ')[0] ?? 'someone'}.`, says: line(c, k?.from === 'witness' || k?.from === 'self' ? 'accuse.saw' : 'accuse.heard'), group: 'reply' });
+  if (r.intent !== 'admit' && !used.has('cf:press')) ch.push({ id: 'cf:press:' + f.id, label: 'Pressure', note: st === 'over' ? 'He outranks you. He will remember it.' : st === 'under' ? 'He answers to you.' : 'Make him think about it.', says: line(c, 'accuse.press.' + st), group: 'reply' });
+  // (a man above the player is not put in his debt: he can be asked to leave the player's people alone, or let be)
+  if (r.intent === 'admit' && st !== 'over') ch.push({ id: 'cf:amends:' + f.id, label: 'Give him a chance to make it right', note: 'He will owe you for it.', says: line(c, 'accuse.amends'), group: 'reply' });
+  if (r.intent === 'admit') ch.push({ id: 'cf:warn:' + f.id, label: st === 'over' ? 'Ask him to leave yours alone' : 'Warn him', says: line(c, st === 'over' ? 'accuse.warn.up' : 'accuse.warn'), group: 'reply' });
+  if (r.intent === 'defy') ch.push({ id: 'cf:settle:' + f.id, label: 'Settle it another way', note: 'Not with words.', says: line(c, 'accuse.settle'), group: 'reply' }, { id: 'cf:back:' + f.id, label: 'Back down', says: line(c, 'accuse.back'), group: 'reply' });
+  if (r.intent === 'deny') ch.push({ id: 'cf:accept:' + f.id, label: 'Take his word for it', says: line(c, 'accuse.accept'), group: 'reply' });
+  if (r.intent === 'admit') ch.push({ id: 'cf:accept:' + f.id, label: 'Leave it there', says: line(c, 'accuse.leave'), group: 'reply' });
+  c.v.choices = [...ch.slice(0, 4), { id: 'back', label: 'Talk about something else', group: 'more' }, { id: 'leave', label: 'Leave', group: 'leave' }];
+}
+// An approach to the accusation: the evidence, pressure (what it costs depends on who he is to the player), making it right, a warning,
+// backing down, taking his word; or taking it out of the conversation (the old "take action against him" screen)
+function doConfrontMove(c: Ctx, move: string, fid: Id): { settle?: boolean } {
+  const { w, h, n } = c, f = w.facts[fid];
+  if (!f) { general(c); return {}; }
+  const st = standingOf(c), k = h.known[f.id], seen = k?.from === 'witness' || k?.from === 'self';
+  c.v.mem.argued.push('cf:' + move);
+  if (move === 'evidence') { answerAccusation(c, f, seen ? 1.6 : 1.1); return {}; }
+  if (move === 'press') {
+    door.regard(w, n, h.id, 'fear', st === 'under' ? 0.08 : st === 'peer' ? 0.05 : 0.02, `${h.name} pressed him`);
+    if (st === 'over') { door.regard(w, n, h.id, 'respect', -0.06, `${h.name} pressed him, above his place`); bear(w, n, h.id, 0.1, `${h.name} leaned on him over ${f.text}`); }
+    else if (st === 'peer') door.regard(w, n, h.id, 'affection', -0.04, `${h.name} leaned on him`);
+    answerAccusation(c, f, seen ? 1.2 : 0.8); return {};
+  }
+  if (move === 'amends') { addFavour(w, h.id, n.id, 1, 'let it go when he owned up' /* (a short phrase: the old engine says a favour back as one, voicesheet {What}) */); him(c, plain(n.id, 'accused.amends', {}, 'flat')); remember(w, n.id, 'accuse:' + f.id, 'amends'); }
+  else if (move === 'warn') { door.regard(w, n, h.id, 'fear', st === 'over' ? 0.01 : 0.05, `${h.name} warned him`); him(c, plain(n.id, st === 'over' ? 'accused.warned.up' : 'accused.warned', {}, 'flat')); remember(w, n.id, 'accuse:' + f.id, 'warned'); }
+  else if (move === 'back') { door.regard(w, n, h.id, 'respect', -0.04, `${h.name} backed down`); him(c, plain(n.id, 'accused.backed', {}, 'flat')); remember(w, n.id, 'accuse:' + f.id, 'backed'); }
+  else if (move === 'accept') { him(c, plain(n.id, 'react.letgo')); remember(w, n.id, 'accuse:' + f.id, 'accepted'); }
+  else if (move === 'settle') { remember(w, n.id, 'accuse:' + f.id, 'settle'); c.v.ended = true; c.v.choices = []; return { settle: true }; }
+  c.v.topic = undefined;
   general(c);
+  return {};
 }
 // The "not yet"s he has had from the player on this matter, across every promise about it: a new promise does not wipe the slate
 function delaysOn(c: Ctx, ob: Obligation) {
@@ -766,7 +936,7 @@ function doPass(c: Ctx, obId: Id, how: 'done' | 'refused') {
 const HIS_OWN = /^(trouble|shop|racket|want|op:|kin:|boss|pressed:)/;
 function onHisMind(c: Ctx, floor: number): { key: string; weight: number; sig: string } | undefined {
   // (said already, and nothing about it has changed: he has nothing new to say of it, unless it is weighing on him)
-  const stale = (x: { key: string; sig: string }) => { const l = lastOf(c.w, c.n.id, 'mind:' + x.key); return !!l && (l.sig === x.sig || c.w.now - l.t < 14 * DAY); };
+  const stale = (x: { key: string; sig: string }) => { const l = lastOf(c.w, c.n.id, 'mind:' + x.key), a = lastOf(c.w, c.n.id, 'ans:tk:' + x.key); return (!!l && (l.sig === x.sig || c.w.now - l.t < 14 * DAY)) || (!!a && c.w.now - a.t < 14 * DAY); }; // (or asked about lately)
   const xs = subjectsOf(c.w, c.h, c.n).filter((x) => HIS_OWN.test(x.key) && x.weight >= floor && !layered(c, 'tk:' + x.key));
   const s = xs.find((x) => !stale(x)) ?? (xs[0] && xs[0].weight >= 0.5 ? xs[0] : undefined);
   return s ? { key: s.key, weight: s.weight, sig: s.sig } : undefined;

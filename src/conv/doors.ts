@@ -1,7 +1,7 @@
 // The action catalogue (spec §3.2): everything the conversation layer does to the world goes through here, and everything here goes
 // through a door the world already has. Nothing in src/conv writes a world record directly (architecture test: conv/integration).
 // Each action leaves an act record (social.log) that obligations are kept or broken by, and, where the world records it, a fact.
-import { addFact, bear, compat, feel, knowMore, learn, transfer } from '../core';
+import { addFact, bear, compat, feel, knowMore, learn, rel, transfer } from '../core';
 import { addFavour } from '../encounters';
 import { discipline as booksDiscipline } from '../books';
 import { agreeAsk, askBetween, layoffFor, move as askMove, openAsk } from '../asks';
@@ -86,6 +86,8 @@ export function spendTime(w: World, a: Character, b: Character, about = ''): Act
   if (c > 0.15) feel(w, b, a.id, 'trust', 0.03, 'an evening together');
   return record(w, { actor: a.id, act: 'spendTime', target: b.id, about });
 }
+// met: two men have met (the world's record of it, Rel.lastMet, which the weekly fading of trust and liking reads, core.feelingsWeek)
+export function met(w: World, a: Character, b: Character): void { rel(a, b.id).lastMet = rel(b, a.id).lastMet = w.now; }
 // introduce: the player and a man now know each other by name (the player's record of who he has met; core.knowMore)
 export function introduce(w: World, p: Character, t: Character): void {
   if (!p.intro?.[t.id]) (p.intro ??= {})[t.id] = w.now;
