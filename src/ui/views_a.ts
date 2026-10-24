@@ -1,3 +1,4 @@
+import { newTalk } from './talk2';
 import { enterpriseLine, lineOf } from '../rackets';
 import { personTexture } from '../sitmoves';
 import { viewOf } from '../temper';
@@ -217,8 +218,8 @@ function guideCard(): string {
     : [prot ? 'Offer a shopkeeper protection, and press it' : 'Offer a shopkeeper protection', 'Rackets, under “Shops you could lean on”: pick a shop and put it to the owner. If he says no, it isn’t over: you can come back to it with better terms, an argument, or time.', prot, 'tab:rackets', 'Find a shop'];
   const steps: [string, string, boolean, string, string][] = [
     ['Show your face to ' + (boss?.name ?? 'your boss'), 'He is the man you answer to. Respect starts with turning up.', !!g['g:boss'], boss ? `talk:${boss.id}` : '', 'Go and find him'],
-    ['Ask a man what’s on his mind', `Every man has his own worries. In a conversation, pick something under “On his mind”: his business, not yours.${peer && peer !== boss ? ` ${peer.name} is in the same crew as you.` : ''}`, tk, peer ? `talk:${peer.id}` : 'people:', peer ? `Talk to ${firstName(peer)}` : 'Find someone'],
-    ['Sit down with a man at the club', 'Sit with one of your own at the social club and talk. Ask what is on his mind, or what he makes of the others.', !!g['g:aside'], 'place:club', 'Go to the club'],
+    ['Ask a man what’s on his mind', `Every man has his own worries. ${newTalk() ? 'In a conversation, choose Personal: ask what’s new, or take him for a drink, and let him talk about himself.' : 'In a conversation, pick something under “On his mind”: his business, not yours.'}${peer && peer !== boss ? ` ${peer.name} is in the same crew as you.` : ''}`, tk, peer ? `talk:${peer.id}` : 'people:', peer ? `Talk to ${firstName(peer)}` : 'Find someone'],
+    ['Sit down with a man at the club', newTalk() ? 'Sit with one of your own at the social club. Business is work and money, Personal is the man himself, Confront is for what needs having out.' : 'Sit with one of your own at the social club and talk. Ask what is on his mind, or what he makes of the others.', !!g['g:aside'], 'place:club', 'Go to the club'],
     protStep,
     ['Follow a story', 'Stories keeps every matter you know of, in the order you learned it, and what you can do about it. Open one.', !!g['g:story'], 'tab:stories', 'Open Stories'],
     ['Let a week go by', 'Hit Wait. The world moves while you do: men answer you, rackets pay, stories move on.', !!g['g:wait'] && w.now >= 7 * DAY, 'wait:', 'Let time pass'],

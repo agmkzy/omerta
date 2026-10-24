@@ -538,7 +538,7 @@ function handle(a: string, v: string) {
       return pass(r.minutes, [], { t: 'talk2', v: r.v });
     }
     case 't2amt': { // a figure named for a choice: the amount (and for a loan the weekly rate) goes with it
-      const amt = Number((document.getElementById('t2fig') as HTMLInputElement | null)?.value), rate = document.getElementById('t2figr') as HTMLInputElement | null;
+      const amt = Number((document.getElementById('t2fig:' + v) as HTMLInputElement | null)?.value), rate = document.getElementById('t2figr:' + v) as HTMLInputElement | null; // (each figure goes with its own choice)
       if (!Number.isFinite(amt)) return;
       return handle('t2', `${v}:${Math.round(amt)}${rate ? `:${Number(rate.value) / 100}` : ''}`);
     }

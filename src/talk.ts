@@ -53,7 +53,11 @@ export const said = (w: World, t: Character, key: string, code: string) => remem
 export const lastSaid = (t: Character, key: string) => mem(t, 'tkc:' + key)?.sig;
 export const done = (key: string): Choice => ({ code: `tk:${key}:end`, label: '“Let’s leave it there.”' });
 export const ch = (key: string, code: string, label: string, hint?: string, big?: boolean): Choice => ({ code: `tk:${key}:${code}`, label, hint, big });
-export const trust = (x: X) => peek(x.t, x.p.id).trust;
+export const trust = (x: X) => Math.max(peek(x.t, x.p.id).trust, candour.who === x.t.id ? candour.v : 0);
+// Gate 3: how freely a man talks about his own life to someone he has been getting to know, set by the new conversation screen
+// while he talks (conv/visit.ts candourOf); unset, it is trust alone, as before
+const candour = { who: '', v: 0 };
+export function withCandour<T>(who: Id, v: number, f: () => T): T { const was = { ...candour }; candour.who = who; candour.v = v; try { return f(); } finally { Object.assign(candour, was); } }
 const warm = (x: X, amt: number, kind: string) => regard(x.w, x.t, x.p, 'affection', amt, kind);
 // What he has told you, in plain words, kept with what you know about him (shown beside the conversation). Only ever what he said
 // or showed you, never what the world knows about him privately. Bounded: the latest few.

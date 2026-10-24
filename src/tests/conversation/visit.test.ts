@@ -6,7 +6,9 @@ import { describe, test as ok } from 'vitest';
 import { advance, deserialize, serialize } from '../../engine';
 import { DAY } from '../../types';
 import { createWorld } from '../../world';
-import { createDebt } from '../../core';
+import { addFact, createDebt } from '../../core';
+import { promise } from '../../conv/tick';
+import { superiors } from '../../conv/authority';
 import { begin, choose, everything, relationOf, type Visit } from '../../conv/visit';
 import { approaches } from '../../conv/approach';
 import { social } from '../../conv/social';
@@ -208,3 +210,135 @@ describe('a visit, under three headings', () => {
     assert.equal(v.pane, 'business', 'still on business once the matter is settled');
   });
 });
+
+// Gate 3 refinement: personal talk that develops, delays remembered, Confront from the layer's records, going over a captain's head
+describe('a visit, over time', () => {
+  ok('evenings with the same man turn on different things in his life, and what he has said, unchanged, he does not say again', { tags: ['scenario'] }, () => {
+    const c = gcast(3)!, w = c.w, m = c.friend;
+    const raised: string[] = [];
+    for (let d = 0; d < 6; d++) {
+      const v = begin(w, m.id); choose(w, v, 'u:personal'); choose(w, v, 'spend');
+      raised.push(...(social(w).talks?.[m.id]?.topics ?? []).filter((x) => x.k.startsWith('mind:') && x.t === w.now).map((x) => x.k));
+      advance(w, w.now + 4 * DAY);
+    }
+    assert.ok(new Set(raised).size >= 3, `subjects raised: ${raised.join(', ')}`);
+    const counts = raised.reduce<Record<string, number>>((a, k) => ({ ...a, [k]: (a[k] ?? 0) + 1 }), {});
+    assert.ok(Object.values(counts).every((n) => n <= 2), JSON.stringify(counts));
+  });
+  ok('a man put off twice remembers it: he asks as a man who has been told "a few days" before, and it costs more each time', { tags: ['scenario'] }, () => {
+    const c = premise(), w = c.w;
+    advance(w, w.now + DAY);
+    let v = begin(w, c.nate.id); v = pick(w, v, /What’s new/); v = pick(w, v, /I’ll talk to/);
+    const trust: number[] = [], opened: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      advance(w, w.now + 3 * DAY + 120); // (he asks again only after three days; three times before the promise's ten days are out)
+      v = begin(w, c.nate.id); opened.push(said(v).at(-1)!);
+      const ny = v.choices.find((x) => x.id.startsWith('report:notyet'));
+      if (!ny) break;
+      v = choose(w, v, ny.id).v; trust.push(c.nate.rels[c.henry.id].trust);
+    }
+    assert.equal(trust.length, 3, opened.join(' / '));
+    assert.notEqual(opened[1], opened[0], 'the second time he asks is not the first');
+    assert.ok(trust[2] < trust[1] && trust[1] < trust[0], `each delay after the first costs him trust: ${trust.join(', ')}`);
+  });
+  ok('told how it went, the answer to "did you talk to them?" is the whole of it: no separate thanks for something that failed', { tags: ['scenario'] }, () => {
+    const c = premise(), w = c.w;
+    advance(w, w.now + DAY);
+    let v = begin(w, c.nate.id); v = pick(w, v, /What’s new/); v = pick(w, v, /I’ll talk to/);
+    v = begin(w, c.riz.id); v = pick(w, v, /having trouble with/); v = pick(w, v, /our ground/);
+    for (let d = 0; d < 10; d++) { advance(w, w.now + DAY); const a = approaches(w).find((x) => x.who === c.riz.id); if (a) { const rv = begin(w, c.riz.id, { approach: a.id }); choose(w, rv, rv.choices[0].id); } }
+    v = begin(w, c.nate.id);
+    const r = v.choices.find((x) => x.id.startsWith('report:done'));
+    assert.ok(r && r.id.split(':')[3], v.choices.map((x) => x.id).join(' '));
+    choose(w, v, r.id);
+    assert.ok(!v.choices.some((x) => x.id.startsWith('pass:')) && !everything(w, v).some((x) => x.id.startsWith('pass:')), 'nothing left to pass on');
+  });
+  ok('Confront: his word to the player, past its time and not done as the player sees it, can be put to him; he answers for himself', { tags: ['scenario'] }, () => {
+    const c = premise(), w = c.w, cap = c.riz, chair = superiors(w, cap)[0] ?? cap;
+    const ob = promise(w, { type: 'action', obligor: cap.id, beneficiary: c.henry.id, promisee: c.henry.id, spec: { kind: 'actionDone', act: 'raise', target: chair.id, about: 'matter' }, from: w.now, by: w.now + 2 * DAY, notify: [c.henry.id] });
+    assert.ok(!subjectsUnder(w, cap.id, 'confront').some((x) => x.id === 'hisword:' + ob.id), 'not before its time');
+    advance(w, w.now + 3 * DAY);
+    if (ob.status !== 'pending' && ob.status !== 'broken') return;
+    let v = begin(w, cap.id); v = choose(w, v, 'u:confront').v;
+    const x = v.choices.find((y) => y.id === 'hisword:' + ob.id);
+    assert.ok(x, v.choices.map((y) => y.label).join(' | '));
+    const n = v.lines.length; v = choose(w, v, x.id).v;
+    assert.equal(v.lines[n + 1]?.who, 'him');
+    assert.ok((social(w).said ?? []).some((s) => s.by === cap.id && s.to === c.henry.id && s.subject === 'ob:' + ob.id), 'what he said is on record, true or not');
+  });
+  ok('Confront: only what the player knows: an act he knows a man did to one of his own can be put to him; one he does not know, cannot', { tags: ['scenario'] }, () => {
+    const c = premise(), w = c.w, man = c.lou;
+    const f = addFact(w, { kind: 'beating', actor: man.id, victim: c.henry.id, text: `${man.name} beat ${c.henry.name}.`, district: man.district });
+    c.henry.known[f.id] = { t: w.now, from: 'public', knowsActor: false };
+    assert.ok(!subjectsUnder(w, man.id, 'confront').some((x) => x.id === 'accuse:' + f.id), 'he does not know who did it');
+    c.henry.known[f.id] = { t: w.now, from: 'self', knowsActor: true };
+    let v = begin(w, man.id); v = choose(w, v, 'u:confront').v;
+    const x = v.choices.find((y) => y.id === 'accuse:' + f.id);
+    assert.ok(x, v.choices.map((y) => y.label).join(' | '));
+    v = choose(w, v, x.id).v;
+    const out = social(w).talks?.[man.id]?.topics.find((t) => t.k === 'accuse:' + f.id)?.out;
+    assert.ok(['admit', 'deny', 'defy'].includes(out!), String(out));
+    if (out === 'deny') assert.ok(man.denied?.[f.id] != null, 'a denial to a man who knows is a lie on record');
+  });
+  ok('a refused matter can be taken over the captain’s head, and the captain thinks less of the man who did it', { tags: ['scenario'] }, () => {
+    const c = premise(), w = c.w, cap = c.riz, above = superiors(w, cap).find((x) => x.alive)!;
+    advance(w, w.now + DAY);
+    let v = begin(w, c.nate.id); v = pick(w, v, /What’s new/); v = pick(w, v, /I’ll do what I can/);
+    begin(w, cap.id); // (he has been to see his captain, who said no: as the visit records it)
+    social(w).talks![cap.id].topics.push({ k: 'intervene:' + c.nate.id + ':' + c.lou.id, t: w.now, out: 'refused', sig: 'x' });
+    const r0 = cap.rels[c.henry.id]?.respect ?? 0;
+    v = begin(w, above.id); v = choose(w, v, 'u:business').v;
+    const x = v.choices.find((y) => y.id.startsWith('intervene:'));
+    assert.ok(x && /wouldn’t touch it|won’t take it up/.test(x.label), v.choices.map((y) => y.label).join(' | '));
+    choose(w, v, x.id);
+    assert.ok((cap.rels[c.henry.id]?.respect ?? 0) < r0, 'his captain hears of it');
+    advance(w, w.now + DAY);
+    const g = begin(w, cap.id).lines.find((l) => l.who === 'him')!;
+    assert.ok(g.trace?.some((t) => /greet\.since\.overhead/.test(t)), 'and says so the next time: ' + g.text);
+  });
+  ok('a man who came with something, left unanswered, is told "not now": his request is put off, not left hanging, and not asked again that day', { tags: ['scenario'] }, () => {
+    const c = premise(), w = c.w;
+    let came: string | undefined;
+    for (let d = 0; d < 14 && !came; d++) { advance(w, w.now + DAY); came = approaches(w).find((a) => a.who === c.nate.id)?.id; }
+    if (!came) return;
+    const v = begin(w, c.nate.id, { approach: came });
+    assert.equal(v.choices.find((x) => x.id === 'leave')?.label, 'Not now');
+    choose(w, v, 'leave');
+    assert.ok(v.lines.some((l) => l.who === 'you' && l.text === 'Not now.'));
+    assert.ok(!approaches(w).some((a) => a.id === came), 'put off, not still waiting');
+  });
+});
+describe('a visit, after words', () => {
+  ok('a man accused, who did not own up, greets the player the next time as a man who has not forgotten it', { tags: ['scenario'] }, () => {
+    const c = premise(), w = c.w, man = c.friend;
+    const f = addFact(w, { kind: 'beating', actor: man.id, victim: c.henry.id, text: `${man.name} beat ${c.henry.name}.`, district: man.district });
+    c.henry.known[f.id] = { t: w.now, from: 'self', knowsActor: true };
+    let v = begin(w, man.id); v = choose(w, v, 'u:confront').v; v = choose(w, v, 'accuse:' + f.id).v;
+    const out = social(w).talks?.[man.id]?.topics.find((t) => t.k === 'accuse:' + f.id)?.out;
+    advance(w, w.now + 2 * DAY);
+    const g = begin(w, man.id).lines.find((l) => l.who === 'him')!;
+    if (out === 'admit') assert.ok(!g.trace?.some((t) => /greet\.since\.slighted/.test(t)));
+    else assert.ok(g.trace?.some((t) => /greet\.since\.slighted/.test(t)), g.text + ' / ' + g.trace?.join(' '));
+  });
+});
+describe('a visit, as the player reads it', () => {
+  const plain3 = () => { const w = createWorld(3, 'Tony Marino'); social(w); advance(w, w.now + 3 * DAY); return w; };
+  const screens = (w: Parameters<typeof begin>[0], id: string) => { const all: { id: string; label: string }[] = []; for (const k of ['business', 'personal', 'confront']) { const v = begin(w, id); choose(w, v, 'u:' + k); if (v.pane !== k) continue; all.push(...v.choices); choose(w, v, 'all:' + k); all.push(...v.choices); } return all; };
+  ok('nothing the player cannot pay for is offered, and the old engine’s subjects are said, not titled', { tags: ['unit'] }, () => {
+    const w = plain3(), p = w.chars[w.playerId!];
+    p.cash = 120;
+    const ids = [p.bossId!, ...Object.values(w.chars).filter((c) => c.alive && c.bossId === p.bossId && c.id !== p.id).map((c) => c.id), ...Object.values(w.biz).filter((b) => b.open && w.chars[b.ownerId]?.rank === 'civilian').slice(0, 4).map((b) => b.ownerId)];
+    for (const id of ids) for (const x of screens(w, id)) {
+      const m = /^(Give|Pay|Go, with|Make a call, put up|Take this|Put|Hand|Cover)\b[^$]*\$([\d,]+)/.exec(x.label);
+      assert.ok(!m || Number(m[2].replace(/,/g, '')) <= p.cash, `offered beyond his means: ${x.label}`);
+      if (/^o:f:(mt:|m:|disputes|sit|debt|shop|crew|amends|memos|enc:|job:)/.test(x.id)) assert.ok(/^(About|“)/.test(x.label) || /[?.!]$/.test(x.label), `a title, not something said: ${x.label}`);
+    }
+  });
+  ok('a man who has said he has no use for his captain is not asked how he finds working for him', { tags: ['unit'] }, () => {
+    const c = gcast(3)!, w = c.w, m = c.friend, b = w.chars[m.bossId!];
+    (c.henry.insight ??= {})[m.id] = [`n:Can’t stand ${b.name}.`];
+    for (const x of screens(w, m.id)) assert.doesNotMatch(x.label, new RegExp(`working for ${b.name.split(' ')[0]}`));
+  });
+});
+// (the subjects under a heading, as the screen would list them all)
+function subjectsUnder(w: Parameters<typeof begin>[0], id: string, k: 'business' | 'personal' | 'confront') { const v = begin(w, id); choose(w, v, 'u:' + k); if (v.pane !== k) return []; choose(w, v, 'all:' + k); return v.pane === k ? v.choices : []; }
