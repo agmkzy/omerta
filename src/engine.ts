@@ -18,6 +18,7 @@ import { addStake, bizMove, businessWeek, seizeShare } from './econ';
 import { daily, ventureWeek } from './jobs';
 import { pendingTick, purge } from './consequences';
 import { memoTick } from './dialogue';
+import { socialDay } from './conv/tick';
 import { encounterTick, eventTick } from './encounters';
 import { enterpriseWeek, opsDaily } from './rackets';
 import { commissionTick, politicsCoup, politicsWeek } from './politics';
@@ -56,6 +57,7 @@ export function advance(w: World, until: number) {
       summonsTick(w);
       memoTick(w);
       pendingTick(w);
+      socialDay(w); // Gate 2a: the conversation layer's requests and obligations (conv/tick.ts); nothing without its records
       encounterTick(w);
       eventTick(w);
       dangerTick(w);

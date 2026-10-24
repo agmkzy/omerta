@@ -6,7 +6,7 @@
 // about what their men are doing and have views. The player and the NPCs use exactly the same moves; NPCs choose theirs from who
 // they are. Each kind of ask only says what is being asked, what it is worth to the man asked, and what yes does in the real world.
 import { ASKS } from './askkinds'; // first: the registry must exist before anything below can reach matters.ts
-import { addFact, bear, bearOn, clamp, createDebt, restructure, ease, easeOn, famName, feel, feelOn, money, notifyProtector, ownerBiz, payDebt, peek, regard, rel, repute, witnessesAt } from './core';
+import { addFact, bear, bearOn, clamp, createDebt, transfer, restructure, ease, easeOn, famName, feel, feelOn, money, notifyProtector, ownerBiz, payDebt, peek, regard, rel, repute, witnessesAt } from './core';
 import { loanPosition } from './negotiate';
 import { say as vsay } from './voicesheet';
 import { bizMove, changedSince, giveTime, noteRefusal, priceOf, sellerFloor, sellTo, setCollector, stakeRoom } from './econ';
@@ -311,6 +311,14 @@ function answer(w: World, s: Situation, a: Character, t: Character, K: AskKind, 
   say('no', { again: tried(S, 'no'), reason: why });
   bumpTried(S, 'no');
   return { answer: 'no', lines };
+}
+
+// Gate 2a: a yes decided elsewhere (the conversation layer's own decision, conv/respond.ts) carried out by the kind's own effects,
+// exactly as any yes is: what agreeing to this kind of ask does in the world stays in one place.
+export function agreeAsk(w: World, s: Situation): Outcome {
+  const K = kindOf(s), a = asker(w, s), t = askee(w, s);
+  if (!K || !a || !t || !isOpen(s)) return { lines: [], closed: true };
+  return finish(w, s, a, t, K, stance(w, s, t.id), [], false);
 }
 
 // V90: he thinks again, on what has just been said (exchange.ts): the same decision as any answer, without a new move.
@@ -776,7 +784,7 @@ ASKS.borrow = {
   better: (w, s) => { const amt = s.terms?.amt ?? 0, next = Math.round(amt * 0.7 / 50) * 50; return next >= 150 && next < amt ? next : undefined; },
   yes: (w, s, a, t) => {
     const amt = Math.min(s.terms?.amt ?? 0, Math.floor(t.cash * 0.6)), pos = loanPosition(w, t, a, amt);
-    t.cash -= amt; a.cash += amt;
+    transfer(w, t, a, amt, 'loan', 'a loan');
     const d = createDebt(w, t.id, a.id, amt, pos.rate, a.isPlayer ? 'a loan to you' : 'a private loan');
     const f = addFact(w, { kind: 'loan', actor: t.id, victim: a.id, amount: amt, story: 'sit:' + s.id, text: `${t.name} lent ${a.name} ${money(amt)}.`, district: t.district });
     d.cause = f.id;
@@ -814,9 +822,8 @@ ASKS.lend = {
   counter: (w, s, a, t) => { const amt = s.terms?.amt ?? 0, b = ownerBiz(w, t.id); return amt >= 1000 && !(b && b.distress > 0) ? { amt: 500, why: 'I don’t need more than that' } : undefined; },
   yes: (w, s, a, t) => {
     const amt = s.terms?.amt ?? 0, rate = lendRate(s, a), b = s.biz ? w.biz[s.biz] : undefined;
-    a.cash -= amt;
-    // (money lent for a business goes into the business: econ.bizMove keeps its books)
-    if (b && b.open && b.ownerId === t.id) { bizMove(w, b, amt, 'aid', a.id); b.distress = 0; } else t.cash += amt;
+    // (money lent for a business goes into the business: econ.bizMove keeps its books; to the man himself, core.transfer)
+    if (b && b.open && b.ownerId === t.id) { a.cash -= amt; bizMove(w, b, amt, 'aid', a.id); b.distress = 0; } else transfer(w, a, t, amt, 'loan', 'a loan'); // (to a business)
     const d = createDebt(w, a.id, t.id, amt, rate, b ? 'business loan' : 'a private loan');
     const f = addFact(w, { kind: 'loan', actor: a.id, victim: t.id, amount: amt, story: 'sit:' + s.id, text: `${a.name} lent ${t.name} ${money(amt)}.`, district: t.district });
     d.cause = f.id;
@@ -871,7 +878,7 @@ ASKS.recruit = {
     const out = recruitProspect(w, a, t); // the existing mechanics: rank, place, crew, the $150 start, the fact
     if (t.bossId !== a.id) return out.join(' ');
     const extra = Math.max(0, Math.min(amt - RECRUIT_COST, a.cash));
-    if (extra) { a.cash -= extra; t.cash += extra; }
+    if (extra) transfer(w, a, t, extra, 'gift', 'to start');
     if (a.isPlayer) t.memos.push({ id: 'm' + w.nextId++, t: w.now, other: a.id, kind: 'agreement', text: `You took him on with ${money(RECRUIT_COST + extra)} to start.` });
     return a.isPlayer ? out.join(' ') : `${t.name} shakes ${first(a)}'s hand. He runs with him now.`;
   },
@@ -910,7 +917,7 @@ ASKS.layoff = {
     if (guilty && f) {
       // what he did to the man is what he makes good: what he took, if he took something; otherwise (an NPC) what he can spare
       const rest = Math.round(Math.min(f.amount ? f.amount : t.isPlayer ? 0 : 800, t.cash * 0.5) / 10) * 10;
-      if (rest >= 50) { t.cash -= rest; v.cash += rest; line = `${t.name} studies his shoes and agrees to make it right: ${money(rest)} to ${v.name}.`; }
+      if (rest >= 50) { transfer(w, t, v, rest, 'gift', 'to make it right'); line = `${t.name} studies his shoes and agrees to make it right: ${money(rest)} to ${v.name}.`; }
     }
     tell(w, s, `${t.name} agreed to leave ${v.name} alone after ${a.name} had a word.`, { actor: t.id, victim: v.id, witnesses: [a.id, v.id], minor: true });
     if (!v.isPlayer && !a.isPlayer && a.id !== v.id) npcFavour(w, a, v, `having a word with ${t.name}`); // he owes the man who spoke for him
@@ -973,7 +980,7 @@ ASKS.favour = {
   yes: (w, s, a, t) => {
     const f = favOf(w, s), what = s.terms?.what;
     let line = '';
-    if (what === 'money') { const pay = Math.max(0, Math.min(s.terms?.amt ?? 0, t.cash)); t.cash -= pay; a.cash += pay; line = `${t.isPlayer ? 'You put' : `${first(t)} puts`} ${money(pay)} in ${a.isPlayer ? 'your' : 'his'} hand.`; }
+    if (what === 'money') { const pay = transfer(w, t, a, s.terms?.amt ?? 0, 'gift', 'a favour called in'); line = `${t.isPlayer ? 'You put' : `${first(t)} puts`} ${money(pay)} in ${a.isPlayer ? 'your' : 'his'} hand.`; }
     else if (what === 'muscle') {
       t.heat = clamp(t.heat + 0.12, 0, 1.5);
       line = `${t.isPlayer ? 'You stand' : `${first(t)} stands`} beside ${a.isPlayer ? 'you' : first(a)} when it counts.`;
@@ -1088,7 +1095,7 @@ ASKS.amends = {
   short: (w, s, a, amt) => (amt > 0 && a.cash < amt ? 'You reach for your money and come up short. Better to wait until you can do it properly.' : undefined),
   yes: (w, s, a, t) => {
     const amt = Math.max(0, Math.min(s.terms?.amt ?? 0, a.cash));
-    if (amt) { a.cash -= amt; t.cash += amt; }
+    if (amt) transfer(w, a, t, amt, 'gift', 'amends');
     const r = rel(t, a.id); easeOn(r, (amt ? 0.3 : 0.5)); feelOn(w, r, 'trust', 0.03);
     ease(a, t.id, 0.5);
     const wf = wordFact(w, s);

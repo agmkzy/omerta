@@ -303,7 +303,7 @@ export function onReturnToPromisee(p: Perception, henry: Character, seenStop: bo
   const t = p.temper;
   const key = seenStop ? 'followup.observed' : 'followup.pending';
   return {
-    decision: { by: p.self.id, constraints: [], candidates: [cand(key, [{ name: seenStop ? 'he has seen Lou’s people stay away' : 'he has heard nothing from you', value: 1 }, { name: 'days since you promised', value: daysSince * 0.1 }, { name: 'patience (caution, agreeable)', value: t.caution * 0.2 + t.agreeable * 0.2 }])], chosen: key, aim: seenStop ? 'find out who to thank' : 'hold you to it' },
+    decision: { by: p.self.id, constraints: [], candidates: [cand(key, [{ name: seenStop ? `he has seen ${against ? first(against.name) + '’s' : 'their'} people stay away` : 'he has heard nothing from you', value: 1 }, { name: 'days since you promised', value: daysSince * 0.1 }, { name: 'patience (caution, agreeable)', value: t.caution * 0.2 + t.agreeable * 0.2 }])], chosen: key, aim: seenStop ? 'find out who to thank' : 'hold you to it' },
     meaning: { key, stance: seenStop ? 'warm' : 'flat', toward: 'speaker', slots: { againstFirst: against ? first(against.name) : '', lastSeen: against ? p.particulars.lastAt(HOSTILE_KINDS, against.id) ?? '' : '' } }, intent: 'question', honest: true,
   };
 }
@@ -315,7 +315,7 @@ export function onSeekHelp(p: Perception, against: Character): Reply {
 export function onReport(p: Perception, henry: Character, kind: 'honest' | 'stall' | 'done' | 'admitNotDone'): Reply {
   const t = p.temper;
   const key = kind === 'done' ? 'thanks.kept' : kind === 'honest' ? 'react.report.honest' : kind === 'admitNotDone' ? 'react.report.admit' : 'react.report.stall';
-  const changes = kind === 'done' ? [`${p.self.name}'s trust in ${henry.name} rises (a promise kept, as he sees it: Lou stopped, and Henry says he took it to the family)`, 'A favour is owed to Henry (encounters.addFavour)']
+  const changes = kind === 'done' ? [`${p.self.name}'s trust in ${henry.name} rises (a promise kept, as he sees it: the trouble stopped, and ${first(henry.name)} says he took it to the family)`]
     : kind === 'admitNotDone' ? [`${p.self.name} had thought it was Henry's doing; now he knows it wasn't. His trust falls a little, less than if he had found out another way`]
     : kind === 'honest' ? [`${p.self.name} keeps waiting, a little less sure; patience shortened`, ...(t.pride > 0.6 ? ['He starts looking at other routes (his own pursuit)'] : [])]
     : [`${p.self.name} does not believe it; his trust in ${henry.name} falls`];
@@ -385,4 +385,126 @@ export function onPromiseSeenBroken(p: Perception, henry: Character): Reply {
 export function predictAcceptance(ph: Perception, other: Character, believesOtherKnowsTrouble: boolean): number {
   const f = ph.feelingFor(other);
   return Math.round(Math.max(0, Math.min(1, 0.1 + (believesOtherKnowsTrouble ? 0.35 : 0) + f.trust * 0.2 + f.known * 0.1)) * 100) / 100;
+}
+
+// ---------------------------------------------------------------- Gate 2a: between men, with no player present (no text: a trace)
+// A captain asked by another captain to rein in his own man over a civilian. What he weighs, from his own perception: the man asking
+// (how he regards him), keeping the peace in the family, and his own man (what he thinks of him, and that he earns).
+export function onOrderRequest(p: Perception, asker: Character, man: Character, forC: Character): Reply {
+  const t = p.temper, fa = p.feelingFor(asker), fm = p.feelingFor(man);
+  const sameFamily = !!asker.familyId && asker.familyId === p.self.familyId;
+  const heard = p.knownFacts((x) => ['vandalism', 'beating', 'threat'].includes(x.kind) && x.actor === man.id && (x.victim === forC.id)).length;
+  const cs = [
+    cand('order', [{ name: `his regard for ${first(asker.name)}`, value: fa.trust * 0.4 + fa.respect * 0.2 }, { name: sameFamily ? 'peace in the family' : 'peace with another family', value: sameFamily ? 0.3 : 0.15 }, { name: 'caution', value: t.caution * 0.2 }, { name: `what he knows ${first(man.name)} has done`, value: heard ? 0.15 : 0 }]),
+    cand('refuse', [{ name: `his regard for ${first(man.name)}, his own man`, value: fm.trust * 0.3 + fm.affection * 0.2 }, { name: 'a civilian’s complaint', value: forC.rank === 'civilian' ? 0.15 : 0 }, { name: 'pride (nobody tells him how to run his crew)', value: t.pride * 0.3 }]),
+  ];
+  const c = best(cs);
+  return { decision: { by: p.self.id, constraints: [], candidates: cs, chosen: c.move, aim: c.move === 'order' ? 'keep the peace' : 'stand by his man' }, meaning: { key: c.move === 'order' ? 'agree.order' : 'refuse.order', stance: 'flat', toward: 'request', slots: { manFirst: first(man.name), forFirst: first(forC.name) } }, intent: c.move, honest: true };
+}
+// The man ordered to leave someone alone, having agreed: does he mean it? From his perception: what he fears of the man who gave the
+// order and what he owes him, against what the shop is worth to him, his grudge, and his temper. Breaking it is his explicit choice.
+export function onOrder(p: Perception, superior: Character, forC: Character, fee: number): Reply {
+  const t = p.temper, fs = p.feelingFor(superior), ff = p.feelingFor(forC), g = p.self.traits.greed;
+  const cs = [
+    cand('obey', [{ name: `fear of ${first(superior.name)}`, value: fs.fear * 0.5 + (1 - t.courage) * 0.3 }, { name: `regard for ${first(superior.name)}`, value: fs.trust * 0.3 + fs.respect * 0.3 }, { name: 'caution', value: t.caution * 0.3 }]),
+    cand('violate', [{ name: 'what the shop would pay him', value: Math.min(0.5, fee / 200) * g }, { name: `his grudge against ${first(forC.name)}`, value: ff.grudge * 0.6 }, { name: 'volatility', value: t.volatility * 0.3 }, { name: 'pride (being told)', value: t.pride * 0.2 }, { name: 'what breaking an order costs', value: -0.35 }]),
+  ];
+  const c = best(cs);
+  return { decision: { by: p.self.id, constraints: [{ kind: 'ordered', source: `${superior.name} told him to leave ${forC.name} alone` }], candidates: cs, chosen: c.move, aim: c.move === 'obey' ? 'stay out of trouble' : `keep at ${first(forC.name)}` }, meaning: { key: c.move === 'obey' ? 'obey.order' : 'violate.order', stance: 'flat', toward: 'third' }, intent: c.move, honest: c.move === 'obey' };
+}
+
+// ================================================================ Gate 2b: the decisions NPCs make of each other, by the same rules
+// Each is a response from the decider's own perception (what he knows, whom he trusts, his temperament, his obligations), with every
+// term recorded. The world's asks carry the result out (asks.ts DECIDERS); pursuits (conv/pursuits.ts) make the requests.
+
+// Asked to leave a man alone (asks 'layoff' / 'warn'): by his own superior it is an order; by anyone else, a warning he weighs.
+export function onLayoff(p: Perception, asker: Character, forC: Character, superior: boolean, guilty: boolean): Reply {
+  const t = p.temper, fa = p.feelingFor(asker), ff = p.feelingFor(forC);
+  const cs = [
+    cand('agree', [
+      ...(superior ? [{ name: `${first(asker.name)} is over him`, value: 0.45 }, { name: `regard for ${first(asker.name)}`, value: fa.trust * 0.2 + fa.respect * 0.2 }, { name: `fear of ${first(asker.name)}`, value: fa.fear * 0.3 + (1 - t.courage) * 0.15 }] : [{ name: `fear of ${first(asker.name)}`, value: fa.fear * 0.4 + (1 - t.courage) * 0.2 }, { name: `regard for ${first(asker.name)}`, value: fa.trust * 0.2 }]),
+      { name: 'caution', value: t.caution * 0.2 },
+      ...(guilty ? [] : [{ name: 'he never touched him (an insult to be warned off)', value: -0.3 }]),
+    ]),
+    cand('refuse', [{ name: `his grudge against ${first(forC.name)}`, value: ff.grudge * 0.6 }, { name: 'pride (being told)', value: t.pride * 0.3 }, { name: 'volatility', value: t.volatility * 0.2 }, ...(superior ? [{ name: 'what defying his superior costs', value: -0.3 }] : [])]),
+  ];
+  const c = best(cs);
+  return { decision: { by: p.self.id, constraints: superior ? [{ kind: 'ordered', source: `${asker.name} is over him` }] : [], candidates: cs, chosen: c.move }, meaning: { key: c.move === 'agree' ? 'agree.layoff' : 'refuse.layoff', stance: 'flat', toward: 'request' }, intent: c.move, honest: true };
+}
+// A protector asked by a man he collects from to deal with someone troubling him (asks 'help').
+export function onHelp(p: Perception, asker: Character, trouble: Character, collects: boolean): Reply {
+  const t = p.temper, fa = p.feelingFor(asker), ft = p.feelingFor(trouble);
+  const sameFamily = !!trouble.familyId && trouble.familyId === p.self.familyId;
+  const cs = [
+    cand('yes', [{ name: collects ? 'he pays me for exactly this' : 'he asked', value: collects ? 0.45 : 0.1 }, { name: `regard for ${first(asker.name)}`, value: fa.trust * 0.2 }, { name: 'standing (a man who does not look after his own is nobody)', value: t.pride * 0.15 }]),
+    cand('no', [{ name: `trouble with ${first(trouble.name)}`, value: ft.fear * 0.4 + (sameFamily ? 0.25 : 0.1) }, { name: 'caution', value: t.caution * 0.2 }, { name: `regard for ${first(trouble.name)}`, value: ft.trust * 0.2 }]),
+  ];
+  const c = best(cs);
+  return { decision: { by: p.self.id, constraints: [], candidates: cs, chosen: c.move }, meaning: { key: c.move === 'yes' ? 'agree.help' : 'refuse.help', stance: 'flat', toward: 'request' }, intent: c.move, honest: true };
+}
+// Who does a man answer to? He tells what he believes, if he trusts the asker enough and has no reason not to.
+export function onAnswersTo(p: Perception, asker: Character, man: Character, believed: string | undefined): Reply {
+  const f = p.feelingFor(asker), fm = p.feelingFor(man), t = p.temper;
+  const tell = !!believed && f.trust + (1 - t.caution) * 0.3 - fm.affection * 0.4 > 0.35;
+  return { decision: { by: p.self.id, constraints: [], candidates: [cand(tell ? 'tell' : believed ? 'withhold' : 'unknown', [{ name: 'he knows', value: believed ? 1 : 0 }, { name: `trust in ${first(asker.name)}`, value: f.trust }, { name: `close to ${first(man.name)}`, value: -fm.affection * 0.4 }])], chosen: tell ? 'tell' : believed ? 'withhold' : 'unknown' }, meaning: { key: tell ? 'answer.answersTo' : 'answer.who.unknown', stance: 'flat', toward: 'third' }, intent: tell ? 'inform' : 'withhold', honest: true };
+}
+// Asked whether he has done what he promised: the truth, a stall, or a lie, from his own position.
+export function onProgressAsked(p: Perception, asker: Character, done: boolean, daysLeft: number): Reply & { says: 'done' | 'notYet' | 'notDone' } {
+  const t = p.temper, f = p.feelingFor(asker);
+  const cs = done ? [cand('truth', [{ name: 'he did it', value: 1 }])] : [
+    cand('truth', [{ name: 'honesty (empathy)', value: t.empathy * 0.3 }, { name: `regard for ${first(asker.name)}`, value: f.trust * 0.3 }, { name: 'time left to do it', value: daysLeft > 1 ? 0.2 : 0 }]),
+    cand('lie', [{ name: 'saving face (pride)', value: t.pride * 0.3 }, { name: 'he does not think he will be found out (as he sees it)', value: (1 - t.caution) * 0.25 }, { name: 'greed for credit', value: p.self.traits.greed * 0.1 }, { name: 'decency', value: -t.empathy * 0.2 }]),
+  ];
+  const c = best(cs);
+  const says = done ? 'done' : c.move === 'lie' ? 'done' : daysLeft > 0 ? 'notYet' : 'notDone';
+  return { decision: { by: p.self.id, constraints: [], candidates: cs, chosen: c.move }, meaning: { key: 'answer.progress.' + says, stance: 'flat', toward: 'request' }, intent: c.move, honest: c.move === 'truth', says };
+}
+// A man who has promised to act decides, today, what to do about it: do it, let it wait, ask to be let off or given time, or let it go.
+export function onKeepWord(p: Perception, promisee: Character, cost: number, daysLeft: number, canAct: boolean): Reply {
+  const t = p.temper, f = p.feelingFor(promisee);
+  const regard = f.trust * 0.35 + f.respect * 0.15 + f.affection * 0.1;
+  const urgent = daysLeft <= 1 ? 0.35 : daysLeft <= 3 ? 0.15 : 0;
+  const cs = [
+    cand('act', canAct ? [{ name: `regard for ${first(promisee.name)}`, value: regard }, { name: 'he gave his word (agreeable)', value: 0.2 + t.agreeable * 0.15 }, { name: 'the deadline', value: urgent }, { name: 'what it will cost him', value: -cost }] : [{ name: 'he cannot do it now', value: -10 }]),
+    cand('delay', daysLeft > 1 ? [{ name: 'there is time', value: 0.25 }, { name: 'caution', value: t.caution * 0.1 }] : [{ name: 'no time left', value: -10 }]),
+    cand('renegotiate', [{ name: 'it costs more than he thought', value: cost * 0.5 }, { name: `regard for ${first(promisee.name)} (he would rather ask than fail him)`, value: regard * 0.5 }, { name: 'pride (asking to be let off)', value: -t.pride * 0.2 }, { name: 'the deadline', value: urgent * 0.5 }]),
+    cand('abandon', [{ name: 'what it would cost him', value: cost * 0.8 }, { name: `little regard for ${first(promisee.name)}`, value: (0.4 - regard) * 0.5 }, { name: 'his word (agreeable)', value: -t.agreeable * 0.3 }]),
+  ];
+  const c = best(cs);
+  return { decision: { by: p.self.id, constraints: [], candidates: cs, chosen: c.move }, meaning: { key: 'keepWord.' + c.move, stance: 'flat', toward: 'self' }, intent: c.move, honest: true };
+}
+// Asked to let a man off a promise, or give him more time.
+export function onRenegotiate(p: Perception, obligor: Character, stakes: number): Reply {
+  const t = p.temper, f = p.feelingFor(obligor);
+  const cs = [
+    cand('extend', [{ name: `regard for ${first(obligor.name)}`, value: f.trust * 0.3 }, { name: 'agreeable', value: t.agreeable * 0.25 }, { name: 'how much it matters to him', value: -stakes * 0.1 }]),
+    cand('release', [{ name: `regard for ${first(obligor.name)}`, value: f.trust * 0.2 }, { name: 'agreeable', value: t.agreeable * 0.2 }, { name: 'how much it matters to him', value: -stakes * 0.4 }]),
+    cand('hold', [{ name: 'how much it matters to him', value: stakes * 0.35 }, { name: 'pride', value: t.pride * 0.2 }]),
+  ];
+  const c = best(cs);
+  return { decision: { by: p.self.id, constraints: [], candidates: cs, chosen: c.move }, meaning: { key: 'renegotiate.' + c.move, stance: 'flat', toward: 'request' }, intent: c.move, honest: true };
+}
+// A superior who believes his man went against his order.
+export function onDisobedience(p: Perception, man: Character): Reply {
+  const t = p.temper, f = p.feelingFor(man);
+  const cs = [
+    cand('discipline', [{ name: 'an order is an order', value: 0.35 }, { name: 'volatility', value: t.volatility * 0.3 }, { name: 'pride', value: t.pride * 0.2 }]),
+    cand('rebuke', [{ name: `regard for ${first(man.name)}`, value: f.trust * 0.3 + f.affection * 0.2 }, { name: 'caution', value: t.caution * 0.2 }]),
+    cand('letGo', [{ name: `he needs ${first(man.name)}`, value: f.trust * 0.2 }, { name: 'agreeable', value: t.agreeable * 0.2 }, { name: 'an order ignored makes him look weak', value: -0.2 }]),
+  ];
+  const c = best(cs);
+  return { decision: { by: p.self.id, constraints: [], candidates: cs, chosen: c.move }, meaning: { key: 'disobedience.' + c.move, stance: 'cold', toward: 'third' }, intent: c.move, honest: true };
+}
+// A collector deciding his next move on a shop that refused him (asks 'protect', the asker's side).
+export function onPressDemand(p: Perception, owner: Character, refusals: number, rounds: number, restrained: number): Reply {
+  const t = p.temper, T = p.self.traits, ff = p.feelingFor(owner);
+  const cs = [
+    cand('ask', [{ name: 'try again', value: rounds === 0 ? 1 : 0.05 }]),
+    cand('pressure', [{ name: 'violence (temperament)', value: T.violence * 0.35 }, { name: 'nerve (courage)', value: t.courage * 0.15 }, { name: 'already pressed', value: -0.15 * Math.max(0, rounds - 1) }, { name: 'bound to leave him alone', value: -restrained }]),
+    cand('force', refusals >= 1 ? [{ name: 'violence (temperament)', value: T.violence * 0.5 }, { name: `his grudge against ${first(owner.name)}`, value: ff.grudge * 0.4 }, { name: 'caution', value: -t.caution * 0.4 }, { name: 'bound to leave him alone', value: -restrained }] : [{ name: 'he has not refused yet', value: -10 }]),
+    cand('wait', [{ name: 'caution', value: 0.05 + t.caution * 0.2 }]),
+    cand('drop', [{ name: 'caution', value: t.caution * 0.2 }, { name: 'turned down again and again', value: refusals >= 3 ? 0.4 : refusals >= 2 ? 0.15 : 0 }, { name: 'the time it has taken', value: rounds >= 6 ? 0.4 : 0 }, { name: 'greed', value: -T.greed * 0.15 }, { name: 'bound to leave him alone', value: restrained * 0.8 }]),
+  ];
+  const c = best(cs);
+  return { decision: { by: p.self.id, constraints: restrained > 0 ? [{ kind: 'forbidden', source: 'he is bound to leave the man alone' }] : [], candidates: cs, chosen: c.move }, meaning: { key: 'press.' + c.move, stance: 'flat', toward: 'third' }, intent: c.move, honest: true };
 }

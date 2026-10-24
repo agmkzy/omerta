@@ -1,4 +1,4 @@
-import { post } from './ledger';
+import { post, type Flow } from './ledger';
 import { bizMove, succeedOwner } from './econ';
 import { applyRank, repairHierarchy } from './rank';
 import { succeed } from './orgs';
@@ -509,6 +509,15 @@ export function writeDown(w: World, d: Debt, amount: number): boolean {
   applyToDebt(d, Math.max(0, Math.round(amount)));
   if (d.balance <= 0 && (d.status === 'active' || d.status === 'defaulted')) { d.status = 'paid'; onDebtCleared(w, d); return true; }
   return false;
+}
+// Gate 2b: the one door for money passing from one man to another. Cash moves (nothing is made or lost), and the ledger records it
+// for anyone in the player's circle. Never more than he has; returns what actually changed hands.
+export function transfer(w: World, from: Character, to: Character, amt: number, flow: Flow, note?: string): number {
+  const x = Math.max(0, Math.min(Math.round(amt), Math.floor(from.cash)));
+  if (!x || from.id === to.id) return 0;
+  from.cash -= x; to.cash += x;
+  post(w, { from: from.id, to: to.id, amt: x, flow, note });
+  return x;
 }
 export function payDebt(w: World, d: Debt, amount: number) {
   const debtor = w.chars[d.debtor];

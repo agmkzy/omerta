@@ -877,7 +877,7 @@ change: Vic Rizzo's respect for Henry Tedesco falls a little: he was told and ke
 <details><summary>trace</summary>
 
 ```
-▶ followup.observed = 2.28: he has seen Lou’s people stay away +1, days since you promised +1, patience (caution, agreeable) +0.28
+▶ followup.observed = 2.28: he has seen their people stay away +1, days since you promised +1, patience (caution, agreeable) +0.28
 meaning: followup.observed · warm · toward speaker · private intent: question
 ```
 </details>
@@ -896,8 +896,7 @@ meaning: followup.observed · warm · toward speaker · private intent: question
 ```
 ▶ done = 1: he believes what you said +1
 meaning: thanks.kept · warm · toward speaker · private intent: done
-change: Nate Ferrara's trust in Henry Tedesco rises (a promise kept, as he sees it: Lou stopped, and Henry says he took it to the family)
-change: A favour is owed to Henry (encounters.addFavour)
+change: Nate Ferrara's trust in Henry Tedesco rises (a promise kept, as he sees it: the trouble stopped, and Henry says he took it to the family)
 ```
 </details>
 

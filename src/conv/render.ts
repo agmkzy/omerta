@@ -243,6 +243,12 @@ const B: Record<string, Entry> = {
   'tell.secret': { _: ['“{forName} came to me about you.”'] },
   'react.told': { _: ['“Did he.”'] },
   'ask.again': { _: ['“Tell me again. From the start.”'] },
+  // ---------------------------------------------------------------- Gate 2a additions: the vocabulary of new acts only
+  'tell.trouble': { _: ['“{againstFirst}’s people smashed up {shop}. That’s our ground.”'] },
+  'card.promise.action': { _: ['You told {first} you’d raise it with your captain. That’s what you’ve promised: to raise it.'] },
+  'card.promise.effort': { _: ['You told {first} you’d do what you can. He’ll expect you to try.'] },
+  'card.promise.result': { _: ['You told {first} {againstFirst} will leave him alone. He’ll hold you to it for {days} days.'] },
+  'card.promise.restraint': { _: ['You told {first} you’d keep it to yourself.'] },
   'card.report.collection': { _: ['{first} says {debtorFirst} paid {amt}.'] },
   'card.answer.debt.paid': { _: ['{first} says he paid {toFirst} {amt}.'] },
   'card.confront.admit': { _: ['{first} admitted keeping {amt}, and says he’ll give it back.'] },

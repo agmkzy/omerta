@@ -558,6 +558,7 @@ export interface World {
   coup?: Coup;
   life?: Life;
   commissionAt?: number;
+  social?: import('./conv/social').Social; // Gate 2a: requests, agreements, obligations and acts of the conversation layer (conv/social.ts)
 }
 
 export interface Coup {
