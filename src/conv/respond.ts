@@ -415,13 +415,29 @@ export function onOrderRequest(p: Perception, asker: Character, man: Character, 
   const c = best(cs);
   return { decision: { by: p.self.id, constraints: [], candidates: cs, chosen: c.move, aim: c.move === 'order' ? 'keep the peace' : 'stand by his man' }, meaning: { key: c.move === 'order' ? 'agree.order' : 'refuse.order', stance: 'flat', toward: 'request', slots: { manFirst: first(man.name), forFirst: first(forC.name) } }, intent: c.move, honest: true };
 }
-// The man ordered to leave someone alone, having agreed: does he mean it? From his perception: what he fears of the man who gave the
-// order and what he owes him, against what the shop is worth to him, his grudge, and his temper. Breaking it is his explicit choice.
-export function onOrder(p: Perception, superior: Character, forC: Character, fee: number): Reply {
+// The man bound by an order (or his own word) to leave someone alone, weighing it when the chance to break it comes. Resentment is
+// not the same as meaning to disobey: a man can hate being told and still do as he is told. What decides it, from his perception:
+// fear of the man over him and how far over him he is, loyalty, his name, whether he has been punished before, how likely he thinks it
+// is to come out (the man he would hurt would complain; he did before), against what breaking it gains him (the money, the grudge
+// settled), his temper, and what breaking an order costs anyone.
+export function onOrder(p: Perception, superior: Character, forC: Character, fee: number, ctx: { rankGap?: number; disciplined?: number; complained?: boolean } = {}): Reply {
   const t = p.temper, fs = p.feelingFor(superior), ff = p.feelingFor(forC), g = p.self.traits.greed;
+  const discovery = Math.min(1, 0.35 + (ctx.complained ? 0.35 : 0) + fs.known * 0.2); // as he judges it
   const cs = [
-    cand('obey', [{ name: `fear of ${first(superior.name)}`, value: fs.fear * 0.5 + (1 - t.courage) * 0.3 }, { name: `regard for ${first(superior.name)}`, value: fs.trust * 0.3 + fs.respect * 0.3 }, { name: 'caution', value: t.caution * 0.3 }]),
-    cand('violate', [{ name: 'what the shop would pay him', value: Math.min(0.5, fee / 200) * g }, { name: `his grudge against ${first(forC.name)}`, value: ff.grudge * 0.6 }, { name: 'volatility', value: t.volatility * 0.3 }, { name: 'pride (being told)', value: t.pride * 0.2 }, { name: 'what breaking an order costs', value: -0.35 }]),
+    cand('obey', [
+      { name: `fear of ${first(superior.name)}`, value: fs.fear * 0.4 + (1 - t.courage) * 0.2 + (ctx.rankGap ?? 1) * 0.08 },
+      { name: `loyalty to ${first(superior.name)}`, value: fs.trust * 0.25 + fs.respect * 0.25 },
+      { name: 'caution', value: t.caution * 0.25 },
+      { name: 'his name (a man who ignores his captain is talked about)', value: 0.04 + t.pride * 0.04 },
+      ...(ctx.disciplined ? [{ name: 'he has been punished before', value: Math.min(0.3, ctx.disciplined * 0.15) }] : []),
+    ]),
+    cand('violate', [
+      { name: 'what the shop would pay him', value: Math.min(0.4, fee / 200) * g * (p.own.cash < 200 ? 1.6 : 1) },
+      ...(p.own.cash < 200 ? [{ name: 'he is short of money', value: 0.1 }] : []),
+      { name: `his grudge against ${first(forC.name)}`, value: ff.grudge * 0.55 },
+      { name: 'temper (volatility)', value: t.volatility * 0.2 },
+      { name: 'what breaking an order costs, if it comes out', value: -(0.15 + discovery * 0.3) },
+    ]),
   ];
   const c = best(cs);
   return { decision: { by: p.self.id, constraints: [{ kind: 'ordered', source: `${superior.name} told him to leave ${forC.name} alone` }], candidates: cs, chosen: c.move, aim: c.move === 'obey' ? 'stay out of trouble' : `keep at ${first(forC.name)}` }, meaning: { key: c.move === 'obey' ? 'obey.order' : 'violate.order', stance: 'flat', toward: 'third' }, intent: c.move, honest: c.move === 'obey' };
@@ -473,15 +489,19 @@ export function onProgressAsked(p: Perception, asker: Character, done: boolean, 
   const says = done ? 'done' : c.move === 'lie' ? 'done' : daysLeft > 0 ? 'notYet' : 'notDone';
   return { decision: { by: p.self.id, constraints: [], candidates: cs, chosen: c.move }, meaning: { key: 'answer.progress.' + says, stance: 'flat', toward: 'request' }, intent: c.move, honest: c.move === 'truth', says };
 }
-// A man who has promised to act decides, today, what to do about it: do it, let it wait, ask to be let off or given time, or let it go.
-export function onKeepWord(p: Perception, promisee: Character, cost: number, daysLeft: number, canAct: boolean): Reply {
+// A man who has promised to act decides, today, what to do about it: do it, let it wait, ask to be let off or given time, or let it
+// go. How he goes about promises is his own: a conscientious man (caution, agreeableness) or a loyal one does it soon; a man who doesn't
+// much care for the one he promised, or for whom it is costly, lets it wait, and the closer the deadline the harder that is; seeing the
+// man he has to see anyway makes it easy. No clock decides it for everyone.
+export function onKeepWord(p: Perception, promisee: Character, cost: number, daysLeft: number, canAct: boolean, ctx: { window?: number; seesHim?: boolean } = {}): Reply {
   const t = p.temper, f = p.feelingFor(promisee);
   const regard = f.trust * 0.35 + f.respect * 0.15 + f.affection * 0.1;
-  const urgent = daysLeft <= 1 ? 0.35 : daysLeft <= 3 ? 0.15 : 0;
+  const window = Math.max(1, ctx.window ?? 7), gone = Math.max(0, Math.min(1, 1 - daysLeft / window));
+  const conscientious = t.caution * 0.2 + t.agreeable * 0.2;
   const cs = [
-    cand('act', canAct ? [{ name: `regard for ${first(promisee.name)}`, value: regard }, { name: 'he gave his word (agreeable)', value: 0.2 + t.agreeable * 0.15 }, { name: 'the deadline', value: urgent }, { name: 'what it will cost him', value: -cost }] : [{ name: 'he cannot do it now', value: -10 }]),
-    cand('delay', daysLeft > 1 ? [{ name: 'there is time', value: 0.25 }, { name: 'caution', value: t.caution * 0.1 }] : [{ name: 'no time left', value: -10 }]),
-    cand('renegotiate', [{ name: 'it costs more than he thought', value: cost * 0.5 }, { name: `regard for ${first(promisee.name)} (he would rather ask than fail him)`, value: regard * 0.5 }, { name: 'pride (asking to be let off)', value: -t.pride * 0.2 }, { name: 'the deadline', value: urgent * 0.5 }]),
+    cand('act', canAct ? [{ name: `regard for ${first(promisee.name)}`, value: regard }, { name: 'he does what he says, and sooner rather than later (conscientiousness)', value: conscientious }, { name: 'time running out', value: gone * 0.35 }, ...(ctx.seesHim ? [{ name: 'he is seeing the man anyway', value: 0.2 }] : []), { name: 'what it will cost him', value: -cost }] : [{ name: 'he cannot do it now', value: -10 }]),
+    cand('delay', daysLeft > 1 ? [{ name: 'there is time', value: 0.2 + (1 - gone) * 0.15 }, { name: 'it can wait (he puts things off)', value: (1 - t.caution) * 0.1 + (1 - t.agreeable) * 0.05 }, { name: 'what it will cost him (he would rather not)', value: cost * 0.3 }] : [{ name: 'no time left', value: -10 }]),
+    cand('renegotiate', [{ name: 'it costs more than he thought', value: cost * 0.5 }, { name: `regard for ${first(promisee.name)} (he would rather ask than fail him)`, value: regard * 0.5 }, { name: 'pride (asking to be let off)', value: -t.pride * 0.2 }, { name: 'time running out', value: gone * 0.15 }]),
     cand('abandon', [{ name: 'what it would cost him', value: cost * 0.8 }, { name: `little regard for ${first(promisee.name)}`, value: (0.4 - regard) * 0.5 }, { name: 'his word (agreeable)', value: -t.agreeable * 0.3 }]),
   ];
   const c = best(cs);
@@ -521,4 +541,54 @@ export function onPressDemand(p: Perception, owner: Character, refusals: number,
   ];
   const c = best(cs);
   return { decision: { by: p.self.id, constraints: restrained > 0 ? [{ kind: 'forbidden', source: 'he is bound to leave the man alone' }] : [], candidates: cs, chosen: c.move }, meaning: { key: 'press.' + c.move, stance: 'flat', toward: 'third' }, intent: c.move, honest: true };
+}
+
+// ================================================================ the general decisions (Gate 2b completion: one model for everything)
+// Any request made of him (an ask of any kind): what it is worth to him by its own measure (the kind's valuation of the thing asked,
+// from his own state: money, stakes), with what he feels for the man asking, the pressure he is under, what he has been offered, and
+// whether yes would break something he is bound to. Yes, terms of his own, time, or no.
+export function onAsk(p: Perception, asker: Character, worth: number, ctx: { fear?: number; good?: number; anger?: number; resolve?: number; canCounter?: boolean; bound?: string; asked?: number }): Reply {
+  const t = p.temper, f = p.feelingFor(asker);
+  const pressure = (ctx.fear ?? 0) * (1 - t.courage * 0.6);
+  const cs = [
+    cand('yes', [{ name: 'what it is worth to him', value: worth }, { name: `regard for ${first(asker.name)}`, value: f.trust * 0.25 + f.affection * 0.1 }, { name: 'fear of saying no', value: pressure * 0.7 }, { name: 'goodwill in this matter', value: (ctx.good ?? 0) * 0.45 }, { name: 'anger at how he has been asked', value: -(ctx.anger ?? 0) * 0.55 }, { name: 'how firmly he holds his ground', value: -(ctx.resolve ?? 0) * 0.45 }, ...(ctx.bound ? [{ name: `it would break his word (${ctx.bound})`, value: -0.5 }] : [])], ctx.bound ? ['obliged'] : []),
+    cand('counter', ctx.canCounter ? [{ name: 'what it is worth to him, on better terms', value: worth + 0.15 }, { name: 'he would rather deal than refuse (agreeable)', value: t.agreeable * 0.15 }, { name: 'pride', value: -t.pride * 0.1 }, { name: 'anger', value: -(ctx.anger ?? 0) * 0.3 }] : [{ name: 'nothing to offer', value: -10 }]),
+    cand('stall', [{ name: 'fear (not ready to say no)', value: pressure * 0.5 }, { name: 'caution', value: t.caution * 0.15 }, { name: 'he has put this off before', value: -(ctx.asked ?? 0) * 0.15 }]),
+    cand('no', [{ name: 'pride', value: t.pride * 0.15 }, { name: 'how firmly he holds his ground', value: (ctx.resolve ?? 0) * 0.35 }, { name: 'he does not want it', value: -worth * 0.5 }, { name: 'anger', value: (ctx.anger ?? 0) * 0.3 }]),
+  ];
+  const c = best(cs);
+  return { decision: { by: p.self.id, constraints: ctx.bound ? [{ kind: 'obliged', source: ctx.bound }] : [], candidates: cs, chosen: c.move }, meaning: { key: 'answer.ask.' + c.move, stance: 'flat', toward: 'request' }, intent: c.move, honest: true };
+}
+// The man asking, after an answer: ask again, sweeten it, argue, press, use force, wait, take what was offered, or drop it.
+export function onPress(p: Perception, other: Character, ctx: { last?: string; rounds: number; refusals: number; offerFair?: number; canSweeten: boolean; canForce: boolean; canLeverage: boolean; bound: number; tried: Record<string, number> }): Reply {
+  const t = p.temper, T = p.self.traits, ff = p.feelingFor(other), tr = (k: string) => ctx.tried[k] ?? 0;
+  const cs = [
+    cand('ask', [{ name: 'try again', value: ctx.rounds === 0 ? 1 : ctx.last === 'stall' ? 0.45 : 0.05 }]),
+    cand('take', ctx.last === 'counter' ? [{ name: 'what he was offered (fair, as he sees it)', value: 0.25 + (ctx.offerFair ?? 1) * 0.45 }, { name: 'caution', value: t.caution * 0.2 }, { name: 'greed', value: -T.greed * 0.2 }] : [{ name: 'nothing offered', value: -10 }]),
+    cand('sweeten', ctx.canSweeten && (ctx.last === 'counter' || ctx.last === 'no') ? [{ name: 'he would rather deal', value: 0.2 + t.caution * 0.2 }, { name: 'greed', value: -T.greed * 0.2 }] : [{ name: 'nothing better to offer', value: -10 }]),
+    cand('persuade', [{ name: 'charm and sociability', value: 0.15 + p.self.skills.charm * 0.35 + T.sociability * 0.15 }, { name: 'already tried', value: -tr('persuade') * 0.2 }]),
+    cand('pressure', [{ name: 'violence (temperament)', value: 0.1 + T.violence * 0.35 + p.self.skills.nerve * 0.15 }, { name: 'already pressed', value: -tr('pressure') * 0.18 }, { name: 'bound to leave him alone', value: -ctx.bound }]),
+    cand('force', ctx.canForce && ctx.last === 'no' && ctx.refusals >= 1 ? [{ name: 'violence (temperament)', value: T.violence * 0.6 }, { name: `his grudge against ${first(other.name)}`, value: ff.grudge * 0.3 }, { name: 'caution', value: -t.caution * 0.4 }, { name: 'bound to leave him alone', value: -ctx.bound }] : [{ name: 'not now', value: -10 }]),
+    cand('leverage', ctx.canLeverage && tr('leverage') === 0 ? [{ name: 'he has something on him', value: 0.3 + t.caution * 0.2 }] : [{ name: 'nothing to use', value: -10 }]),
+    cand('wait', [{ name: 'caution', value: (ctx.last === 'stall' ? 0.3 : 0.05) + t.caution * 0.2 }]),
+    cand('drop', [{ name: 'caution', value: 0.02 + t.caution * 0.2 }, { name: 'turned down again and again', value: ctx.refusals >= 5 ? 0.7 : ctx.refusals >= 3 ? 0.35 : 0 }, { name: 'what he has put into it already', value: ctx.rounds >= 7 ? 0.55 : ctx.rounds >= 5 ? 0.2 : 0 }, { name: 'ambition and greed', value: -T.ambition * 0.12 - T.greed * 0.1 }, { name: 'bound to leave him alone', value: ctx.bound * 0.8 }]),
+  ];
+  const c = best(cs);
+  return { decision: { by: p.self.id, constraints: ctx.bound > 0 ? [{ kind: 'forbidden', source: 'he is bound to leave the man alone' }] : [], candidates: cs, chosen: c.move }, meaning: { key: 'press.' + c.move, stance: 'flat', toward: 'third' }, intent: c.move, honest: true };
+}
+// What he does with his day: among the things the world offers him (each with what it is worth by the world's own measure: income,
+// a debt due, a shop to lean on, a grudge to settle), chosen with the same motives as everything else he decides: what he is pursuing,
+// what he is bound to, whom he believes wronged him and whom he is avoiding, and the risk he believes he runs.
+export interface DayOption { key: string; kind: string; worth: number; target?: Character; bound?: number; serves?: string; avoids?: string }
+export function onDay(p: Perception, opts: DayOption[], jitter: (k: string) => number): Reply & { pick: number } {
+  const cs = opts.map((o) => cand(o.key, [
+    { name: 'what it is worth to him', value: o.worth },
+    ...(o.bound !== undefined ? [{ name: 'he is bound not to', value: o.bound > 0 ? -0.1 : -10 }] : []),
+    ...(o.serves ? [{ name: o.serves, value: 0.25 }] : []),
+    ...(o.avoids ? [{ name: o.avoids, value: -0.5 }] : []),
+    { name: 'the day as it falls', value: jitter(o.key) },
+  ]));
+  let i = 0;
+  for (let j = 1; j < cs.length; j++) if (cs[j].value > cs[i].value) i = j;
+  return { decision: { by: p.self.id, constraints: [], candidates: cs, chosen: cs[i]?.move ?? 'wait' }, meaning: { key: 'day.' + (opts[i]?.kind ?? 'wait'), stance: 'flat', toward: 'self' }, intent: opts[i]?.kind ?? 'wait', honest: true, pick: i };
 }

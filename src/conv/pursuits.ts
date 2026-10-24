@@ -13,7 +13,7 @@ import type { Character, Fact, Id, World } from '../types';
 import { DAY } from '../types';
 import { newSession, perceive, type Perception } from './perception';
 import { onAnswersTo, onIntervention, onKeepWord, onOrderRequest, onProgressAsked, onRenegotiate, onWhoQuestion, type Reply } from './respond';
-import { HOSTILE, release, withdraw, type Obligation } from './obligations';
+import { HOSTILE, injured, offender, release, withdraw, type Obligation } from './obligations';
 import { note, sid, social, type Request } from './social';
 import { agreement, captaincyOf, hooks, onPromise, promise, request } from './tick';
 import { captainOf, chairFor, may } from './authority';
@@ -82,26 +82,39 @@ function demandOf(w: World, v: Character, a: Character) { const b = ownerBiz(w, 
 function troubleRoutes(w: World, p: Pursuit, v: Character, a: Character): Route[] {
   const pv = perceive(w, newSession(), v), t = pv.temper, out: Route[] = [];
   const b = ownerBiz(w, v.id), dem = demandOf(w, v, a), fact = p.fact ? w.facts[p.fact] : undefined;
+  // what has already gone wrong weighs on what he tries next: every man who said no makes the next ask feel less worth it (less so for
+  // a proud man, who takes a refusal as a reason to push harder), and makes waiting, paying or putting up with it look better
+  const failures = (p.turnedDown ?? []).length, discouraged = failures * 0.1 * (1 - t.pride * 0.5);
+  const inLife = v.rank !== 'civilian';
   // his protector, if he has one other than the man himself
   const prot = live(w, b?.protection?.collectorId);
-  if (prot && prot.id !== a.id && dem && !tried(p, 'protector', prot.id)) out.push({ route: 'protector', with: prot.id, value: r2(0.45 + peek(v, prot.id).trust * 0.3), why: `${prot.name} looks after the place` });
+  if (prot && prot.id !== a.id && dem && !tried(p, 'protector', prot.id)) out.push({ route: 'protector', with: prot.id, value: r2(0.4 + peek(v, prot.id).trust * 0.3 + t.caution * 0.15 - discouraged), why: `${prot.name} looks after the place` });
   // the man's own captain, if he believes he knows who that is and has any standing with him
   const chairB = belief(w, v, 'answersTo:' + a.id), chair = live(w, chairB.value);
   if (chair && chairB.conf >= 0.4 && !tried(p, 'chair', chair.id)) {
     const r = onOrderRequest(modelOf(w, v, chair), v, a, v);
-    out.push({ route: 'chair', with: chair.id, value: r2(sig(margin(r, 'order')) * (0.5 + (peek(v, chair.id).known ?? 0)) - 0.1), why: `${chair.name} is over ${a.name}, as he understands it` });
-  } else if (!chair && !tried(p, 'askAround')) out.push({ route: 'askAround', value: r2(0.18 + t.caution * 0.1), why: `he doesn't know who ${a.name} answers to` });
-  // a man in the life he knows and trusts, who might take it up for him (the player among them)
-  const known = Object.values(w.chars).filter((x) => x.alive && x.id !== v.id && x.id !== a.id && x.bossId !== a.id && x.rank !== 'civilian' && (peek(v, x.id).known ?? 0) >= 0.2 && peek(v, x.id).trust >= 0.1 && peek(v, x.id).grudge < 0.3 && !tried(p, 'intercessor', x.id)).sort((x, y) => (peek(v, y.id).trust - peek(v, x.id).trust) || (x.id < y.id ? -1 : 1)).slice(0, 3);
+    out.push({ route: 'chair', with: chair.id, value: r2(sig(margin(r, 'order')) * (0.4 + (peek(v, chair.id).known ?? 0)) + t.pride * 0.1 + (inLife ? 0.1 : 0) - 0.1 - discouraged), why: `${chair.name} is over ${a.name}, as he understands it` });
+  } else if (!chair && (p.asked ?? []).length < 3) { // (he asks around, but not the whole city: three men at most
+    // finding out is worth what it would open (spec §7.3: information unlocks routes): going to the man's captain is what a man does
+    // when he has a name to go to, more so a proud man or one in the life; a careful man asks before he acts
+    const opens = 0.3 + t.pride * 0.1 + (inLife ? 0.1 : 0);
+    out.push({ route: 'askAround', value: r2(opens * 0.8 + t.caution * 0.15 - discouraged * 0.5), why: `he doesn't know who ${a.name} answers to, and that would open a way` });
+  }
+  // a man in the life he knows, who might take it up for him (the player among them): the one he trusts most, not everyone in turn
+  const known = Object.values(w.chars).filter((x) => x.alive && x.id !== v.id && x.id !== a.id && x.bossId !== a.id && x.rank !== 'civilian' && (peek(v, x.id).known ?? 0) >= 0.2 && peek(v, x.id).trust >= 0.1 && peek(v, x.id).grudge < 0.3 && !tried(p, 'intercessor', x.id)).sort((x, y) => (peek(v, y.id).trust - peek(v, x.id).trust) || (x.id < y.id ? -1 : 1)).slice(0, 2);
   for (const x of known) {
     const k = captaincyOf(w, x, v, a, v); k.knowsTrouble = k.knowsTrouble || !!fact; // he would tell him what happened
     const r = onIntervention(modelOf(w, v, x), v, v, a, k, []);
-    out.push({ route: 'intercessor', with: x.id, value: r2(sig(margin(r, 'accept')) * 0.9 + peek(v, x.id).trust * 0.3 + (peek(v, x.id).known ?? 0) * 0.2 - 0.05), why: `${x.name} is in the life, and he knows him` });
+    out.push({ route: 'intercessor', with: x.id, value: r2(sig(margin(r, 'accept')) * 0.8 + peek(v, x.id).trust * 0.3 + (peek(v, x.id).known ?? 0) * 0.2 + t.agreeable * 0.1 - 0.1 - discouraged), why: `${x.name} is in the life, and he knows him` });
   }
-  // pay, and have it over with
-  if (dem) { const fee = dem.terms?.amt ?? 0, burden = fee / Math.max(20, (b?.income ?? 100) * 0.1); out.push({ route: 'pay', value: r2(0.25 + (1 - t.courage) * 0.3 - burden * 0.25 - t.pride * 0.3), why: `$${fee} a week, and it stops` }); }
+  // pay, and have it over with: what a frightened man does, and a proud one won't
+  if (dem) { const fee = dem.terms?.amt ?? 0, burden = fee / Math.max(20, (b?.income ?? 100) * 0.1); out.push({ route: 'pay', value: r2(0.2 + (1 - t.courage) * 0.3 - burden * 0.25 - t.pride * 0.35 + failures * 0.06 * (1 - t.pride)), why: `$${fee} a week, and it stops` }); }
+  // a man in the life answers it himself (the world's own retaliation takes it from there, with the grudge he now means to settle)
+  if (inLife && !tried(p, 'retaliate')) out.push({ route: 'retaliate', value: r2(t.pride * 0.25 + t.volatility * 0.25 + v.traits.violence * 0.2 - t.caution * 0.2 + failures * 0.05 - 0.15), why: 'he will deal with it himself' });
+  // wait and see whether it blows over: a careful man's choice, more so after asking has got him nowhere
+  if (!tried(p, 'wait')) out.push({ route: 'wait', value: r2(0.05 + t.caution * 0.2 + failures * 0.08 * t.caution - (dem ? 0.05 : 0)), why: 'see whether it blows over' });
   // or put up with it
-  out.push({ route: 'endure', value: r2(0.05 + t.caution * 0.05 - t.pride * 0.05), why: 'nothing he can do' });
+  out.push({ route: 'endure', value: r2(0.04 + failures * 0.04 + (1 - t.pride) * 0.05 - t.pride * 0.05), why: 'nothing he can do' });
   return out.sort((x, y) => y.value - x.value || (x.route < y.route ? -1 : 1));
 }
 function stopTrouble(w: World, p: Pursuit) {
@@ -122,6 +135,9 @@ function stopTrouble(w: World, p: Pursuit) {
     log(w, p, p.route ?? '?', p.with, settledBad ? 'it came to nothing' : 'he ran out of patience waiting');
     enter({ t: w.now, who: v.id, with: p.with, what: `${v.name}: ${settledBad ? `going to ${w.chars[p.with ?? '']?.name ?? 'them'} came to nothing` : `tired of waiting on ${w.chars[p.with ?? '']?.name ?? 'them'}`}; he thinks again`, chain: p.id });
     p.waitingOn = undefined; p.route = undefined;
+    // he takes a day or more to think, longer the more it has gone wrong
+    const pause = Math.min(4, 1 + Math.floor((p.turnedDown ?? []).length / 2));
+    if (pause > 1) { p.next = w.now + pause * DAY; return; }
   }
   const routes = troubleRoutes(w, p, v, a), top = routes[0];
   enter({ t: w.now, who: v.id, what: `${v.name} weighs what to do about ${a.name}: ${routes.map((x) => `${x.route}${x.with ? ' (' + w.chars[x.with].name + ')' : ''} ${x.value}`).join(', ')}`, chain: p.id });
@@ -155,6 +171,14 @@ function stopTrouble(w: World, p: Pursuit) {
     enter({ t: w.now, who: y.id, with: v.id, what: `${v.name} asks ${y.name} who ${a.name} answers to: ${r.decision.chosen}`, reply: r, chain: p.id });
     if (r.decision.chosen === 'tell' && held) say(w, y, v, 'answersTo:' + a.id, held, y.familyId === a.familyId ? 'seen' : 'rumour', true, `${a.name} is with ${w.chars[held].name}`);
     log(w, p, 'askAround', y.id, r.decision.chosen === 'tell' ? 'told' : 'got nothing');
+  } else if (top.route === 'wait') {
+    log(w, p, 'wait', undefined, 'waited');
+    enter({ t: w.now, who: v.id, what: `${v.name} decides to wait and see whether it blows over`, chain: p.id });
+    p.next = w.now + Math.round(3 + perceive(w, newSession(), v).temper.caution * 5) * DAY; return;
+  } else if (top.route === 'retaliate') {
+    door.grudge(w, v, a.id, 0.35, `he means to answer ${a.name} himself`);
+    log(w, p, 'retaliate', undefined, 'his own way');
+    return done(w, p, 'abandoned', 'he will settle it his own way');
   } else if (top.route === 'pay' && dem) {
     door.agree(w, dem, 'trouble:' + a.id);
     log(w, p, 'pay', a.id, 'paid');
@@ -203,7 +227,9 @@ function keepWord(w: World, p: Pursuit) {
   const k = a && to && prom ? captaincyOf(w, x, prom, a, prom) : undefined;
   const cost = r2(0.2 + (to && to.rank !== 'civilian' && to.id !== x.bossId ? 0.15 + perceive(w, newSession(), x).temper.caution * 0.15 : 0) - (k?.knowsTrouble ? 0.2 : 0) + (ob.conflicts?.length ? 0.3 : 0));
   if (!prom) return done(w, p, 'abandoned', 'the man he promised is gone');
-  const d = onKeepWord(perceive(w, newSession(), x), prom, cost, daysLeft, canAct);
+  // (he is seeing the man anyway: they met in the last day, as men in the same crew or the same streets do)
+  const seesHim = !!to && w.now - (x.rels[to.id]?.lastMet ?? -1e9) < DAY;
+  const d = onKeepWord(perceive(w, newSession(), x), prom, cost, daysLeft, canAct, { window: Math.round((ob.by - ob.from) / DAY), seesHim });
   const ch = d.decision.chosen;
   enter({ t: w.now, who: x.id, with: prom.id, what: `${x.name}, on his promise to ${prom.name} (${daysLeft} days left): ${ch}`, reply: d, chain: p.id });
   if (ch === 'act' && to && a && m) {
@@ -237,29 +263,42 @@ function followUp(w: World, p: Pursuit) {
   const s = social(w), ob = s.obs.find((o) => o.id === p.ob), b = live(w, p.who), o = live(w, ob?.obligor);
   if (!ob || !b) return done(w, p, 'abandoned', 'nothing to follow');
   judge(w, b, ob);
-  const bv = belief(w, b, 'ob:' + ob.id).value;
-  if ((bv === 'kept' || bv === 'released') || (bv === 'done' && w.now > ob.by + 7 * DAY)) return done(w, p, 'achieved', `as he believes it: ${bv}`);
-  if (bv === 'broken' || bv === 'notDone' || bv === 'withdrawn' || w.now > ob.by + 10 * DAY) return done(w, p, 'abandoned', `as he believes it: ${bv ?? 'nothing came of it'}`);
+  const bel = belief(w, b, 'ob:' + ob.id), bv = bel.value;
+  // what settles his question depends on what was promised (spec §6.3): told credibly that the thing was done settles a promise to
+  // do it, or to try; a promise of a result, or to stay away, is settled by the result, not by the man saying he did his part
+  const deed = ob.type === 'action' || ob.type === 'effort';
+  if (!bel.uncertain && ((deed && bv === 'done') || bv === 'kept' || bv === 'released')) return done(w, p, 'achieved', `as he believes it: ${bv}`);
+  if (!bel.uncertain && (bv === 'broken' || bv === 'notDone' || bv === 'withdrawn')) return done(w, p, 'abandoned', `as he believes it: ${bv}`);
+  if (ob.status !== 'pending' && w.now > ob.by + 10 * DAY) return done(w, p, 'abandoned', 'nothing came of it that he knows of');
   // verification (spec §5.3): told it was done, and yet the trouble goes on, he checks with the man it was supposed to be done with
-  const told = (social(w).said ?? []).filter((x) => x.to === b.id && x.subject === 'ob:' + ob.id && x.by === ob.obligor && x.value === 'done').at(-1);
-  const m = ob.matter, spec = ob.spec;
-  const after = told && m?.against ? Object.values(w.facts).some((f) => HOSTILE.has(f.kind) && f.t > told.t && (f.actor === m.against || w.chars[f.actor ?? '']?.bossId === m.against) && (f.victim === b.id || f.business === m.biz) && b.known[f.id]) : false;
+  const said = (s.said ?? []).filter((x) => x.to === b.id && x.subject === 'ob:' + ob.id && x.by === ob.obligor);
+  const told = said.filter((x) => x.value === 'done').at(-1), m = ob.matter, spec = ob.spec;
+  const after = told && m?.against ? Object.values(w.facts).some((f) => HOSTILE.has(f.kind) && f.t > told.t && offender(f) !== undefined && (offender(f) === m.against || w.chars[offender(f) ?? '']?.bossId === m.against) && (injured(f) === b.id || f.business === m.biz) && b.known[f.id]) : false;
   const check = spec.kind === 'actionDone' ? live(w, spec.target) : undefined;
   if (told && after && check && !(p.asked ?? []).includes(check.id) && !check.isPlayer) {
     (p.asked ??= []).push(check.id);
-    const did = social(w).log.some((x) => x.actor === ob.obligor && x.act === (spec as { act: string }).act && x.target === check.id && x.t >= ob.from);
+    const did = s.log.some((x) => x.actor === ob.obligor && x.act === (spec as { act: string }).act && x.target === check.id && x.t >= ob.from);
     const willSay = peek(check, b.id).trust + (1 - perceive(w, newSession(), check).temper.caution) * 0.3 > 0.3;
     enter({ t: w.now, who: b.id, with: check.id, what: `${b.name}, told it was done and seeing the trouble go on, asks ${check.name} whether ${o?.name} ever came to him: ${willSay ? (did ? 'yes' : 'no') : 'he won’t say'}`, chain: p.id });
     if (willSay) say(w, check, b, 'ob:' + ob.id, did ? 'done' : 'notDone', 'own', true, did ? 'He came to me.' : 'He never came to me.');
     judge(w, b, ob);
     p.next = w.now + DAY; return;
   }
-  const daysLeft = Math.floor((ob.by - w.now) / DAY), since = Math.floor((w.now - (p.waitedFrom ?? ob.from)) / DAY);
-  if (o && (since >= p.patience || daysLeft <= 1) && !o.isPlayer) {
+  // asking him how it stands: only with a reason to (spec §6.7). Not when he has already been told and has no cause to doubt it; not
+  // twice for the same reason. Reasons: he has heard nothing at all and his patience is spent; the deadline is on them and he has
+  // heard nothing since he last asked; he was told "not yet" and has waited his patience again
+  const daysLeft = Math.floor((ob.by - w.now) / DAY), last = said.at(-1);
+  const heardSinceAsked = !!last && last.t >= (p.waitedFrom ?? ob.from);
+  const quietFor = Math.floor((w.now - (last?.t ?? ob.from)) / DAY);
+  const reason = !last && quietFor >= p.patience ? 'he has heard nothing'
+    : last?.value === 'notYet' && quietFor >= p.patience ? 'he was told “not yet”, and has waited'
+    : daysLeft <= 1 && daysLeft >= 0 && !heardSinceAsked && !(deed && last?.value === 'done') ? 'the time is nearly up'
+    : undefined;
+  if (o && reason && !o.isPlayer && !(last && last.value === 'done')) {
     p.waitedFrom = w.now;
-    const did = ob.spec.kind === 'actionDone' ? s.log.some((x) => x.actor === ob.obligor && x.act === (ob.spec as { act: string }).act && x.about === (ob.spec as { about: string }).about && x.t >= ob.from) : false;
+    const did = spec.kind === 'actionDone' ? s.log.some((x) => x.actor === ob.obligor && x.act === (spec as { act: string }).act && x.about === (spec as { about: string }).about && x.t >= ob.from) : false;
     const r = onProgressAsked(perceive(w, newSession(), o), b, did, daysLeft);
-    enter({ t: w.now, who: o.id, with: b.id, what: `${b.name} asks ${o.name} whether he has done it: he says ${r.says}${r.honest ? '' : ' (a lie)'}`, reply: r, chain: p.id });
+    enter({ t: w.now, who: o.id, with: b.id, what: `${b.name} asks ${o.name} whether he has done it (${reason}): he says ${r.says}${r.honest ? '' : ' (a lie)'}`, reply: r, chain: p.id });
     say(w, o, b, 'ob:' + ob.id, r.says, 'own', r.honest);
     judge(w, b, ob);
   }
@@ -337,6 +376,11 @@ onPromise.push((w, ob) => {
 });
 // what he learns can open a better route (spec §7.4): his pursuits look again tomorrow, not at their next scheduled turn
 onRevision.push((w, r) => {
+  // a follow-up settled on his belief reopens when he comes to believe otherwise (a lie found out, the result failing): a new reason
+  for (const p of P(w)) if (p.status !== 'active' && p.kind === 'followUp' && p.who === r.who && r.subject === 'ob:' + p.ob && ['broken', 'notDone'].includes(r.to ?? '') && p.why?.includes('as he believes it: done')) {
+    p.status = 'active'; p.why = `reopened: he now believes ${r.to} (${r.why})`; p.next = w.now + DAY;
+    enter({ t: w.now, who: r.who, what: `${w.chars[r.who].name} takes it up again: he now believes it was ${r.to === 'notDone' ? 'never done' : 'broken'} (${r.why})`, chain: p.id });
+  }
   for (const p of P(w)) if (p.status === 'active' && p.who === r.who && ((r.subject.startsWith('answersTo:') && p.kind === 'stopTrouble' && r.subject.endsWith(p.against ?? '#')) || (r.subject === 'ob:' + p.ob) || (r.subject === 'who:' + p.fact))) {
     p.next = Math.min(p.next, w.now + DAY); p.revised = `he now believes ${r.subject.startsWith('answersTo:') ? `${w.chars[r.subject.split(':')[1]]?.name} answers to ${w.chars[r.to ?? '']?.name}` : `${r.subject} is ${r.to}`}`;
     enter({ t: w.now, who: r.who, what: `${w.chars[r.who].name} now believes ${r.subject.split(':')[0] === 'answersTo' ? `${w.chars[r.subject.split(':')[1]]?.name} answers to ${w.chars[r.to ?? '']?.name}` : `${r.subject}: ${r.to}`} (${r.why}); he will think again`, chain: p.id });

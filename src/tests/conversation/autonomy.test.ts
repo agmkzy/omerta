@@ -13,17 +13,17 @@ import { advance, deserialize, serialize } from '../../engine';
 import { audit } from '../../consistency';
 import { ledgerCheck } from '../../econ';
 import { moneyTotal } from '../../goals';
-import { openAsk, move as askMove } from '../../asks';
+import { layoffFor, openAsk, move as askMove } from '../../asks';
 import { DAY, type World } from '../../types';
 import { social } from '../../conv/social';
 import { promise, request } from '../../conv/tick';
-import { conflicts, release, settle, withdraw } from '../../conv/obligations';
+import { conflicts, injured, offender, release, settle, withdraw } from '../../conv/obligations';
 import { belief, judge, say } from '../../conv/minds';
 import { breakWish } from '../../conv/obey';
 import { onKeepWord, onProtectionDemand } from '../../conv/respond';
 import { newSession, perceive } from '../../conv/perception';
 import { annals } from '../../conv/annals';
-import { emergence } from '../../conv/emergence';
+import { chainOf, emergence } from '../../conv/emergence';
 import { scenarioG } from '../../conv/scenarioG';
 import * as door from '../../conv/doors';
 import { cast } from '../../conv/ferrara';
@@ -223,6 +223,28 @@ describe('long runs (priority 8)', () => {
     assert.ok(sum('throughTwo') >= 8, `${sum('throughTwo')} through two or more people`);
     assert.ok(sum('revisionsChangedPlan') >= 4, `${sum('revisionsChangedPlan')} plans changed by a revision`);
     assert.ok(sum('requests') >= 80, `${sum('requests')} requests`);
+  });
+  ok('identity holds through every chain: each linked request carries the same victim and offender as the one it came from, and promises made for it the same', { tags: ['sim'] }, () => {
+    for (const { seed, w } of runs) {
+      const so = social(w);
+      for (const r of so.requests) {
+        const c = chainOf(w, r);
+        for (const x of c) { assert.equal(x.for ?? c[0].for, c[0].for, `seed ${seed}: ${x.id} is for ${x.for}, its chain for ${c[0].for}`); assert.equal(x.against ?? c[0].against, c[0].against, `seed ${seed}: ${x.id} against ${x.against}, its chain against ${c[0].against}`); }
+      }
+      for (const o of so.obs) { const g = so.agreements.find((a) => a.id === o.agreement), r = g && so.requests.find((q) => q.id === g.madeIn); if (r && o.matter) { assert.equal(o.matter.for, r.for, `seed ${seed}: ${o.id}`); assert.equal(o.matter.against, r.against, `seed ${seed}: ${o.id}`); } }
+    }
+  });
+  ok('a man ordered to leave alone the man who complained of him is never told he did nothing to him (the refusal names who caused the trouble)', { tags: ['sim'] }, () => {
+    const w = newWorld(3), s = sol(w), t = civ(w);
+    const f = addFact(w, { kind: 'protection_refused', actor: t.id, victim: s.id, business: ownerBiz(w, t.id)!.id, text: 'x', district: t.district }, {});
+    assert.equal(offender(f), s.id); assert.equal(injured(f), t.id);
+    social(w); annals.length = 0;
+    const boss = Object.values(w.chars).find((c) => c.id === s.bossId)!;
+    const sit = layoffFor(w, boss, s, t, f.id)!;
+    askMove(w, sit, 'ask');
+    const e = annals.find((x) => x.who === s.id && /to leave .* alone/.test(x.what))!;
+    assert.ok(e, 'he answered his superior');
+    assert.ok(!e.reply!.decision.candidates.some((c) => c.terms.some((tm) => tm.name.includes('never touched him'))), JSON.stringify(e.reply!.decision.candidates));
   });
   ok('the same seed gives the same society; saved halfway and loaded, it goes on exactly as it would have', { tags: ['determinism'] }, () => {
     const a = newWorld(7); social(a); advance(a, a.now + 30 * DAY);

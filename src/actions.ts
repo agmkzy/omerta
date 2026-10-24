@@ -163,12 +163,16 @@ export function generate(w: World, c: Character, kind: Kind): Action[] {
   return out;
 }
 
+export const dayDecider: { f?: (w: World, c: Character, all: Action[]) => Action } = {};
 export function chooseAction(w: World, c: Character): Action {
   // Restraint: after something violent, a man keeps his head down for a while. Fewer incidents, each one heavier.
   const calm = (c.cooldown.restraint ?? 0) > w.now;
   const kinds: Kind[] = c.hurtUntil > w.now ? ['work'] : calm ? ['work', 'socialise', 'lend', 'collect', 'gamble'] : ['work', 'socialise', 'lend', 'collect', 'shakedown', 'gamble', 'retaliate'];
   const all: Action[] = [];
   for (const k of kinds) all.push(...generate(w, c, k));
+  // (Gate 2b: in a world running the conversation layer, the choice among what the world offers him is that layer's, with the same
+  // motives as everything else he decides: conv/daily.ts. generate() still says what there is to do and what each is worth.)
+  if (w.social && dayDecider.f) return dayDecider.f(w, c, all);
   let best = all[0];
   for (const a of all) {
     a.score += w.rng.next() * 0.12;

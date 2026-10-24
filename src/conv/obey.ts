@@ -16,7 +16,12 @@ export function breakWish(w: World, c: Character, target: Id, biz?: Id): number 
   const ob = bound[0], over = w.chars[ob.beneficiary], forC = w.chars[target];
   if (!over || !forC) return undefined;
   const fee = biz ? Math.round((w.biz[biz]?.income ?? 0) * 0.08) : 0;
-  const r = onOrder(perceive(w, newSession(), c), over, forC, fee);
+  // what he knows of his own position: how far over him the man is, whether he has been punished before, whether the man he would hurt
+  // has already gone over his head once (and so would again)
+  const rank = ['civilian', 'associate', 'soldier', 'capo', 'underboss', 'boss'];
+  const disciplined = Object.keys(c.known).filter((id) => { const f = w.facts[id]; return f?.kind === 'discipline' && f.victim === c.id; }).length;
+  const complained = (w.social?.requests ?? []).some((r) => r.by === target && r.against === c.id);
+  const r = onOrder(perceive(w, newSession(), c), over, forC, fee, { rankGap: Math.max(1, rank.indexOf(over.rank) - rank.indexOf(c.rank)), disciplined, complained });
   const v = (m: string) => r.decision.candidates.find((x) => x.move === m)?.value ?? 0;
   const wish = Math.round((v('violate') - v('obey')) * 100) / 100;
   if (tested.length > 200) tested.splice(0, 100);

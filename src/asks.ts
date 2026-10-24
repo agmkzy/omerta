@@ -268,7 +268,7 @@ function answer(w: World, s: Situation, a: Character, t: Character, K: AskKind, 
   const say = (decision: 'yes' | 'counter' | 'stall' | 'no' | 'help', o: { again?: number; reason?: string; terms?: string; coerced?: boolean } = {}) => { if (toP && how) lines.push(...speak(w, a, t, { ...how, decision, again: o.again ?? 0, cls: classOf(s), kind: s.ak, above: rk(t) > rk(a), claim: s.m?.claim ? String(s.m.claim) : undefined, ...o })); };
   // (Gate 2b: in a world running the conversation layer, the answer is that layer's decision, from the man's own perception; the
   // kind's weighing below is used only where no such decision exists)
-  const D = w.social ? DECIDERS.answer[s.ak ?? '']?.(w, s, a, t) : undefined;
+  const D = w.social ? (DECIDERS.answer[s.ak ?? ''] ?? DECIDERS.answer['*'])?.(w, s, a, t) : undefined;
   const score = D ? 0 : v + S.fear * 0.7 * (1 - tp.courage * 0.6) + S.good * 0.45 - S.anger * 0.55 - S.resolve * 0.55 + jitter(w, s, 'ans' + tried(stance(w, s, a.id), 'ask'));
   if (D ? D.move === 'yes' : score > 0.12) { const coerced = S.fear > S.good + 0.1; say('yes', { coerced }); return finish(w, s, a, t, K, S, lines, coerced); }
   const kc = K.counter?.(w, s, a, t), c = D?.move === 'counter' && D.amt !== undefined ? { amt: D.amt, why: D.why ?? kc?.why ?? 'that is what I can do' } : kc;
@@ -434,7 +434,7 @@ function step(w: World, s: Situation) {
     return;
   }
   if (t.isPlayer) return askPlayer(w, s, a, t, K);
-  const mv = (w.social ? DECIDERS.move[s.ak ?? '']?.(w, s, a, t) : undefined) ?? npcMove(w, s, a, t, S);
+  const mv = (w.social ? (DECIDERS.move[s.ak ?? ''] ?? DECIDERS.move['*'])?.(w, s, a, t) : undefined) ?? npcMove(w, s, a, t, S);
   move(w, s, mv);
   if (isOpen(s) && (s.next ?? 0) <= w.now) s.next = w.now + (2 + Math.floor((jitter(w, s, 'gap') + 0.08) * 25)) * DAY;
 }

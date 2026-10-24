@@ -45,6 +45,10 @@ export interface Store { obs: Obligation[]; log: Act[]; n: number }
 export const newStore = (): Store => ({ obs: [], log: [], n: 0 });
 export interface Settlement { ob: Obligation; to: 'kept' | 'broken' | 'void'; why: string }
 
+// who a fact sets against whom: the offender is the actor, except in a refusal (the shopkeeper who refused is the actor, the man who
+// demanded is the one causing the trouble)
+export const offender = (f: Fact) => (f.kind === 'protection_refused' ? f.victim : f.actor);
+export const injured = (f: Fact) => (f.kind === 'protection_refused' ? f.actor : f.victim);
 export const HOSTILE = new Set(['vandalism', 'beating', 'threat', 'robbery', 'protection_refused', 'murder']);
 // a man's people: himself and the men who answer to him
 const menOf = (w: World, id: Id) => new Set([id, ...Object.values(w.chars).filter((c) => c.bossId === id).map((c) => c.id)]);
