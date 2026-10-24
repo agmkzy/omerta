@@ -356,7 +356,7 @@ describe('a visit, as the world records it', () => {
   });
   ok('asked where he stands, the captain answers from the family’s actual conditions, and the second time says what has changed or that nothing has', { tags: ['scenario'] }, () => {
     const w = plain3(), p = w.chars[w.playerId!], b = w.chars[p.bossId!];
-    const ask = () => { const v = begin(w, b.id); choose(w, v, 'u:business'); const x = everything(w, v).find((y) => y.id === 'o:promo'); assert.ok(x, 'he can be asked'); const n = v.lines.length; choose(w, v, x.id); return v.lines.slice(n).filter((l) => l.who === 'him').map(keyOf); };
+    const ask = () => { const v = begin(w, b.id); choose(w, v, 'u:business'); const x = everything(w, v).find((y) => y.id === 'a:promo'); assert.ok(x, 'he can be asked'); const n = v.lines.length; choose(w, v, x.id); return v.lines.slice(n).filter((l) => l.who === 'him').map(keyOf); };
     const first = ask();
     assert.equal(first[0], 'advance.open'); assert.ok(first.some((k) => /^advance\.(gap|ready|noSeat)/.test(k ?? '')), first.join(' '));
     advance(w, w.now + DAY);
@@ -374,7 +374,7 @@ describe('a visit, as the world records it', () => {
     let v = begin(w, b.id);
     assert.ok(v.lines.some((l) => keyOf(l) === 'job.ack.done'), v.lines.map((l) => l.text).join(' / '));
     choose(w, v, 'u:business');
-    if (everything(w, v).some((x) => x.id === 'o:report')) assert.equal(v.choices[0].label, 'Tell him how the job went');
+    if (everything(w, v).some((x) => x.id === 'a:report')) assert.equal(v.choices[0].label, 'Tell him how the job went');
     const failed = mkJob(w, { kind: 'deliver', title: 'Another errand', brief: 'x', giver: b.id, via: 'boss', assignee: p.id, pay: 50, status: 'active', days: 7 } as never);
     failed.status = 'failed'; // (as jobs.ts records a job that went wrong)
     v = begin(w, b.id);
@@ -443,7 +443,7 @@ describe('a visit, as the world records it', () => {
   ok('a figure goes with its own choice: a suffix on a choice that takes no figure is refused', { tags: ['unit'] }, () => {
     const w = plain3(), p = w.chars[w.playerId!];
     const v = begin(w, p.bossId!); choose(w, v, 'u:business'); choose(w, v, 'all:business');
-    const fig = v.choices.find((x) => x.amount), plainC = v.choices.find((x) => !x.amount && x.id.startsWith('o:'));
+    const fig = v.choices.find((x) => x.amount), plainC = v.choices.find((x) => !x.amount && /^a:/.test(x.id));
     if (plainC) { const n = v.lines.length; choose(w, v, plainC.id + ':500'); assert.equal(v.lines.length, n, 'not a choice with a figure'); }
     if (fig) { const n = v.lines.length; choose(w, v, `${fig.id}:${fig.amount!.value}`); assert.ok(v.lines.length > n, 'its figure is accepted'); }
   });

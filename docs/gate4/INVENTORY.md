@@ -128,19 +128,19 @@
 
 | Legacy interaction | Handler | Gameplay dependency | Replacement · pane | Status |
 |---|---|---|---|---|
-| Is there work / what he needs done / more | `work`, `b_need`, `b_more` | `jobs.bossOffer`, `tipFrom`, `oppFrom` | `acts/org` · B | pending |
-| Work he offers: take it / not this time | `f:job:` → `jobtake`, `jobpass` | `takeJob`, `declineJob` | `acts/org` · his | pending |
-| Report on work done | `report` | `j.reported`, relationship, `repute` | `acts/org` · B (first, when due) | pending (already surfaced, through the old engine) |
-| Ask why / refuse an order | `challenge:<job>`, `refuse:<job>` | relationship; refusal: `j.status = declined`, `repute` | `acts/org` · C | pending |
+| Is there work / what he needs done / more | `work`, `b_need`, `b_more` | `jobs.bossOffer`, `tipFrom`, `oppFrom` | `acts/org` · B | migrated (Stage C; parity) |
+| Work he offers: take it / not this time | `f:job:` → `jobtake`, `jobpass` | `takeJob`, `declineJob` | `acts/org` · his | migrated (Stage C; parity) |
+| Report on work done | `report` | `j.reported`, relationship, `repute` | `acts/org` · B (first, when due) | migrated (Stage C; parity) |
+| Ask why / refuse an order | `challenge:<job>`, `refuse:<job>` | relationship; refusal: `j.status = declined`, `repute` | `acts/org` · C | migrated (Stage C; parity) |
 | Where you stand / advancement | `b_stand`, `promo`, `fl:promo_*` | `pathInfo`, `readiness` (read only) | the layer's `doAdvance` (Gate 3) · B | partly done |
-| Put in a word for me | `recommend` | memo "favour", the boss's respect | `acts/org` · B | pending |
-| Back me / what has he said / call in, take, haggle | `rk_back`, `rk_back_ask`, `fl:back_*` | `p.backer`, favours, memos | `acts/org` · B | pending |
-| A concern about a man | `pick_concern` → `concern:<id>` | `books.react` (a superior acts on skimming), grudge | `acts/org` · B | pending |
-| Your own man: keep head down / extra income (and resistance) | `assign_low`, `assign_hustle`, `fl:ord_*` | heat, side income, grudge | `acts/org` · B | pending |
-| Your own man: what's wrong, help, light envelope, look into it, money, thin ice | `cr_ask`, `cr_cash`, `cr_duties`, `cr_drop`, `cr_look`, `cr_money`, `cr_thin`, `fl:th_*` | `helpMan`, problem revealed, notes, restraint, threat fact | `acts/org` · P/C | pending (`cr_drop`, `cr_thin` reach Confront through the old engine) |
+| Put in a word for me | `recommend` | memo "favour", the boss's respect | `acts/org` · B | migrated (Stage C; parity) |
+| Back me / what has he said / call in, take, haggle | `rk_back`, `rk_back_ask`, `fl:back_*` | `p.backer`, favours, memos | `acts/org` · B | migrated (Stage C; parity) |
+| A concern about a man | `pick_concern` → `concern:<id>` | `books.react` (a superior acts on skimming), grudge | `acts/org` · B | migrated (Stage C; parity) |
+| Your own man: keep head down / extra income (and resistance) | `assign_low`, `assign_hustle`, `fl:ord_*` | heat, side income, grudge | `acts/org` · B | migrated (Stage C; parity) |
+| Your own man: what's wrong, help, light envelope, look into it, money, thin ice | `cr_ask`, `cr_cash`, `cr_duties`, `cr_drop`, `cr_look`, `cr_money`, `cr_thin`, `fl:th_*` | `helpMan`, problem revealed, notes, restraint, threat fact | `acts/org` · P/C | migrated (Stage C; parity) |
 | His light envelopes as a conversation | `tk:earn` (`threads.ts`) | the books, skimming admitted, payments | `conv/subjects` · C | pending |
 | Work he did for you | `tk:job:` (`threads.ts`) | `questionReport` | `conv/subjects` · B | pending |
-| Take a man on | `recruit_offer`, `fl:rc_*` | `asks.openAsk('recruit')`, $150 | `acts/org` · B | pending |
+| Take a man on | `recruit_offer`, `fl:rc_*` | `asks.openAsk('recruit')`, $150 | `acts/org` · B | migrated (Stage C; parity) |
 
 ### 3.4 Confrontation, amends and his own requests (Stage D)
 

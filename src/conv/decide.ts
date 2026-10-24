@@ -18,9 +18,11 @@ export function weigh(by: Id, cs: Candidate[], aim?: string): Decision {
   return { by, constraints: [], candidates: cs, chosen: best.move, aim };
 }
 // a yes-or-no the world's rules leave to chance: the odds (the sum of the terms, held between lo and hi), one roll of the world's dice
-export function chance(w: World, by: Id, yes: string, no: string, terms: Term[], lo = 0, hi = 1, aim?: string): Decision & { yes: boolean; odds: number } {
+// (top: the rule reads the roll from the top, yes when it comes up high, as some of the world's rules always have; the odds are the same,
+// and the same seed gives the same answer the rule always gave)
+export function chance(w: World, by: Id, yes: string, no: string, terms: Term[], lo = 0, hi = 1, aim?: string, top = false): Decision & { yes: boolean; odds: number } {
   const raw = terms.reduce((a, t) => a + t.value, 0), odds = clamp(raw, lo, hi);
-  const roll = w.rng.next(), ok = roll < odds;
+  const roll = w.rng.next(), ok = top ? roll > 1 - odds : roll < odds;
   const held = raw !== odds ? [term(raw > odds ? `no better than ${r2(hi)}` : `no worse than ${r2(lo)}`, odds - raw)] : [];
   return { by, constraints: [], candidates: [{ move: yes, value: r2(odds), terms: [...terms, ...held].map((t) => ({ ...t, value: r2(t.value) })), crosses: [] }, { move: no, value: r2(1 - odds), terms: [term('the rest of the odds', 1 - odds)], crosses: [] }, { move: `(the roll: ${r2(roll)})`, value: -10, terms: [], crosses: [] }], chosen: ok ? yes : no, aim, yes: ok, odds };
 }

@@ -4,6 +4,7 @@ import type { Act } from '../kit';
 import { PERSONAL } from './personal';
 import { INFO } from './info';
 import { BUSINESS } from './business';
+import { ORG } from './org';
 
 export const ACTS: Record<string, Act> = {};
-for (const a of [...PERSONAL, ...INFO, ...BUSINESS]) { if (ACTS[a.base]) throw new Error(`two interactions share the code ${a.base}`); ACTS[a.base] = a; }
+for (const a of [...PERSONAL, ...INFO, ...BUSINESS, ...ORG]) { if (ACTS[a.base]) throw new Error(`two interactions share the code ${a.base}`); ACTS[a.base] = a; }

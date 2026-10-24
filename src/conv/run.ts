@@ -11,7 +11,7 @@ import { say as vsay } from '../voicesheet';
 import { openAsks } from '../asks';
 import type { Character, World } from '../types';
 import * as door from './doors';
-import { says, type Act, type Ctx, type Offer, type Out } from './kit';
+import { agoWords, him, lastOf, plain, remember, says, type Act, type Ctx, type Offer, type Out } from './kit';
 import { answered, asksOf, speechFor } from './acts/words';
 import { ACTS } from './acts';
 
@@ -33,9 +33,22 @@ const SOCIAL_ACK = new Set(['how', 'old_times', 'drink', 'rv_drink', 'welcome', 
 
 export const actOf = (code: string): Act | undefined => ACTS[code.split(':')[0]];
 // What can be put to him now, by every interaction that has something to offer (each by its own conditions)
+// (and, of the rest, the two a man in the player's position would naturally put to this man first, by who he is to him: work and a
+// bigger piece from the boss, protection to a shopkeeper, orders to the player's own man, a word to a man of another family)
+const ROLE_PUTS: Record<string, string[]> = {
+  boss: ['b_need', 'promo', 'b_more'], above: ['rk_back', 'recommend', 'work', 'promo', 'borrow'], mine: ['assign_low', 'assign_hustle'], peer: ['work', 'borrow', 'rk_back'],
+  shop: ['suggest', 'offer_loan', 'partner_chop', 'partner_fence'], civilian: ['recruit_offer', 'offer_loan'], rival: ['rv_favour', 'rv_warn'],
+};
+const RK = (r: string) => ['civilian', 'associate', 'soldier', 'capo', 'underboss', 'boss'].indexOf(r);
+export function roleOf(c: Ctx): string {
+  const { w, h: p, n: t } = c;
+  return t.id === p.bossId ? 'boss' : t.bossId === p.id ? 'mine' : t.rank === 'civilian' ? (Object.values(w.biz).some((b) => b.ownerId === t.id && b.open) ? 'shop' : 'civilian') : t.familyId && p.familyId && t.familyId !== p.familyId ? 'rival' : RK(t.rank) > RK(p.rank) ? 'above' : 'peer';
+}
 export function offersNow(c: Ctx): Offer[] {
   const out: Offer[] = [];
   for (const a of Object.values(ACTS)) if (a.offers) for (const o of a.offers(c)) out.push({ pane: a.pane, ...o });
+  const lead = ROLE_PUTS[roleOf(c)].map((k) => out.find((o) => (o.kind ?? 'other') === 'other' && o.code.split(':')[0] === k)).filter((o): o is Offer => !!o).slice(0, 2);
+  for (const o of lead) o.kind = 'lead';
   return out;
 }
 
@@ -91,6 +104,8 @@ export function perform(c: Ctx, code: string, label: string): Done {
     door.cool(p, k, day * 10 + same + 1); door.cool(p, kw, wk * 100 + Math.min(99, sameW + 1));
     dull = same >= 2 ? 'day' : sameW >= 6 ? 'week' : undefined;
   }
+  // (what the player said is remembered across visits, so the next one can answer to it: a slight, see visit.SLIGHT)
+  if (label) remember(w, t.id, 'said:' + code.split(':').slice(0, 3).join(':'), 'said');
   const from = v.lines.length, inSubject = !!v.th.fact;
   const open0 = new Set(openAsks(w).filter((x) => x.terms?.by === p.id && x.terms?.of === t.id).map((x) => x.id));
   const r: Out = act.run(c, code) ?? {};
@@ -128,6 +143,16 @@ export function perform(c: Ctx, code: string, label: string): Done {
     const prev = new Set(v.th.spoken), mine = v.lines.slice(from), kept = mine.filter((l) => l.who === 'you' || l.who === 'card' || l.text.length <= 30 || !prev.has(l.text));
     if (kept.length !== mine.length) { const alr = vsay(w, t, p, 'already'); v.lines.splice(from); v.lines.push(...kept); if (!kept.some((l) => l.who === 'him')) says(c, prev.has(alr) ? 'He has nothing more to say on it.' : alr); }
     v.th.spoken = [...v.th.spoken, ...v.lines.slice(from).filter((l) => l.who === 'him' && l.text.length > 30).map((l) => l.text)].slice(-60);
+  }
+  // asked the same thing and answered the same way, with nothing changed since: he says that, not the same words again (only what the
+  // player asked: a man raising his own matter again says it again)
+  {
+    const saidNow = v.lines.slice(from).filter((l) => l.who === 'him').map((l) => l.text).join(' '), ak = 'ans:' + code.split(':').slice(0, 3).join(':'), was = lastOf(w, t.id, ak);
+    if (label && saidNow && was && was.sig === saidNow.slice(0, 120) && w.now - was.t < 21 * 1440 && w.now - was.t > 60) {
+      const keep = v.lines.slice(from).filter((l) => l.who !== 'him');
+      v.lines.splice(from); v.lines.push(...keep); him(c, plain(t.id, 'again.same', { ago: agoWords(w.now, was.t) }, 'flat'));
+    }
+    if (saidNow) remember(w, t.id, ak, 'said', saidNow.slice(0, 120));
   }
   // what needs no words back still gets an answer, in keeping with what it was and how he is with the player
   if (!r.end && !act.nav && !v.lines.slice(from).some((l) => l.who === 'him' || answered(l.text, t.name.split(' ')[0]))) says(c, ackLine(w, t, p, v.lines.length - from, SOCIAL_ACK.has(base)));

@@ -258,7 +258,7 @@ function subjectsNow(c: Ctx, k: Pane, all: boolean): Choice[] {
     const mine = myPromiseTo(c), how = mine ? passOf(c, mine) : undefined;
     if (mine && how) out.push({ id: 'pass:' + mine.id + ':' + how, label: passLine(c, mine, how), group: 'matter' });
     // (finished work of his, not yet reported to him, comes first: the old engine's report)
-    if (unreported(c)) { const r = oldGroups(c, ['org']).find((x) => x.id === 'o:report'); if (r) out.push({ ...r, label: 'Tell him how the job went', says: line(c, 'report.job') }); }
+    if (unreported(c)) { const r = actRows(c, 'business', ['between']).find((x) => x.id === 'a:report'); if (r) out.push(r); }
     out.push(...pending);
     // what a man in your position would naturally put to him: work from your boss, orders to your own man
     out.push(...actRows(c, k, ['lead']), ...oldRows(c, 'lead'));
@@ -493,36 +493,6 @@ const jobPhrase = (t: string) => (t.length <= 48 ? `‘${t}’` : 'that job');
 // Finished work of his not yet reported to him: the conversation's first business (the old engine's report, which he rewards)
 const unreported = (c: Ctx) => c.w.jobs.some((j) => j.giver === c.n.id && j.assignee === c.h.id && j.status === 'done' && !j.reported);
 
-// ---------------------------------------------------------------- where the player stands with the family
-// What a man who can speak to it says when asked: from the road the family actually holds him to (path.ts: money passed up, work
-// done, the family's hard work, his name, the men who would back him, the proof), the gaps that matter most first, and against what he
-// said the last time: what has come on since, or that nothing has.
-const GOAL_RANK: Record<string, number> = { earn: 0, sponsor: 1, deeds: 2, kills: 3, name: 4, trial: 5 };
-function doAdvance(c: Ctx) {
-  const { w, h, n } = c;
-  const canSay = ['capo', 'underboss', 'boss'].includes(n.rank) || n.id === h.bossId;
-  const info = canSay ? pathInfo(w, h) : undefined, rd = canSay ? readiness(w, h) : undefined;
-  if (!canSay || !info) { him(c, plain(n.id, canSay ? 'advance.top' : 'advance.notMe')); return general(c); }
-  const lvl = (g: { done: boolean; frac: number }) => (g.done ? 4 : Math.floor(g.frac * 4));
-  const sig = info.goals.map((g) => `${g.key}=${lvl(g)}`).join(',') + `|${standingWord(h.standing)}|${Math.round(h.standing)}`;
-  const prev = lastOf(w, n.id, 'advance'), was = Object.fromEntries((prev?.sig ?? '').split('|')[0].split(',').filter(Boolean).map((x) => x.split('=')));
-  const gaps = info.goals.filter((g) => !g.done).sort((a, b) => (GOAL_RANK[a.key] ?? 9) - (GOAL_RANK[b.key] ?? 9) || a.frac - b.frac);
-  const better = prev ? info.goals.filter((g) => was[g.key] !== undefined && lvl(g) > Number(was[g.key])) : [];
-  const worse = prev ? info.goals.filter((g) => was[g.key] !== undefined && lvl(g) < Number(was[g.key])) : [];
-  const word = standingWord(h.standing), wordWas = prev?.sig?.split('|')[1], stWas = Number(prev?.sig?.split('|')[2] ?? h.standing);
-  // (which way his name has moved, by the measure itself, not by whether the word for it changed)
-  const nameUp = wordWas && wordWas !== word && h.standing > stWas, nameDown = wordWas && wordWas !== word && h.standing < stWas;
-  if (prev && (prev.sig ?? '').split('|').slice(0, 2).join('|') === sig.split('|').slice(0, 2).join('|')) him(c, plain(n.id, 'advance.same', { ago: agoWords(w.now, prev.t) }, 'flat'));
-  else if (prev && (worse.length || nameDown) && !better.length && !nameUp) him(c, plain(n.id, 'advance.worse', { ago: agoWords(w.now, prev.t), what: worse.length ? GOAL_WORD[worse[0].key] ?? 'the work' : `people call you ${word} now, not ${wordWas}` }, 'cold'));
-  else if (prev && (better.length || nameUp)) him(c, plain(n.id, 'advance.better', { ago: agoWords(w.now, prev.t), what: better.length ? GOAL_WORD[better[0].key] ?? 'the work' : `people call you ${word} now` }, 'warm'));
-  else him(c, plain(n.id, 'advance.open', { standing: word }, 'flat'));
-  if (!gaps.length) him(c, plain(n.id, rd?.openSeat ? 'advance.ready' : 'advance.noSeat'));
-  for (const g of gaps.slice(0, 2)) him(c, plain(n.id, 'advance.gap.' + (g.key === 'trial' && g.note.startsWith('waiting') ? 'trialOpen' : g.key), { note: g.note, standing: word, label: g.label }, 'flat'));
-  remember(w, n.id, 'advance', 'asked', sig);
-  general(c);
-}
-const GOAL_WORD: Record<string, string> = { earn: 'the money you pass up', deeds: 'the work', kills: 'the hard work', name: 'what people say of you', sponsor: 'the men who would back you', trial: 'your proof' };
-
 const shopOf = (c: Ctx) => { const b = ownerBiz(c.w, c.n.id); return b?.open && c.n.rank === 'civilian' ? b : undefined; };
 const feeOf = (c: Ctx) => { const b = shopOf(c)!; return Math.max(15, Math.round((b.income * 0.08) / 5) * 5); };
 const protectAvailable = (c: Ctx) => { const b = shopOf(c); return !!b && b.protection?.collectorId !== c.h.id && may(c.w, c.h, 'protect', c.n); };
@@ -558,7 +528,6 @@ function chooseIn(w: World, v: Visit, id: string): { v: Visit; minutes: number; 
   const base = [...v.choices, ...everything(w, v)].find((x) => x.id === id || (!!x.amount && id.startsWith(x.id + ':') && /^:\d+(:[\d.]+)?$/.test(id.slice(x.id.length))));
   const label = base?.label;
   // (where he stands: answered from the family's actual conditions, and against what he was told last time: see doAdvance)
-  if (label && (id === 'o:promo' || id.startsWith('o:fl:promo_'))) { you(c, label); doAdvance(c); return { v, minutes: 15 }; }
   if (label && kind === 'o') { you(c, label); const r = doOld(c, id.slice(2), label); return { v, ...r }; }
   if (label && kind === 'a') { you(c, base?.says ?? label); return { v, ...doAct(c, id.slice(2), label) }; }
   // (an approach is chosen by name and said in words: what the player says is the line it stands for)

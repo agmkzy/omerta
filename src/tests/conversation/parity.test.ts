@@ -7,6 +7,8 @@ import { addFact, createDebt, feelToOn, rel } from '../../core';
 import { addFavour } from '../../encounters';
 import { openAsk, playerMove } from '../../asks';
 import { replies as exReplies } from '../../exchange';
+import { mkJob } from '../../jobs';
+import { social } from '../../conv/social';
 import { DAY, type Character, type World } from '../../types';
 import { newWorld, P } from '../helpers';
 import { layer, legacy, parity } from './parity';
@@ -14,8 +16,10 @@ import { layer, legacy, parity } from './parity';
 const SEEDS = [3, 7, 11];
 const TRUST = [0.1, 0.4, 0.75];
 // the men a conversation is had with: his boss, a man of his own family, one of another family, a shopkeeper, and one of his own crew
+// (every world has the conversation layer's record, as every game does after Gate 4: new games, and old saves on load)
 function cast(seed: number) {
-  const w = newWorld(seed), p = P(w), alive = Object.values(w.chars).filter((c) => c.alive && !c.isPlayer);
+  const w = newWorld(seed); social(w);
+  const p = P(w), alive = Object.values(w.chars).filter((c) => c.alive && !c.isPlayer);
   const boss = w.chars[p.bossId!];
   const fam = alive.find((c) => c.familyId === p.familyId && c.rank === 'soldier' && c.id !== boss.id)!;
   const rival = alive.find((c) => c.familyId && c.familyId !== p.familyId && c.rank === 'soldier')!;
@@ -198,4 +202,49 @@ describe('Gate 4 parity, Stage B: money and business', () => {
   // running a racket of his
   M.push({ name: 'running his racket', who: (x) => { const o = x.w.ops.find((q) => q.kind !== 'hijack' && q.state === 'running' && !x.w.chars[q.owner]?.isPlayer && x.w.chars[q.owner]?.alive); return o ? x.w.chars[o.owner] : x.fam; }, old: 'run_ask', node: 'business' });
   for (const cs of M) ok(cs.name, { tags: ['compat'] }, () => check(cs));
+});
+
+describe('Gate 4 parity, Stage C: the family', () => {
+  const job = (x: Cast, t: Character, status: 'offered' | 'active' | 'done', via: 'boss' | 'tip' = 'tip') => mkJob(x.w, { kind: 'handle', title: 'See to a man', brief: 'A man needs seeing to.', giver: t.id, via, assignee: x.p.id, target: x.rival.id, pay: 200, status, days: 14 } as never);
+  const trouble = (t: Character, revealed = false) => { t.problem = { kind: 'gambling', sev: 0.5, since: 0, revealed } as never; };
+  const light = (t: Character) => { t.books.arrears = 120; t.books.missed = 2; };
+  const C: Case[] = [
+    { name: 'is there work (a man of the family)', who: (x) => x.fam, old: 'work', node: 'orders', both: true },
+    { name: 'is there work (his boss)', who: (x) => x.boss, old: 'work', node: 'orders' },
+    { name: 'what he needs done', who: (x) => x.boss, old: 'b_need', node: 'myboss' },
+    { name: 'a bigger piece', who: (x) => x.boss, old: 'b_more', node: 'myboss', both: true },
+    { name: 'work he offers: taken', who: (x) => x.fam, setup: (x, t) => ({ j: job(x, t, 'offered').id }), old: (s) => 'jobtake:' + s.j },
+    { name: 'work he offers: passed', who: (x) => x.fam, setup: (x, t) => ({ j: job(x, t, 'offered').id }), old: (s) => 'jobpass:' + s.j },
+    { name: 'work he offers: raised', who: (x) => x.fam, setup: (x, t) => ({ j: job(x, t, 'offered').id }), old: (s) => 'f:job:' + s.j, now: (s) => 'job:' + s.j },
+    { name: 'reporting work done', who: (x) => x.fam, setup: (x, t) => { job(x, t, 'done'); }, old: 'report', node: 'orders' },
+    { name: 'asking why', who: (x) => x.boss, setup: (x, t) => ({ j: job(x, t, 'active', 'boss').id }), old: (s) => 'challenge:' + s.j, node: 'orders' },
+    { name: 'refusing an order', who: (x) => x.boss, setup: (x, t) => ({ j: job(x, t, 'active', 'boss').id }), old: (s) => 'refuse:' + s.j, node: 'orders' },
+    { name: 'where you stand', who: (x) => x.boss, old: 'b_stand', node: 'myboss' },
+    { name: 'a word put in', who: (x) => x.fam, old: 'recommend', node: 'family', both: true },
+    { name: 'backing: asked', who: (x) => x.fam, old: 'rk_back' },
+    { name: 'backing: asked, with a favour he owes', who: (x) => x.fam, setup: (x, t) => { addFavour(x.w, x.p.id, t.id, 1, 'a good turn'); }, old: 'rk_back' },
+    { name: 'backing: what he needs to see', who: (x) => x.fam, old: 'fl:back_what', now: 'back_what', node: 'follow' },
+    { name: 'backing: the favour called in', who: (x) => x.fam, setup: (x, t) => { addFavour(x.w, x.p.id, t.id, 1, 'a good turn'); }, old: 'fl:back_call', now: 'back_call', node: 'follow' },
+    { name: 'backing: on his terms', who: (x) => x.fam, old: 'fl:back_take', now: 'back_take', node: 'follow' },
+    { name: 'backing: haggled', who: (x) => x.fam, setup: (x) => { x.p.standing = 60; }, old: 'fl:back_press', now: 'back_press', node: 'follow', both: true },
+    { name: 'what my backer has said', who: (x) => x.fam, setup: (x, t) => { x.p.backer = t.id; }, old: 'rk_back_ask' },
+    { name: 'a concern about a man', who: (x) => x.boss, setup: (x) => ({ y: x.crew.id }), old: (s) => 'concern:' + s.y, node: 'pick_concern', both: true },
+    { name: 'my man: what is wrong', who: (x) => x.crew, setup: (_x, t) => { trouble(t); }, old: 'cr_ask', node: 'crew', both: true },
+    { name: 'my man: money for his trouble', who: (x) => x.crew, setup: (x, t) => { trouble(t, true); x.p.cash = 3000; }, old: 'cr_cash', node: 'crew' },
+    { name: 'my man: lighter duties', who: (x) => x.crew, setup: (_x, t) => { trouble(t, true); }, old: 'cr_duties', node: 'crew' },
+    { name: 'my man: a light envelope', who: (x) => x.crew, setup: (_x, t) => { light(t); trouble(t); }, old: 'cr_drop', node: 'crew' },
+    { name: 'my man: looking into it', who: (x) => x.crew, setup: (_x, t) => { light(t); trouble(t); }, old: 'cr_look', node: 'crew', ctx: () => ({ asked: ['cr_drop'] }), th: () => ({ asked: ['cr_drop'] }) },
+    { name: 'my man: thin ice', who: (x) => x.crew, setup: (_x, t) => { trouble(t); }, old: 'cr_thin', node: 'crew', both: true },
+    { name: 'thin ice: a good week', who: (x) => x.crew, old: 'fl:th_ease', now: 'th_ease', node: 'follow' },
+    { name: 'thin ice: listening', who: (x) => x.crew, setup: (_x, t) => { trouble(t); }, old: 'fl:th_hear', now: 'th_hear', node: 'follow' },
+    { name: 'thin ice: it stands', who: (x) => x.crew, old: 'fl:th_hold', now: 'th_hold', node: 'follow' },
+    { name: 'thin ice: backing down', who: (x) => x.crew, old: 'fl:th_back', now: 'th_back', node: 'follow' },
+    { name: 'thin ice: pushing', who: (x) => x.crew, old: 'fl:th_push', now: 'th_push', node: 'follow' },
+    { name: 'my man: keep your head down', who: (x) => x.crew, setup: (_x, t) => { light(t); }, old: 'assign_low', node: 'orders', both: true },
+    { name: 'my man: find some extra', who: (x) => x.crew, old: 'assign_hustle', node: 'orders' },
+    { name: 'an order insisted on', who: (x) => x.crew, old: 'fl:ord_insist:assign_low', now: 'ord_insist:assign_low', node: 'follow' },
+    { name: 'an order let go', who: (x) => x.crew, old: 'fl:ord_ok:assign_hustle', now: 'ord_ok:assign_hustle', node: 'follow' },
+    { name: 'taking a man on', who: (x) => x.shop, setup: (x, t) => { t.prospect = true; x.p.rank = 'soldier'; x.p.cash = 1000; }, old: 'recruit_offer' },
+  ];
+  for (const cs of C) ok(cs.name, { tags: ['compat'] }, () => check(cs));
 });
