@@ -9,57 +9,20 @@ import { DAY, type Character, type World } from '../types';
 import { newSession, perceive, type Session } from './perception';
 import { interpret } from './speech';
 import { render } from './render';
-import { EncounterMemory } from './encounter';
+import { Out, Visit, LEAVE, first, trace, traceLines, type Row } from './harness';
+import { ClaimStore, believe, contradictions } from './beliefs';
+import { Obligations, type ObType } from './obligations';
+import { generalisation } from './gen';
+import { createDebt, feel } from '../core';
+import { prospects, recruitProspect } from '../orders';
+import { onCollectionReport, onConfrontation, onDebtQuestion, onPromise, onPromiseSeenBroken, predictAcceptance } from './respond';
 import { onAnnouncement, onArrival, onAuthorityClaim, onIntervention, onIntroduction, onLoanRequest, onProgressQuestion, onProtectionDemand, onReport, onReturnToPromisee, onUnknownTopic, onWait, onWhoQuestion, spendTimeAccount, type Captaincy, type Reply } from './respond';
-import type { Meaning, Spoken } from './types';
 
-const out: string[] = [];
-const P = (s = '') => out.push(s);
-const first = (n: string) => n.split(' ')[0];
+let o = new Out();
+const P = (x = '') => o.P(x);
 const byId = (a: { id: string }, b: { id: string }) => (a.id < b.id ? -1 : 1);
 const famOf = (w: World, c: Character) => (c.familyId ? w.fam[c.familyId].name : '');
-interface Row { key: string; note: string; slots?: Record<string, string>; leave?: boolean }
-
-// One visit: its transcript, its memory, the lines already said (never twice), and the rows on screen right now.
-class Visit {
-  spoken = new Set<string>(); n = 0; rows: Row[] = []; mem: EncounterMemory;
-  constructor(public w: World, public s: Session, public henry: Character, public him: Character, public where: string, patience = 2) { this.mem = new EncounterMemory(patience); }
-  private slots(x: Record<string, string> = {}) { return { selfName: this.henry.name, selfFamily: famOf(this.w, this.henry), ...x }; }
-  label(r: Row) { return r.leave ? 'Leave' : render({ key: r.key, stance: 'flat', toward: 'speaker', slots: this.slots(r.slots) }, this.henry.id, 'earnest'); }
-  offer(rows: Row[]) {
-    this.rows = rows.length > 5 ? rows.slice(0, 5) : rows;
-    P(''); P('> **What you can say**');
-    for (const r of this.rows) P(r.note ? `> - ${this.label(r)}  \n>   *${r.note}*` : `> - ${this.label(r)}`);
-    P('');
-  }
-  // the player picks a row that is on screen, or the harness stops: a transcript is only valid if every choice was offered
-  pick(key: string, opts: { act?: string; explicit?: 0 | 1 | 2 } = {}): Spoken {
-    const r = this.rows.find((x) => x.key === key);
-    if (!r) throw new Error(`choice "${key}" was not on screen (offered: ${this.rows.map((x) => x.key).join(', ')})`);
-    const m: Meaning = { key: r.key, stance: 'flat', toward: 'speaker', slots: this.slots(r.slots) };
-    P(`**You:** ${render(m, this.henry.id, 'earnest', this.spoken)}`);
-    this.rows = [];
-    return { speaker: this.henry.id, listener: this.him.id, act: opts.act ?? key, explicit: opts.explicit ?? 2, meaning: m, where: this.where, at: this.w.now + this.n++ };
-  }
-  him_(r: Reply, extra?: { heard?: ReturnType<typeof interpret>; trace?: string[] }) {
-    const p = perceive(this.w, this.s, this.him);
-    P(`**${first(this.him.name)}:** ${render(r.meaning, this.him.id, p.arch, this.spoken, String(this.n))}`);
-    trace(r, extra);
-  }
-  card(key: string, slots: Record<string, string>, more = '') { P(`> **Outcome:** ${render({ key, stance: 'flat', toward: 'speaker', slots: { first: first(this.him.name), ...slots } }, 'card', 'earnest')}${more ? ' ' + more : ''}`); P(''); }
-}
-function trace(r: Reply, extra?: { heard?: ReturnType<typeof interpret>; trace?: string[] }) {
-  const d = r.decision, lines: string[] = [];
-  if (extra?.heard) { const h = extra.heard; lines.push(`heard as: ${h.act} (confidence ${h.confidence}${h.literal ? ', taken literally' : ''})`); for (const c of h.cues) lines.push(`  cue: ${c.kind} (${c.weight >= 0 ? '+' : ''}${c.weight}; basis: ${c.basis.kind}${c.basis.ref ? ' ' + c.basis.ref : ''})`); }
-  if (d.constraints.length) lines.push(`constraints: ${d.constraints.map((c) => `${c.kind} (${c.source})`).join('; ')}`);
-  for (const c of [...d.candidates].sort((a, b) => b.value - a.value)) if (c.value > -9) lines.push(`${c.move === d.chosen ? '▶' : ' '} ${c.move} = ${c.value}${c.crosses.length ? ` [would cross: ${c.crosses.join(', ')}]` : ''}: ${c.terms.map((t) => `${t.name} ${t.value >= 0 ? '+' : ''}${t.value}`).join(', ')}`);
-  if (d.grounds) lines.push(`reason given: ${d.grounds.factor}${d.grounds.honest ? '' : ' (a cover: not his real reason)'}`);
-  lines.push(`meaning: ${r.meaning.key}${r.meaning.grounds ? '.' + r.meaning.grounds : ''} · ${r.meaning.stance} · toward ${r.meaning.toward}${r.meaning.implies && r.meaning.implies !== 'none' ? ` · implies ${r.meaning.implies}` : ''} · private intent: ${r.intent}${r.aim ? ` · aim: ${r.aim}` : ''}`);
-  for (const c of r.changes ?? []) lines.push(`change: ${c}`);
-  for (const t of extra?.trace ?? []) lines.push(t);
-  P(''); P('<details><summary>trace</summary>'); P(''); P('```'); for (const l of lines) P(l); P('```'); P('</details>'); P('');
-}
-const LEAVE: Row = { key: 'leave', note: '', leave: true };
+class V extends Visit { constructor(w: World, s: Session, henry: Character, him: Character, where: string, patience = 2) { super(o, w, s, henry, him, where, patience); } }
 
 // ------------------------------------------------------------------ the bakery world and its five Franks
 interface Profile { label: string; about: string; temper: Record<string, number>; arch: 'earnest' | 'proud' | 'bitter' | 'frightened' | 'schemer' | 'hothead' | 'cold'; setup: (w: World, s: Session, frank: Character, henry: Character) => void }
@@ -94,7 +57,7 @@ function bakery() {
     const { w, s, henry, frank } = bakeryWorld(3);
     s.temper[frank.id] = pr.temper; s.arch[frank.id] = pr.arch; pr.setup(w, s, frank, henry);
     P(`### ${pr.label} Frank`); P(`*${pr.about}*`); P('');
-    const v = new Visit(w, s, henry, frank, 'Russo’s Bakery');
+    const v = new V(w, s, henry, frank, 'Russo’s Bakery');
     P('*Russo’s Bakery, Mulberry Street. Tuesday afternoon. He doesn’t know you.*'); P('');
     v.him_(onArrival(perceive(w, s, frank), henry, 'three in the afternoon'));
     v.offer(OPENING);
@@ -131,7 +94,7 @@ function compliment() {
     const { w, s, henry, frank } = bakeryWorld(3);
     s.temper[frank.id] = pr.temper; s.arch[frank.id] = pr.arch; pr.setup(w, s, frank, henry);
     P(`### ${pr.label} Frank`);
-    const v = new Visit(w, s, henry, frank, 'Russo’s Bakery');
+    const v = new V(w, s, henry, frank, 'Russo’s Bakery');
     v.offer(OPENING);
     const sp = v.pick('compliment.business', { act: 'compliment', explicit: 0 });
     const heard = interpret(perceive(w, s, frank), sp, henry);
@@ -151,7 +114,7 @@ function doorAndClaims() {
     const f = addFact(w, { kind: 'protection_refused', actor: o.id, victim: henry.id, business: other.id, text: `${o.name} told ${henry.name} to get out of ${other.name}.`, district: b.district }, { witnesses: [] });
     learn(w, frank.id, f, o.id, true);
     P(`### ${label} Frank, who has heard what happened next door`);
-    const v = new Visit(w, s, henry, frank, 'Russo’s Bakery');
+    const v = new V(w, s, henry, frank, 'Russo’s Bakery');
     v.him_(onArrival(perceive(w, s, frank), henry, 'three in the afternoon'));
     v.offer([{ key: 'leave.another', note: 'Go, and come back another day.' }, { key: 'stay.wait', note: 'Stay where you are. He won’t like it.' }, LEAVE]);
     v.pick('stay.wait', { act: 'wait' });
@@ -163,7 +126,7 @@ function doorAndClaims() {
   const cap = captainOf(w, henry)!;
   P(`### A false claim: "${cap.name} sent me" (Cautious Frank)`);
   P('*Henry’s captain sent him nowhere. Frank can only judge the claim from what he knows.*'); P('');
-  const v = new Visit(w, s, henry, frank, 'Russo’s Bakery');
+  const v = new V(w, s, henry, frank, 'Russo’s Bakery');
   v.offer([{ key: 'claim.authority', note: 'Say your captain sent you. It isn’t true.', slots: { authority: cap.name } }, ...OPENING]);
   v.pick('claim.authority', { act: 'claim' });
   v.him_(onAuthorityClaim(perceive(w, s, frank), henry, cap), { trace: ['private (Henry): honest = false (his captain did not send him)'] });
@@ -179,7 +142,7 @@ function simple() {
   rel(friend, henry.id).trust = 0.7; rel(friend, henry.id).known = 0.6;
   P(`### Scenario A: asking ${first(friend.name)}, whom you trust, who smashed the window at ${shop.name}`);
   P('*One choice, one answer, an outcome.*'); P('');
-  const v = new Visit(w, s, henry, friend, shop.name);
+  const v = new V(w, s, henry, friend, shop.name);
   v.offer([{ key: 'ask.who', note: 'Ask what he knows.', slots: { shop: shop.name } }, { key: 'spend.time', note: 'Spend the evening with him.' }, LEAVE]);
   v.pick('ask.who');
   v.him_(onWhoQuestion(perceive(w, s, friend), henry, f.id, thug));
@@ -193,7 +156,7 @@ function simple() {
 
 // ------------------------------------------------------------------ a contested request, argued within one visit
 function captainOf(w: World, c: Character): Character | undefined { let x: Character | undefined = c; for (let i = 0; i < 6 && x; i++) { x = x.bossId ? w.chars[x.bossId] : undefined; if (x?.rank === 'capo') return x; } return undefined; }
-function ferraraWorld() {
+export function ferraraWorld() {
   const w = createWorld(3, 'Henry Tedesco'), s = newSession(), henry = w.chars[w.playerId!];
   const riz = captainOf(w, henry)!; riz.name = 'Vic Rizzo';
   const lou = Object.values(w.chars).filter((c) => c.alive && c.rank === 'soldier' && c.familyId === henry.familyId && captainOf(w, c) && captainOf(w, c)!.id !== riz.id).sort(byId)[0]; lou.name = 'Lou Valenti';
@@ -218,7 +181,7 @@ function ferrara() {
   const slotsC = { forName: nate.name, againstName: lou.name };
   // Day 1: raising it, and arguing it
   P('### Day 1: raising it, and arguing it');
-  let v = new Visit(w, s, henry, riz, 'the club', 2);
+  let v = new V(w, s, henry, riz, 'the club', 2);
   v.offer([{ key: 'ask.intervention', note: 'Ask him to take it up with the family.', slots: slotsC }, { key: 'spend.time', note: 'Leave Nate for another day.' }, LEAVE]);
   v.pick('ask.intervention');
   let args: ('ground' | 'word' | 'money')[] = [];
@@ -239,7 +202,7 @@ function ferrara() {
   // Day 3: Nate, waiting
   w.now += 2 * DAY;
   P('### Day 3: Nate, still waiting');
-  v = new Visit(w, s, henry, nate, 'Ferrara’s Grocery');
+  v = new V(w, s, henry, nate, 'Ferrara’s Grocery');
   v.him_(onReturnToPromisee(perceive(w, s, nate), henry, false, 2));
   v.offer([{ key: 'report.refusedSoFar', note: 'Tell him the truth: the captain won’t move yet.' }, { key: 'report.stall', note: 'Put him off.' }, LEAVE]);
   v.pick('report.refusedSoFar');
@@ -256,7 +219,7 @@ function ferrara() {
   // Day 5: back to Rizzo
   w.now += 1 * DAY;
   P('### Day 5: back to Rizzo, after something has changed');
-  v = new Visit(w, s, henry, riz, 'the club', 2);
+  v = new V(w, s, henry, riz, 'the club', 2);
   P('*He raises it before you can.*');
   v.him_({ decision: { by: riz.id, constraints: [], candidates: [], chosen: 'raise.newinfo', aim: 'his own: Lou on his book' }, meaning: { key: 'raise.newinfo', stance: 'cold', toward: 'third', slots: { hitShop: k.trouble?.shop ?? '', againstFirst: 'Lou' } }, intent: 'inform', honest: true });
   v.offer([{ key: 'raise.again', note: 'Bring Nate into it.', slots: { forFirst: 'Nate', againstFirst: 'Lou' } }, LEAVE]);
@@ -268,7 +231,7 @@ function ferrara() {
   for (const [day, label] of [[7, 'Day 7: asking how it’s going'], [8, 'Day 8: asking again'], [9, 'Day 9: and again']] as [number, string][]) {
     w.now = 9 * DAY + day * DAY;
     P(`### ${label}`);
-    v = new Visit(w, s, henry, riz, 'the club');
+    v = new V(w, s, henry, riz, 'the club');
     k.asked++;
     v.offer([{ key: 'ask.progress', note: 'Ask whether he’s done it.', slots: { theirCaptainFirst: 'Joe', forFirst: 'Nate' } }, LEAVE]);
     v.pick('ask.progress');
@@ -278,7 +241,7 @@ function ferrara() {
   P('### Day 11: word from Rizzo, and Nate');
   P('*Rizzo has spoken to Marchese, and Marchese to Lou. Henry learns it the way he would: Rizzo sends word with one of his men.*'); P('');
   P(`> *A message from Rizzo:* ${render({ key: 'answer.progress.done', stance: 'flat', toward: 'speaker', slots: { theirCaptainFirst: 'Joe', againstFirst: 'Lou', forFirst: 'Nate' } }, riz.id, perceive(w, s, riz).arch)}`); P('');
-  v = new Visit(w, s, henry, nate, 'Ferrara’s Grocery');
+  v = new V(w, s, henry, nate, 'Ferrara’s Grocery');
   v.him_(onReturnToPromisee(perceive(w, s, nate), henry, true, 10));
   v.offer([{ key: 'report.done', note: 'Tell him you took it to the family.' }, LEAVE]);
   v.pick('report.done');
@@ -295,7 +258,7 @@ function loan() {
   lender.cash = Math.max(lender.cash, 2500);
   rel(lender, henry.id).known = 0.15; rel(lender, henry.id).trust = 0.2;
   P(`### ${lender.name}, a soldier Henry has met once`);
-  const v = new Visit(w, s, henry, lender, 'the club');
+  const v = new V(w, s, henry, lender, 'the club');
   v.offer([{ key: 'ask.loan', note: 'Ask him for money, on the usual terms.', slots: { amt: '$500' } }, { key: 'tell.news', note: 'Tell him what happened at the Gilded Lily.', slots: { topic: 'the Gilded Lily' } }, LEAVE]);
   v.pick('ask.loan');
   let r = onLoanRequest(perceive(w, s, lender), henry, 500, v.mem);
@@ -314,17 +277,217 @@ function loan() {
   } else if (r.decision.chosen === 'accept') v.card('card.agreed.loan', { amt: '$500', rate: '8' });
   else v.card('card.refuse.loan', { groundsWords: r.meaning.grounds === 'doesNotKnow' ? 'he doesn’t know you well enough' : r.meaning.grounds === 'cannotSpare' ? 'he hasn’t got it to spare' : 'he’d like to see his money again' });
   P(`### The same man, told something he hasn’t heard`);
-  const v2 = new Visit(w, s, henry, lender, 'the club');
+  const v2 = new V(w, s, henry, lender, 'the club');
   v2.offer([{ key: 'tell.news', note: 'Tell him what happened at the Gilded Lily.', slots: { topic: 'the Gilded Lily' } }, LEAVE]);
   v2.pick('tell.news');
   v2.him_(onUnknownTopic(perceive(w, s, lender), henry, 'the window at the Gilded Lily'));
 }
 
-P('# Gate 1: generated conversations (second pass)');
-P('');
-P('*Produced by `npx tsx src/conv/gate1.ts` from the proof-of-concept engine in `src/conv/`. Every line spoken by a character other than Henry is rendered from a decision and its meaning; every line of Henry’s is one of the rows that was on screen (the harness refuses anything else). Outcome cards say only what was said or seen, attributed. Names are fixtures; the men behind them are ordinary characters of a generated world.*');
-P('');
-bakery(); compliment(); doorAndClaims(); simple(); ferrara(); loan();
-mkdirSync('docs/gate1', { recursive: true });
-writeFileSync('docs/gate1/TRANSCRIPTS.md', out.join('\n'));
-console.log('wrote docs/gate1/TRANSCRIPTS.md', out.length, 'lines');
+
+// ------------------------------------------------------------------ 7. deception, believed and then found out
+// What follows a confrontation, as Henry can know it: an admission returns the money and costs the man more of Henry's trust than
+// a denial does. A denial leaves Henry holding two accounts; the truth settles nothing here.
+export function settleConfrontation(w: World, henry: Character, man: Character, admits: boolean, kept: number, otherFirst: string) {
+  if (admits) { man.cash -= kept; henry.cash += kept; feel(w, henry, man.id, 'trust', -0.2, `${man.name} lied about ${otherFirst}'s money`); }
+  else feel(w, henry, man.id, 'trust', -0.1, `${man.name}'s account and ${otherFirst}'s don't agree`);
+}
+export function deceptionWorld(pick: number, trouble: 0 | 1 | 2 = 2) {
+  const w = createWorld(7, 'Henry Tedesco'), s = newSession(), henry = w.chars[w.playerId!], store = new ClaimStore();
+  henry.cash = 5000; recruitProspect(w, henry, prospects(w, henry)[pick].c);
+  const joey = Object.values(w.chars).find((c) => c.bossId === henry.id)!;
+  const gino = Object.values(w.chars).filter((c) => c.alive && c.rank === 'civilian' && !c.familyId && ownerBiz(w, c.id)?.open).sort(byId)[2]; gino.name = 'Gino Bruno';
+  createDebt(w, henry.id, gino.id, 400, 0.05, 'a private loan');
+  // Joey's own trouble: money he owes and has missed (his reason, which only he knows)
+  const shark = Object.values(w.chars).filter((c) => c.alive && c.rank === 'soldier' && c.familyId !== henry.familyId).sort(byId)[2];
+  if (trouble) {
+  createDebt(w, shark.id, joey.id, 300, 0.1, 'a private loan');
+  addFact(w, { kind: 'debt_missed', actor: joey.id, victim: shark.id, amount: 60, text: `${joey.name} missed a $60 payment to ${shark.name}.`, district: joey.district }, { witnesses: [] });
+  }
+  if (trouble === 2) {
+  addFact(w, { kind: 'debt_missed', actor: joey.id, victim: shark.id, amount: 60, text: `${joey.name} missed another payment to ${shark.name}.`, district: joey.district }, { witnesses: [] });
+  joey.cash = 30;
+  }
+  rel(henry, joey.id).trust = 0.6; rel(henry, joey.id).known = 0.5; rel(henry, gino.id).trust = 0.35; rel(henry, gino.id).known = 0.3;
+  return { w, s, henry, store, joey, gino, shark };
+}
+function deception() {
+  P('## 7. Deception: a man with a reason to lie, believed, then found out'); P('');
+  P('*Henry sends one of his men to collect $200 from a barber who owes him. The man he sends is in trouble of his own: he owes a loan shark and has missed two payments, and he has $30 on him. Whether he lies is his own decision, from his own state and temperament; nobody scripts it. What he says is a claim; Henry judges it from what Henry knows, which does not include the truth. Later the barber tells his side.*'); P('');
+  P('### Who lies? The same job, given in turn to each of the six young men Henry could have taken on, with and without trouble of his own');
+  P('*Each cell: what he does, and the margin between the two choices (skimming’s value minus honesty’s; above zero he skims).*'); P('');
+  P('| Man | Manner | Greed | Empathy | No debts | Owes a shark, missed one payment | Missed two, $30 to his name |'); P('|---|---|---|---|---|---|---|');
+  let liar = -1;
+  const said = (r: ReturnType<typeof onCollectionReport>) => { const v = (m: string) => r.decision.candidates.find((c) => c.move === m)!.value; const d = Math.round((v('skim') - v('honest')) * 100) / 100; return `${r.honest ? 'all $200' : `**keeps $${r.keeps}**`} (${d >= 0 ? '+' : ''}${d})`; };
+  for (let i = 0; i < 6; i++) {
+    const [a, m, b] = ([0, 1, 2] as const).map((tr) => { const x = deceptionWorld(i, tr); x.joey.cash += 200; return { x, r: onCollectionReport(perceive(x.w, x.s, x.joey), x.henry, x.gino, 200) }; });
+    if (!b.r.honest && liar < 0) liar = i;
+    P(`| ${b.x.joey.name} | ${perceive(b.x.w, b.x.s, b.x.joey).arch} | ${b.x.joey.traits.greed.toFixed(2)} | ${perceive(b.x.w, b.x.s, b.x.joey).temper.empathy.toFixed(2)} | ${said(a.r)} | ${said(m.r)} | ${said(b.r)} |`);
+  }
+  P('');
+  { const x = deceptionWorld(liar < 0 ? 0 : liar); x.joey.cash += 200; const r = onCollectionReport(perceive(x.w, x.s, x.joey), x.henry, x.gino, 200); traceLines(o, `the full decision, for ${x.joey.name} in the worst of it`, r.decision.candidates.map((c) => `${c.move === r.decision.chosen ? '▶' : ' '} ${c.move} = ${c.value}: ${c.terms.map((t) => `${t.name} ${t.value >= 0 ? '+' : ''}${t.value}`).join(', ')}`)); }
+  if (liar < 0) { P('*None of the six lied. (The sequence below needs one who does.)*'); return; }
+  const { w, s, henry, store, joey, gino } = deceptionWorld(liar);
+  P(`*Following ${joey.name}, the first of them who decides to skim.*`); P('');
+  const fJ = first(joey.name);
+  P('### Day 1: the job');
+  let v = new V(w, s, henry, joey, 'the club');
+  v.offer([{ key: 'order.collect', note: 'Send him to collect. He’ll come back and tell you how it went.', slots: { debtorFirst: 'Gino', amt: '$200' } }, LEAVE]);
+  v.pick('order.collect');
+  // the world: Gino pays $200, to ${fJ}; Henry is not there
+  const paidFact = addFact(w, { kind: 'debt_paid', actor: gino.id, victim: henry.id, amount: 200, text: `${gino.name} paid ${joey.name} $200 against what he owes ${henry.name}.`, district: gino.district, minor: true }, { witnesses: [joey.id] });
+  gino.cash = Math.max(0, gino.cash - 200); joey.cash += 200;
+  P(`*That afternoon, in Henry’s absence: Gino pays ${fJ} $200. (A fact Gino and ${fJ} know; Henry doesn’t.)*`); P('');
+  P(`### Day 1, evening: ${fJ} reports back`);
+  v = new V(w, s, henry, joey, 'the club');
+  const rep = onCollectionReport(perceive(w, s, joey), henry, gino, 200);
+  v.him_(rep);
+  joey.cash -= rep.says; henry.cash += rep.says;
+  const c1 = store.add({ by: joey.id, to: henry.id, subject: 'paid:gino', value: rep.says, t: w.now, honest: rep.honest, words: 'Gino paid ' + rep.says });
+  const b1 = believe(perceive(w, s, henry), store, c1, joey);
+  traceLines(o, 'what Henry makes of it', [`Henry’s belief in ${fJ}’s account: ${b1.belief} (${b1.basis.join('; ')})`, `Henry has no access to what ${fJ} did; the truth ($200) is in Gino’s and ${fJ}’s knowledge only (fact ${paidFact.id})`]);
+  v.offer([{ key: 'accept.report', note: 'Take his word for it.' }, { key: 'ask.again', note: 'Make him tell it again. A story told twice can slip.' }, LEAVE]);
+  v.pick('accept.report');
+  v.card('card.report.collection', { debtorFirst: 'Gino', amt: `$${rep.says}` });
+  // Day 3: the other side of it
+  w.now += 2 * DAY;
+  P('### Day 3: Henry calls on Gino about the rest');
+  v = new V(w, s, henry, gino, 'the barbershop');
+  v.offer([{ key: 'ask.debt', note: 'Ask about what he owes.' }, LEAVE]);
+  v.pick('ask.debt');
+  v.him_(onDebtQuestion(perceive(w, s, gino), henry, 200, joey, 'Tuesday'));
+  store.add({ by: gino.id, to: henry.id, subject: 'paid:gino', value: 200, t: w.now, honest: true, words: 'I paid your man 200' });
+  const cx = contradictions(perceive(w, s, henry), store);
+  traceLines(o, 'what Henry now holds', cx.length ? cx.map((x) => `contradiction on "${x.subject}": ${w.chars[x.a.by].name} says ${x.a.value}; ${w.chars[x.b.by].name} says ${x.b.value}. Henry holds both; which he believes is his own judgement (trust: ${fJ} ${rel(henry, joey.id).trust}, Gino ${rel(henry, gino.id).trust})`) : ['no contradiction: the two accounts agree']);
+  v.card('card.answer.debt.paid', { amt: '$200', toFirst: fJ });
+  // Day 4: the confrontation, offered only because Henry holds a contradiction
+  w.now += 1 * DAY;
+  P(`### Day 4: back to ${fJ}`);
+  v = new V(w, s, henry, joey, 'the club');
+  const rows: Row[] = [];
+  if (contradictions(perceive(w, s, henry), store).length) rows.push({ key: 'confront.claim', note: 'Put Gino’s word to him.', slots: { otherFirst: 'Gino', amt: '$200' } });
+  rows.push({ key: 'spend.time', note: 'Leave it. Have a drink with him instead.' }, LEAVE);
+  v.offer(rows);
+  v.pick('confront.claim');
+  const cf = onConfrontation(perceive(w, s, joey), henry, !rep.honest, 0.6);
+  v.him_(cf);
+  settleConfrontation(w, henry, joey, cf.admits, rep.keeps, 'Gino');
+  traceLines(o, 'consequences', cf.admits ? [`${fJ} hands over the $${rep.keeps} he kept`, `Henry’s trust in ${fJ} falls (core.feel, with the reason: he lied about Gino’s money)`, `The lie is on record as a false claim ${fJ} made to Henry`] : [`${fJ} holds to his story. Henry still holds two accounts that disagree, and his trust in ${fJ} falls (core.feel). Nothing is settled by the truth; Henry can check further, or let it go`]);
+  v.card(cf.admits ? 'card.confront.admit' : 'card.confront.deny', { amt: `$${rep.keeps}` });
+}
+
+// ------------------------------------------------------------------ 8. four kinds of promise, and what makes each kept or broken
+const PROMISE_ROWS: Row[] = [
+  { key: 'promise.action', note: 'You’re promising to raise it with him, not that it will work.' },
+  { key: 'promise.effort', note: 'You’re saying you’ll try, not that you’ll manage it.' },
+  { key: 'promise.result', note: 'You’re promising it will stop. He’ll hold you to that.' },
+  { key: 'promise.restraint', note: 'You won’t tell anyone he came to you.' },
+  LEAVE,
+];
+function promiseRun(title: string, type: ObType, story: (ctx: { w: World; s: Session; henry: Character; riz: Character; lou: Character; nate: Character; k: Captaincy; obs: Obligations; ob: ReturnType<Obligations['make']>; log: (x: string) => void }) => void) {
+  P(`### ${title}`);
+  const { w, s, henry, riz, lou, nate, k } = ferraraWorld();
+  w.now = 9 * DAY;
+  const obs = new Obligations();
+  const v = new V(w, s, henry, nate, 'Ferrara’s Grocery');
+  v.him_({ decision: { by: nate.id, constraints: [], candidates: [], chosen: 'seekHelp', aim: 'get someone to make Lou stop' }, meaning: { key: 'seek.help', stance: 'pleading', toward: 'third' }, intent: 'ask', honest: true });
+  v.offer(PROMISE_ROWS);
+  v.pick('promise.' + type);
+  v.him_(onPromise(perceive(w, s, nate), henry, type));
+  const nateBiz = ownerBiz(w, nate.id)!;
+  const spec = type === 'action' ? { kind: 'actionDone' as const, act: 'raise', target: riz.id, about: 'lou-nate' }
+    : type === 'effort' ? { kind: 'effort' as const, acts: ['raise', 'warn', 'askOther'], about: 'lou-nate', floor: 0.15 }
+    : type === 'result' ? { kind: 'noHostility' as const, actor: lou.id, target: nate.id, biz: nateBiz.id, days: 30 }
+    : { kind: 'notDisclosedBy' as const, about: 'nate-complained' };
+  const ob = obs.make({ type, obligor: henry.id, beneficiary: nate.id, spec, from: w.now, by: w.now + (type === 'result' ? 30 : 14) * DAY });
+  const timeline: string[] = [`day ${Math.floor(w.now / DAY) - 9}: promise recorded (${type}); window to day ${Math.floor(ob.by / DAY) - 9}`];
+  const log = (x: string) => timeline.push(`day ${Math.floor(w.now / DAY) - 9}: ${x}`);
+  story({ w, s, henry, riz, lou, nate, k, obs, ob, log });
+  traceLines(o, 'the promise, tracked (internal: none of this is on the player’s screen)', [...timeline, `status: ${ob.status}${ob.why ? ' (' + ob.why + ')' : ''}`]);
+}
+function promises() {
+  P('## 8. Four kinds of promise, kept or broken by what happens'); P('');
+  P('*Nate asks for help. Henry’s four possible answers are each a different promise, worded as a man would say it; the note under each says what he is undertaking, in plain words. What follows is the world: who does what, and when. The promise is judged by what it actually undertook (spec §6.3, §6.5).*'); P('');
+  const day = (w: World, n: number) => { w.now = 9 * DAY + n * DAY; };
+  const raise = (c: { w: World; s: Session; henry: Character; riz: Character; nate: Character; lou: Character; k: Captaincy; obs: Obligations; log: (x: string) => void }) => {
+    const pred = predictAcceptance(perceive(c.w, c.s, c.henry), c.riz, false);
+    const v = new V(c.w, c.s, c.henry, c.riz, 'the club');
+    v.offer([{ key: 'ask.intervention', note: 'Ask him to take it up with the family.', slots: { forName: c.nate.name, againstName: c.lou.name } }, LEAVE]);
+    v.pick('ask.intervention');
+    const r = onIntervention(perceive(c.w, c.s, c.riz), c.henry, c.nate, c.lou, c.k, [], v.mem); v.him_(r);
+    c.obs.did({ t: c.w.now, actor: c.henry.id, act: 'raise', target: c.riz.id, about: 'lou-nate', predicted: pred });
+    c.log(`Henry raised it with Rizzo (Henry expected a ${pred} chance he would agree); Rizzo ${r.decision.chosen === 'accept' ? 'agreed' : 'refused'}`);
+    return r;
+  };
+  promiseRun('An action promise, kept: “I’ll speak to my captain about it.” Rizzo says no; the promise was to speak to him, and Henry did', 'action', (c) => {
+    day(c.w, 2); raise(c); for (const t of c.obs.tick(c.w)) c.log(`→ ${t.to}: ${t.why}`);
+  });
+  promiseRun('An action promise, broken by a good outcome: Lou stops by himself, but Henry never spoke to his captain', 'action', (c) => {
+    day(c.w, 6); c.log('Lou’s people stop coming round (no word from anyone; nothing happens at the shop)');
+    day(c.w, 15); for (const t of c.obs.tick(c.w)) c.log(`→ ${t.to}: ${t.why}`);
+    day(c.w, 16);
+    const v = new V(c.w, c.s, c.henry, c.nate, 'Ferrara’s Grocery');
+    v.him_(onReturnToPromisee(perceive(c.w, c.s, c.nate), c.henry, true, 16));
+    v.offer([{ key: 'report.admitNotDone', note: 'Tell him the truth: you never got to it.' }, { key: 'report.done', note: 'Take the credit. It isn’t true.' }, LEAVE]);
+    v.pick('report.admitNotDone');
+    v.him_(onReport(perceive(c.w, c.s, c.nate), c.henry, 'admitNotDone'));
+    c.log('Nate had believed Henry did it (he saw Lou stop, and Henry had promised); the obligation was broken all the same, and now he knows');
+  });
+  promiseRun('An effort promise, kept by a failed attempt: “I’ll do what I can.” Rizzo refuses; Henry tried', 'effort', (c) => {
+    day(c.w, 2); raise(c); for (const t of c.obs.tick(c.w)) c.log(`→ ${t.to}: ${t.why}`);
+  });
+  promiseRun('An effort promise, not kept by a gesture: Henry only mentions it to a shopkeeper who has no say', 'effort', (c) => {
+    day(c.w, 3);
+    const shopkeeper = Object.values(c.w.chars).filter((x) => x.alive && x.rank === 'civilian' && x.id !== c.nate.id && ownerBiz(c.w, x.id)?.open).sort(byId)[3];
+    c.obs.did({ t: c.w.now, actor: c.henry.id, act: 'askOther', target: shopkeeper.id, about: 'lou-nate', predicted: predictAcceptance(perceive(c.w, c.s, c.henry), shopkeeper, false) * 0.1 });
+    c.log(`Henry mentions it to ${shopkeeper.name}, who has no say over Lou (Henry had no reason to think it would help)`);
+    day(c.w, 24); for (const t of c.obs.tick(c.w)) c.log(`→ ${t.to}: ${t.why}`);
+  });
+  promiseRun('A result promise, broken at the first violation: “I’ll make sure he leaves you alone.” Lou’s people are back on day 12', 'result', (c) => {
+    day(c.w, 2); raise(c);
+    day(c.w, 10); for (const t of c.obs.tick(c.w)) c.log(`→ ${t.to}: ${t.why}`); c.log(`still ${c.ob.status}: ten clean days are not thirty`);
+    day(c.w, 12);
+    addFact(c.w, { kind: 'vandalism', actor: c.lou.id, victim: c.nate.id, business: ownerBiz(c.w, c.nate.id)!.id, text: `${c.lou.name}'s people smashed the window at Ferrara’s Grocery.`, district: ownerBiz(c.w, c.nate.id)!.district }, { witnesses: [c.nate.id] });
+    c.log('Lou’s people smash the window at Ferrara’s Grocery');
+    for (const t of c.obs.tick(c.w)) c.log(`→ ${t.to} on day 12, not day 30: ${t.why}`);
+    day(c.w, 13);
+    const v = new V(c.w, c.s, c.henry, c.nate, 'Ferrara’s Grocery');
+    v.him_(onPromiseSeenBroken(perceive(c.w, c.s, c.nate), c.henry));
+  });
+  promiseRun('A result promise, kept only when the whole period has passed', 'result', (c) => {
+    day(c.w, 20); for (const t of c.obs.tick(c.w)) c.log(`→ ${t.to}: ${t.why}`); c.log(`day 20, nothing has happened: still ${c.ob.status}`);
+    day(c.w, 31); for (const t of c.obs.tick(c.w)) c.log(`→ ${t.to}: ${t.why}`);
+  });
+  promiseRun('A restraint promise, kept although the secret got out another way: “I won’t tell a soul you came to me.”', 'restraint', (c) => {
+    day(c.w, 4);
+    const witness = Object.values(c.w.chars).filter((x) => x.alive && x.rank === 'civilian' && x.id !== c.nate.id).sort(byId)[5];
+    addFact(c.w, { kind: 'rumour', actor: c.nate.id, text: `${c.nate.name} has been complaining about ${c.lou.name} to Henry Tedesco.`, district: ownerBiz(c.w, c.nate.id)!.district, minor: true }, { witnesses: [c.lou.id] });
+    c.log(`${witness.name}’s cousin saw Nate and Henry together; it reaches Lou by itself. Henry told nobody`);
+    for (const t of c.obs.tick(c.w)) c.log(`→ ${t.to}: ${t.why}`);
+    day(c.w, 16); for (const t of c.obs.tick(c.w)) c.log(`→ ${t.to}: ${t.why}`);
+  });
+  promiseRun('A restraint promise, broken: Henry tells Lou himself', 'restraint', (c) => {
+    day(c.w, 5);
+    const v = new V(c.w, c.s, c.henry, c.lou, 'the club');
+    v.offer([{ key: 'tell.secret', note: 'Tell him who complained. You gave Nate your word you wouldn’t.' }, LEAVE]);
+    v.pick('tell.secret');
+    v.him_({ decision: { by: c.lou.id, constraints: [], candidates: [], chosen: 'acknowledge', aim: 'remember it' }, meaning: { key: 'react.told', stance: 'cold', toward: 'third' }, intent: 'acknowledge', honest: true, changes: [`${c.lou.name} now knows Nate complained (from Henry)`] });
+    c.obs.did({ t: c.w.now, actor: c.henry.id, act: 'inform', target: c.lou.id, about: 'nate-complained' });
+    for (const t of c.obs.tick(c.w)) c.log(`→ ${t.to}: ${t.why}`);
+  });
+}
+
+export function buildTranscripts(): string {
+  o = new Out();
+  P('# Gate 1: generated conversations (third pass)');
+  P('');
+  P('*Produced by `npx tsx src/conv/gate1.ts` from the proof-of-concept engine in `src/conv/`. Every line spoken by a character other than Henry is rendered from a decision and its meaning; every line of Henry’s is one of the rows that was on screen (the harness refuses anything else). Outcome cards say only what was said or seen, attributed. Names are fixtures; the men behind them are ordinary characters of a generated world.*');
+  P('');
+  bakery(); compliment(); doorAndClaims(); simple(); ferrara(); loan(); deception(); promises(); generalisation(o);
+  return o.text();
+}
+if (process.argv[1]?.endsWith('gate1.ts')) {
+  const text = buildTranscripts();
+  mkdirSync('docs/gate1', { recursive: true });
+  writeFileSync('docs/gate1/TRANSCRIPTS.md', text);
+  console.log('wrote docs/gate1/TRANSCRIPTS.md', text.split('\n').length, 'lines');
+}

@@ -216,6 +216,36 @@ const B: Record<string, Entry> = {
   'report.done': { _: ['“I took it to the family. He won’t bother you again.”'] },
   'thanks.kept': { _: ['“I won’t forget it. Anything you need here, you ask.”'], cold: ['He nods once. “I owe you.”'], frightened: ['“Thank you. Thank you. I didn’t think anybody would.”'] },
 
+  // ---------------------------------------------------------------- Gate 1 additions: the vocabulary of new acts only (one plain line each)
+  'order.collect': { _: ['“Go and see {debtorFirst}. Collect {amt}.”'] },
+  'accept.report': { _: ['“All right.”'] },
+  'ask.debt': { _: ['“About what you owe me.”'] },
+  'confront.claim': { _: ['“{otherFirst} says he paid you {amt}.”'] },
+  'report.collection.honest': { _: ['“{amt}. All of it.”'] },
+  'report.collection.short': { _: ['“{debtorFirst} only had {amt}. Says the rest next week.”'] },
+  'answer.debt.paid': { _: ['“I paid your man {amt} on {day}. Ask him.”'] },
+  'confront.admit': { _: ['He looks at the floor. “All right. I kept some of it. I’ll get it back to you.”'] },
+  'confront.deny': { _: ['“He’s lying. I got what I told you.”'] },
+  'confront.defy': { _: ['“You’d take his word over mine?”'] },
+  'seek.help': { _: ['“Lou’s people were in again. I won’t pay him. Can you do anything?”'] },
+  'promise.action': { _: ['“I’ll speak to my captain about it.”'] },
+  'promise.effort': { _: ['“I’ll do what I can.”'] },
+  'promise.result': { _: ['“I’ll make sure he leaves you alone.”'] },
+  'promise.restraint': { _: ['“I won’t tell a soul you came to me.”'] },
+  'ack.promise.action': { _: ['“That’s something. Tell him what they did to the window.”'] },
+  'ack.promise.effort': { _: ['“I suppose that’s all anyone can do.”'] },
+  'ack.promise.result': { _: ['“You mean that? Then I’ll hold you to it.”'] },
+  'ack.promise.restraint': { _: ['“Good. If Lou hears I came to you…”'] },
+  'followup.broken': { _: ['“They were back. You said you’d make sure.”'] },
+  'report.admitNotDone': { _: ['“No. I never got to it.”'] },
+  'react.report.admit': { _: ['He takes that in. “Well. At least you didn’t take the credit.”'] },
+  'tell.secret': { _: ['“Nate Ferrara came to me about you.”'] },
+  'react.told': { _: ['“Did he.”'] },
+  'ask.again': { _: ['“Tell me again. From the start.”'] },
+  'card.report.collection': { _: ['{first} says {debtorFirst} paid {amt}.'] },
+  'card.answer.debt.paid': { _: ['{first} says he paid {toFirst} {amt}.'] },
+  'card.confront.admit': { _: ['{first} admitted keeping {amt}, and says he’ll give it back.'] },
+  'card.confront.deny': { _: ['{first} sticks to his story. He says Gino is lying.'] },
   // ---------------------------------------------------------------- outcome cards: only what was said or seen, attributed
   'card.refuse.hasArrangement': { _: ['{first} turned you down. He says he already pays {collectorFirst}.'] },
   'card.refuse.hasArrangement.inferred': { _: ['{first} turned you down before you’d asked. He says he already has someone.'] },
@@ -246,20 +276,27 @@ const N: Record<string, Entry> = {
 
 const fill = (s: string, slots: Record<string, string>) => s.replace(/\{(\w+)\}/g, (_m, k) => slots[k] ?? `{${k}}`);
 
+// How a line was found: the bank level it came from (for the generalisation report). 'specific' = written for this request and
+// reason; 'reason' = the general line for this kind of answer and reason; 'kind' = the line for the request with no reason;
+// 'verb' = the bare answer ("No."); 'missing' = nothing at all. 'own' says whether the speaker's archetype had a line of its own.
+export interface RenderInfo { line: string; key: string; level: 'specific' | 'reason' | 'kind' | 'verb' | 'missing'; own: boolean }
+export const lastRender: { info?: RenderInfo } = {};
 export function render(m: Meaning, speakerId: string, arch: Arch, spoken: Set<string> = new Set(), salt = ''): string {
   // most specific first; then the general line for this kind of answer and reason, so a new kind of request reuses what exists
   const verb = m.key.split('.')[0];
   const keys = [m.grounds ? `${m.key}.${m.grounds}${m.stance === 'indignant' ? '.indignant' : ''}` : '', m.grounds ? `${m.key}.${m.grounds}` : '', m.grounds ? `${verb}.${m.grounds}` : '', m.key, verb].filter(Boolean);
-  let entry: Entry | undefined;
-  for (const k of keys) if (B[k] || N[k]) { entry = B[k] ?? N[k]; break; }
-  if (!entry) return `[missing bank: ${keys[0]}]`;
+  let entry: Entry | undefined, used = '';
+  for (const k of keys) if (B[k] || N[k]) { entry = B[k] ?? N[k]; used = k; break; }
+  const level = (k: string): RenderInfo['level'] => !k ? 'missing' : k === m.key && !m.grounds ? (k.includes('.') ? 'specific' : 'verb') : k.startsWith(m.key + '.') ? 'specific' : k === m.key ? 'kind' : k === verb ? 'verb' : 'reason';
+  if (!entry) { lastRender.info = { line: `[missing bank: ${keys[0]}]`, key: keys[0], level: 'missing', own: false }; return lastRender.info.line; }
   // (a man's own manner first: the default lines are for men without one of their own for this)
   const own = entry[arch], lines = own && ([] as string[]).concat(own).length ? ([] as string[]).concat(own, ([] as string[]).concat(entry._ ?? [])) : ([] as string[]).concat(entry._ ?? ['…']);
   const n = own ? ([] as string[]).concat(own).length : lines.length;
   const start = hash(speakerId + '|' + keys[0] + '|' + salt) % n;
   for (let i = 0; i < lines.length; i++) {
     const l = fill(lines[(start + i) % lines.length], m.slots ?? {});
-    if (!spoken.has(l)) { spoken.add(l); return l; }
+    if (!spoken.has(l)) { spoken.add(l); lastRender.info = { line: l, key: used, level: level(used), own: !!own }; return l; }
   }
-  return fill(lines[start], m.slots ?? {});
+  lastRender.info = { line: fill(lines[start], m.slots ?? {}), key: used, level: level(used), own: !!own };
+  return lastRender.info.line;
 }

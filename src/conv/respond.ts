@@ -298,11 +298,76 @@ export function onReturnToPromisee(p: Perception, henry: Character, seenStop: bo
     meaning: { key, stance: seenStop ? 'warm' : 'flat', toward: 'speaker' }, intent: 'question', honest: true,
   };
 }
-export function onReport(p: Perception, henry: Character, kind: 'honest' | 'stall' | 'done'): Reply {
+export function onReport(p: Perception, henry: Character, kind: 'honest' | 'stall' | 'done' | 'admitNotDone'): Reply {
   const t = p.temper;
-  const key = kind === 'done' ? 'thanks.kept' : kind === 'honest' ? 'react.report.honest' : 'react.report.stall';
+  const key = kind === 'done' ? 'thanks.kept' : kind === 'honest' ? 'react.report.honest' : kind === 'admitNotDone' ? 'react.report.admit' : 'react.report.stall';
   const changes = kind === 'done' ? [`${p.self.name}'s trust in ${henry.name} rises (a promise kept, as he sees it: Lou stopped, and Henry says he took it to the family)`, 'A favour is owed to Henry (encounters.addFavour)']
+    : kind === 'admitNotDone' ? [`${p.self.name} had thought it was Henry's doing; now he knows it wasn't. His trust falls a little, less than if he had found out another way`]
     : kind === 'honest' ? [`${p.self.name} keeps waiting, a little less sure; patience shortened`, ...(t.pride > 0.6 ? ['He starts looking at other routes (his own pursuit)'] : [])]
     : [`${p.self.name} does not believe it; his trust in ${henry.name} falls`];
   return { decision: { by: p.self.id, constraints: [], candidates: [cand(kind, [{ name: kind === 'stall' ? 'he hears an evasion' : 'he believes what you said', value: 1 }])], chosen: kind }, meaning: { key, stance: kind === 'done' ? 'warm' : kind === 'stall' ? 'cold' : 'flat', toward: 'speaker' }, intent: kind, honest: true, changes };
+}
+
+// ---------------------------------------------------------------- reporting back on a collection: honestly, or not (a reason to lie)
+// He collected `got`. He decides what to hand over and what to say, from his own state (his money, his debts, his greed, his
+// conscience) and from what he believes of the man he answers to: how likely Henry is to check.
+export function onCollectionReport(p: Perception, boss: Character, debtor: Character, got: number): Reply & { says: number; keeps: number } {
+  const t = p.temper, f = p.feelingFor(boss), g = p.self.traits.greed;
+  const owes = p.knownFacts((x) => x.kind === 'debt_missed' && x.actor === p.self.id).length;
+  const need = (p.own.cash - got < 100 ? 0.4 : 0) + owes * 0.2; // his own money: what he collected is not his
+  const checkRisk = 0.25 + f.known * 0.3 + (1 - t.courage) * 0.1; // as he imagines it: a boss who knows him better checks more
+  const keep = Math.round(got / 2 / 10) * 10;
+  const cs = [
+    cand('honest', [{ name: `loyalty to ${first(boss.name)}`, value: f.trust * 0.5 + f.respect * 0.2 }, { name: 'conscience (empathy)', value: t.empathy * 0.3 }]),
+    cand('skim', [{ name: 'he needs the money', value: need }, { name: 'greed', value: g * 0.5 }, { name: 'the chance he is found out (as he sees it)', value: -checkRisk * 0.8 }, { name: 'fear of what happens then', value: -(1 - t.courage) * 0.2 }]),
+  ];
+  const c = best(cs);
+  const says = c.move === 'skim' ? got - keep : got;
+  return {
+    decision: { by: p.self.id, constraints: [], candidates: cs, chosen: c.move, aim: c.move === 'skim' ? 'keep some of it' : undefined },
+    meaning: { key: c.move === 'skim' ? 'report.collection.short' : 'report.collection.honest', stance: 'flat', toward: 'third', slots: { amt: `$${says}`, debtorFirst: first(debtor.name) } },
+    intent: c.move, honest: c.move === 'honest', says, keeps: got - says,
+    changes: c.move === 'skim' ? [`${p.self.name} hands over $${says} and keeps $${got - says} (private: the truth is $${got})`, `Claim made to ${boss.name}: "${first(debtor.name)} paid $${says}" (honest: false)`] : [`${p.self.name} hands over all $${got}`],
+  };
+}
+// What the debtor says when asked about it: from his own state, so it is the truth as he knows it.
+export function onDebtQuestion(p: Perception, asker: Character, paid: number, to: Character, day: string): Reply {
+  return {
+    decision: { by: p.self.id, constraints: [], candidates: [cand('answer', [{ name: 'he paid, and wants it known', value: 1 }])], chosen: 'answer', aim: 'not be asked twice for the same money' },
+    meaning: { key: 'answer.debt.paid', stance: 'firm', toward: 'third', slots: { amt: `$${paid}`, day, toFirst: first(to.name) } },
+    intent: 'inform', honest: true, changes: [`Claim made to ${asker.name}: "I paid ${to.name} $${paid}" (honest: true)`],
+  };
+}
+// Put to him: the contradiction, with whatever weight the other man's word carries for him.
+export function onConfrontation(p: Perception, accuser: Character, lied: boolean, otherWord: number): Reply & { admits: boolean } {
+  const t = p.temper, f = p.feelingFor(accuser);
+  const cs = [
+    cand('admit', [{ name: 'the evidence (another man’s word, as he weighs it)', value: otherWord * 0.6 }, { name: 'fear of you', value: (f.fear + (1 - t.courage) * 0.3) }, { name: 'conscience', value: t.empathy * 0.3 }, { name: 'he did it', value: lied ? 0.2 : -10 }]),
+    cand('deny', [{ name: 'caution (hold the story)', value: t.caution * 0.4 }, { name: 'pride', value: t.pride * 0.2 }, { name: 'he did not do it', value: lied ? 0 : 1 }]),
+    cand('defy', [{ name: 'pride', value: t.pride * 0.5 }, { name: 'volatility', value: t.volatility * 0.4 }, { name: 'fear', value: -f.fear - (1 - t.courage) * 0.4 }]),
+  ];
+  const c = best(cs);
+  return {
+    decision: { by: p.self.id, constraints: [], candidates: cs, chosen: c.move, aim: c.move === 'admit' ? 'limit the damage' : 'keep the money and the story' },
+    meaning: { key: 'confront.' + c.move, stance: c.move === 'admit' ? 'afraid' : c.move === 'defy' ? 'hostile' : 'firm', toward: 'speaker', slots: { youFirst: first(accuser.name) } },
+    intent: c.move, honest: c.move === 'admit' || !lied, admits: c.move === 'admit',
+  };
+}
+// How a man in trouble takes what you've promised him (the kind of promise is in what you said, never named on screen).
+export function onPromise(p: Perception, henry: Character, type: 'action' | 'effort' | 'result' | 'restraint'): Reply {
+  const t = p.temper;
+  const relief = { action: 0.4, effort: 0.25, result: 0.8, restraint: 0.5 }[type];
+  return {
+    decision: { by: p.self.id, constraints: [], candidates: [cand('acknowledge', [{ name: 'what it gives him', value: relief }, { name: 'trust in you', value: p.feelingFor(henry).trust * 0.3 }])], chosen: 'acknowledge', aim: type === 'result' ? 'hold you to it' : undefined },
+    meaning: { key: 'ack.promise.' + type, stance: type === 'result' ? 'warm' : 'flat', toward: 'speaker' }, intent: 'acknowledge', honest: true,
+    changes: [`${p.self.name}'s trust in ${henry.name} rises a little now (more for a bigger promise); it will move again when he sees what comes of it`, ...(t.caution > 0.6 ? ['He keeps his own counsel on whether to believe it'] : [])],
+  };
+}
+export function onPromiseSeenBroken(p: Perception, henry: Character): Reply {
+  return { decision: { by: p.self.id, constraints: [], candidates: [cand('reproach', [{ name: 'he was promised it would stop, and it didn’t', value: 1 }])], chosen: 'reproach', aim: 'let you know' }, meaning: { key: 'followup.broken', stance: 'cold', toward: 'speaker' }, intent: 'reproach', honest: true, changes: [`${p.self.name}'s trust in ${henry.name} falls (a broken promise, as he saw it)`] };
+}
+// What Henry expects of an approach before he makes it, from HIS perception of the other man (spec §7.3): a guess, which can be wrong.
+export function predictAcceptance(ph: Perception, other: Character, believesOtherKnowsTrouble: boolean): number {
+  const f = ph.feelingFor(other);
+  return Math.round(Math.max(0, Math.min(1, 0.1 + (believesOtherKnowsTrouble ? 0.35 : 0) + f.trust * 0.2 + f.known * 0.1)) * 100) / 100;
 }
