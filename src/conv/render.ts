@@ -1,0 +1,203 @@
+// Rendering (spec §9): a line is composed from what it means (key, stance, who the feeling is aimed at, the subtext, the grounds)
+// and from who is saying it (archetype, temperament). Nothing here reads the world: only the meaning's slots, which the decision
+// filled from the speaker's own perception. Variants are chosen by a stable hash, and a visit never repeats a line.
+import type { Arch } from '../voice';
+import { hash } from '../voice';
+import type { Meaning } from './types';
+
+type Pick = string | string[];
+// a bank entry: lines by archetype (default '_'), optionally by grounds or stance
+type Entry = Partial<Record<Arch | '_', Pick>>;
+const B: Record<string, Entry> = {
+  // ---------------------------------------------------------------- arriving
+  'greet.customer': {
+    _: ['“Help you?”', '“What can I get you?”'],
+    jovial: ['“Afternoon! What’ll it be?”', '“Come in, come in. What can I get you?”'],
+    cold: ['“Yeah?”', '“What do you need?”'],
+    frightened: ['“Can I— can I help you with something?”'],
+    proud: ['“Yes?”'],
+    bitter: ['“What do you want?”'],
+  },
+  'greet.known': { _: ['“Ah. It’s you.”', '“Back again.”'], jovial: ['“There he is! Come in.”'], cold: ['He nods. Nothing more.'] },
+  'beat.greet': { _: ['He looks up from the counter.', 'He doesn’t stop what he’s doing.'], frightened: ['He looks up too quickly.'], jovial: ['He wipes his hands on his apron.'], cold: ['He looks at you, then at the door behind you.'] },
+
+  // ---------------------------------------------------------------- what the player says (rendered the same way)
+  'introduce.self': { _: ['“{selfName}. I’m with the {selfFamily} family.”'] },
+  'compliment.business': { _: ['“Nice place. You must do well here.”'] },
+  'demand.protection': { _: ['“{amt} a week, and nothing happens to the place.”'] },
+  'demand.protection.soft': { _: ['“{amt} a week, and I’m around if anyone gives you trouble.”'] },
+  'demand.protection.lean': { _: ['“That’s a lot of glass in the window. Glass is expensive.”'] },
+  'tell.reputation': { _: ['“Ask around. {selfName}, {selfFamily} family.”'] },
+  'press.now': { _: ['“I’m asking now.”'] },
+  'announce.return': { _: ['“Think it over. I’ll be back {day}.”'] },
+  'buy.small': { _: ['“Just a loaf, thanks.”'] },
+  'stay.wait': { _: ['“I’ll wait.”'] },
+  'claim.authority': { _: ['“{authority} sent me.”'] },
+  'ask.who': { _: ['“Who did the window at {shop}?”'] },
+  'ask.intervention': { _: ['“{forName}’s having trouble with {againstName}. I want to bring it to the family.”'] },
+  'argue.ground': { _: ['“{againstFirst}’s making trouble on our streets.”'] },
+  'argue.word': { _: ['“I gave {forFirst} my word I’d raise it.”'] },
+  'argue.money': { _: ['“There’s money in bringing {forFirst} under our protection.”'] },
+  'ask.whoPays': { _: ['“Who collects from you?”'] },
+  'offer.better': { _: ['“Whoever it is, I could do better for you.”'] },
+  'accept.counter': { _: ['“{amt}. Fridays.”'] },
+  'raise.again': { _: ['“About {forFirst} and {againstFirst}.”'] },
+  'ask.progress': { _: ['“Have you talked to {theirCaptainFirst}?”', '“Anything on {forFirst}?”'] },
+
+  // ---------------------------------------------------------------- hearing who you are
+  'react.introduction.warnOff.sameFamily': {
+    _: ['“Then you know {collectorFirst}. He comes by on the first.”'],
+    cold: ['“{collectorFirst} comes by on the first. You’re not him.”'],
+    earnest: ['“{youFamily}. Then you know {collectorFirst} already. He comes by on the first of the month.”'],
+  },
+  'react.introduction.warnOff.otherFamily': {
+    _: ['“I’m looked after. The {collectorFamily} people. Have been for years.”'],
+    cold: ['“The {collectorFamily}s look after this place. You’d want to talk to them first.”'],
+  },
+  'react.introduction.warnOff.kin': {
+    _: ['“{youFamily}, huh. My cousin {kinFirst}’s with the {kinFamily}s. Just so you know.”'],
+    schemer: ['“{youFamily}. My cousin {kinFirst} runs with the {kinFamily}s. Small world.”'],
+  },
+  'react.introduction.probe': {
+    _: ['“The {youFamily} family. And what does the {youFamily} family want with a place like this?”'],
+    bitter: ['“{youFamily}. Course you are. So what’s this about?”'],
+  },
+  'react.introduction.appease': {
+    _: ['“Mr. {youSurname}. Of course. What can I do for you?”'],
+    frightened: ['“Mr. {youSurname}. Yes. Of course. Whatever you need.”'],
+  },
+  'react.introduction.proud': {
+    _: ['“I know who the {youFamily}s are. I don’t need anything from them.”'],
+    hothead: ['“Good for you. I don’t need anything from the {youFamily}s.”'],
+  },
+  'react.introduction.neutral': { _: ['“{youName}.” He nods. “All right.”'], jovial: ['“{youName}! Good to meet you.”'] },
+
+  // ---------------------------------------------------------------- a compliment taken at face value
+  'reply.compliment': {
+    _: ['“We do all right.”', '“Can’t complain. Wouldn’t do any good if I did.”'],
+    proud: ['“It didn’t happen by accident.”'],
+    bitter: ['“Do well? You seen the rents around here?”'],
+    schemer: ['“Well enough. Why do you ask?”'],
+    hothead: ['“Better than most.”'],
+    earnest: ['“We do all right, thank God.”'],
+    jovial: ['“You should taste the cannoli. Then you’d really be impressed.”'],
+    frightened: ['“Oh— thank you. We get by.”'],
+  },
+
+  // ---------------------------------------------------------------- refusing protection, by the reason given
+  'refuse.protection.doesNotKnow': {
+    _: ['“I don’t know you. I don’t know who you’re with. Come back with someone I know.”'],
+    earnest: ['“I don’t know you, Mr. {youSurname}. I don’t do business with people I don’t know.”'],
+  },
+  'refuse.protection.doesNotKnow.indignant': {
+    _: ['“You walk in off the street asking for money, and I’m supposed to hand it over?”'],
+  },
+  'refuse.protection.hasArrangement': {
+    _: ['“You tell whoever sent you I already have an arrangement.”'],
+    earnest: ['“I already pay {collectorFirst}. I’m not paying twice.”'],
+    cold: ['“I pay {collectorFirst}. Take it up with him.”'],
+    frightened: ['“I already pay someone. Please. I can’t pay two people.”'],
+  },
+  'refuse.protection.hasArrangement.inferred': {
+    _: ['“I know where this is going. I already have someone who looks after the place.”'],
+    cold: ['“If this is about an envelope, I already have someone.”'],
+  },
+  'refuse.protection.pride': {
+    _: ['“Nobody tells me what to pay in my own shop. Get out.”'],
+    hothead: ['“Get out of my shop before I throw you out.”'],
+    proud: ['“I’ve run this place a long time without anybody’s help. Get out.”'],
+  },
+  'refuse.protection.cannotAfford': {
+    _: ['“I can’t carry it. Look at this place.”'],
+  },
+
+  'counter.protection': {
+    _: ['“{amt} I could do, if it means the street stays quiet. What do I get for it?”'],
+    bitter: ['“{amt}. That’s all there is, and what do I get for it?”'],
+  },
+  'accept.protection.afraid': {
+    _: ['“All right. All right. {amt} a week.”'],
+    frightened: ['He looks at the window, then at you. “Fine. {amt}. Fridays. Just— fine.”'],
+  },
+  'accept.protection': { _: ['“{amt} a week. Fridays.”'] },
+  'refer.protection.kin': {
+    _: ['“Talk to my cousin {kinFirst}. He’s with the {kinFamily}s. Anything about this place goes through him.”'],
+    schemer: ['“You’ll want to talk to my cousin {kinFirst} about that. The {kinFamily}s take an interest in this street.”'],
+  },
+
+  // ---------------------------------------------------------------- a stated intention, acknowledged (no promise from him)
+  'acknowledge.return': {
+    _: ['“Friday, then.”'],
+    cold: ['He’s already turning back to his work. “Suit yourself.”'],
+    frightened: ['“Friday. All right.”'],
+    proud: ['“Come back whenever you like. The answer won’t change.”'],
+  },
+
+  // ---------------------------------------------------------------- not wanting to talk, and staying anyway
+  'dismiss.pretext': { _: ['He keeps his eyes on the till. “We’re closing.” It’s {hour}.'], jovial: ['“Not today, friend. I’m run off my feet.”'] },
+  'dismiss.hostile': { _: ['“I’ve got nothing to say to you. Go on.”'], hothead: ['“Out. Now.”'] },
+  'react.wait.tolerate': { _: ['He goes back to his work as if you weren’t there.'] },
+  'react.wait.threaten': { _: ['“Stand there all day if you like. I’ll call {protectorFirst} and he can stand there with you.”'] },
+  'react.wait.giveIn': { _: ['He sighs and puts the cloth down. “All right. What do you want?”'], frightened: ['After a minute he can’t stand it. “All right. What is it you want?”'] },
+  'react.wait.call': { _: ['He goes into the back. You hear him on the telephone, low. When he comes out he doesn’t look at you.'] },
+
+  // ---------------------------------------------------------------- a claim of authority
+  'react.claim.unknownName': { _: ['“I don’t know any {authority}. I pay {collectorFirst}.”'], cold: ['“Never heard of him.”'] },
+  'react.claim.test': { _: ['“{authority}? Then he can come and tell me himself.”'], schemer: ['“Did he. Funny, he never mentioned you.”'] },
+  'react.claim.believed': { _: ['He goes a little pale. “If {authority} sent you…”'] },
+
+  // ---------------------------------------------------------------- information between men who trust each other
+  'answer.who.knows': {
+    _: ['“{actorFirst}’s boys. {basis}”'],
+    cold: ['“{actorFirst}. {basis}”'],
+    jovial: ['“That was {actorFirst}’s crowd, God help us. {basis}”'],
+  },
+  'answer.who.rumour': { _: ['“Word is it was {actorFirst}’s boys. I didn’t see it myself.”'] },
+  'answer.who.unknown': { _: ['“I couldn’t tell you. Nobody’s saying.”'] },
+  'answer.who.withhold': { _: ['“I didn’t see anything.”'], cold: ['“Not my business.”'] },
+
+  // ---------------------------------------------------------------- the captain
+  'refuse.intervention.notOurs': {
+    _: ['“{forFirst}? He’s not one of ours. Why should we get involved?”'],
+    cold: ['“{forFirst} isn’t ours. It isn’t our business.”'],
+  },
+  'doubt.argument.ground': { _: ['“Our streets? Says who? I haven’t heard a word about it.”'] },
+  'reject.argument.word': { _: ['“Then you gave it too quickly. That’s yours to carry, not mine.”'] },
+  'weigh.argument.money': { _: ['“Maybe. A bakery’s not much of an envelope.”'] },
+  'react.argument.ground.supported': { _: ['“I know what {againstFirst}’s been doing on my streets.”'] },
+  'raise.newinfo': {
+    _: ['“You heard about {hitShop}? {againstFirst}’s people. On my book.”'],
+    cold: ['“{againstFirst}’s people were at {hitShop}. That’s mine.”'],
+  },
+  'accept.intervention.liable': {
+    _: ['“All right. I’ll have a word with {theirCaptainFirst}. But if this turns ugly, it’s on you.”'],
+    proud: ['“I’ll speak to {theirCaptainFirst}. Understand me: if this goes bad, it’s on you.”'],
+  },
+  'answer.progress.pending': { _: ['“I said I’d talk to him. Give it a few days.”'], proud: ['“I told you I’d see to it. I don’t need reminding.”'] },
+  'answer.progress.irritated': { _: ['“You’ve asked me {nTimes} now. I heard you the first time.”'] },
+  'dismiss.persistence': { _: ['“Don’t come to me about {forFirst} again. When there’s something to tell you, you’ll hear it.”'] },
+  'answer.progress.done': { _: ['“It’s done. {theirCaptainFirst} spoke to him. {againstFirst} stays away from {forFirst}.”'] },
+};
+
+// Narration for what is done rather than said
+const N: Record<string, Entry> = {
+  'outcome.metOnly': { _: ['You’ve met {listenerFirst}.'] },
+};
+
+const fill = (s: string, slots: Record<string, string>) => s.replace(/\{(\w+)\}/g, (_m, k) => slots[k] ?? `{${k}}`);
+
+export function render(m: Meaning, speakerId: string, arch: Arch, spoken: Set<string> = new Set(), salt = ''): string {
+  const keys = [m.grounds ? `${m.key}.${m.grounds}${m.stance === 'indignant' ? '.indignant' : ''}` : '', m.grounds ? `${m.key}.${m.grounds}` : '', m.key].filter(Boolean);
+  let entry: Entry | undefined;
+  for (const k of keys) if (B[k] || N[k]) { entry = B[k] ?? N[k]; break; }
+  if (!entry) return `[missing bank: ${keys[0]}]`;
+  // (a man's own manner first: the default lines are for men without one of their own for this)
+  const own = entry[arch], lines = own && ([] as string[]).concat(own).length ? ([] as string[]).concat(own, ([] as string[]).concat(entry._ ?? [])) : ([] as string[]).concat(entry._ ?? ['…']);
+  const n = own ? ([] as string[]).concat(own).length : lines.length;
+  const start = hash(speakerId + '|' + keys[0] + '|' + salt) % n;
+  for (let i = 0; i < lines.length; i++) {
+    const l = fill(lines[(start + i) % lines.length], m.slots ?? {});
+    if (!spoken.has(l)) { spoken.add(l); return l; }
+  }
+  return fill(lines[start], m.slots ?? {});
+}
