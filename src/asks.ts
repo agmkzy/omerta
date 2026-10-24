@@ -266,11 +266,14 @@ function answer(w: World, s: Situation, a: Character, t: Character, K: AskKind, 
   const v = K.lean(w, s, a, t), tp = temper(t);
   const toP = a.isPlayer && !t.isPlayer;
   const say = (decision: 'yes' | 'counter' | 'stall' | 'no' | 'help', o: { again?: number; reason?: string; terms?: string; coerced?: boolean } = {}) => { if (toP && how) lines.push(...speak(w, a, t, { ...how, decision, again: o.again ?? 0, cls: classOf(s), kind: s.ak, above: rk(t) > rk(a), claim: s.m?.claim ? String(s.m.claim) : undefined, ...o })); };
-  const score = v + S.fear * 0.7 * (1 - tp.courage * 0.6) + S.good * 0.45 - S.anger * 0.55 - S.resolve * 0.55 + jitter(w, s, 'ans' + tried(stance(w, s, a.id), 'ask'));
-  if (score > 0.12) { const coerced = S.fear > S.good + 0.1; say('yes', { coerced }); return finish(w, s, a, t, K, S, lines, coerced); }
-  const c = K.counter?.(w, s, a, t);
+  // (Gate 2b: in a world running the conversation layer, the answer is that layer's decision, from the man's own perception; the
+  // kind's weighing below is used only where no such decision exists)
+  const D = w.social ? DECIDERS.answer[s.ak ?? '']?.(w, s, a, t) : undefined;
+  const score = D ? 0 : v + S.fear * 0.7 * (1 - tp.courage * 0.6) + S.good * 0.45 - S.anger * 0.55 - S.resolve * 0.55 + jitter(w, s, 'ans' + tried(stance(w, s, a.id), 'ask'));
+  if (D ? D.move === 'yes' : score > 0.12) { const coerced = S.fear > S.good + 0.1; say('yes', { coerced }); return finish(w, s, a, t, K, S, lines, coerced); }
+  const kc = K.counter?.(w, s, a, t), c = D?.move === 'counter' && D.amt !== undefined ? { amt: D.amt, why: D.why ?? kc?.why ?? 'that is what I can do' } : kc;
   // an agreeable man looks for terms he could live with sooner than a proud one does
-  if (score > -0.12 - tp.agreeable * 0.14 && c && S.last !== 'counter') {
+  if (c && S.last !== 'counter' && (D ? D.move === 'counter' : score > -0.12 - tp.agreeable * 0.14)) {
     S.last = 'counter'; s.m = { ...(s.m ?? {}), offer: c.amt };
     s.m.why = c.why; // the reason he gave, kept with the matter (what he said, not what is true)
     tell(w, s, K.low ? `${t.name} told ${a.name} what he wants instead: ${fmtOf(K, c.amt)}.` : `${t.name} offered ${a.name} ${money(c.amt)} instead.`, { actor: t.id, victim: a.id, minor: true });
@@ -285,7 +288,7 @@ function answer(w: World, s: Situation, a: Character, t: Character, K: AskKind, 
   // protector in too, and the warnings that followed filled every negotiation slot in the city.)
   const b = s.biz ? w.biz[s.biz] : undefined;
   const backed = s.ak === 'protect' && !!b?.protection && b.protection.collectorId !== a.id && !!live(w, b.protection.collectorId);
-  if (!backed && S.fear > 0.35 && S.resolve < 0.6 && tried(S, 'stalled') < 2) {
+  if (D ? D.move === 'stall' && tried(S, 'stalled') < 2 : !backed && S.fear > 0.35 && S.resolve < 0.6 && tried(S, 'stalled') < 2) {
     const before = tried(S, 'stalled'); bumpTried(S, 'stalled'); S.last = 'stall'; s.phase = 'stalled'; s.next = w.now + 3 * DAY;
     const why = giveReason(w, s, a, t, 'stall');
     if (toP) say('stall', { again: before, reason: before ? undefined : why ?? (K.voice?.stall ? K.voice.stall(w, s, a, t) : undefined) });
@@ -304,7 +307,7 @@ function answer(w: World, s: Situation, a: Character, t: Character, K: AskKind, 
   // A man who is frightened or angry enough, or asked once too often, goes to someone.
   // (V90: only a man something is being demanded of goes to someone over it: nobody sends for his protector because he was
   // offered a loan, asked for one, or apologised to)
-  if (classOf(s) === 'demand' && (backed || S.fear + S.anger > 0.65 || tried(S, 'no') >= 2) && !s.m?.help && Number(s.m?.depth ?? 0) < 2) {
+  if ((D ? D.move === 'help' : classOf(s) === 'demand' && (backed || S.fear + S.anger > 0.65 || tried(S, 'no') >= 2)) && !s.m?.help && Number(s.m?.depth ?? 0) < 2) {
     const h = seekHelp(w, s, a, t);
     if (h) { say('help', { again: tried(S, 'no'), reason: why }); lines.push(...h); return { answer: 'help', lines }; }
   }
@@ -312,6 +315,15 @@ function answer(w: World, s: Situation, a: Character, t: Character, K: AskKind, 
   bumpTried(S, 'no');
   return { answer: 'no', lines };
 }
+
+// Gate 2b: who decides. In a world running the conversation layer (World.social), the answer to an ask and the asker's next move,
+// for the kinds that layer covers (conv/deciders.ts), are its decisions: from each man's own perception, by the same rules whether the
+// player or another man is asking. The ask carries them out exactly as before. Elsewhere, and in every world without the layer, the
+// kinds' own weighing stands.
+export interface Decided { move: Answer; amt?: number; why?: string }
+export const DECIDERS: { answer: Record<string, (w: World, s: Situation, a: Character, t: Character) => Decided | undefined>; move: Record<string, (w: World, s: Situation, a: Character, t: Character) => AskMove | undefined> } = { answer: {}, move: {} };
+export const askStance = (w: World, s: Situation, id: Id) => stance(w, s, id);
+export const askTried = (S: Stance, k: string) => tried(S, k);
 
 // Gate 2a: a yes decided elsewhere (the conversation layer's own decision, conv/respond.ts) carried out by the kind's own effects,
 // exactly as any yes is: what agreeing to this kind of ask does in the world stays in one place.
@@ -422,7 +434,7 @@ function step(w: World, s: Situation) {
     return;
   }
   if (t.isPlayer) return askPlayer(w, s, a, t, K);
-  const mv = npcMove(w, s, a, t, S);
+  const mv = (w.social ? DECIDERS.move[s.ak ?? '']?.(w, s, a, t) : undefined) ?? npcMove(w, s, a, t, S);
   move(w, s, mv);
   if (isOpen(s) && (s.next ?? 0) <= w.now) s.next = w.now + (2 + Math.floor((jitter(w, s, 'gap') + 0.08) * 25)) * DAY;
 }

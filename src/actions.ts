@@ -1,4 +1,4 @@
-import { restrainedFrom } from './conv/social';
+import { free } from './conv/obey';
 import { menace } from './danger';
 import { temper } from './temper';
 import { noteGrievance } from './orgs';
@@ -108,7 +108,7 @@ export function generate(w: World, c: Character, kind: Kind): Action[] {
         if (b.lastApproach !== undefined && now - b.lastApproach < 7 * DAY) continue;
         const o = w.chars[b.ownerId];
         if (!o || !o.alive) continue;
-        if (restrainedFrom(w, c.id, o.id, b.id)) continue; // (Gate 2a: he has given his word, or been ordered, to leave this man alone, and means to keep it)
+        if (!free(w, c, o.id, b.id)) continue; // (Gate 2a/2b: bound to leave this man alone, and, weighing it now, he means to keep it)
         const rival = !!b.protection;
         const home = fam.districts.includes(b.district);
         let why = '';
@@ -142,7 +142,7 @@ export function generate(w: World, c: Character, kind: Kind): Action[] {
       for (const x of alive()) {
         const r = c.rels[x.id];
         if (!r || r.grudge < 0.5 || (x.familyId && x.familyId === c.familyId) || x.jailedUntil > now) continue; // (V89: 0.45 → 0.5, docs/V89_HEALTH.md)
-        if (restrainedFrom(w, c.id, x.id, ownerBiz(w, x.id)?.id)) continue; // (Gate 2a: bound to leave him alone, and meaning it)
+        if (!free(w, c, x.id, ownerBiz(w, x.id)?.id)) continue; // (Gate 2a/2b: bound to leave him alone, and, weighing it now, meaning it)
         if (c.isPlayer && !sanctioned(w, c, x)) continue;
         const hi = x.rank === 'boss' || x.rank === 'underboss' ? 0.4 : 0;
         const base = r.grudge * (0.6 + tp.pride * 0.2) + T.violence * 0.2 + tp.volatility * 0.15 - T.caution * 0.25 - tp.caution * 0.2 - (r.fear ?? 0) * 0.4 * (1 - tp.courage) + T.ambition * 0.05 - hi - crime - 0.08;

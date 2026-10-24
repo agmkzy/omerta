@@ -23,11 +23,11 @@ export interface Social extends Store {
   agreements: Agreement[]; requests: Request[];
   // Gate 2b (all optional: a store from Gate 2a loads as it is)
   said?: import('./minds').Said[]; held?: import('./minds').Held[]; revisions?: import('./minds').Revision[]; judged?: import('./minds').Judged[];
-  pursuits?: unknown[];
+  pursuits?: import('./pursuits').Pursuit[];
 }
 export const social = (w: World): Social => (w.social ??= { obs: [], log: [], n: 0, agreements: [], requests: [] });
 export const sid = (s: Social, p: string) => p + ++s.n;
-export function note(r: Request, t: number, event: string) { r.hist.push({ t, event }); if (r.hist.length > 8) r.hist.splice(0, r.hist.length - 8); }
+export function note(r: Request, t: number, event: string) { r.hist.push({ t, event }); if (r.hist.length > 4) r.hist.splice(0, r.hist.length - 4); }
 
 // keep it small: what is closed and old goes; anything an open obligation rests on stays
 export function prune(w: World) {
@@ -38,8 +38,19 @@ export function prune(w: World) {
   if (s.obs.length > 400) { const open = s.obs.filter((o) => o.status === 'pending'), closed = s.obs.filter((o) => o.status !== 'pending'); s.obs = [...closed.slice(-200), ...open]; }
   const live = new Set(s.obs.map((o) => o.agreement).filter(Boolean));
   s.agreements = s.agreements.filter((a) => live.has(a.id) || !old(a.t)).slice(-200);
-  s.requests = s.requests.filter((r) => r.status === 'open' || !old(r.t)).slice(-200);
-  s.log = s.log.filter((a) => w.now - a.t <= 120 * DAY).slice(-400);
+  // (a finished request is kept 60 days, or while an obligation that came of it is open: what was asked, and who said no, is what
+  // later decisions rest on)
+  const madeIn = new Set(s.agreements.filter((a) => s.obs.some((o) => o.status === 'pending' && a.obligations.includes(o.id))).map((a) => a.madeIn));
+  s.requests = s.requests.filter((r) => r.status === 'open' || madeIn.has(r.id) || w.now - r.t <= 60 * DAY).slice(-100);
+  // beliefs and judgements: kept while what they are about is still on record
+  const obs = new Set(s.obs.map((o) => o.id));
+  if (s.judged) s.judged = s.judged.filter((j) => obs.has(j.ob));
+  if (s.held) s.held = s.held.filter((h) => !h.subject.startsWith('ob:') || obs.has(h.subject.slice(3))).slice(-300);
+  if (s.said) s.said = s.said.filter((x) => w.now - x.t <= 90 * DAY).slice(-150);
+  if (s.revisions) s.revisions = s.revisions.filter((x) => w.now - x.t <= 90 * DAY).slice(-100);
+  // (acts within the window of any open obligation are what keep or break it; beyond that, 90 days)
+  const since = Math.min(w.now - 90 * DAY, ...s.obs.filter((o) => o.status === 'pending').map((o) => o.from));
+  s.log = s.log.filter((a) => a.t >= since).slice(-250);
 }
 
 // Is he bound not to touch this man or his place? An open restraint he means to keep (an order he has accepted, a promise to stay

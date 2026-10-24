@@ -18,6 +18,7 @@ import { social } from './social';
 import { agreement, captaincyOf, offstage, promise, request, settleNow } from './tick';
 import { captainOf, chairFor, reach } from './authority';
 import * as door from './doors';
+import { judge, say } from './minds';
 
 const byId = (a: { id: string }, b: { id: string }) => (a.id < b.id ? -1 : 1);
 const dayOf = (w: World, t0: number) => Math.floor((w.now - t0) / DAY);
@@ -163,6 +164,10 @@ export function chain(c: Cast, type: ObType, opts: { tell?: boolean; days?: numb
     const rows: Row[] = o1.status === 'kept' || run.o2?.status === 'kept' ? [{ key: 'report.done', note: 'Tell him you took it to the family.' }] : [{ key: 'report.admitNotDone', note: 'Tell him the truth: it didn’t get anywhere.' }];
     v.offer([...rows, LEAVE]);
     v.pick(rows[0].key);
+    // what Henry says is a claim Nate weighs: that he took it to the family (true if he raised it, whatever came of it)
+    if (rows[0].key === 'report.done') say(w, henry, nate, 'credit:' + o1.id, 'delegate', 'own', social(w).log.some((a) => a.actor === henry.id && a.act === 'raise' && a.about === MATTER), 'I took it to the family');
+    else say(w, henry, nate, 'credit:' + o1.id, 'none', 'own', true, 'I never got anywhere with it');
+    judge(w, nate, o1);
     v.him_(onReport(perceive(w, s, nate), henry, rows[0].key === 'report.done' ? 'done' : 'admitNotDone'));
     if (o1.status === 'kept' && since.length === 0) { door.favour(w, nate, henry, 1, `${henry.name} saw to ${lou.name}`, MATTER); v.card('card.kept', { againstFirst: first(lou.name) }); }
   }

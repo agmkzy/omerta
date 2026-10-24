@@ -1,8 +1,9 @@
 // The action catalogue (spec §3.2): everything the conversation layer does to the world goes through here, and everything here goes
 // through a door the world already has. Nothing in src/conv writes a world record directly (architecture test: conv/integration).
 // Each action leaves an act record (social.log) that obligations are kept or broken by, and, where the world records it, a fact.
-import { addFact, bear, feel, learn, transfer } from '../core';
+import { addFact, bear, compat, feel, knowMore, learn, transfer } from '../core';
 import { addFavour } from '../encounters';
+import { discipline as booksDiscipline } from '../books';
 import { agreeAsk, askBetween, layoffFor, move as askMove, openAsk } from '../asks';
 import type { Character, Fact, Id, Situation, World } from '../types';
 import type { Act } from './obligations';
@@ -59,8 +60,8 @@ export function agree(w: World, sit: Situation, about: string): Act | undefined 
 // pay: money from one man to another (core.transfer: the one door for it)
 export function pay(w: World, from: Character, to: Character, amt: number, why: string, about = ''): Act | undefined {
   if (Math.round(amt) <= 0 || from.cash < Math.round(amt)) return undefined;
-  transfer(w, from, to, amt, 'gift', why);
-  return record(w, { actor: from.id, act: 'pay', target: to.id, about });
+  const x = transfer(w, from, to, amt, 'gift', why);
+  return record(w, { actor: from.id, act: 'pay', target: to.id, about, amt: x });
 }
 // favour: one man now owes another (encounters.addFavour)
 export function favour(w: World, from: Character, to: Character, size: number, what: string, about = ''): Act {
@@ -72,3 +73,16 @@ export const regard = (w: World, who: Character, about: Id, f: 'trust' | 'respec
 export const grudge = (w: World, who: Character, against: Id, amt: number, why: string) => bear(w, who, against, amt, why);
 // something that happened between men, on record for those who were there (core.addFact)
 export const happened = addFact;
+// discipline: a superior punishes a man for going against him (books.discipline: what the family does to a man who crosses it)
+export function discipline(w: World, boss: Character, man: Character, cause: Id, amt: number, about = ''): Act {
+  booksDiscipline(w, boss, man, cause, amt);
+  return record(w, { actor: boss.id, act: 'discipline', target: man.id, about });
+}
+// spend time: an evening together (core.knowMore, and liking by how well they get on: core.compat)
+export function spendTime(w: World, a: Character, b: Character, about = ''): Act {
+  knowMore(a, b, 0.08);
+  const c = compat(w, a, b);
+  if (Math.abs(c) > 0.1) { feel(w, b, a.id, 'affection', c * 0.1, 'an evening together'); feel(w, a, b.id, 'affection', c * 0.1, 'an evening together'); }
+  if (c > 0.15) feel(w, b, a.id, 'trust', 0.03, 'an evening together');
+  return record(w, { actor: a.id, act: 'spendTime', target: b.id, about });
+}

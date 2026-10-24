@@ -19,6 +19,8 @@ const B: Record<string, Entry> = {
     bitter: ['“What do you want?”'],
   },
   'greet.known': { _: ['“Ah. It’s you.”', '“Back again.”'], jovial: ['“There he is! Come in.”'], cold: ['He nods. Nothing more.'] },
+  'greet.acquaintance': { _: ['He nods you to a chair.', '“Sit down.”'], jovial: ['“There he is! Sit, sit.”'], cold: ['He nods. Nothing more.'], proud: ['“You’re here.”'] },
+  'greet.stranger': { _: ['He looks you over. “Do I know you?”'], jovial: ['“Friend. What brings you?”'], cold: ['“Yeah?”'] },
   'beat.greet': { _: ['He looks up from the counter.', 'He doesn’t stop what he’s doing.'], frightened: ['He looks up too quickly.'], jovial: ['He wipes his hands on his apron.'], cold: ['He looks at you, then at the door behind you.'] },
 
   // ---------------------------------------------------------------- what the player says (rendered the same way)

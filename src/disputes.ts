@@ -1,6 +1,6 @@
 // Disputes are things in the world, not menus. A quarrel starts from an incident, then goes on without anyone watching:
 // the injured side asks its superiors, the other side presses or backs off, someone plans a reply, a sit-down gets called, terms are agreed and sometimes broken.
-import { restrainedFrom } from './conv/social';
+import { free } from './conv/obey';
 import { temper, viewOf } from './temper';
 import { addEnc } from './encounters';
 import { addFact, bear, bearOn, clamp, famName, feel, feelOn, money, ownerBiz, rel, repute, witnessesAt } from './core';
@@ -157,7 +157,7 @@ export function intentDue(w: World, q: import('./types').Pending, perform: (w: W
   const why = (t: string) => d && log(w, d, t);
   // (Gate 2a: a man who has since given his word, or been ordered, to leave him alone, and means to keep it, calls off what he had
   // planned; one who means to break it goes ahead)
-  if (restrainedFrom(w, a.id, b.id, Object.values(w.biz).find((x) => x.ownerId === b.id && x.open)?.id)) return void why(`${a.name} let it go: he had given his word to leave ${b.name} alone.`);
+  if (!free(w, a, b.id, Object.values(w.biz).find((x) => x.ownerId === b.id && x.open)?.id)) return void why(`${a.name} let it go: he had given his word to leave ${b.name} alone.`);
   if (d && d.status !== 'open' && d.status !== 'violated') return void why(`${a.name} dropped the idea of answering ${b.name}. The matter is closed.`);
   if (a.jailedUntil > w.now) return void why(`${a.name} is locked up, so nothing comes of his plan against ${b.name}.`);
   if (a.hurtUntil > w.now) return void why(`${a.name} is laid up and can’t do anything about it.`);

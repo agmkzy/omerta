@@ -100,9 +100,13 @@ export function claim(w: World, s: Situation, by: Id, text: string, honest: bool
   c.push({ by, text, honest, t: w.now });
   if (c.length > SIT.cap.claims) c.splice(0, c.length - SIT.cap.claims);
 }
+// Gate 2b: what listens for a matter closing (the conversation layer's requests that ride on an ask learn its outcome here, before
+// a settled matter between other men is cleared away)
+export const onClose: ((w: World, s: Situation) => void)[] = [];
 export function closeSit(w: World, s: Situation, out: string, cons: string[] = [], coolWeeks = 8) {
   if (!isOpen(s)) return;
   s.stage = 'resolved'; s.resolvedAt = w.now; s.how = 'alone'; s.out = out; s.phase = 'closed';
+  for (const f of onClose) f(w, s);
   s.cons = [...(s.cons ?? []), ...cons].slice(-SIT.cap.cons);
   delete s.ask; delete s.next;
   if (s.key) (w.sitcool ??= {})[s.key] = w.now + coolWeeks * WEEK;

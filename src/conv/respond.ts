@@ -14,7 +14,7 @@ const best = (cs: Candidate[]) => cs.filter((c) => c.value > -9).sort((a, b) => 
 export interface Reply { decision: Decision; meaning: Meaning; intent: string; honest: boolean; aim?: string; changes?: string[] }
 
 // ---------------------------------------------------------------- arriving: does he talk to you at all
-export function onArrival(p: Perception, visitor: Character, hour: string): Reply {
+export function onArrival(p: Perception, visitor: Character, hour: string, atShop = true): Reply {
   const t = p.temper, f = p.feelingFor(visitor);
   const bad = p.knownFacts((x) => (x.actor === visitor.id || x.victim === visitor.id) && ['protection_refused', 'vandalism', 'beating', 'threat'].includes(x.kind));
   const wary = Math.min(1, bad.length * 0.6 + f.grudge);
@@ -27,7 +27,7 @@ export function onArrival(p: Perception, visitor: Character, hour: string): Repl
   const known = f.known >= 0.3;
   return {
     decision: { by: p.self.id, constraints: [], candidates: cs, chosen: c.move, aim: c.move === 'greet' ? undefined : 'get rid of you' },
-    meaning: c.move === 'greet' ? { key: known ? 'greet.known' : 'greet.customer', stance: 'polite', toward: 'speaker' } : { key: c.move === 'dismiss.pretext' ? 'dismiss.pretext' : 'dismiss.hostile', stance: c.move === 'dismiss.pretext' ? 'cold' : 'hostile', toward: 'speaker', slots: { hour } },
+    meaning: c.move === 'greet' ? { key: p.own.shop && atShop ? (known ? 'greet.known' : 'greet.customer') : known ? 'greet.acquaintance' : 'greet.stranger', stance: 'polite', toward: 'speaker' } : { key: c.move === 'dismiss.pretext' ? 'dismiss.pretext' : 'dismiss.hostile', stance: c.move === 'dismiss.pretext' ? 'cold' : 'hostile', toward: 'speaker', slots: { hour } },
     intent: c.move === 'dismiss.pretext' ? 'dismiss' : c.move, honest: c.move !== 'dismiss.pretext', aim: c.move === 'greet' ? undefined : 'get rid of you',
   };
 }
@@ -210,7 +210,7 @@ export function onProgressQuestion(p: Perception, henry: Character, forC: Charac
 }
 
 // ---------------------------------------------------------------- a question between men: what he knows, and whether he'll say it
-export function onWhoQuestion(p: Perception, asker: Character, factId: string, actor: Character | undefined): Reply {
+export function onWhoQuestion(p: Perception, asker: Character, factId: string, actor: Character | undefined, scapegoat?: Character, suspectName?: string): Reply {
   const fact = p.knownFacts((x) => x.id === factId)[0], f = p.feelingFor(asker), t = p.temper;
   const k = p.self.known[factId];
   // what he is to it decides how he can speak of it and what he can honestly claim: the man it was done to speaks of his own
@@ -220,27 +220,41 @@ export function onWhoQuestion(p: Perception, asker: Character, factId: string, a
   const protects = !!actor && p.feelingFor(actor).affection >= 0.6;
   const afraid = role === 'victim' && !!actor && (p.feelingFor(actor).fear ?? 0) + (1 - t.courage) * 0.4 > 0.5;
   const willSay = knowsWho && !protects && !afraid && f.trust >= 0.45;
-  const move = !k || !knowsWho ? 'unknown' : !willSay ? 'withhold' : 'knows';
-  const key = 'answer.who.' + move;
+  // a man covering for the one who did it, with a grudge against someone plausible, may put the blame there instead: a lie, with a motive
+  const g = scapegoat ? p.feelingFor(scapegoat).grudge : 0;
+  const misdirect = knowsWho && protects && !!scapegoat && g * 0.8 + (1 - t.empathy) * 0.3 - t.caution * 0.2 > 0.35;
+  // a man who doesn't know but suspects (the world gives people their guesses: core.suspect) passes the suspicion on as what is said,
+  // honestly, and perhaps wrongly: misinformation with no liar in it
+  const suspects = !knowsWho && !!k?.blame && k.blame !== p.self.id && f.trust >= 0.3 ? k.blame : undefined;
+  const move = misdirect ? 'misdirect' : suspects ? 'suspects' : !k || !knowsWho ? 'unknown' : !willSay ? 'withhold' : 'knows';
+  const key = 'answer.who.' + (move === 'misdirect' || move === 'suspects' ? 'knows' : move);
   const basis = CLAIMABLE[role][0];
   // withholding what he saw by saying he saw nothing is a lie; a victim or a man who only heard, keeping quiet, says so plainly
-  const honest = !(move === 'withhold' && role === 'witness');
+  const honest = move !== 'misdirect' && !(move === 'withhold' && role === 'witness');
+  const named = move === 'knows' ? actor!.id : move === 'misdirect' ? scapegoat!.id : move === 'suspects' ? suspects! : '';
   return {
-    decision: { by: p.self.id, constraints: [...(protects ? [{ kind: 'loyalty', source: `he is close to ${actor!.name}` }] : []), ...(afraid ? [{ kind: 'fear', source: `${actor!.name} did it to him` }] : [])], candidates: [cand(move, [{ name: 'he knows who', value: knowsWho ? 1 : 0 }, { name: `trust in ${first(asker.name)}`, value: f.trust }, { name: 'caution', value: -t.caution * 0.2 }])], chosen: move, aim: willSay ? 'help you' : undefined },
-    meaning: { key, stance: 'flat', toward: 'third', role, slots: { actorFirst: actor && move === 'knows' ? first(actor.name) : '' } },
-    intent: willSay ? 'inform' : 'withhold', honest,
-    changes: willSay ? [`Claim made to ${asker.name}: ${actor!.name} did it (basis: ${basis}; he is the ${role === 'victim' ? 'man it was done to' : role === 'witness' ? 'man who saw it' : 'man who heard of it'})`] : !honest ? [`Claim made to ${asker.name}: he saw nothing (honest: false; he saw it)`] : [],
+    decision: { by: p.self.id, constraints: [...(protects ? [{ kind: 'loyalty', source: `he is close to ${actor!.name}` }] : []), ...(afraid ? [{ kind: 'fear', source: `${actor!.name} did it to him` }] : [])], candidates: [cand(move, [{ name: 'he knows who', value: knowsWho ? 1 : 0 }, { name: `trust in ${first(asker.name)}`, value: f.trust }, { name: 'caution', value: -t.caution * 0.2 }, ...(misdirect ? [{ name: `his grudge against ${first(scapegoat!.name)}`, value: g }] : [])])], chosen: move, aim: willSay ? 'help you' : misdirect ? `protect ${first(actor!.name)}, and hurt ${first(scapegoat!.name)}` : undefined },
+    meaning: { key, stance: 'flat', toward: 'third', role: move === 'suspects' ? 'hearsay' : role, slots: { actorFirst: named ? (move === 'suspects' ? suspectName ?? '' : first((move === 'misdirect' ? scapegoat! : actor!).name)) : '', named } },
+    intent: willSay ? 'inform' : misdirect ? 'deceive' : 'withhold', honest,
+    changes: willSay ? [`Claim made to ${asker.name}: ${actor!.name} did it (basis: ${basis}; he is the ${role === 'victim' ? 'man it was done to' : role === 'witness' ? 'man who saw it' : 'man who heard of it'})`] : misdirect ? [`Claim made to ${asker.name}: ${scapegoat!.name} did it (honest: false; it was ${actor!.name})`] : !honest ? [`Claim made to ${asker.name}: he saw nothing (honest: false; he saw it)`] : [],
   };
 }
 
 // ---------------------------------------------------------------- spending time: an account of what happened, not a score
-export function spendTimeAccount(pa: Perception, pb: Perception, b: Character, venue: string, compat: number): { text: string; changes: string[] } {
+export function spendTimeAccount(pa: Perception, pb: Perception, b: Character, venue: string, compat: number, salt = ''): { text: string; changes: string[] } {
   const tb = pb.temper, shop = pb.own.shop, kin = pb.own.kin[0];
-  const topic = shop && shop.distress > 0 ? `how slow the shop has been, and the rent` : kin ? `his ${kin.role} ${first(kin.name)}` : tb.pride > 0.6 ? 'the old neighbourhood, and the men who used to run it' : 'the fights on Saturday, and who should have won';
-  const went = compat > 0.15 ? 'It was easy. He laughed more than you expected.' : compat > -0.1 ? 'It was pleasant enough, and no more than that.' : 'It never quite caught. He kept looking at the door.';
+  // what's on his mind: what has happened to him or around him lately, as he knows it, and otherwise the things men talk about;
+  // which of them tonight is the evening's own (the same two men don't have the same evening twice)
+  const recent = pb.knownFacts((f) => !f.minor && pb.at - f.t < 14 * DAY && (f.victim === pb.self.id || f.actor === pb.self.id || f.district === (shop?.district ?? pb.self.district))).sort((x, y) => y.t - x.t).slice(0, 3);
+  const about = (t: string) => { const m = t.match(/ at ([A-Z][^.,]+)/); return m ? `what happened at ${m[1]}` : 'what has been going on around him'; };
+  const subjects = [...recent.map((f) => `${about(f.text)}, and what he thinks of it`), shop && shop.distress > 0 ? 'how slow the shop has been, and the rent' : '', kin ? `his ${kin.role} ${first(kin.name)}` : '', pb.own.cash < 100 ? 'money, and how short he is' : '', tb.pride > 0.6 ? 'the old neighbourhood, and the men who used to run it' : '', 'the fights on Saturday, and who should have won', 'the price of everything', 'his mother, who is not well', 'the Yankees, and what has happened to them', 'a girl he knew in Bensonhurst'].filter(Boolean);
+  const topic = subjects[hashStr(pb.self.id + '|' + salt) % subjects.length];
+  const pick = (xs: string[]) => xs[hashStr(salt + pb.self.id + 'w') % xs.length];
+  const went = compat > 0.15 ? pick(['It was easy. He laughed more than you expected.', 'The hours went quickly.', 'He ordered another round without being asked.']) : compat > -0.1 ? pick(['It was pleasant enough, and no more than that.', 'Nobody said anything that mattered.', 'He was polite, and a little tired.']) : pick(['It never quite caught. He kept looking at the door.', 'The silences went on too long.']);
   const change = compat > 0.15 ? 'He likes you better for it.' : compat > -0.1 ? 'You’re no closer than you were, and no further.' : 'If anything, you’re further apart.';
   return { text: `You spent the evening at ${venue} with ${first(b.name)}. He talked about ${topic}. ${went} ${change}`, changes: [`familiarity up (time together)`, compat > 0.15 ? 'his liking for you up (compatibility)' : compat < -0.1 ? 'a little friction (compatibility)' : 'no change in his regard'] };
 }
+const hashStr = (x: string) => { let h = 0; for (let i = 0; i < x.length; i++) h = (h * 31 + x.charCodeAt(i)) >>> 0; return h; };
 
 // ---------------------------------------------------------------- a request the worked examples never covered: a loan
 // The same two stages: what he can't do (spare the money), then what each answer is worth to him, from what he believes of the man

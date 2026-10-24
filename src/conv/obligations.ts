@@ -13,13 +13,17 @@ import { DAY } from '../types';
 
 export type ObType = 'action' | 'effort' | 'result' | 'restraint';
 // an act done, as the obligation rules see it: who, what, to whom, about which matter, and (for good faith) what he expected of it
-export interface Act { id?: string; t: number; actor: Id; act: string; target?: Id; about: string; predicted?: number; best?: boolean; fact?: Id }
+export interface Act { id?: string; t: number; actor: Id; act: string; target?: Id; about: string; predicted?: number; best?: boolean; fact?: Id; amt?: number }
 export type Spec =
   | { kind: 'actionDone'; act: string; target?: Id; about: string; delegable?: boolean }
   | { kind: 'effort'; acts: string[]; about: string; floor: number }
   | { kind: 'noHostility'; actor: Id; target: Id; biz?: Id; days: number }
   | { kind: 'notDisclosedBy'; about: string }
-  | { kind: 'demandWithdrawn'; sit: Id };
+  | { kind: 'demandWithdrawn'; sit: Id }
+  | { kind: 'paid'; from: Id; to: Id; amount: number }                 // money handed over, by the date (core.transfer, through doors.pay)
+  | { kind: 'knows'; who: Id; fact: Id }                               // he has come to know it
+  | { kind: 'notKnows'; who: Id | 'anyone'; fact: Id; except?: Id[] }  // nobody (or he) learns it: a guarantee, so a result
+  | { kind: 'all' | 'any'; of: Spec[] };                              // at most two levels (spec §3.3)
 // what follows for someone else if this obligation is broken: "if this turns ugly, it's on you" (§6.4)
 export interface Liability { who: Id; by: Id; feeling: 'trust' | 'respect'; amount: number; why: string; fell?: number }
 export interface Obligation {
@@ -35,6 +39,7 @@ export interface Obligation {
   intends?: 'keep' | 'break';   // (the obligor's own, private: what he has decided to do about it)
   words?: string;               // what was said that made it, for the record
   matter?: { for?: Id; against?: Id; biz?: Id; fact?: Id }; // what it is about, for the man who must act on it
+  conflicts?: Id[];             // his other obligations this one cannot be kept alongside (found when it was made)
 }
 export interface Store { obs: Obligation[]; log: Act[]; n: number }
 export const newStore = (): Store => ({ obs: [], log: [], n: 0 });
@@ -75,44 +80,101 @@ function creditOf(s: Store, ob: Obligation): Obligation['credit'] {
   return 'none';
 }
 
+// What one condition says now, for this obligation's window and type: kept, broken, void or still pending.
+type State = { state: 'kept' | 'broken' | 'void' | 'pending'; why: string };
+function evaluate(w: World, s: Store, ob: Obligation, sp: Spec, depth = 0): State {
+  const closed = w.now > ob.by, imp = impossible(w, ob);
+  const pending: State = { state: 'pending', why: '' };
+  switch (sp.kind) {
+    case 'actionDone': {
+      const a = doneBy(w, s, ob, [sp.act], sp.about, sp.target);
+      if (a) return { state: 'kept', why: `${a.actor === ob.obligor ? 'he' : nameOf(w, a.actor) + ', for him,'} did it: ${a.act}${a.target ? ' with ' + nameOf(w, a.target) : ''}` };
+      if (imp) return { state: 'void', why: imp };
+      return closed ? { state: 'broken', why: 'the time ran out and it was never done (whatever else happened)' } : pending;
+    }
+    case 'effort': {
+      const a = doneBy(w, s, ob, sp.acts, sp.about, undefined, sp.floor), hollow = doneBy(w, s, ob, sp.acts, sp.about);
+      if (a) return { state: 'kept', why: `a real attempt: ${a.act}${a.target ? ' with ' + nameOf(w, a.target) : ''}, which he expected might work (${a.predicted ?? 'his best route'}), whatever came of it` };
+      if (imp) return { state: 'void', why: imp };
+      return closed ? { state: 'broken', why: hollow ? 'only a gesture he had no reason to think would work' : 'no attempt was made' } : pending;
+    }
+    case 'noHostility': {
+      const end = ob.from + sp.days * DAY, v = violation(w, sp, ob.from, Math.min(w.now, end));
+      if (v) return { state: 'broken', why: `a violation inside the period: ${v.text}` };
+      if (imp) return { state: 'void', why: imp };
+      return w.now >= end ? { state: 'kept', why: `the whole ${sp.days} days passed cleanly` } : pending;
+    }
+    case 'notDisclosedBy': {
+      const told = s.log.find((x) => x.actor === ob.obligor && x.act === 'inform' && x.about === sp.about && x.t >= ob.from && x.t <= ob.by);
+      if (told) return { state: 'broken', why: `he told ${nameOf(w, told.target)}` };
+      return closed ? { state: 'kept', why: 'the time passed and he never told anyone (what others found out for themselves is not his doing)' } : pending;
+    }
+    case 'demandWithdrawn': {
+      const sit = (w.situations ?? []).find((x) => x.id === sp.sit);
+      if (!sit || sit.stage === 'resolved') return { state: 'kept', why: `the demand is withdrawn${sit?.out ? ` (${sit.out})` : ''}` };
+      return closed ? { state: 'broken', why: 'the demand still stands' } : pending;
+    }
+    case 'paid': {
+      const got = s.log.filter((x) => x.act === 'pay' && x.actor === sp.from && x.target === sp.to && x.t >= ob.from && x.t <= ob.by).reduce((a, x) => a + (x.amt ?? 0), 0);
+      if (got >= sp.amount) return { state: 'kept', why: `$${got} handed over` };
+      return closed ? { state: 'broken', why: got ? `only $${got} of $${sp.amount}` : 'nothing was paid' } : pending;
+    }
+    case 'knows': {
+      const k = w.chars[sp.who]?.known[sp.fact];
+      if (k) return { state: 'kept', why: `${nameOf(w, sp.who)} knows it now` };
+      return closed ? { state: 'broken', why: `${nameOf(w, sp.who)} never learnt it` } : pending;
+    }
+    case 'notKnows': {
+      const ok = new Set([ob.obligor, ...(sp.except ?? [])]);
+      const who = Object.values(w.chars).find((c) => !ok.has(c.id) && (sp.who === 'anyone' || c.id === sp.who) && (c.known[sp.fact]?.t ?? -1) > ob.from);
+      if (who) return { state: 'broken', why: `${who.name} found out` };
+      return closed ? { state: 'kept', why: 'nobody found out' } : pending;
+    }
+    case 'all': case 'any': {
+      if (depth >= 2) return pending;
+      const xs = sp.of.map((x) => evaluate(w, s, ob, x, depth + 1));
+      const n = (st: State['state']) => xs.filter((x) => x.state === st);
+      if (sp.kind === 'all') {
+        if (n('broken').length) return n('broken')[0];
+        if (n('void').length) return n('void')[0];
+        return n('kept').length === xs.length ? { state: 'kept', why: xs.map((x) => x.why).join('; ') } : pending;
+      }
+      if (n('kept').length) return n('kept')[0];
+      return n('broken').length + n('void').length === xs.length ? (n('broken')[0] ?? n('void')[0]) : pending;
+    }
+  }
+}
+
 // The check: settles what can be settled now, by the rules above. Returns what changed.
 export function settle(w: World, s: Store): Settlement[] {
   const out: Settlement[] = [];
-  const done = (ob: Obligation, to: Settlement['to'], why: string) => { ob.status = to; ob.settled = w.now; ob.why = why; if (to === 'kept' && ob.type === 'result') ob.credit = creditOf(s, ob); out.push({ ob, to, why }); };
   for (const ob of s.obs) {
     if (ob.status !== 'pending') continue;
-    const sp = ob.spec, closed = w.now > ob.by;
-    const imp = impossible(w, ob);
-    if (sp.kind === 'actionDone') {
-      const a = doneBy(w, s, ob, [sp.act], sp.about, sp.target);
-      if (a) done(ob, 'kept', `${a.actor === ob.obligor ? 'he' : nameOf(w, a.actor) + ', for him,'} did it: ${a.act}${a.target ? ' with ' + nameOf(w, a.target) : ''}`);
-      else if (imp) done(ob, 'void', imp);
-      else if (closed) done(ob, 'broken', 'the time ran out and it was never done (whatever else happened)');
-    } else if (sp.kind === 'effort') {
-      const a = doneBy(w, s, ob, sp.acts, sp.about, undefined, sp.floor);
-      const hollow = doneBy(w, s, ob, sp.acts, sp.about);
-      if (a) done(ob, 'kept', `a real attempt: ${a.act}${a.target ? ' with ' + nameOf(w, a.target) : ''}, which he expected might work (${a.predicted ?? 'his best route'}), whatever came of it`);
-      else if (imp) done(ob, 'void', imp);
-      else if (closed) done(ob, 'broken', hollow ? 'only a gesture he had no reason to think would work' : 'no attempt was made');
-    } else if (sp.kind === 'noHostility') {
-      // a result guarantees it whoever does it; a restraint binds only the obligor and his people (the same test here: the spec names
-      // the actor whose people must stay away, and for a restraint that is the obligor himself)
-      const end = ob.from + sp.days * DAY;
-      const v = violation(w, sp, ob.from, Math.min(w.now, end));
-      if (v) done(ob, 'broken', `a violation inside the period: ${v.text}`);
-      else if (imp) done(ob, 'void', imp);
-      else if (w.now >= end) done(ob, 'kept', `the whole ${sp.days} days passed cleanly`);
-    } else if (sp.kind === 'notDisclosedBy') {
-      const told = s.log.find((x) => x.actor === ob.obligor && x.act === 'inform' && x.about === sp.about && x.t >= ob.from && x.t <= ob.by);
-      if (told) done(ob, 'broken', `he told ${nameOf(w, told.target)}`);
-      else if (closed) done(ob, 'kept', 'the time passed and he never told anyone (what others found out for themselves is not his doing)');
-    } else if (sp.kind === 'demandWithdrawn') {
-      const sit = (w.situations ?? []).find((x) => x.id === sp.sit);
-      if (!sit || sit.stage === 'resolved') done(ob, 'kept', `the demand is withdrawn${sit?.out ? ` (${sit.out})` : ''}`);
-      else if (closed) done(ob, 'broken', 'the demand still stands');
-    }
+    const r = evaluate(w, s, ob, ob.spec);
+    if (r.state === 'pending') continue;
+    ob.status = r.state; ob.settled = w.now; ob.why = r.why;
+    if (r.state === 'kept' && ob.type === 'result') ob.credit = creditOf(s, ob);
+    out.push({ ob, to: r.state, why: r.why });
   }
   return out;
+}
+
+// Freed by the man it was promised to: no break, and no credit either.
+export function release(w: World, ob: Obligation, why: string) { if (ob.status === 'pending') { ob.status = 'released'; ob.settled = w.now; ob.why = why; } }
+// Taken back by the man who promised, before it fell due: a smaller thing than breaking it (the promisee judges it so: conv/minds.ts).
+export function withdraw(w: World, ob: Obligation, why: string) { if (ob.status === 'pending') { ob.status = 'withdrawn'; ob.settled = w.now; ob.why = why; } }
+
+// Obligations of one man that cannot both be kept (spec §6.4): bound to leave a man alone and bound to lean on him; bound to keep
+// something quiet and bound to tell it. Found when the second is made; which gives way is his choice when the time comes.
+const HARM_ACTS = new Set(['harm', 'demand', 'collect', 'force']);
+export function conflicts(s: Store, ob: Obligation): Obligation[] {
+  const leaveAlone = (x: Obligation) => (x.spec.kind === 'noHostility' && (x.type === 'restraint' || x.spec.actor === x.obligor) ? x.spec.target : undefined);
+  const leanOn = (x: Obligation) => (x.spec.kind === 'actionDone' && HARM_ACTS.has(x.spec.act) ? x.spec.target : undefined);
+  const quiet = (x: Obligation) => (x.spec.kind === 'notDisclosedBy' ? x.spec.about : undefined);
+  const tell = (x: Obligation) => (x.spec.kind === 'actionDone' && x.spec.act === 'inform' ? x.spec.about : undefined);
+  return s.obs.filter((x) => x.id !== ob.id && x.obligor === ob.obligor && x.status === 'pending' && (
+    (!!leaveAlone(x) && leaveAlone(x) === leanOn(ob)) || (!!leanOn(x) && leanOn(x) === leaveAlone(ob)) ||
+    (!!quiet(x) && quiet(x) === tell(ob)) || (!!tell(x) && tell(x) === quiet(ob))));
 }
 
 // Gate 1's harness store: the same rules, its own records.

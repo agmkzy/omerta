@@ -19,6 +19,8 @@ import { daily, ventureWeek } from './jobs';
 import { pendingTick, purge } from './consequences';
 import { memoTick } from './dialogue';
 import { socialDay } from './conv/tick';
+import './conv/pursuits'; // (Gate 2b: registers pursuits, and where they start, on the tick)
+import './conv/deciders'; // (Gate 2b: the conversation layer's decisions for the world's asks, in worlds that run it)
 import { encounterTick, eventTick } from './encounters';
 import { enterpriseWeek, opsDaily } from './rackets';
 import { commissionTick, politicsCoup, politicsWeek } from './politics';

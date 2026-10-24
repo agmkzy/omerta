@@ -16,7 +16,7 @@ const famOf = (w: World, c: Character) => (c.familyId ? w.fam[c.familyId].name :
 
 export class Visit {
   spoken = new Set<string>(); n = 0; rows: Row[] = []; mem: EncounterMemory;
-  constructor(public o: Out, public w: World, public s: Session, public henry: Character, public him: Character, public where: string, patience = 2) { this.mem = new EncounterMemory(patience); }
+  constructor(public o: Out, public w: World, public s: Session, public henry: Character, public him: Character, public where: string, patience = 2, lately?: Set<string>) { this.mem = new EncounterMemory(patience); if (lately) this.spoken = lately; }
   private slots(x: Record<string, string> = {}) { return { selfName: this.henry.name, selfFamily: famOf(this.w, this.henry), ...x }; }
   label(r: Row) { return r.leave ? 'Leave' : render({ key: r.key, stance: 'flat', toward: 'speaker', slots: this.slots(r.slots) }, this.henry.id, 'earnest'); }
   offer(rows: Row[]) {
@@ -30,7 +30,7 @@ export class Visit {
     const r = this.rows.find((x) => x.key === key);
     if (!r) throw new Error(`choice "${key}" was not on screen (offered: ${this.rows.map((x) => x.key).join(', ') || 'nothing'})`);
     const m: Meaning = { key: r.key, stance: 'flat', toward: 'speaker', slots: this.slots(r.slots) };
-    this.o.P(`**You:** ${render(m, this.henry.id, 'earnest', this.spoken)}`);
+    this.o.P(r.leave ? '*You leave.*' : `**You:** ${render(m, this.henry.id, 'earnest', this.spoken)}`);
     this.rows = [];
     return { speaker: this.henry.id, listener: this.him.id, act: opts.act ?? key, explicit: opts.explicit ?? 2, meaning: m, where: this.where, at: this.w.now + this.n++ };
   }
