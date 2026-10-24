@@ -68,3 +68,14 @@ export function parity(a: Run, b: Run, allow: RegExp[] = []): string[] {
   const sa = state(a.w), sb = state(b.w);
   return diff(sa, sb).filter((d) => !DEFAULT_REL.test(d) && !allow.some((re) => re.test(d)));
 }
+
+// The old engine's effects, recorded (Gate 4): before dialogue.ts was deleted, every parity case was run on the old engine and what it
+// changed was written down as a fingerprint (src/tests/fixtures/gate4-parity.json). The layer is held to that record from then on.
+// (a relationship record created at its default values, and nothing more, is no change at all: see DEFAULT_REL)
+const MADE = /\.rel\.[^.]+\.(affection|grudge|lastMet|respect|trust): undefined → (0\.1|0|-1000000000|0\.3)$/;
+export function fingerprint(changed: string[]): string {
+  const xs = changed.filter((d) => !MADE.test(d)).sort();
+  let h = 2166136261;
+  for (const ch of xs.join('\n')) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  return `${xs.length}:${(h >>> 0).toString(16)}`;
+}

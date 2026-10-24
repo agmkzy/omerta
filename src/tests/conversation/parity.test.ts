@@ -12,7 +12,13 @@ import { addEnc } from '../../encounters';
 import { social } from '../../conv/social';
 import { DAY, type Character, type World } from '../../types';
 import { newWorld, P } from '../helpers';
-import { layer, legacy, parity } from './parity';
+import { fingerprint, layer, legacy, parity } from './parity';
+import { writeFileSync } from 'node:fs';
+import { afterAll } from 'vitest';
+
+// (GOLDEN=write: the old engine's effects for every case are recorded, for when the old engine is gone)
+const GOLD: Record<string, string> = {};
+afterAll(() => { if (process.env.GOLDEN === 'write') writeFileSync(new URL('../fixtures/gate4-parity.json', import.meta.url), JSON.stringify(GOLD, Object.keys(GOLD).sort(), 1)); });
 
 const SEEDS = [3, 7, 11];
 const TRUST = [0.1, 0.4, 0.75];
@@ -54,6 +60,8 @@ function check(cs: Case) {
     const b = layer(x.w, t.id, nc, (cs.th?.(s) ?? {}) as never);
     const d = parity(a, b, cs.allow);
     assert.deepEqual(d, [], `${cs.name} (seed ${seed}, trust ${tr})\nold: ${a.lines.join(' / ')}\nnew: ${b.lines.join(' / ')}\nold changed: ${a.changed.join('; ')}\nnew changed: ${b.changed.join('; ')}`);
+    GOLD[`${cs.name}|${seed}|${tr}`] = fingerprint(a.changed);
+    assert.equal(fingerprint(b.changed), fingerprint(a.changed), `${cs.name} (seed ${seed}, trust ${tr}): fingerprints differ\nold: ${a.changed.join('; ')}\nnew: ${b.changed.join('; ')}`);
     outcomes.add(a.changed.filter((k) => !/\.(cool|talk)\./.test(k)).map((k) => k.split(':')[0]).sort().join(','));
   }
   // (a decision left to chance: across the worlds and levels of trust tried, it went more than one way, so both ways are proved)
@@ -77,7 +85,7 @@ describe('Gate 4 parity, Stage A: personal talk and what a man knows', () => {
     { name: 'about another man', who: (x) => x.fam, setup: (x, t) => { rel(t, x.boss.id).trust = 0.8; event(x.w, 'beating', x.boss, x.rival, [{ c: t, actor: true }]); return { id: x.boss.id }; }, old: (s) => 'about:' + s.id, node: 'pick_member' },
     { name: 'the leadership', who: (x) => x.boss, old: 'leaders', node: 'family' },
     { name: 'what people say', who: (x) => x.fam, old: 'ask_rep' },
-    { name: 'where he heard it', who: (x) => x.fam, setup: (x, t) => { const f = event(x.w, 'beating', x.p, x.rival, []); t.known[f.id] = { t: x.w.now, from: x.boss.id, knowsActor: true }; }, old: 'f_rep_who', node: 'follow' },
+    { name: 'where he heard what people say', who: (x) => x.fam, setup: (x, t) => { const f = event(x.w, 'beating', x.p, x.rival, []); t.known[f.id] = { t: x.w.now, from: x.boss.id, knowsActor: true }; }, old: 'f_rep_who', node: 'follow' },
     { name: 'what is between you', who: (x) => x.fam, setup: (x, t) => { addFact(x.w, { kind: 'favour', actor: x.p.id, victim: t.id, text: 'a favour', district: t.district }, { witnesses: [x.p.id, t.id] }); }, old: 'ask_history' },
     { name: 'asking around about him', who: (x) => x.rival, setup: (x, t) => { delete x.p.intro![t.id]; }, old: 'ask_around' },
     { name: 'introducing yourself', both: true, who: (x) => x.rival, setup: (x, t) => { delete x.p.intro![t.id]; }, old: 'intro' },
@@ -255,7 +263,7 @@ describe('Gate 4 parity, Stage D: having things out, his ask, and what is on his
     { name: 'demanding an explanation', who: (x) => x.fam, setup: (x, t) => { t.cash = 900; return { f: event(x.w, 'robbery', t, x.p, [{ c: x.p, actor: true }, { c: t, actor: true }], 300).id }; }, old: (s) => 'demand:' + s.f, node: 'disputes', both: true },
     { name: 'he lied, and the player knows', who: (x) => x.fam, setup: (x, t) => { const f = event(x.w, 'beating', t, x.shop, [{ c: t, actor: true }]); x.p.known[f.id] = { t: 0, from: x.boss.id, knowsActor: true }; (t.denied ??= {})[f.id] = 0; t.traits.courage = 0.8; return { f: f.id }; }, old: (s) => 'confront:' + s.f, both: true },
     { name: 'the bad blood, raised', who: (x) => x.fam, setup: (x, t) => { rel(t, x.p.id).grudge = 0.4; }, old: 'f:amends', now: 'amends' },
-    { name: 'owning up', who: (x) => x.fam, setup: (x, t) => ({ f: event(x.w, 'beating', x.p, t, [{ c: t, actor: true }]).id }), old: (s) => 'a_own:' + s.f, node: 'amends' },
+    { name: 'clearing the air: owning up', who: (x) => x.fam, setup: (x, t) => ({ f: event(x.w, 'beating', x.p, t, [{ c: t, actor: true }]).id }), old: (s) => 'a_own:' + s.f, node: 'amends' },
     { name: 'paying to make it right', who: (x) => x.fam, setup: (x, t) => { x.p.cash = 2000; return { f: event(x.w, 'beating', x.p, t, [{ c: t, actor: true }], 200).id }; }, old: (s) => 'a_pay:' + s.f, node: 'amends' },
     { name: 'he started it', who: (x) => x.fam, setup: (x, t) => { event(x.w, 'beating', t, x.p, [{ c: x.p, actor: true }]); t.traits.violence = 0.7; return { f: event(x.w, 'beating', x.p, t, [{ c: t, actor: true }]).id }; }, old: (s) => 'a_start:' + s.f, node: 'amends', both: true },
     { name: 'I would do it again', who: (x) => x.fam, setup: (x, t) => ({ f: event(x.w, 'beating', x.p, t, [{ c: t, actor: true }]).id }), old: (s) => 'a_defy:' + s.f, node: 'amends' },
@@ -283,7 +291,7 @@ describe('Gate 4 parity, Stage D: having things out, his ask, and what is on his
     { name: 'his trouble: raised', who: (x) => x.crew, setup: troubled, old: 'tk:trouble' },
     { name: 'his trouble: pressed', who: (x) => x.crew, setup: (x, t) => { troubled(x, t); t.problem!.revealed = false; }, old: 'tk:trouble:press' },
     { name: 'his trouble: money, no strings', who: (x) => x.crew, setup: (x, t) => { troubled(x, t); x.p.cash = 3000; }, old: 'tk:trouble:gift' },
-    { name: 'his trouble: a loan', who: (x) => x.crew, setup: (x, t) => { troubled(x, t); x.p.cash = 3000; }, old: 'tk:trouble:lend' },
+    { name: 'his trouble (on his mind): a loan', who: (x) => x.crew, setup: (x, t) => { troubled(x, t); x.p.cash = 3000; }, old: 'tk:trouble:lend' },
     { name: 'his trouble: straighten out', who: (x) => x.crew, setup: troubled, old: 'tk:trouble:straighten' },
     { name: 'his trouble: listened to', who: (x) => x.crew, setup: troubled, old: 'tk:trouble:listen' },
     { name: 'his shop: raised', who: (x) => x.shop, old: 'tk:shop' },
