@@ -38,6 +38,9 @@ const B: Record<string, Entry> = {
   'argue.ground': { _: ['“{againstFirst}’s making trouble on our streets.”'] },
   'argue.word': { _: ['“I gave {forFirst} my word I’d raise it.”'] },
   'argue.money': { _: ['“There’s money in bringing {forFirst} under our protection.”'] },
+  'leave.another': { _: ['“Another time, then.”'] },
+  'spend.time': { _: ['“Let me buy you a drink.”'] },
+  'let.go': { _: ['“All right. I’ll leave it.”'] },
   'ask.whoPays': { _: ['“Who collects from you?”'] },
   'offer.better': { _: ['“Whoever it is, I could do better for you.”'] },
   'accept.counter': { _: ['“{amt}. Fridays.”'] },
@@ -177,7 +180,64 @@ const B: Record<string, Entry> = {
   'answer.progress.irritated': { _: ['“You’ve asked me {nTimes} now. I heard you the first time.”'] },
   'dismiss.persistence': { _: ['“Don’t come to me about {forFirst} again. When there’s something to tell you, you’ll hear it.”'] },
   'answer.progress.done': { _: ['“It’s done. {theirCaptainFirst} spoke to him. {againstFirst} stays away from {forFirst}.”'] },
+  // ---------------------------------------------------------------- general answers, for any request (fallbacks by reason)
+  'refuse.doesNotKnow': { _: ['“I don’t know you well enough for that.”'], cold: ['“I don’t know you.”'], jovial: ['“Ah, I don’t know you from Adam, friend. Ask me again in a month.”'] },
+  'refuse.risk': { _: ['“I’d like to help. I’d also like to see my money again.”'], cold: ['“I don’t lend to people I’d have to chase.”'], bitter: ['“And when would I see it back? Never, that’s when.”'] },
+  'refuse.cannotSpare': { _: ['“I haven’t got it to spare. Not this week.”'], proud: ['“It isn’t there to lend. Leave it.”'] },
+  'refuse.wordNotEnough': { _: ['“Everybody’s good for it, until they’re not. I don’t know you.”'], jovial: ['“Sure you are. They all are. Ask me again when I know you.”'], cold: ['“Anyone can say that.”'] },
+  'refuse.already': { _: ['“You asked me. I answered.”'], hothead: ['“I heard you the first time.”'], jovial: ['“Same question, same answer, friend.”'] },
+  'refuse': { _: ['“No.”'] },
+
+  // ---------------------------------------------------------------- the captain, pressed within one visit
+  'condition.intervention': { _: ['“Tell me something I don’t know. Show me {againstFirst}’s people on our streets and we’ll talk.”'], cold: ['“You’re telling me what you want. Bring me what {againstFirst}’s actually done on our streets.”'] },
+  'cutOff.argument': { _: ['“We’re done with this, {youFirst}. Bring me something, or let it go.”'], proud: ['“Enough. You’ve made your case. The answer’s the same.”'] },
+
+  // ---------------------------------------------------------------- a loan (a situation the worked examples never covered)
+  'ask.loan': { _: ['“I need {amt}. I’ll pay the usual.”'] },
+  'argue.reputation': { _: ['“I’m good for it. Ask anyone.”'] },
+  'sweeten.rate': { _: ['“Make it {rate} percent a week, then.”'] },
+  'promise.repay': { _: ['“You’ll have it back by {when}. My word.”'] },
+  'accept.counter.loan': { _: ['“{amt} at {rate}. Done.”'] },
+  'accept.loan': { _: ['He counts it out without looking at it. “{amt}. {rate} a week. Don’t make me come looking.”'], jovial: ['“{amt}. {rate} a week, and the first drink’s on you.”'] },
+  'counter.loan.risk': { _: ['“I can do {amt}. {rate} a week, and I want it on time.”'], cold: ['“{amt}. {rate}. Miss a week and we have a different conversation.”'] },
+  'counter.loan.cannotSpare': { _: ['“{amt} is what I can spare. {rate} a week.”'] },
+
+  // ---------------------------------------------------------------- telling him something he has never heard
+  'tell.news': { _: ['“You hear what happened at {topic}?”'] },
+  'answer.unknownTopic': { _: ['“First I’ve heard of it.”'], jovial: ['“No! When was this? First I’ve heard.”'], cold: ['“No. Should I have?”'], frightened: ['“No. God. Is it— is it bad?”'] },
+
+  // ---------------------------------------------------------------- the man you made a promise to, when you come back
+  'followup.pending': { _: ['“Well? Did you talk to them?”'], frightened: ['“Did you— is anything happening? They were back on Tuesday.”'], proud: ['“I’m still waiting on you.”'] },
+  'report.refusedSoFar': { _: ['“I raised it. The captain won’t move on it yet.”'] },
+  'report.stall': { _: ['“Give it time. These things take time.”'] },
+  'react.report.honest': { _: ['He lets out a breath. “At least you’re straight with me.”'], proud: ['“So I’m on my own.”'], frightened: ['“What do I do if they come back?”'] },
+  'react.report.stall': { _: ['“Time. Right.” He doesn’t believe you.'] },
+  'followup.observed': { _: ['“Lou’s people haven’t been back. Was that you?”'] },
+  'report.done': { _: ['“I took it to the family. He won’t bother you again.”'] },
+  'thanks.kept': { _: ['“I won’t forget it. Anything you need here, you ask.”'], cold: ['He nods once. “I owe you.”'], frightened: ['“Thank you. Thank you. I didn’t think anybody would.”'] },
+
+  // ---------------------------------------------------------------- outcome cards: only what was said or seen, attributed
+  'card.refuse.hasArrangement': { _: ['{first} turned you down. He says he already pays {collectorFirst}.'] },
+  'card.refuse.hasArrangement.inferred': { _: ['{first} turned you down before you’d asked. He says he already has someone.'] },
+  'card.refuse.doesNotKnow': { _: ['{first} turned you down. He says he doesn’t know you.'] },
+  'card.refuse.pride': { _: ['{first} told you to get out.'] },
+  'card.counter.protection': { _: ['{first} offered {amt} a week instead, and asked what he gets for it.'] },
+  'card.accept.protection.afraid': { _: ['Agreed: {amt} a week, Fridays. He said it fast, and he wouldn’t look at you.'] },
+  'card.accept.protection': { _: ['Agreed: {amt} a week, Fridays.'] },
+  'card.refer.protection.kin': { _: ['{first} sent you to his cousin {kinFirst}. He says anything about the place goes through the {kinFamily}s.'] },
+  'card.agreed.counter': { _: ['Agreed: {amt} a week, Fridays. He says he wants the street kept quiet for it.'] },
+  'card.refuse.intervention': { _: ['{first} won’t take it up. He says {forFirst} isn’t one of ours.'] },
+  'card.condition.intervention': { _: ['{first} won’t take it up yet. He says he’d need to see {againstFirst}’s people on our streets.'] },
+  'card.cutOff.argument': { _: ['{first} won’t hear any more about it today.'] },
+  'card.accept.intervention.liable': { _: ['{first} says he’ll speak to {theirCaptainFirst}. If it turns ugly, he says, it’s on you.'] },
+  'card.refuse.loan': { _: ['{first} won’t lend to you. He says {groundsWords}.'] },
+  'card.counter.loan': { _: ['{first} offered {amt} at {rate} a week instead.'] },
+  'card.agreed.loan': { _: ['Agreed: {first} lends you {amt} at {rate} percent a week. He says he wants it on time.'] },
+  'card.intention.return': { _: ['You said you’d be back {day}.'] },
+  'card.answer.who.knows': { _: ['{first} says it was {actorFirst}’s people. He says he saw it.'] },
+  'card.kept': { _: ['{first} says his trouble with Lou is over. He thanks you.'] },
 };
+
 
 // Narration for what is done rather than said
 const N: Record<string, Entry> = {
@@ -187,7 +247,9 @@ const N: Record<string, Entry> = {
 const fill = (s: string, slots: Record<string, string>) => s.replace(/\{(\w+)\}/g, (_m, k) => slots[k] ?? `{${k}}`);
 
 export function render(m: Meaning, speakerId: string, arch: Arch, spoken: Set<string> = new Set(), salt = ''): string {
-  const keys = [m.grounds ? `${m.key}.${m.grounds}${m.stance === 'indignant' ? '.indignant' : ''}` : '', m.grounds ? `${m.key}.${m.grounds}` : '', m.key].filter(Boolean);
+  // most specific first; then the general line for this kind of answer and reason, so a new kind of request reuses what exists
+  const verb = m.key.split('.')[0];
+  const keys = [m.grounds ? `${m.key}.${m.grounds}${m.stance === 'indignant' ? '.indignant' : ''}` : '', m.grounds ? `${m.key}.${m.grounds}` : '', m.grounds ? `${verb}.${m.grounds}` : '', m.key, verb].filter(Boolean);
   let entry: Entry | undefined;
   for (const k of keys) if (B[k] || N[k]) { entry = B[k] ?? N[k]; break; }
   if (!entry) return `[missing bank: ${keys[0]}]`;

@@ -1,10 +1,10 @@
-# Gate 1: generated conversations
+# Gate 1: generated conversations (second pass)
 
-*Produced by `npx tsx src/conv/gate1.ts` from the proof-of-concept engine in `src/conv/` (docs/CONVERSATION_SPEC.md §15, Gate 1). Every line spoken by a character other than Henry is rendered from a decision and its meaning; the trace beneath each shows what he heard, what he weighed and what he meant. Henry’s own lines are rendered the same way, from what the player chose. Names are fixtures (Frank, Nate, Lou, Rizzo, Marchese); the men behind them are ordinary characters of a generated world.*
+*Produced by `npx tsx src/conv/gate1.ts` from the proof-of-concept engine in `src/conv/`. Every line spoken by a character other than Henry is rendered from a decision and its meaning; every line of Henry’s is one of the rows that was on screen (the harness refuses anything else). Outcome cards say only what was said or seen, attributed. Names are fixtures; the men behind them are ordinary characters of a generated world.*
 
 ## 1. The bakery: a first visit, five different men
 
-Henry Tedesco (an associate of the Corrente family) walks into Russo’s Bakery for the first time. The same Henry, the same afternoon, the same words. Only the man behind the counter differs, as described. Every reply is the engine’s: a decision made from Frank’s own perception, then put into words.
+Henry Tedesco (an associate of the Corrente family) walks into Russo’s Bakery for the first time. Same Henry, same afternoon, same choices. Only the man behind the counter differs. Every reply is the engine’s, and every choice Henry makes is one of the rows on screen at that moment.
 
 ### Cautious Frank
 *Careful by nature; pays a Corrente soldier for protection already.*
@@ -49,6 +49,14 @@ change: Frank Russo now believes Henry Tedesco is with the Corrente family (he s
 ```
 </details>
 
+
+> **What you can say**
+> - “$40 a week, and nothing happens to the place.”  
+>   *Put it to him plainly.*
+> - “Just a loaf, thanks.”  
+>   *Leave it at an introduction.*
+> - Leave
+
 **You:** “$40 a week, and nothing happens to the place.”
 **Frank:** “I already pay Tommy. I’m not paying twice.”
 
@@ -60,16 +68,16 @@ constraints: obliged (he pays Tommy Conti (Corrente))
   dismiss = -0.13: pride +0.24, volatility +0.14, fear -0.32, caution -0.28, he is looked after +0.1
   accept = -0.88 [would cross: obliged]: fear of what happens if he says no +0.35, what it costs him -0.23, pride -0.16, paying twice, and crossing Tommy -0.84
 reason given: hasArrangement
-meaning: refuse.protection · cold · toward third · implies warning · private intent: refuse · aim: warn you off
+meaning: refuse.protection.hasArrangement · cold · toward third · implies warning · private intent: refuse · aim: warn you off
 ```
 </details>
 
 
 > **What you can say**
-> - “Who collects from you?”  
->   *Find out who collects from him.*
 > - “Whoever it is, I could do better for you.”  
 >   *Offer to look after him for less. Whoever he pays now will hear of it.*
+> - “Think it over. I’ll be back Friday.”  
+>   *Give him time. You’re only saying you’ll come back; he hasn’t promised you anything.*
 > - Leave
 
 **You:** “Think it over. I’ll be back Friday.”
@@ -85,7 +93,7 @@ change: Frank Russo's own next step, privately: tell Tommy Conti that Henry Tede
 ```
 </details>
 
-> **Outcome:** Frank turned you down. He says he already has an arrangement. You said you’d be back Friday.
+> **Outcome:** Frank turned you down. He says he already pays Tommy. You said you’d be back Friday.
 
 ### Proud Frank
 *Proud and quick to anger; nobody protects him and he likes it that way.*
@@ -129,6 +137,14 @@ change: Frank Russo now believes Henry Tedesco is with the Corrente family (he s
 ```
 </details>
 
+
+> **What you can say**
+> - “$40 a week, and nothing happens to the place.”  
+>   *Put it to him plainly.*
+> - “Just a loaf, thanks.”  
+>   *Leave it at an introduction.*
+> - Leave
+
 **You:** “$40 a week, and nothing happens to the place.”
 **Frank:** “Get out of my shop before I throw you out.”
 
@@ -140,11 +156,15 @@ change: Frank Russo now believes Henry Tedesco is with the Corrente family (he s
   counter = -0.14: he wants the street quiet +0, fear (bargaining with it takes nerve) +0.14, it costs less than asked -0.09, he would rather bargain than refuse +0.07, pride -0.25
   accept = -0.36: fear of what happens if he says no +0.21, what it costs him -0.23, pride -0.34
 reason given: pride
-meaning: refuse.protection · hostile · toward speaker · private intent: dismiss · aim: be rid of you
+meaning: refuse.protection.pride · hostile · toward speaker · private intent: dismiss · aim: be rid of you
 ```
 </details>
 
-> **Outcome:** Frank refused. He told you to get out.
+
+> **What you can say**
+> - Leave
+
+> **Outcome:** Frank told you to get out.
 
 ### Desperate Frank
 *Three bad weeks running; almost no cash; nobody protects him.*
@@ -188,6 +208,14 @@ change: Frank Russo now believes Henry Tedesco is with the Corrente family (he s
 ```
 </details>
 
+
+> **What you can say**
+> - “$40 a week, and nothing happens to the place.”  
+>   *Put it to him plainly.*
+> - “Just a loaf, thanks.”  
+>   *Leave it at an introduction.*
+> - Leave
+
 **You:** “$40 a week, and nothing happens to the place.”
 **Frank:** “$30. That’s all there is, and what do I get for it?”
 
@@ -211,7 +239,7 @@ meaning: counter.protection · pleading · toward request · private intent: cou
 > - Leave
 
 **You:** “$30. Fridays.”
-> **Outcome:** Agreed: $30 a week from Russo’s Bakery, Fridays. He’ll expect the street to stay quiet.
+> **Outcome:** Agreed: $30 a week, Fridays. He says he wants the street kept quiet for it.
 
 ### Frightened Frank
 *Timid; a shop on his street was smashed up last week, and he saw it.*
@@ -255,6 +283,14 @@ change: Frank Russo now believes Henry Tedesco is with the Corrente family (he s
 ```
 </details>
 
+
+> **What you can say**
+> - “$40 a week, and nothing happens to the place.”  
+>   *Put it to him plainly.*
+> - “Just a loaf, thanks.”  
+>   *Leave it at an introduction.*
+> - Leave
+
 **You:** “$40 a week, and nothing happens to the place.”
 **Frank:** He looks at the window, then at you. “Fine. $40. Fridays. Just— fine.”
 
@@ -269,7 +305,7 @@ meaning: accept.protection.afraid · afraid · toward speaker · private intent:
 ```
 </details>
 
-> **Outcome:** Agreed: $40 a week, Fridays. He agreed because he was afraid, and he won’t forget it.
+> **Outcome:** Agreed: $40 a week, Fridays. He said it fast, and he wouldn’t look at you.
 
 ### Connected Frank
 *His cousin is a soldier in another family; nobody else protects him.*
@@ -314,6 +350,14 @@ change: Frank Russo now believes Henry Tedesco is with the Corrente family (he s
 ```
 </details>
 
+
+> **What you can say**
+> - “$40 a week, and nothing happens to the place.”  
+>   *Put it to him plainly.*
+> - “Just a loaf, thanks.”  
+>   *Leave it at an introduction.*
+> - Leave
+
 **You:** “$40 a week, and nothing happens to the place.”
 **Frank:** “You’ll want to talk to my cousin Sal about that. The Marchettis take an interest in this street.”
 
@@ -329,20 +373,30 @@ meaning: refer.protection.kin · cold · toward third · implies warning · priv
 ```
 </details>
 
-> **Outcome:** Frank sent you to his cousin Sal. Anything about the bakery goes through the Marchetti people, he says.
+> **Outcome:** Frank sent you to his cousin Sal. He says anything about the place goes through the Marchettis.
 
 ## 2. "Nice place. You must do well here."
 
-The same indirect remark, before Henry has said who he is. Whether Frank hears a demand depends only on what *he* knows: whether he pays someone, whether he has been asked before, what has happened on his street, how suspicious he is. Henry’s real intention is never visible to him.
+The same indirect remark, before Henry has said who he is. Whether Frank hears a demand depends only on what *he* knows. Henry’s real intention is never visible to him.
 
 ### Cautious Frank
+
+> **What you can say**
+> - “Henry Tedesco. I’m with the Corrente family.”  
+>   *Introduce yourself. He’ll know who you are from now on, for better or worse.*
+> - “Nice place. You must do well here.”  
+>   *Get to the point: protection. He doesn’t know you, and he owes you nothing.*
+> - “Just a loaf, thanks.”  
+>   *Buy something and leave it there. Next time you’re a face he knows.*
+> - Leave
+
 **You:** “Nice place. You must do well here.”
 **Frank:** “I know where this is going. I already have someone who looks after the place.”
 
 <details><summary>trace</summary>
 
 ```
-heard as: **demand.protection** (confidence 0.66)
+heard as: demand.protection (confidence 0.66)
   cue: he already pays someone, so he knows how this goes (+0.9; basis: own arrangement)
   cue: he has the look of a man in the life (+0.4; basis: inferred appearance)
   cue: his own suspicion (+0.58; basis: own temperament)
@@ -351,18 +405,28 @@ constraints: obliged (he pays Tommy Conti (Corrente))
   dismiss = 0.13: pride +0.24, volatility +0.14, fear -0.07, caution -0.28, he is looked after +0.1
   accept = -1.16 [would cross: obliged]: fear of what happens if he says no +0.07, what it costs him -0.23, pride -0.16, paying twice, and crossing Tommy -0.84
 reason given: hasArrangement.inferred
-meaning: refuse.protection · cold · toward third · implies warning · private intent: refuse · aim: warn you off
+meaning: refuse.protection.hasArrangement.inferred · cold · toward third · implies warning · private intent: refuse · aim: warn you off
 ```
 </details>
 
 ### Proud Frank
+
+> **What you can say**
+> - “Henry Tedesco. I’m with the Corrente family.”  
+>   *Introduce yourself. He’ll know who you are from now on, for better or worse.*
+> - “Nice place. You must do well here.”  
+>   *Get to the point: protection. He doesn’t know you, and he owes you nothing.*
+> - “Just a loaf, thanks.”  
+>   *Buy something and leave it there. Next time you’re a face he knows.*
+> - Leave
+
 **You:** “Nice place. You must do well here.”
 **Frank:** “Better than most.”
 
 <details><summary>trace</summary>
 
 ```
-heard as: **compliment** (confidence 0.11, taken literally)
+heard as: compliment (confidence 0.11, taken literally)
   cue: he has the look of a man in the life (+0.4; basis: inferred appearance)
   cue: his own suspicion (+0.14; basis: own temperament)
 meaning: reply.compliment · polite · toward speaker · private intent: remark
@@ -372,13 +436,23 @@ meaning: reply.compliment · polite · toward speaker · private intent: remark
 *He took it as a compliment. To ask for anything now, Henry has to say it plainly.*
 
 ### Desperate Frank
+
+> **What you can say**
+> - “Henry Tedesco. I’m with the Corrente family.”  
+>   *Introduce yourself. He’ll know who you are from now on, for better or worse.*
+> - “Nice place. You must do well here.”  
+>   *Get to the point: protection. He doesn’t know you, and he owes you nothing.*
+> - “Just a loaf, thanks.”  
+>   *Buy something and leave it there. Next time you’re a face he knows.*
+> - Leave
+
 **You:** “Nice place. You must do well here.”
 **Frank:** “Do well? You seen the rents around here?”
 
 <details><summary>trace</summary>
 
 ```
-heard as: **compliment** (confidence 0.16, taken literally)
+heard as: compliment (confidence 0.16, taken literally)
   cue: he has the look of a man in the life (+0.4; basis: inferred appearance)
   cue: his own suspicion (+0.34; basis: own temperament)
 meaning: reply.compliment · polite · toward speaker · private intent: remark
@@ -388,13 +462,23 @@ meaning: reply.compliment · polite · toward speaker · private intent: remark
 *He took it as a compliment. To ask for anything now, Henry has to say it plainly.*
 
 ### Frightened Frank
+
+> **What you can say**
+> - “Henry Tedesco. I’m with the Corrente family.”  
+>   *Introduce yourself. He’ll know who you are from now on, for better or worse.*
+> - “Nice place. You must do well here.”  
+>   *Get to the point: protection. He doesn’t know you, and he owes you nothing.*
+> - “Just a loaf, thanks.”  
+>   *Buy something and leave it there. Next time you’re a face he knows.*
+> - Leave
+
 **You:** “Nice place. You must do well here.”
 **Frank:** “Oh— thank you. We get by.”
 
 <details><summary>trace</summary>
 
 ```
-heard as: **compliment** (confidence 0.32, taken literally)
+heard as: compliment (confidence 0.32, taken literally)
   cue: trouble on his street (1 thing he knows of) (+0.35; basis: seen f221)
   cue: he has the look of a man in the life (+0.4; basis: inferred appearance)
   cue: his own suspicion (+0.42; basis: own temperament)
@@ -405,13 +489,23 @@ meaning: reply.compliment · polite · toward speaker · private intent: remark
 *He took it as a compliment. To ask for anything now, Henry has to say it plainly.*
 
 ### Connected Frank
+
+> **What you can say**
+> - “Henry Tedesco. I’m with the Corrente family.”  
+>   *Introduce yourself. He’ll know who you are from now on, for better or worse.*
+> - “Nice place. You must do well here.”  
+>   *Get to the point: protection. He doesn’t know you, and he owes you nothing.*
+> - “Just a loaf, thanks.”  
+>   *Buy something and leave it there. Next time you’re a face he knows.*
+> - Leave
+
 **You:** “Nice place. You must do well here.”
 **Frank:** “Well enough. Why do you ask?”
 
 <details><summary>trace</summary>
 
 ```
-heard as: **compliment** (confidence 0.19, taken literally)
+heard as: compliment (confidence 0.19, taken literally)
   cue: he has the look of a man in the life (+0.4; basis: inferred appearance)
   cue: his own suspicion (+0.42; basis: own temperament)
 meaning: reply.compliment · polite · toward speaker · private intent: remark
@@ -492,7 +586,19 @@ meaning: react.wait.giveIn · afraid · toward speaker · private intent: giveIn
 </details>
 
 ### A false claim: "Louie Costa sent me" (Cautious Frank)
-*Henry’s captain sent him nowhere. Frank can’t know that; he can only judge the claim from what he knows.*
+*Henry’s captain sent him nowhere. Frank can only judge the claim from what he knows.*
+
+
+> **What you can say**
+> - “Louie Costa sent me.”  
+>   *Say your captain sent you. It isn’t true.*
+> - “Henry Tedesco. I’m with the Corrente family.”  
+>   *Introduce yourself. He’ll know who you are from now on, for better or worse.*
+> - “Nice place. You must do well here.”  
+>   *Get to the point: protection. He doesn’t know you, and he owes you nothing.*
+> - “Just a loaf, thanks.”  
+>   *Buy something and leave it there. Next time you’re a face he knows.*
+> - Leave
 
 **You:** “Louie Costa sent me.”
 **Frank:** “I don’t know any Louie Costa. I pay Tommy.”
@@ -507,10 +613,18 @@ private (Henry): honest = false (his captain did not send him)
 ```
 </details>
 
-## 4. A straightforward question, and an evening together
+## 4. A straightforward question, and two evenings
 
 ### Scenario A: asking Marty, whom you trust, who smashed the window at The Gilded Lily
-*One choice, one answer, an outcome. No approach to pick and no follow-up menu.*
+*One choice, one answer, an outcome.*
+
+
+> **What you can say**
+> - “Who did the window at The Gilded Lily?”  
+>   *Ask what he knows.*
+> - “Let me buy you a drink.”  
+>   *Spend the evening with him.*
+> - Leave
 
 **You:** “Who did the window at The Gilded Lily?”
 **Marty:** “Angelo’s boys. I was across the street.”
@@ -524,28 +638,27 @@ change: Henry Tedesco now knows who did it (from Marty Russo, who saw it)
 ```
 </details>
 
-> **Outcome:** Marty says it was Angelo Zito’s people. He saw it.
+> **Outcome:** Marty says it was Angelo’s people. He says he saw it.
 
 ### Spend time with Marty
 > You spent the evening at Fino’s with Marty. He talked about the fights on Saturday, and who should have won. It was easy. He laughed more than you expected. He likes you better for it.
 
-<details><summary>trace</summary>
-
-```
-compatibility 0.18
-change: familiarity up (time together)
-change: his liking for you up (compatibility)
-```
-</details>
-
 ### Spend time with Mario, with whom it doesn’t take
 > You spent the evening at the club with Mario. He talked about the old neighbourhood, and the men who used to run it. It never quite caught. He kept looking at the door. If anything, you’re further apart.
 
-## 5. Your captain, over two weeks: one unresolved matter, five visits
+## 5. A contested request: your captain, Nate Ferrara and Lou Valenti
 
-*Henry promised Nate Ferrara he would raise Lou Valenti’s shakedown with the family. Vic Rizzo is Henry’s captain; Joe Marchese is Lou’s.*
+*Henry promised Nate Ferrara he would raise Lou Valenti’s shakedown with the family. Vic Rizzo is Henry’s captain; Joe Marchese is Lou’s. Within a visit Rizzo remembers what Henry has already argued; across visits, what has changed.*
 
-### Day 1: raising it
+### Day 1: raising it, and arguing it
+
+> **What you can say**
+> - “Nate Ferrara’s having trouble with Lou Valenti. I want to bring it to the family.”  
+>   *Ask him to take it up with the family.*
+> - “Let me buy you a drink.”  
+>   *Leave Nate for another day.*
+> - Leave
+
 **You:** “Nate Ferrara’s having trouble with Lou Valenti. I want to bring it to the family.”
 **Vic:** “Nate? He’s not one of ours. Why should we get involved?”
 
@@ -555,7 +668,7 @@ change: his liking for you up (compatibility)
 ▶ refuse = 0.56: not ours, not worth the friction +0.46, he has not heard of trouble on his streets +0.1
   accept = -0.55: Lou’s people on his own streets (as he knows it) +0, his regard for Henry +0.13, arguments +0, trouble with another captain -0.52, the man is not one of ours -0.15
 reason given: notOurs
-meaning: refuse.intervention · flat · toward request · private intent: refuse
+meaning: refuse.intervention.notOurs · flat · toward request · private intent: refuse
 ```
 </details>
 
@@ -568,10 +681,10 @@ meaning: refuse.intervention · flat · toward request · private intent: refuse
 > - “There’s money in bringing Nate under our protection.”  
 >   *Make it business.*
 > - “All right. I’ll leave it.”  
->   *Let it go.*
+>   *Let it go for now.*
 
 **You:** “Lou’s making trouble on our streets.”
-**Vic:** “Our streets? Says who? I haven’t heard a word about it.”
+**Vic:** “Tell me something I don’t know. Show me Lou’s people on our streets and we’ll talk.”
 
 <details><summary>trace</summary>
 
@@ -579,9 +692,19 @@ meaning: refuse.intervention · flat · toward request · private intent: refuse
 ▶ refuse = 0.56: not ours, not worth the friction +0.46, he has not heard of trouble on his streets +0.1
   accept = -0.6: Lou’s people on his own streets (as he knows it) +0, his regard for Henry +0.13, arguments -0.05, trouble with another captain -0.52, the man is not one of ours -0.15
 reason given: notOurs
-meaning: refuse.intervention · flat · toward request · private intent: refuse
+meaning: condition.intervention · firm · toward request · private intent: refuse
+change: Vic Rizzo has refused once already this visit; argument 1 adds -0.05
 ```
 </details>
+
+
+> **What you can say**
+> - “I gave Nate my word I’d raise it.”  
+>   *Put your own word on it. It’s worth what he thinks of you.*
+> - “There’s money in bringing Nate under our protection.”  
+>   *Make it business.*
+> - “All right. I’ll leave it.”  
+>   *Let it go for now.*
 
 **You:** “I gave Nate my word I’d raise it.”
 **Vic:** “Then you gave it too quickly. That’s yours to carry, not mine.”
@@ -592,15 +715,70 @@ meaning: refuse.intervention · flat · toward request · private intent: refuse
 ▶ refuse = 0.56: not ours, not worth the friction +0.46, he has not heard of trouble on his streets +0.1
   accept = -0.56: Lou’s people on his own streets (as he knows it) +0, his regard for Henry +0.13, arguments -0.01, trouble with another captain -0.52, the man is not one of ours -0.15
 reason given: notOurs
-meaning: refuse.intervention · flat · toward request · private intent: refuse
+meaning: reject.argument.word · firm · toward request · private intent: refuse
+change: Vic Rizzo has refused once already this visit; argument 2 adds 0.04
 ```
 </details>
 
-> **Outcome:** Rizzo won’t take it up. He says Nate isn’t one of ours. Your word to Nate stands.
+
+> **What you can say**
+> - “There’s money in bringing Nate under our protection.”  
+>   *Make it business.*
+> - “All right. I’ll leave it.”  
+>   *Let it go for now.*
+
+**You:** “There’s money in bringing Nate under our protection.”
+**Vic:** “We’re done with this, Henry. Bring me something, or let it go.”
+
+<details><summary>trace</summary>
+
+```
+▶ refuse = 0.56: not ours, not worth the friction +0.46, he has not heard of trouble on his streets +0.1
+  accept = -0.44: Lou’s people on his own streets (as he knows it) +0, his regard for Henry +0.13, arguments +0.11, trouble with another captain -0.52, the man is not one of ours -0.15
+reason given: notOurs
+meaning: cutOff.argument · weary · toward request · private intent: refuse
+change: Vic Rizzo has refused once already this visit; argument 3 adds 0.12
+change: Vic Rizzo's patience on this is spent for today
+```
+</details>
+
+> **Outcome:** Vic won’t hear any more about it today.
+
+### Day 3: Nate, still waiting
+**Nate:** “Well? Did you talk to them?”
+
+<details><summary>trace</summary>
+
+```
+▶ followup.pending = 1.48: he has heard nothing from you +1, days since you promised +0.2, patience (caution, agreeable) +0.28
+meaning: followup.pending · flat · toward speaker · private intent: question
+```
+</details>
+
+
+> **What you can say**
+> - “I raised it. The captain won’t move on it yet.”  
+>   *Tell him the truth: the captain won’t move yet.*
+> - “Give it time. These things take time.”  
+>   *Put him off.*
+> - Leave
+
+**You:** “I raised it. The captain won’t move on it yet.”
+**Nate:** He lets out a breath. “At least you’re straight with me.”
+
+<details><summary>trace</summary>
+
+```
+▶ honest = 1: he believes what you said +1
+meaning: react.report.honest · flat · toward speaker · private intent: honest
+change: Nate Ferrara keeps waiting, a little less sure; patience shortened
+change: He starts looking at other routes (his own pursuit)
+```
+</details>
 
 *Day 4. Without Henry: Lou’s people smash up Barone's Grocery, a shop on Rizzo’s own book. The man who collects there tells Rizzo.*
 
-### Day 5: going back, after something has changed
+### Day 5: back to Rizzo, after something has changed
 *He raises it before you can.*
 **Vic:** “You heard about Barone's Grocery? Lou’s people. On my book.”
 
@@ -610,6 +788,12 @@ meaning: refuse.intervention · flat · toward request · private intent: refuse
 meaning: raise.newinfo · cold · toward third · private intent: inform
 ```
 </details>
+
+
+> **What you can say**
+> - “About Nate and Lou.”  
+>   *Bring Nate into it.*
+> - Leave
 
 **You:** “About Nate and Lou.”
 **Vic:** “All right. I’ll have a word with Joe. But if this turns ugly, it’s on you.”
@@ -626,9 +810,15 @@ change: Nate Ferrara's request is now carried by Vic Rizzo as well (referred, on
 ```
 </details>
 
-> **Outcome:** Rizzo will speak to Joe Marchese. If it turns ugly, it’s on you.
+> **Outcome:** Vic says he’ll speak to Joe. If it turns ugly, he says, it’s on you.
 
 ### Day 7: asking how it’s going
+
+> **What you can say**
+> - “Anything on Nate?”  
+>   *Ask whether he’s done it.*
+> - Leave
+
 **You:** “Anything on Nate?”
 **Vic:** “I said I’d talk to him. Give it a few days.”
 
@@ -641,6 +831,12 @@ meaning: answer.progress.pending · flat · toward speaker · private intent: an
 </details>
 
 ### Day 8: asking again
+
+> **What you can say**
+> - “Anything on Nate?”  
+>   *Ask whether he’s done it.*
+> - Leave
+
 **You:** “Anything on Nate?”
 **Vic:** “You’ve asked me twice now. I heard you the first time.”
 
@@ -653,6 +849,12 @@ meaning: answer.progress.irritated · weary · toward speaker · private intent:
 </details>
 
 ### Day 9: and again
+
+> **What you can say**
+> - “Anything on Nate?”  
+>   *Ask whether he’s done it.*
+> - Leave
+
 **You:** “Anything on Nate?”
 **Vic:** “Don’t come to me about Nate again. When there’s something to tell you, you’ll hear it.”
 
@@ -665,9 +867,141 @@ change: Vic Rizzo's respect for Henry Tedesco falls a little: he was told and ke
 ```
 </details>
 
-### Day 11: what reaches Henry, without asking
-*Rizzo has spoken to Marchese, and Marchese to Lou. Henry learns of it the way he would: Rizzo sends word with one of his men.*
+### Day 11: word from Rizzo, and Nate
+*Rizzo has spoken to Marchese, and Marchese to Lou. Henry learns it the way he would: Rizzo sends word with one of his men.*
 
 > *A message from Rizzo:* “It’s done. Joe spoke to him. Lou stays away from Nate.”
 
-> **Outcome:** Your word to Nate is kept: it was raised with the family, and Lou is to stay away. Nate will hear it from you, or from the street.
+**Nate:** “Lou’s people haven’t been back. Was that you?”
+
+<details><summary>trace</summary>
+
+```
+▶ followup.observed = 2.28: he has seen Lou’s people stay away +1, days since you promised +1, patience (caution, agreeable) +0.28
+meaning: followup.observed · warm · toward speaker · private intent: question
+```
+</details>
+
+
+> **What you can say**
+> - “I took it to the family. He won’t bother you again.”  
+>   *Tell him you took it to the family.*
+> - Leave
+
+**You:** “I took it to the family. He won’t bother you again.”
+**Nate:** “I won’t forget it. Anything you need here, you ask.”
+
+<details><summary>trace</summary>
+
+```
+▶ done = 1: he believes what you said +1
+meaning: thanks.kept · warm · toward speaker · private intent: done
+change: Nate Ferrara's trust in Henry Tedesco rises (a promise kept, as he sees it: Lou stopped, and Henry says he took it to the family)
+change: A favour is owed to Henry (encounters.addFavour)
+```
+</details>
+
+> **Outcome:** Nate says his trouble with Lou is over. He thanks you.
+
+## 6. Unfamiliar ground: asking a man you barely know for a loan
+
+*Not one of the worked examples. The same engine: what he can’t do, what each answer is worth to him from what he believes of Henry, a reason, and replies to that reason. Lines come from the general banks where no specific one exists.*
+
+### Tony Fiore, a soldier Henry has met once
+
+> **What you can say**
+> - “I need $500. I’ll pay the usual.”  
+>   *Ask him for money, on the usual terms.*
+> - “You hear what happened at the Gilded Lily?”  
+>   *Tell him what happened at the Gilded Lily.*
+> - Leave
+
+**You:** “I need $500. I’ll pay the usual.”
+**Tony:** “I don’t know you well enough for that.”
+
+<details><summary>trace</summary>
+
+```
+▶ refuse = 0.45: the risk +0.42, caution +0.02, he hasn’t got it +0
+  counter = 0.2: a smaller sum, a smaller risk +0.09, he would rather deal than refuse +0.12
+  accept = 0.03: what it earns him +0.4, the chance he never sees it again -0.47, greed +0.1
+reason given: doesNotKnow
+meaning: refuse.loan.doesNotKnow · flat · toward speaker · private intent: refuse
+```
+</details>
+
+
+> **What you can say**
+> - “I’m good for it. Ask anyone.”  
+>   *Stand on your name. It counts for what he’s heard of you.*
+> - “Make it 8 percent a week, then.”  
+>   *Pay more for the money.*
+> - “You’ll have it back by the end of the month. My word.”  
+>   *Give him your word on when. He’ll hold you to it.*
+> - Leave
+
+**You:** “I’m good for it. Ask anyone.”
+**Tony:** “Everybody’s good for it, until they’re not. I don’t know you.”
+
+<details><summary>trace</summary>
+
+```
+▶ refuse = 0.38: the risk +0.35, caution +0.02, he hasn’t got it +0
+  counter = 0.24: a smaller sum, a smaller risk +0.13, he would rather deal than refuse +0.12
+  accept = 0.11: what it earns him +0.4, the chance he never sees it again -0.39, greed +0.1
+reason given: wordNotEnough
+meaning: refuse.loan.wordNotEnough · flat · toward request · private intent: refuse
+```
+</details>
+
+
+> **What you can say**
+> - “Make it 8 percent a week, then.”  
+>   *Pay more for the money.*
+> - “You’ll have it back by the end of the month. My word.”  
+>   *Give him your word on when. He’ll hold you to it.*
+> - Leave
+
+**You:** “Make it 8 percent a week, then.”
+**Tony:** “I can do $300. 10 percent a week, and I want it on time.”
+
+<details><summary>trace</summary>
+
+```
+▶ counter = 0.43: a smaller sum, a smaller risk +0.32, he would rather deal than refuse +0.12
+  refuse = 0.38: the risk +0.35, caution +0.02, he hasn’t got it +0
+  accept = 0.35: what it earns him +0.64, the chance he never sees it again -0.39, greed +0.1
+reason given: risk
+meaning: counter.loan.risk · flat · toward request · private intent: counter
+```
+</details>
+
+
+> **What you can say**
+> - “$300 at 10. Done.”  
+>   *Take what he offers, on his terms.*
+> - “You’ll have it back by the end of the month. My word.”  
+>   *Give him your word on when. He’ll hold you to it.*
+> - Leave
+
+**You:** “$300 at 10. Done.”
+> **Outcome:** Agreed: Tony lends you $300 at 10 percent a week. He says he wants it on time.
+
+### The same man, told something he hasn’t heard
+
+> **What you can say**
+> - “You hear what happened at the Gilded Lily?”  
+>   *Tell him what happened at the Gilded Lily.*
+> - Leave
+
+**You:** “You hear what happened at the Gilded Lily?”
+**Tony:** “First I’ve heard of it.”
+
+<details><summary>trace</summary>
+
+```
+▶ answer = 1.15: he has not heard of it +1, curiosity (sociability) +0.15
+meaning: answer.unknownTopic · flat · toward third · private intent: answer
+change: Tony Fiore now knows what Henry told him: the window at the Gilded Lily (from Henry Tedesco; he may repeat it)
+```
+</details>
