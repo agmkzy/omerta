@@ -98,8 +98,8 @@
 | I'll find out who / I'll speak to him / a sit-down | `find`, `speak`, `sitdown` | memo "question"; `mkJob('handle')` + memo "promise"; `openSitdown` (a meeting) | `acts/info` · follow | migrated (Stage A; parity) |
 | Who he suspects → that man | `suspect`, `tell`, `exon`, `handle`, `mediate2` | `learn`, `bear`, `ease`, `mkJob`, grievance + `openSitdown` | `acts/info` · follow | migrated (Stage A; parity) |
 | Mediate his feud | `mediate` | grievance + `openSitdown` | `acts/info` · P | migrated (Stage A; parity) |
-| His trouble (situation) | `sit_ask`, `sit_cover`, `sit_lend`, `sit_rival`, `sit_leave` | `situations.askAbout`, `helpWith` (money, loan, a rival's heat) | `acts/personal` · P/follow | pending |
-| Something you heard about him / a matter he is in | `mt:<matter>:<code>` | `matters.matterAct` | `acts/info` · P | pending |
+| His trouble (situation) | `sit_ask`, `sit_cover`, `sit_lend`, `sit_rival`, `sit_leave` | `situations.askAbout`, `helpWith` (money, loan, a rival's heat) | `acts/personal` · P/follow | migrated (Stage B; parity) |
+| Something you heard about him / a matter he is in | `mt:<matter>:<code>` | `matters.matterAct` | `acts/info` · P | migrated (Stage B; parity) |
 | What is on his mind | `tk:*` (`talk.ts`, 9 subjects) | as each subject's replies (loans, favours, jobs, notes, grudges) | `conv/subjects/life.ts` · P / "he raises it" | pending (already used by the new screen, through the old engine) |
 | A rival family's man: gossip, drink, mood, favour | `rv_ears` (+trade/pass), `rv_drink`, `rv_mood`, `rv_favour` | `learn` facts both ways, cash, favour, heat | `acts/personal` · P | migrated (Stage A; parity) |
 
@@ -107,22 +107,22 @@
 
 | Legacy interaction | Handler | Gameplay dependency | Replacement · pane | Status |
 |---|---|---|---|---|
-| How's business | `op`, `biz_none` | `confide`; may reveal a side operation (fact) or open an incident | `acts/business` · B | pending |
-| Earnings / what's owed | `earn` | none (his account) | `acts/business` · B | pending |
-| Ask for a smaller share | `rate_ask` | `asks.rateAsk` → a matter | `acts/business` · B (boss) | pending |
-| Chop-shop partnership | `partner_chop` | cash $2,000, a venture record, memo | `acts/business` · B | pending |
-| Move goods for you | `partner_fence` | `jobs.oppFrom` | `acts/business` · B | pending |
-| Cut / raise his protection fee (and the haggle) | `terms_cut`, `terms_raise`, `deal:take/hold/drop/nothing/remember` | the fee, memo, fact "terms", favour, grudge, fact "protection_refused" | `acts/business` · B (collector) | pending |
-| Protection put to a shop | `suggest` | `asks.openAsk('protect')` | already the layer's own (`doProtect`) where it may be put; otherwise `acts/business` · B | pending |
-| Borrow from him | `borrow` | `asks.openAsk('borrow')`, cooldown | `acts/business` · B | pending |
-| Buy the place / a piece / run his racket / sell him yours | `buy_ask`, `stake_ask`, `run_ask`, `sell_ask` | `asks.openAsk('buy'/'run'/'sell')` | `acts/business` · B | pending |
-| Offer him a loan | `offer_loan` | `asks.openAsk('lend')` | `acts/business` · B | pending |
-| A matter between you (a figure, a move, an answer to his point) | `f:m:<matter>`, `mv:`, `x:`, `nm:` | `asks.playerMove`, `nameFigure`, `exchange.reply` | `acts/business` · B/follow | pending |
-| The shop that pays you: how, why late, ears, hand back, time, lean | `sh_how`, `sh_why`, `sh_ears`, `sh_back`, `sh_time`, `sh_lean` | `evidence`, `bizMove`, `giveTime`, `takeFromBiz`, `clearArrears`, `earn`, `repute` | `acts/business` · B (`sh_lean` C) | pending |
-| Debts: remind, time, halve, favour, forgive, pay, settle, ask for time, put money down | `d_remind`, `d_time`, `d_half`, `d_favour`, `d_forgive`, `d_pay`, `d_all`, `d_ask`, `deal:part` | `payDebt`, `restructure`, `writeDown`, favour, `repute` | `acts/business` · B (`d_remind` C) | pending |
+| How's business | `op`, `biz_none` | `confide`; may reveal a side operation (fact) or open an incident | `acts/business` · B | migrated (Stage B; parity) |
+| Earnings / what's owed | `earn` | none (his account) | `acts/business` · B | migrated (Stage B; parity) |
+| Ask for a smaller share | `rate_ask` | `asks.rateAsk` → a matter | `acts/business` · B (boss) | migrated (Stage B; parity) |
+| Chop-shop partnership | `partner_chop` | cash $2,000, a venture record, memo | `acts/business` · B | migrated (Stage B; parity) |
+| Move goods for you | `partner_fence` | `jobs.oppFrom` | `acts/business` · B | migrated (Stage B; parity) |
+| Cut / raise his protection fee (and the haggle) | `terms_cut`, `terms_raise`, `deal:take/hold/drop/nothing/remember` | the fee, memo, fact "terms", favour, grudge, fact "protection_refused" | `acts/business` · B (collector) | migrated (Stage B; parity) |
+| Protection put to a shop | `suggest` | `asks.openAsk('protect')` | already the layer's own (`doProtect`) where it may be put; otherwise `acts/business` · B | migrated (Stage B; parity) |
+| Borrow from him | `borrow` | `asks.openAsk('borrow')`, cooldown | `acts/business` · B | migrated (Stage B; parity) |
+| Buy the place / a piece / run his racket / sell him yours | `buy_ask`, `stake_ask`, `run_ask`, `sell_ask` | `asks.openAsk('buy'/'run'/'sell')` | `acts/business` · B | migrated (Stage B; parity) |
+| Offer him a loan | `offer_loan` | `asks.openAsk('lend')` | `acts/business` · B | migrated (Stage B; parity) |
+| A matter between you (a figure, a move, an answer to his point) | `f:m:<matter>`, `mv:`, `x:`, `nm:` | `asks.playerMove`, `nameFigure`, `exchange.reply` | `acts/business` · B/follow | migrated (Stage B; parity) |
+| The shop that pays you: how, why late, ears, hand back, time, lean | `sh_how`, `sh_why`, `sh_ears`, `sh_back`, `sh_time`, `sh_lean` | `evidence`, `bizMove`, `giveTime`, `takeFromBiz`, `clearArrears`, `earn`, `repute` | `acts/business` · B (`sh_lean` C) | migrated (Stage B; parity) |
+| Debts: remind, time, halve, favour, forgive, pay, settle, ask for time, put money down | `d_remind`, `d_time`, `d_half`, `d_favour`, `d_forgive`, `d_pay`, `d_all`, `d_ask`, `deal:part` | `payDebt`, `restructure`, `writeDown`, favour, `repute` | `acts/business` · B (`d_remind` C) | migrated (Stage B; parity) |
 | A debt as a conversation | `tk:debt:*` (`threads.ts`) | as above | `conv/subjects` · B | pending |
-| The envelope / extra / tribute | `b_envelope`, `b_extra`, `b_extra2`, `b_tribute` | `books.handOver`, cash, `lifetimeKick`, `repute`, favour; may pass news or a job | `acts/business` · his/B (boss) | pending |
-| Call in a favour he owes | `favcall:<favour>` | `asks.callFavour` + `playerMove` | `acts/business` · B | pending |
+| The envelope / extra / tribute | `b_envelope`, `b_extra`, `b_extra2`, `b_tribute` | `books.handOver`, cash, `lifetimeKick`, `repute`, favour; may pass news or a job | `acts/business` · his/B (boss) | migrated (Stage B; parity) |
+| Call in a favour he owes | `favcall:<favour>` | `asks.callFavour` + `playerMove` | `acts/business` · B | migrated (Stage B; parity) |
 
 ### 3.3 Organisation (Stage C)
 

@@ -59,7 +59,7 @@ export function layer(w0: World, npc: string, code: string, th: Partial<Visit['t
 // what differs between the two runs' effects (both started from the same world): the paths, with each side's final value
 // (named differences: the old engine, listing its menus, made an empty relationship record, at the default values, for every man it
 // looked at; the layer reads without writing. A default record and none are the same footing.)
-export const DEFAULT_REL = /\.rel\.[^.]+\.(affection: 0\.1|grudge: 0|lastMet: -1000000000|respect: 0\.3|trust: 0\.1) → undefined$/;
+export const DEFAULT_REL = /\.rel\.[^.]+\.(?:(affection: 0\.1|grudge: 0|lastMet: -1000000000|respect: 0\.3|trust: 0\.1) → undefined|(affection|grudge|lastMet|respect|trust): undefined → (0\.1|0|-1000000000|0\.3))$/;
 export function parity(a: Run, b: Run, allow: RegExp[] = []): string[] {
   const sa = state(a.w), sb = state(b.w);
   return diff(sa, sb).filter((d) => !DEFAULT_REL.test(d) && !allow.some((re) => re.test(d)));

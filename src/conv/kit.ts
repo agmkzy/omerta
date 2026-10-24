@@ -34,7 +34,7 @@ export interface Act {
   base: string; pane: Pane;
   offers?: (c: Ctx) => Offer[];          // what can be put to him now; none: it is only ever an answer to what he has said
   run: (c: Ctx, code: string) => Out | void;
-  pushy?: boolean;                       // pressure: it wears on his patience
+  nav?: boolean;                         // an answer within what is in hand (a haggle's terms): no patience spent, not 'said' for the visit
   social?: boolean;                      // ordinary talk: worth less the third time in a day, the seventh in a week, and only so much
   repeat?: { window: number; sig: (c: Ctx, arg: string) => string; round?: boolean }; // asked again, unchanged, within the window
   conduct?: (c: Ctx, before: { cash: number }) => void; // what doing it says about the kind of man the player is

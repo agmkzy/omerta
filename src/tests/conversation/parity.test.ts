@@ -3,8 +3,10 @@
 // differs (the ledger now records money the old engine moved by hand) the difference is named, not hidden.
 import assert from 'node:assert';
 import { describe, test as ok } from 'vitest';
-import { addFact } from '../../core';
-import { feelToOn, rel } from '../../core';
+import { addFact, createDebt, feelToOn, rel } from '../../core';
+import { addFavour } from '../../encounters';
+import { openAsk, playerMove } from '../../asks';
+import { replies as exReplies } from '../../exchange';
 import { DAY, type Character, type World } from '../../types';
 import { newWorld, P } from '../helpers';
 import { layer, legacy, parity } from './parity';
@@ -114,4 +116,86 @@ describe('Gate 4 parity, Stage A: a man he has a problem with', () => {
     { name: 'offering to mediate (from the subject)', who: (x) => x.shop, setup: grudge, old: 'mediate2', node: 'subject', ctx: (s) => ({ subject: s.s }), th: (s) => ({ subject: s.s }) },
   ];
   for (const cs of cases) ok(cs.name, { tags: ['compat'] }, () => check(cs));
+});
+
+describe('Gate 4 parity, Stage B: money and business', () => {
+  // the shop that pays the player: a civilian's place with the player as its collector
+  const shopFor = (x: Cast, t: Character, o: { late?: number; why?: 'unable' | 'delayed'; distress?: number } = {}) => {
+    const b = Object.values(x.w.biz).find((q) => q.ownerId === t.id)!;
+    b.protection = { collectorId: x.p.id, familyId: x.p.familyId!, fee: 60, since: 0, ...(o.late ? { late: o.late, owed: 60 * o.late, why: o.why ?? 'unable' } : {}) };
+    if (o.distress) b.distress = o.distress;
+    return b;
+  };
+  const garage = (x: Cast) => { const b = Object.values(x.w.biz).find((q) => q.kind === 'garage' && q.open && x.w.chars[q.ownerId]?.rank === 'civilian')!; x.p.cash = 5000; return x.w.chars[b.ownerId]; };
+  const pawn = (x: Cast) => { const b = Object.values(x.w.biz).find((q) => q.kind === 'pawnshop' && q.open && x.w.chars[q.ownerId]?.rank === 'civilian'); return b ? x.w.chars[b.ownerId] : x.shop; };
+  const owes = (x: Cast, t: Character, missed = 0) => { const d = createDebt(x.w, x.p.id, t.id, 800, 0.05, 'a loan'); d.missed = missed; t.cash = 500; return { d: d.id }; };
+  const owe = (x: Cast, t: Character, missed = 0) => { const d = createDebt(x.w, t.id, x.p.id, 800, 0.05, 'a loan'); d.missed = missed; x.p.cash = 2000; return { d: d.id }; };
+  const B: Case[] = [
+    { name: 'how is business (his shop, with trouble there)', who: (x) => x.shop, setup: (x, t) => { event(x.w, 'vandalism', x.rival, t, [{ c: t, actor: true }]); }, old: 'op', node: 'business', both: true },
+    { name: 'how is business (a made man, a side line)', who: (x) => x.fam, setup: (_x, t) => { t.books.side = 150; }, old: 'op', node: 'business' },
+    { name: 'how is business (no business of his own)', who: (x) => x.crew, old: 'biz_none' },
+    { name: 'earnings, with his boss', who: (x) => x.boss, old: 'earn', node: 'business' },
+    { name: 'what is owed, with a debtor', who: (x) => x.fam, setup: (x, t) => { owes(x, t, 1); }, old: 'earn', node: 'business' },
+    { name: 'a smaller share', who: (x) => x.boss, old: 'rate_ask', node: 'business' },
+    { name: 'a chop shop', who: garage, old: 'partner_chop', node: 'business', both: true },
+    { name: 'moving goods', who: pawn, old: 'partner_fence', node: 'business' },
+    { name: 'cutting his fee', who: (x) => x.shop, setup: (x, t) => { shopFor(x, t); }, old: 'terms_cut', node: 'business' },
+    { name: 'raising his fee', who: (x) => x.shop, setup: (x, t) => { shopFor(x, t); }, old: 'terms_raise', node: 'business' },
+    { name: 'the haggle: nothing for it', who: (x) => x.shop, setup: (x, t) => { shopFor(x, t); }, old: 'deal:nothing', node: 'follow' },
+    { name: 'the haggle: remember it', who: (x) => x.shop, setup: (x, t) => { shopFor(x, t); }, old: 'deal:remember', node: 'follow' },
+    { name: 'the haggle: settle at his figure', who: (x) => x.shop, setup: (x, t) => ({ b: shopFor(x, t).id }), old: 'deal:take', node: 'follow', ctx: (s) => ({ deal: { kind: 'fee', biz: s.b, ask: 75, old: 60, offer: 65 } }), th: (s) => ({ deal: { kind: 'fee', biz: s.b, ask: 75, old: 60, offer: 65 } }) },
+    { name: 'the haggle: hold out', who: (x) => x.shop, setup: (x, t) => ({ b: shopFor(x, t).id }), old: 'deal:hold', node: 'follow', ctx: (s) => ({ deal: { kind: 'fee', biz: s.b, ask: 75, old: 60, offer: 65 } }), th: (s) => ({ deal: { kind: 'fee', biz: s.b, ask: 75, old: 60, offer: 65 } }), both: true },
+    { name: 'the haggle: let it lie', who: (x) => x.shop, setup: (x, t) => ({ b: shopFor(x, t).id }), old: 'deal:drop', node: 'follow', ctx: (s) => ({ deal: { kind: 'fee', biz: s.b, ask: 75, old: 60, offer: 65 } }), th: (s) => ({ deal: { kind: 'fee', biz: s.b, ask: 75, old: 60, offer: 65 } }) },
+    { name: 'protection, put to a shop', who: (x) => x.shop, old: 'suggest', node: 'business' },
+    { name: 'borrowing', who: (x) => x.boss, setup: (_x, t) => { t.cash = 5000; }, old: 'borrow', node: 'business' },
+    { name: 'buying the place', who: (x) => x.shop, old: 'buy_ask', node: 'business' },
+    { name: 'buying a piece', who: (x) => x.shop, old: 'stake_ask', node: 'business' },
+    { name: 'selling him yours', who: (x) => x.boss, setup: (x, t) => { const b = Object.values(x.w.biz).find((q) => q.open && q.kind !== 'casino' && q.ownerId !== t.id && x.w.chars[q.ownerId]?.rank === 'civilian')!; b.ownerId = x.p.id; t.cash = 50000; }, old: 'sell_ask', node: 'business' },
+    { name: 'a loan, offered', who: (x) => x.shop, old: 'offer_loan', node: 'business' },
+    { name: 'the shop: how it does', who: (x) => x.shop, setup: (x, t) => { shopFor(x, t, { distress: 1 }); }, old: 'sh_how', node: 'shop' },
+    { name: 'the shop: why it is late', who: (x) => x.shop, setup: (x, t) => { shopFor(x, t, { late: 1, why: 'delayed' }); }, old: 'sh_why', node: 'shop', both: true },
+    { name: 'the shop: anyone else around', who: (x) => x.shop, setup: (x, t) => { const b = shopFor(x, t); const f = event(x.w, 'vandalism', x.rival, t, [{ c: t, actor: true }]); f.business = b.id; }, old: 'sh_ears', node: 'shop' },
+    { name: 'the shop: this week handed back', who: (x) => x.shop, setup: (x, t) => { shopFor(x, t, { distress: 2 }); }, old: 'sh_back', node: 'shop' },
+    { name: 'the shop: a week’s grace', who: (x) => x.shop, setup: (x, t) => { shopFor(x, t, { late: 1 }); }, old: 'sh_time', node: 'shop' },
+    { name: 'the shop: leaning on him', who: (x) => x.shop, setup: (x, t) => { shopFor(x, t, { late: 2 }); }, old: 'sh_lean', node: 'shop' },
+    { name: 'a debt: reminding him', who: (x) => x.fam, setup: (x, t) => { owes(x, t, 1); }, old: 'd_remind', node: 'debt', both: true },
+    { name: 'a debt: more time', who: (x) => x.fam, setup: (x, t) => { owes(x, t, 1); }, old: 'd_time', node: 'debt' },
+    { name: 'a debt: halved', who: (x) => x.fam, setup: (x, t) => { owes(x, t); }, old: 'd_half', node: 'debt' },
+    { name: 'a debt: a favour for $300', who: (x) => x.fam, setup: (x, t) => { owes(x, t); }, old: 'd_favour', node: 'debt' },
+    { name: 'a debt: a quarter forgiven', who: (x) => x.fam, setup: (x, t) => { owes(x, t); }, old: 'd_forgive', node: 'debt' },
+    { name: 'a debt: paying the week', who: (x) => x.fam, setup: (x, t) => { owe(x, t); }, old: 'd_pay', node: 'debt' },
+    { name: 'a debt: settling it', who: (x) => x.fam, setup: (x, t) => { owe(x, t); }, old: 'd_all', node: 'debt' },
+    { name: 'a debt: asking for time', who: (x) => x.fam, setup: (x, t) => { owe(x, t, 1); }, old: 'd_ask', node: 'debt', both: true },
+    { name: 'a debt: money down for the week', who: (x) => x.fam, setup: (x, t) => owe(x, t), old: 'deal:part', node: 'follow', ctx: (s) => ({ deal: { kind: 'ext', debt: s.d, ask: 0, offer: 100 } }), th: (s) => ({ deal: { kind: 'ext', debt: s.d, ask: 0, offer: 100 } }) },
+    { name: 'the envelope', who: (x) => x.boss, setup: (x) => { x.p.cash = 3000; }, old: 'b_envelope', node: 'myboss' },
+    { name: 'over and above: $250', who: (x) => x.boss, setup: (x) => { x.p.cash = 3000; }, old: 'b_extra', node: 'myboss' },
+    { name: 'over and above: $1,000', who: (x) => x.boss, setup: (x) => { x.p.cash = 3000; }, old: 'b_extra2', node: 'myboss' },
+    { name: 'a gift for nothing', who: (x) => x.boss, setup: (x) => { x.p.cash = 3000; }, old: 'b_tribute', node: 'myboss' },
+    { name: 'calling in a favour', who: (x) => x.fam, setup: (x, t) => ({ f: addFavour(x.w, x.p.id, t.id, 2, 'a good turn').id }), old: (s) => 'favcall:' + s.f },
+  ];
+  for (const cs of B) ok(cs.name, { tags: ['compat'] }, () => check(cs));
+  // a matter between them, opened by the old engine's own entry, then moved, answered and given a figure
+  const matter = (x: Cast, t: Character) => { const b = Object.values(x.w.biz).find((q) => q.ownerId === t.id)!; const s = openAsk(x.w, 'protect', x.p, t, { biz: b.id, amt: 60, why: 'test' })!; return { s: s.id }; };
+  const M: Case[] = [
+    { name: 'a matter: raising it', who: (x) => x.shop, setup: matter, old: (s) => 'f:m:' + s.s, now: (s) => 'm:' + s.s },
+    { name: 'a matter: asking', who: (x) => x.shop, setup: matter, old: (s) => `mv:${s.s}:ask`, both: true },
+    { name: 'a matter: making the case', who: (x) => x.shop, setup: matter, old: (s) => `mv:${s.s}:persuade` },
+    { name: 'a matter: pressure', who: (x) => x.shop, setup: matter, old: (s) => `mv:${s.s}:pressure` },
+    { name: 'a matter: a figure named', who: (x) => x.shop, setup: matter, old: (s) => `nm:${s.s}:45` },
+  ];
+  // (his answer to the ask leaves a point the player can answer: the first such answer, as the screen would offer it)
+  const pointed = (x: Cast, t: Character) => { const m = matter(x, t); playerMove(x.w, x.p, m.s, 'ask'); const s0 = (x.w.situations ?? []).find((q) => q.id === m.s)!; const k = exReplies(x.w, x.p, s0)[0]?.k ?? 'drop'; return { ...m, k }; };
+  M.push({ name: 'a matter: answering his point', who: (x) => x.shop, setup: pointed, old: (s) => `x:${s.s}:${s.k}` });
+  // his trouble: the shop losing money, he has told the player
+  const trouble = (x: Cast, t: Character, told = true) => { const b = Object.values(x.w.biz).find((q) => q.ownerId === t.id)!; const rv = Object.values(x.w.biz).find((q) => q.open && q.id !== b.id)!; b.distress = 2; (x.w.situations ??= []).push({ id: 's' + x.w.nextId++, kind: 'money', who: t.id, biz: b.id, rival: rv.id, since: 0, stage: 'handling', cause: `${b.name} is losing customers to ${rv.name}`, knows: told, told, weeks: 1 }); x.p.cash = 2000; };
+  M.push(
+    { name: 'his trouble: asking', who: (x) => x.shop, setup: (x, t) => { trouble(x, t, false); }, old: 'sit_ask' },
+    { name: 'his trouble: covering it', who: (x) => x.shop, setup: (x, t) => { trouble(x, t); }, old: 'sit_cover' },
+    { name: 'his trouble: a loan', who: (x) => x.shop, setup: (x, t) => { trouble(x, t); }, old: 'sit_lend' },
+    { name: 'his trouble: a word to the rival', who: (x) => x.shop, setup: (x, t) => { trouble(x, t); }, old: 'sit_rival' },
+    { name: 'his trouble: left to him', who: (x) => x.shop, setup: (x, t) => { trouble(x, t); }, old: 'sit_leave' },
+  );
+  // running a racket of his
+  M.push({ name: 'running his racket', who: (x) => { const o = x.w.ops.find((q) => q.kind !== 'hijack' && q.state === 'running' && !x.w.chars[q.owner]?.isPlayer && x.w.chars[q.owner]?.alive); return o ? x.w.chars[o.owner] : x.fam; }, old: 'run_ask', node: 'business' });
+  for (const cs of M) ok(cs.name, { tags: ['compat'] }, () => check(cs));
 });

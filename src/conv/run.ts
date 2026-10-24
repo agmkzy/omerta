@@ -67,7 +67,7 @@ export function perform(c: Ctx, code: string, label: string): Done {
   door.footing(w, p, t);
   const used = (v.th.used ??= []), key = code;
   // said or done already in this visit: it changes nothing until the player comes back
-  if (used.includes(key) && act.repeat?.round !== true) { says(c, 'You’ve already been over that.'); return { minutes: 0 }; }
+  if (!act.nav && used.includes(key) && act.repeat?.round !== true) { says(c, 'You’ve already been over that.'); return { minutes: 0 }; }
   // asked lately, and nothing has changed since: he says so, and it pays nothing; asked over and over, he tires of it
   const day0 = Math.floor(w.now / 1440), tkey = base === 'about' ? code : base;
   if (act.repeat) {
@@ -92,7 +92,10 @@ export function perform(c: Ctx, code: string, label: string): Done {
     dull = same >= 2 ? 'day' : sameW >= 6 ? 'week' : undefined;
   }
   const from = v.lines.length, inSubject = !!v.th.fact;
+  const open0 = new Set(openAsks(w).filter((x) => x.terms?.by === p.id && x.terms?.of === t.id).map((x) => x.id));
   const r: Out = act.run(c, code) ?? {};
+  // a proposal that has become a matter between them is now the subject in hand: what can be said to it comes next
+  if (!r.next && !r.end && !r.meeting) { const opened = openAsks(w).find((x) => x.terms?.by === p.id && x.terms?.of === t.id && !open0.has(x.id)); if (opened) r.next = ACTS.m?.offersFor?.(c, opened.id); }
   // (what he says is said as a man talks: his own name is "I", the men he names by their first names)
   for (let i = from; i < v.lines.length; i++) if (v.lines[i].who !== 'you' && v.lines[i].who !== 'card') v.lines[i].text = speechFor(w, p, t, v.lines[i].text);
   if (dull) {
@@ -127,7 +130,7 @@ export function perform(c: Ctx, code: string, label: string): Done {
     v.th.spoken = [...v.th.spoken, ...v.lines.slice(from).filter((l) => l.who === 'him' && l.text.length > 30).map((l) => l.text)].slice(-60);
   }
   // what needs no words back still gets an answer, in keeping with what it was and how he is with the player
-  if (!r.end && !v.lines.slice(from).some((l) => l.who === 'him' || answered(l.text, t.name.split(' ')[0]))) says(c, ackLine(w, t, p, v.lines.length - from, SOCIAL_ACK.has(base)));
+  if (!r.end && !act.nav && !v.lines.slice(from).some((l) => l.who === 'him' || answered(l.text, t.name.split(' ')[0]))) says(c, ackLine(w, t, p, v.lines.length - from, SOCIAL_ACK.has(base)));
   // what changed, as a card
   {
     const a = snap(), bits: string[] = [];
@@ -141,8 +144,8 @@ export function perform(c: Ctx, code: string, label: string): Done {
   // he remembers what he was asked, and what it stood on, for next time
   if (act.repeat && v.lines.length > from && !r.skip) (t.talk ??= {})[tkey] = { d: day0, sig: act.repeat.sig(c, arg), n: 1 };
   { const m = t.talk ?? {}, ks = Object.keys(m); if (ks.length > 18) delete m[ks.sort((x, y) => m[x].d - m[y].d)[0]]; }
-  used.push(key);
-  if (r.end || r.meeting) return { ...r, minutes: r.minutes ?? 10 };
+  if (!act.nav) used.push(key);
+  if (r.end || r.meeting || act.nav) return { ...r, minutes: r.minutes ?? 10 };
   return { ...r, minutes: r.minutes ?? 10, ...govern(c, code, from) };
 }
 

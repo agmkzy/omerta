@@ -13,6 +13,8 @@ const money = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
 
 // ---------------------------------------------------------------- money
 // money spent on a man that goes to nobody in particular (a round, a drink): out of the world, on the ledger
+// money given, no strings (a gift the player makes: posted, and nothing else)
+export function gift(w: World, from: Character, to: Character, amt: number, why: string): number { return transfer(w, from, to, amt, 'gift', why); }
 export function spend(w: World, c: Character, amt: number, note: string): number {
   const x = Math.max(0, Math.min(Math.round(amt), Math.floor(c.cash)));
   if (!x) return 0;
@@ -21,8 +23,9 @@ export function spend(w: World, c: Character, amt: number, note: string): number
   return x;
 }
 // money handed up to a man above, over and above what is owed: it counts towards what the player has passed up (path.ts)
+// (posted as a gift, not as the week's kick-up: it is over and above what is owed, and the week's account must not count it as handed up)
 export function tribute(w: World, p: Character, boss: Character, amt: number, why: string): number {
-  const x = transfer(w, p, boss, amt, 'kickup', why);
+  const x = transfer(w, p, boss, amt, 'gift', why);
   p.lifetimeKick += x;
   return x;
 }

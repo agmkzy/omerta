@@ -116,6 +116,7 @@ export function spend(w: World, c: Character, amt: number, note: string): number
 export function tribute(w: World, p: Character, boss: Character, amt: number, why: string): number { return deeds.tribute(w, p, boss, amt, why); }
 export function giveBack(w: World, t: Character, p: Character, f: Fact): number { return deeds.giveBack(w, t, p, f); }
 export function payDebt(w: World, d: Debt, amt: number): void { corePayDebt(w, d, amt); }
+export function gift(w: World, from: Character, to: Character, amt: number, why: string): number { return deeds.gift(w, from, to, amt, why); }
 export function friendLoan(w: World, p: Character, t: Character, amt: number, rate: number, why: string): Debt | undefined { return deeds.friendLoan(w, p, t, amt, rate, why); }
 // ---- regard: at least so much (a witness he now has reason to trust), set outright (talk that has gone stale gives back what it gave), eased
 export function trustAtLeast(w: World, who: Character, about: Id, level: number): void { feelAtLeast(w, who, about, 'trust', level); }

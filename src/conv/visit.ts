@@ -37,6 +37,7 @@ import { standingWord } from '../jobs';
 import { actOf, offersNow, perform } from './run';
 import { streetNews } from './acts/info';
 import { strangerHere } from './acts/personal';
+import { protectOwnedBy } from './acts/business';
 import { speechFor } from './acts/words';
 import { ACTS } from './acts';
 import { says } from './kit';
@@ -525,6 +526,7 @@ const GOAL_WORD: Record<string, string> = { earn: 'the money you pass up', deeds
 const shopOf = (c: Ctx) => { const b = ownerBiz(c.w, c.n.id); return b?.open && c.n.rank === 'civilian' ? b : undefined; };
 const feeOf = (c: Ctx) => { const b = shopOf(c)!; return Math.max(15, Math.round((b.income * 0.08) / 5) * 5); };
 const protectAvailable = (c: Ctx) => { const b = shopOf(c); return !!b && b.protection?.collectorId !== c.h.id && may(c.w, c.h, 'protect', c.n); };
+protectOwnedBy(protectAvailable);
 function interveneChoice(c: Ctx, ob: Obligation, again: boolean): Choice {
   const forC = c.w.chars[ob.matter?.for ?? ''], a = c.w.chars[ob.matter?.against ?? ''];
   const cap = MY_CAPTAIN(c);

@@ -102,7 +102,7 @@ const helpGift: Act = {
   run: (c) => {
     const x = T(c);
     if (x.p.cash < 200) { line(x, 'You can’t spare it.'); return out(15); }
-    door.pay(x.w, x.p, x.t, 200, 'a gift, no questions');
+    door.gift(x.w, x.p, x.t, 200, 'a gift, no questions');
     tweak(x, 0.1, 0.08, 0.02);
     line(x, voice(x, 'gift_thanks'));
     return out(15);

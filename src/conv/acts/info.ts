@@ -185,7 +185,7 @@ const canDo: Act = {
   },
 };
 const press: Act = {
-  base: 'press', pane: 'confront', pushy: true,
+  base: 'press', pane: 'confront',
   run: (c) => {
     const x = T(c), { w, p, t } = x, f = fact(c)!; ask(c, 'press');
     const d = chance(w, t.id, 'owns it', 'holds to his story', [term('base', 0.15), term('his trust in you × 0.6', R(x).trust * 0.6), term('his caution × −0.2', -t.traits.caution * 0.2)], 0.05, 0.85);
