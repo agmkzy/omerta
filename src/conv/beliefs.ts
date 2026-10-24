@@ -4,8 +4,9 @@
 // contradiction he can act on; the truth is never what tells him.
 import type { Character, Id } from '../types';
 import type { Perception } from './perception';
+import type { BasisKind } from './types';
 
-export interface Claim { id: string; by: Id; to: Id; subject: string; value: string | number; t: number; honest: boolean; words: string }
+export interface Claim { id: string; by: Id; to: Id; subject: string; value: string | number; t: number; honest: boolean; words: string; basis?: BasisKind }
 export class ClaimStore {
   claims: Claim[] = [];
   private n = 0;
@@ -18,6 +19,9 @@ export function believe(p: Perception, store: ClaimStore, claim: Claim, teller: 
   const others = store.heardBy(p.self.id, claim.subject).filter((c) => c.id !== claim.id && c.value !== claim.value);
   let b = 0.35 + f.trust * 0.5 + f.known * 0.1 - p.temper.caution * 0.1;
   const basis = [`trust in ${teller.name} ${f.trust.toFixed(2)}`];
+  // what he says it rests on: a man who saw it, or whose loss it was, counts for more than a man repeating what he heard
+  if (claim.basis === 'seen' || claim.basis === 'own') { b += 0.1; basis.push(claim.basis === 'seen' ? 'he says he saw it' : 'it was done to him'); }
+  else if (claim.basis === 'rumour' || claim.basis === 'told') { b -= 0.1; basis.push('he only heard it'); }
   if (others.length) { b -= 0.25; basis.push(`he has heard otherwise from ${others.length} other${others.length > 1 ? 's' : ''}`); }
   return { belief: Math.max(0, Math.min(1, Math.round(b * 100) / 100)), basis };
 }

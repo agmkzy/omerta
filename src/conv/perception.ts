@@ -5,7 +5,7 @@ import { temper, type Temper } from '../temper';
 import { arch, type Arch } from '../voice';
 import type { Character, Fact, Id, World } from '../types';
 import { DAY } from '../types';
-import type { Basis } from './types';
+import type { Basis, Role } from './types';
 
 // What a scene has established that the world does not record yet (introductions said aloud, claims heard, kin a fixture declares).
 // In the full engine these are claims and knowledge records (spec §5); here they live on the session.
@@ -35,7 +35,24 @@ export interface Perception {
   feelingFor(other: Character): { trust: number; affection: number; grudge: number; fear: number; respect: number; known: number };
   streetPressure(): { n: number; basis: Basis[] };
   knownFacts(pred: (f: Fact) => boolean): Fact[];
+  // what he is to an event, from his own knowledge of it: the world records a victim as having learnt of it like a witness, so
+  // being the one it was done to (or the owner of the place it was done to) is checked first
+  roleIn(f: Fact): Role;
+  // particulars he can speak of, each from something he perceives; undefined when he has no basis for it (the line needing it is not used)
+  particulars: Particulars;
 }
+export interface Particulars {
+  shopNoun(bizId?: Id): string | undefined;          // what kind of place a shop is: its sign says so (public)
+  shopNounOf(owner: Id): string | undefined;          // what kind of place another man's shop is (public)
+  ownShopNoun(): string | undefined;
+  protectedSince(): string | undefined;               // how long his own arrangement has run, from its record (his own)
+  lastAt(kinds: string[], by?: Id): string | undefined; // when he last knew of such a thing at his place, from a fact he knows
+  smallBuy(bizId?: Id): string | undefined;           // something small a customer would buy there (what the shop sells: public)
+}
+const NOUN: Record<string, string> = { grocer: 'grocery', barber: 'barber shop', cleaner: 'dry cleaner', deli: 'deli', cafe: 'café', newsstand: 'newsstand', restaurant: 'restaurant', bakery: 'bakery', funeral: 'funeral home', fish: 'fish market', club: 'social club', diner: 'diner', hardware: 'hardware store', billiards: 'pool hall', pawnshop: 'pawnshop', candy: 'candy store', photo: 'photo studio', tailor: 'tailor’s', jeweller: 'jeweller’s', florist: 'florist', butcher: 'butcher’s', bar: 'bar', pharmacy: 'pharmacy', shoes: 'shoe repair', garage: 'garage', laundromat: 'laundromat', casino: 'card room' };
+const BUY: Record<string, string> = { grocer: 'a few things', bakery: 'a loaf', newsstand: 'the paper', cafe: 'a coffee', deli: 'a sandwich', candy: 'a bag of these', pharmacy: 'some aspirin', florist: 'a few of those', butcher: 'a pound of sausage', fish: 'a couple of those', bar: 'a beer', diner: 'a coffee to go', restaurant: 'a coffee', hardware: 'a box of nails', laundromat: 'change for the machines', cleaner: 'my shirts back', tailor: 'a collar stay', shoes: 'a tin of polish' };
+const ago = (now: number, t: number) => { const d = Math.floor(now / DAY) - Math.floor(t / DAY); return d <= 0 ? 'today' : d === 1 ? 'yesterday' : d < 7 ? `${d} days ago` : d < 14 ? 'last week' : d < 60 ? `${Math.round(d / 7)} weeks ago` : undefined; };
+const howLong = (now: number, t: number) => { const d = Math.floor((now - t) / DAY); return d < 14 ? undefined : d < 60 ? `${Math.round(d / 7)} weeks` : d < 730 ? `${Math.round(d / 30)} months` : `${Math.round(d / 365)} years`; };
 
 export function perceive(w: World, s: Session, c: Character): Perception {
   const b = ownerBiz(w, c.id);
@@ -61,5 +78,20 @@ export function perceive(w: World, s: Session, c: Character): Perception {
       return { n: fs.length, basis: fs.map((f) => ({ kind: (c.known[f.id].from === 'witness' ? 'seen' : 'told') as Basis['kind'], ref: f.id })) };
     },
     knownFacts: known,
+    roleIn(f) {
+      if (f.actor === c.id) return 'actor';
+      if (f.victim === c.id || (f.business && w.biz[f.business]?.ownerId === c.id)) return 'victim';
+      const k = c.known[f.id];
+      if (!k) return 'none';
+      return k.from === 'witness' || k.from === 'self' ? 'witness' : 'hearsay';
+    },
+    particulars: {
+      shopNoun: (id) => (id && w.biz[id] ? NOUN[w.biz[id].kind] : undefined),
+      shopNounOf: (id) => { const x = ownerBiz(w, id); return x ? NOUN[x.kind] : undefined; },
+      ownShopNoun: () => (b ? NOUN[b.kind] : undefined),
+      protectedSince: () => (b?.protection?.since !== undefined ? howLong(w.now, b.protection.since) : undefined),
+      lastAt: (kinds, by) => { const fs = known((f) => kinds.includes(f.kind) && !!b && (f.business === b.id || f.victim === c.id) && (!by || f.actor === by || w.chars[f.actor ?? '']?.bossId === by)).sort((x, y) => y.t - x.t); return fs[0] ? ago(w.now, fs[0].t) : undefined; },
+      smallBuy: (id) => (id && w.biz[id] ? BUY[w.biz[id].kind] : undefined),
+    },
   };
 }

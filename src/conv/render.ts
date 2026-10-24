@@ -26,14 +26,14 @@ const B: Record<string, Entry> = {
   'compliment.business': { _: ['“Nice place. You must do well here.”'] },
   'demand.protection': { _: ['“{amt} a week, and nothing happens to the place.”'] },
   'demand.protection.soft': { _: ['“{amt} a week, and I’m around if anyone gives you trouble.”'] },
-  'demand.protection.lean': { _: ['“That’s a lot of glass in the window. Glass is expensive.”'] },
+  'demand.protection.lean': { _: ['“It’d be a shame if something happened to {bizName}.”', '“Places like this, things happen to them. Not if you’re with us.”'] },
   'tell.reputation': { _: ['“Ask around. {selfName}, {selfFamily} family.”'] },
   'press.now': { _: ['“I’m asking now.”'] },
   'announce.return': { _: ['“Think it over. I’ll be back {day}.”'] },
-  'buy.small': { _: ['“Just a loaf, thanks.”'] },
+  'buy.small': { _: ['“Just {item}, thanks.”', '“Just this, thanks.”'] },
   'stay.wait': { _: ['“I’ll wait.”'] },
   'claim.authority': { _: ['“{authority} sent me.”'] },
-  'ask.who': { _: ['“Who did the window at {shop}?”'] },
+  'ask.who': { _: ['“Who was behind what happened at {shop}?”'] },
   'ask.intervention': { _: ['“{forName}’s having trouble with {againstName}. I want to bring it to the family.”'] },
   'argue.ground': { _: ['“{againstFirst}’s making trouble on our streets.”'] },
   'argue.word': { _: ['“I gave {forFirst} my word I’d raise it.”'] },
@@ -43,18 +43,18 @@ const B: Record<string, Entry> = {
   'let.go': { _: ['“All right. I’ll leave it.”'] },
   'ask.whoPays': { _: ['“Who collects from you?”'] },
   'offer.better': { _: ['“Whoever it is, I could do better for you.”'] },
-  'accept.counter': { _: ['“{amt}. Fridays.”'] },
+  'accept.counter': { _: ['“{amt} a week, then.”'] },
   'raise.again': { _: ['“About {forFirst} and {againstFirst}.”'] },
   'ask.progress': { _: ['“Have you talked to {theirCaptainFirst}?”', '“Anything on {forFirst}?”'] },
 
   // ---------------------------------------------------------------- hearing who you are
   'react.introduction.warnOff.sameFamily': {
-    _: ['“Then you know {collectorFirst}. He comes by on the first.”'],
-    cold: ['“{collectorFirst} comes by on the first. You’re not him.”'],
-    earnest: ['“{youFamily}. Then you know {collectorFirst} already. He comes by on the first of the month.”'],
+    _: ['“Then you know {collectorFirst}. He looks after this place.”'],
+    cold: ['“{collectorFirst} looks after this place. You’re not him.”'],
+    earnest: ['“{youFamily}. Then you know {collectorFirst} already. He looks after this place.”'],
   },
   'react.introduction.warnOff.otherFamily': {
-    _: ['“I’m looked after. The {collectorFamily} people. Have been for years.”'],
+    _: ['“I’m looked after. The {collectorFamily} people. Have been for {since}.”', '“I’m looked after. The {collectorFamily} people.”'],
     cold: ['“The {collectorFamily}s look after this place. You’d want to talk to them first.”'],
   },
   'react.introduction.warnOff.kin': {
@@ -83,7 +83,7 @@ const B: Record<string, Entry> = {
     schemer: ['“Well enough. Why do you ask?”'],
     hothead: ['“Better than most.”'],
     earnest: ['“We do all right, thank God.”'],
-    jovial: ['“You should taste the cannoli. Then you’d really be impressed.”'],
+    jovial: ['“Flattery! You’ll go far. What can I get you?”'],
     frightened: ['“Oh— thank you. We get by.”'],
   },
 
@@ -108,7 +108,7 @@ const B: Record<string, Entry> = {
   'refuse.protection.pride': {
     _: ['“Nobody tells me what to pay in my own shop. Get out.”'],
     hothead: ['“Get out of my shop before I throw you out.”'],
-    proud: ['“I’ve run this place a long time without anybody’s help. Get out.”'],
+    proud: ['“I’ve run this {ownNoun} without anybody’s help. Get out.”'],
   },
   'refuse.protection.cannotAfford': {
     _: ['“I can’t carry it. Look at this place.”'],
@@ -120,9 +120,9 @@ const B: Record<string, Entry> = {
   },
   'accept.protection.afraid': {
     _: ['“All right. All right. {amt} a week.”'],
-    frightened: ['He looks at the window, then at you. “Fine. {amt}. Fridays. Just— fine.”'],
+    frightened: ['He looks at the door, then at you. “Fine. {amt}. Just— fine.”'],
   },
-  'accept.protection': { _: ['“{amt} a week. Fridays.”'] },
+  'accept.protection': { _: ['“{amt} a week.”'] },
   'refer.protection.kin': {
     _: ['“Talk to my cousin {kinFirst}. He’s with the {kinFamily}s. Anything about this place goes through him.”'],
     schemer: ['“You’ll want to talk to my cousin {kinFirst} about that. The {kinFamily}s take an interest in this street.”'],
@@ -130,9 +130,9 @@ const B: Record<string, Entry> = {
 
   // ---------------------------------------------------------------- a stated intention, acknowledged (no promise from him)
   'acknowledge.return': {
-    _: ['“Friday, then.”'],
+    _: ['“{day}, then.”'],
     cold: ['He’s already turning back to his work. “Suit yourself.”'],
-    frightened: ['“Friday. All right.”'],
+    frightened: ['“{day}. All right.”'],
     proud: ['“Come back whenever you like. The answer won’t change.”'],
   },
 
@@ -150,14 +150,15 @@ const B: Record<string, Entry> = {
   'react.claim.believed': { _: ['He goes a little pale. “If {authority} sent you…”'] },
 
   // ---------------------------------------------------------------- information between men who trust each other
-  'answer.who.knows': {
-    _: ['“{actorFirst}’s boys. {basis}”'],
-    cold: ['“{actorFirst}. {basis}”'],
-    jovial: ['“That was {actorFirst}’s crowd, God help us. {basis}”'],
-  },
-  'answer.who.rumour': { _: ['“Word is it was {actorFirst}’s boys. I didn’t see it myself.”'] },
+  // (by what he is to it: the man it was done to, a man who saw it, a man who heard. What each can claim is in types.CLAIMABLE.)
+  'answer.who.knows.victim': { _: ['“It was {actorFirst}’s people. They did it to me.”'], cold: ['“{actorFirst}. It was my place.”'] },
+  'answer.who.knows.witness': { _: ['“{actorFirst}’s boys. I saw it.”'], cold: ['“{actorFirst}. I saw them.”'], jovial: ['“That was {actorFirst}’s crowd, God help us. I saw the whole thing.”'] },
+  'answer.who.knows.hearsay': { _: ['“Word is it was {actorFirst}’s boys. I didn’t see it myself.”'] },
+  'answer.who.withhold.victim': { _: ['“I don’t want any more trouble.”'], cold: ['“That’s my business.”'] },
+  'answer.who.withhold.witness': { _: ['“I didn’t see anything.”'], cold: ['“Not my business.”'] },
+  'answer.who.withhold.hearsay': { _: ['“I wouldn’t want to say.”'], cold: ['“Not my business.”'] },
+  'answer.who.unknown.victim': { _: ['“I wish I knew. Nobody’s saying.”'] },
   'answer.who.unknown': { _: ['“I couldn’t tell you. Nobody’s saying.”'] },
-  'answer.who.withhold': { _: ['“I didn’t see anything.”'], cold: ['“Not my business.”'] },
 
   // ---------------------------------------------------------------- the captain
   'refuse.intervention.notOurs': {
@@ -166,7 +167,7 @@ const B: Record<string, Entry> = {
   },
   'doubt.argument.ground': { _: ['“Our streets? Says who? I haven’t heard a word about it.”'] },
   'reject.argument.word': { _: ['“Then you gave it too quickly. That’s yours to carry, not mine.”'] },
-  'weigh.argument.money': { _: ['“Maybe. A bakery’s not much of an envelope.”'] },
+  'weigh.argument.money': { _: ['“Maybe. A {forNoun}’s not much of an envelope.”', '“Maybe. It’s not much of an envelope.”'] },
   'react.argument.ground.supported': { _: ['“I know what {againstFirst}’s been doing on my streets.”'] },
   'raise.newinfo': {
     _: ['“You heard about {hitShop}? {againstFirst}’s people. On my book.”'],
@@ -207,12 +208,12 @@ const B: Record<string, Entry> = {
   'answer.unknownTopic': { _: ['“First I’ve heard of it.”'], jovial: ['“No! When was this? First I’ve heard.”'], cold: ['“No. Should I have?”'], frightened: ['“No. God. Is it— is it bad?”'] },
 
   // ---------------------------------------------------------------- the man you made a promise to, when you come back
-  'followup.pending': { _: ['“Well? Did you talk to them?”'], frightened: ['“Did you— is anything happening? They were back on Tuesday.”'], proud: ['“I’m still waiting on you.”'] },
+  'followup.pending': { _: ['“Well? Did you talk to them?”'], frightened: ['“Did you— is anything happening? They were back {lastSeen}.”', '“Did you— is anything happening?”'], proud: ['“I’m still waiting on you.”'] },
   'report.refusedSoFar': { _: ['“I raised it. The captain won’t move on it yet.”'] },
   'report.stall': { _: ['“Give it time. These things take time.”'] },
   'react.report.honest': { _: ['He lets out a breath. “At least you’re straight with me.”'], proud: ['“So I’m on my own.”'], frightened: ['“What do I do if they come back?”'] },
   'react.report.stall': { _: ['“Time. Right.” He doesn’t believe you.'] },
-  'followup.observed': { _: ['“Lou’s people haven’t been back. Was that you?”'] },
+  'followup.observed': { _: ['“{againstFirst}’s people haven’t been back. Was that you?”'] },
   'report.done': { _: ['“I took it to the family. He won’t bother you again.”'] },
   'thanks.kept': { _: ['“I won’t forget it. Anything you need here, you ask.”'], cold: ['He nods once. “I owe you.”'], frightened: ['“Thank you. Thank you. I didn’t think anybody would.”'] },
 
@@ -223,39 +224,39 @@ const B: Record<string, Entry> = {
   'confront.claim': { _: ['“{otherFirst} says he paid you {amt}.”'] },
   'report.collection.honest': { _: ['“{amt}. All of it.”'] },
   'report.collection.short': { _: ['“{debtorFirst} only had {amt}. Says the rest next week.”'] },
-  'answer.debt.paid': { _: ['“I paid your man {amt} on {day}. Ask him.”'] },
+  'answer.debt.paid': { _: ['“I paid your man {amt} {when}. Ask him.”', '“I paid your man {amt}. Ask him.”'] },
   'confront.admit': { _: ['He looks at the floor. “All right. I kept some of it. I’ll get it back to you.”'] },
   'confront.deny': { _: ['“He’s lying. I got what I told you.”'] },
   'confront.defy': { _: ['“You’d take his word over mine?”'] },
-  'seek.help': { _: ['“Lou’s people were in again. I won’t pay him. Can you do anything?”'] },
+  'seek.help': { _: ['“{againstFirst}’s people were in {lastSeen}. I won’t pay him. Can you do anything?”', '“{againstFirst} wants money off me. I won’t pay him. Can you do anything?”'] },
   'promise.action': { _: ['“I’ll speak to my captain about it.”'] },
   'promise.effort': { _: ['“I’ll do what I can.”'] },
   'promise.result': { _: ['“I’ll make sure he leaves you alone.”'] },
   'promise.restraint': { _: ['“I won’t tell a soul you came to me.”'] },
-  'ack.promise.action': { _: ['“That’s something. Tell him what they did to the window.”'] },
+  'ack.promise.action': { _: ['“That’s something. Tell him what they’ve been doing.”'] },
   'ack.promise.effort': { _: ['“I suppose that’s all anyone can do.”'] },
   'ack.promise.result': { _: ['“You mean that? Then I’ll hold you to it.”'] },
-  'ack.promise.restraint': { _: ['“Good. If Lou hears I came to you…”'] },
+  'ack.promise.restraint': { _: ['“Good. If {againstFirst} hears I came to you…”'] },
   'followup.broken': { _: ['“They were back. You said you’d make sure.”'] },
   'report.admitNotDone': { _: ['“No. I never got to it.”'] },
   'react.report.admit': { _: ['He takes that in. “Well. At least you didn’t take the credit.”'] },
-  'tell.secret': { _: ['“Nate Ferrara came to me about you.”'] },
+  'tell.secret': { _: ['“{forName} came to me about you.”'] },
   'react.told': { _: ['“Did he.”'] },
   'ask.again': { _: ['“Tell me again. From the start.”'] },
   'card.report.collection': { _: ['{first} says {debtorFirst} paid {amt}.'] },
   'card.answer.debt.paid': { _: ['{first} says he paid {toFirst} {amt}.'] },
   'card.confront.admit': { _: ['{first} admitted keeping {amt}, and says he’ll give it back.'] },
-  'card.confront.deny': { _: ['{first} sticks to his story. He says Gino is lying.'] },
+  'card.confront.deny': { _: ['{first} sticks to his story. He says {otherFirst} is lying.'] },
   // ---------------------------------------------------------------- outcome cards: only what was said or seen, attributed
   'card.refuse.hasArrangement': { _: ['{first} turned you down. He says he already pays {collectorFirst}.'] },
   'card.refuse.hasArrangement.inferred': { _: ['{first} turned you down before you’d asked. He says he already has someone.'] },
   'card.refuse.doesNotKnow': { _: ['{first} turned you down. He says he doesn’t know you.'] },
   'card.refuse.pride': { _: ['{first} told you to get out.'] },
   'card.counter.protection': { _: ['{first} offered {amt} a week instead, and asked what he gets for it.'] },
-  'card.accept.protection.afraid': { _: ['Agreed: {amt} a week, Fridays. He said it fast, and he wouldn’t look at you.'] },
-  'card.accept.protection': { _: ['Agreed: {amt} a week, Fridays.'] },
+  'card.accept.protection.afraid': { _: ['Agreed: {amt} a week. He said it fast, and he wouldn’t look at you.'] },
+  'card.accept.protection': { _: ['Agreed: {amt} a week.'] },
   'card.refer.protection.kin': { _: ['{first} sent you to his cousin {kinFirst}. He says anything about the place goes through the {kinFamily}s.'] },
-  'card.agreed.counter': { _: ['Agreed: {amt} a week, Fridays. He says he wants the street kept quiet for it.'] },
+  'card.agreed.counter': { _: ['Agreed: {amt} a week. He says he wants the street kept quiet for it.'] },
   'card.refuse.intervention': { _: ['{first} won’t take it up. He says {forFirst} isn’t one of ours.'] },
   'card.condition.intervention': { _: ['{first} won’t take it up yet. He says he’d need to see {againstFirst}’s people on our streets.'] },
   'card.cutOff.argument': { _: ['{first} won’t hear any more about it today.'] },
@@ -264,8 +265,10 @@ const B: Record<string, Entry> = {
   'card.counter.loan': { _: ['{first} offered {amt} at {rate} a week instead.'] },
   'card.agreed.loan': { _: ['Agreed: {first} lends you {amt} at {rate} percent a week. He says he wants it on time.'] },
   'card.intention.return': { _: ['You said you’d be back {day}.'] },
-  'card.answer.who.knows': { _: ['{first} says it was {actorFirst}’s people. He says he saw it.'] },
-  'card.kept': { _: ['{first} says his trouble with Lou is over. He thanks you.'] },
+  'card.answer.who.knows.witness': { _: ['{first} says it was {actorFirst}’s people. He says he saw it.'] },
+  'card.answer.who.knows.hearsay': { _: ['{first} says he heard it was {actorFirst}’s people. He didn’t see it himself.'] },
+  'card.answer.who.knows.victim': { _: ['{first} says it was {actorFirst}’s people who did it to him.'] },
+  'card.kept': { _: ['{first} says his trouble with {againstFirst} is over. He thanks you.'] },
 };
 
 
@@ -279,24 +282,43 @@ const fill = (s: string, slots: Record<string, string>) => s.replace(/\{(\w+)\}/
 // How a line was found: the bank level it came from (for the generalisation report). 'specific' = written for this request and
 // reason; 'reason' = the general line for this kind of answer and reason; 'kind' = the line for the request with no reason;
 // 'verb' = the bare answer ("No."); 'missing' = nothing at all. 'own' says whether the speaker's archetype had a line of its own.
-export interface RenderInfo { line: string; key: string; level: 'specific' | 'reason' | 'kind' | 'verb' | 'missing'; own: boolean }
+export interface RenderInfo { line: string; key: string; level: 'specific' | 'reason' | 'kind' | 'verb' | 'missing'; own: boolean; template?: string }
 export const lastRender: { info?: RenderInfo } = {};
 export function render(m: Meaning, speakerId: string, arch: Arch, spoken: Set<string> = new Set(), salt = ''): string {
-  // most specific first; then the general line for this kind of answer and reason, so a new kind of request reuses what exists
+  // most specific first; then the general line for this kind of answer and reason, so a new kind of request reuses what exists.
+  // What he is to the event (his role) comes before the bare key: a victim is never given a bystander's line if he has his own.
   const verb = m.key.split('.')[0];
-  const keys = [m.grounds ? `${m.key}.${m.grounds}${m.stance === 'indignant' ? '.indignant' : ''}` : '', m.grounds ? `${m.key}.${m.grounds}` : '', m.grounds ? `${verb}.${m.grounds}` : '', m.key, verb].filter(Boolean);
-  let entry: Entry | undefined, used = '';
-  for (const k of keys) if (B[k] || N[k]) { entry = B[k] ?? N[k]; used = k; break; }
+  const keys = [m.grounds ? `${m.key}.${m.grounds}${m.stance === 'indignant' ? '.indignant' : ''}` : '', m.grounds ? `${m.key}.${m.grounds}` : '', m.grounds ? `${verb}.${m.grounds}` : '', m.role ? `${m.key}.${m.role}` : '', m.key, verb].filter(Boolean);
+  const slots = m.slots ?? {};
+  // a line may be used only if everything it names is known: a slot the decision could not fill from the speaker's perception
+  // (empty or absent) rules the line out, so he never says a particular he has no basis for
+  const usable = (l: string) => [...l.matchAll(/\{(\w+)\}/g)].every(([, k]) => !!slots[k]);
   const level = (k: string): RenderInfo['level'] => !k ? 'missing' : k === m.key && !m.grounds ? (k.includes('.') ? 'specific' : 'verb') : k.startsWith(m.key + '.') ? 'specific' : k === m.key ? 'kind' : k === verb ? 'verb' : 'reason';
-  if (!entry) { lastRender.info = { line: `[missing bank: ${keys[0]}]`, key: keys[0], level: 'missing', own: false }; return lastRender.info.line; }
-  // (a man's own manner first: the default lines are for men without one of their own for this)
-  const own = entry[arch], lines = own && ([] as string[]).concat(own).length ? ([] as string[]).concat(own, ([] as string[]).concat(entry._ ?? [])) : ([] as string[]).concat(entry._ ?? ['…']);
-  const n = own ? ([] as string[]).concat(own).length : lines.length;
-  const start = hash(speakerId + '|' + keys[0] + '|' + salt) % n;
-  for (let i = 0; i < lines.length; i++) {
-    const l = fill(lines[(start + i) % lines.length], m.slots ?? {});
-    if (!spoken.has(l)) { spoken.add(l); lastRender.info = { line: l, key: used, level: level(used), own: !!own }; return l; }
+  for (const k of keys) {
+    const entry = B[k] ?? N[k];
+    if (!entry) continue;
+    // (a man's own manner first: the default lines are for men without one of their own for this)
+    const own = ([] as string[]).concat(entry[arch] ?? []).filter(usable), def = ([] as string[]).concat(entry._ ?? []).filter(usable);
+    const lines = own.length ? [...own, ...def] : def;
+    if (!lines.length) continue;
+    const n = own.length || lines.length;
+    const start = hash(speakerId + '|' + keys[0] + '|' + salt) % n;
+    for (let i = 0; i < lines.length; i++) {
+      const l = fill(lines[(start + i) % lines.length], slots);
+      if (!spoken.has(l)) { spoken.add(l); lastRender.info = { line: l, key: k, level: level(k), own: own.length > 0, template: lines[(start + i) % lines.length] }; return l; }
+    }
+    lastRender.info = { line: fill(lines[start], slots), key: k, level: level(k), own: own.length > 0, template: lines[start] };
+    return lastRender.info.line;
   }
-  lastRender.info = { line: fill(lines[start], m.slots ?? {}), key: used, level: level(used), own: !!own };
+  lastRender.info = { line: `[missing bank: ${keys[0]}]`, key: keys[0], level: 'missing', own: false };
   return lastRender.info.line;
+}
+// Particulars no line may carry in its own words (Gate 2a): the kind of a business, a weekday, how long, where a man stood, a
+// piece of evidence, a name. Each must come through a slot filled from the speaker's perception, or not be said.
+export const PARTICULARS = /\b(bakery|bread|loaf|cannoli|oven|window|glass|grocery|deli|monday|tuesday|wednesday|thursday|friday|saturday|sunday|fridays|for years|a long time|twenty years|across the street|on the first|first of the month|lou|nate|gino|rizzo|ferrara|frank|tommy)\b/i;
+// The words of every bank line with its slots taken out: what a speaker would say whatever the world (for the particulars scan).
+export function bankText(): { key: string; line: string }[] {
+  const out: { key: string; line: string }[] = [];
+  for (const [key, e] of Object.entries({ ...B, ...N })) for (const ls of Object.values(e)) for (const l of ([] as string[]).concat(ls ?? [])) out.push({ key, line: l.replace(/\{\w+\}/g, '') });
+  return out;
 }

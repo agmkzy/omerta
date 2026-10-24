@@ -10,7 +10,7 @@ import { crewGround } from '../econ';
 import { DAY, type Character, type Fact, type World } from '../types';
 import { newSession, perceive, type Session } from './perception';
 import { interpret } from './speech';
-import { lastRender, type RenderInfo } from './render';
+import { lastRender, PARTICULARS, type RenderInfo } from './render';
 import { Out, Visit, LEAVE, first, type Row } from './harness';
 import { onAnnouncement, onIntervention, onIntroduction, onLoanRequest, onProtectionDemand, onUnknownTopic, onWhoQuestion, type Captaincy, type Reply } from './respond';
 
@@ -57,7 +57,7 @@ export function generalisation(o: Out, seeds = [3, 7, 11, 19]): GenStats {
     shops.forEach((c, i) => {
       const b = ownerBiz(w, c.id)!, fee = Math.max(20, Math.round((b.income * 0.08) / 5) * 5);
       visit('protection', c, b.name, (v, s, say) => {
-        v.offer([{ key: 'introduce.self', note: 'Introduce yourself.' }, { key: 'compliment.business', note: 'Get to the point: protection.' }, LEAVE]);
+        v.offer([{ key: 'introduce.self', note: 'Introduce yourself.' }, { key: 'compliment.business', note: 'Get to the point: protection.' }, { key: 'buy.small', note: 'Buy something and leave it there.', slots: { item: perceive(w, s, henry).particulars.smallBuy(b.id) ?? '' } }, LEAVE]);
         let r: ReturnType<typeof onProtectionDemand> | undefined;
         if (i % 2 === 0) {
           v.pick('introduce.self');
@@ -65,7 +65,7 @@ export function generalisation(o: Out, seeds = [3, 7, 11, 19]): GenStats {
           say(onIntroduction(perceive(w, s, c), henry, famOf(w, henry)));
           const how = (['plain', 'soft', 'lean'] as const)[(i / 2) % 3];
           const key = how === 'plain' ? 'demand.protection' : 'demand.protection.' + how;
-          v.offer([{ key, note: 'Put it to him.', slots: { amt: `$${fee}` } }, LEAVE]);
+          v.offer([{ key, note: 'Put it to him.', slots: { amt: `$${fee}`, bizName: b.name } }, LEAVE]);
           v.pick(key);
           r = onProtectionDemand(perceive(w, s, c), henry, fee, how, v.mem); say(r);
         } else {
@@ -76,7 +76,7 @@ export function generalisation(o: Out, seeds = [3, 7, 11, 19]): GenStats {
         }
         if (r.followups.some((f) => f.key === 'announce.return')) {
           v.offer([...r.followups.map((f) => ({ key: f.key, note: f.note, slots: { day: 'Friday', amt: `$${r!.counterAmt ?? fee}` } })), LEAVE]);
-          v.pick('announce.return', { act: 'announce' }); say(onAnnouncement(perceive(w, s, c), henry));
+          v.pick('announce.return', { act: 'announce' }); say(onAnnouncement(perceive(w, s, c), henry, 'Friday'));
         }
         return r.decision.chosen;
       });
@@ -113,7 +113,8 @@ export function generalisation(o: Out, seeds = [3, 7, 11, 19]): GenStats {
           v.pick('ask.who');
           const r = onWhoQuestion(perceive(w, s, c), henry, f.id, w.chars[f.actor!]); say(r);
           // the meaning has no place for what he is to it (the man it was done to, a man who saw it, a man who heard): a victim gets a bystander's line
-          if (c.id === f.victim) roleMismatch.push(`${c.name}, whose own ${w.biz[f.business!].name} it was: ${lastRender.info!.line}`);
+          if (perceive(w, s, c).roleIn(f) === 'victim' && !lastRender.info!.key.endsWith('.victim')) roleMismatch.push(`${c.name}, whose own ${w.biz[f.business!].name} it was: ${lastRender.info!.line}`);
+          if (r.meaning.role !== perceive(w, s, c).roleIn(f)) roleMismatch.push(`${c.name}: the meaning says ${r.meaning.role}, his knowledge says ${perceive(w, s, c).roleIn(f)}`);
           return r.meaning.key.split('.').pop()!;
         });
       }
@@ -200,11 +201,11 @@ export function generalisation(o: Out, seeds = [3, 7, 11, 19]): GenStats {
   P('');
   P(roleMismatch.length ? `Lines that misstate what the speaker is to the matter (${roleMismatch.length}):\n${roleMismatch.map((x) => '- ' + x).join('\n')}` : 'No role mismatches detected.');
   P('');
-  // words that came in with the worked examples and assert something the meaning does not carry (found by reading this run's
-  // lines, then counted by pattern): the kind of business, the damage, the day, how long, where he stood
-  const ASSUMED = /bakery|loaf|window|for years|Tuesday|across the street/i;
+  // particulars said in a line's own words rather than through a slot filled from the speaker's perception (render.PARTICULARS):
+  // the kind of business, the damage, the day, how long, where he stood, a name
+  const ASSUMED = PARTICULARS;
   const am = new Map<string, { n: number; word: string }>();
-  for (const r of recs) { const m = r.info.line.match(ASSUMED); if (m) { const x = am.get(r.info.line) ?? { n: 0, word: m[0] }; x.n++; am.set(r.info.line, x); } }
+  for (const r of recs) { const m = (r.info.template ?? r.info.line).replace(/\{\w+\}/g, '').match(ASSUMED); if (m) { const x = am.get(r.info.line) ?? { n: 0, word: m[0] }; x.n++; am.set(r.info.line, x); } }
   assumed.push(...[...am].map(([line, x]) => ({ line, ...x })).sort((a, b) => b.n - a.n));
   P(assumed.length ? `NPC lines asserting something from the worked examples that the decision did not establish (${assumed.reduce((a, x) => a + x.n, 0)} of ${recs.length}):\n${assumed.map((x) => `- “${x.word}” ×${x.n}: ${x.line}`).join('\n')}` : 'No fixture assumptions in NPC lines.');
   P('');

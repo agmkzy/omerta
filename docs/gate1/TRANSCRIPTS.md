@@ -29,12 +29,12 @@ meaning: greet.customer · polite · toward speaker · private intent: greet
 >   *Introduce yourself. He’ll know who you are from now on, for better or worse.*
 > - “Nice place. You must do well here.”  
 >   *Get to the point: protection. He doesn’t know you, and he owes you nothing.*
-> - “Just a loaf, thanks.”  
+> - “Just this, thanks.”  
 >   *Buy something and leave it there. Next time you’re a face he knows.*
 > - Leave
 
 **You:** “Henry Tedesco. I’m with the Corrente family.”
-**Frank:** “Corrente. Then you know Tommy already. He comes by on the first of the month.”
+**Frank:** “Corrente. Then you know Tommy already. He looks after this place.”
 
 <details><summary>trace</summary>
 
@@ -53,7 +53,7 @@ change: Frank Russo now believes Henry Tedesco is with the Corrente family (he s
 > **What you can say**
 > - “$40 a week, and nothing happens to the place.”  
 >   *Put it to him plainly.*
-> - “Just a loaf, thanks.”  
+> - “Just this, thanks.”  
 >   *Leave it at an introduction.*
 > - Leave
 
@@ -118,7 +118,7 @@ meaning: greet.customer · polite · toward speaker · private intent: greet
 >   *Introduce yourself. He’ll know who you are from now on, for better or worse.*
 > - “Nice place. You must do well here.”  
 >   *Get to the point: protection. He doesn’t know you, and he owes you nothing.*
-> - “Just a loaf, thanks.”  
+> - “Just this, thanks.”  
 >   *Buy something and leave it there. Next time you’re a face he knows.*
 > - Leave
 
@@ -141,7 +141,7 @@ change: Frank Russo now believes Henry Tedesco is with the Corrente family (he s
 > **What you can say**
 > - “$40 a week, and nothing happens to the place.”  
 >   *Put it to him plainly.*
-> - “Just a loaf, thanks.”  
+> - “Just this, thanks.”  
 >   *Leave it at an introduction.*
 > - Leave
 
@@ -189,7 +189,7 @@ meaning: greet.customer · polite · toward speaker · private intent: greet
 >   *Introduce yourself. He’ll know who you are from now on, for better or worse.*
 > - “Nice place. You must do well here.”  
 >   *Get to the point: protection. He doesn’t know you, and he owes you nothing.*
-> - “Just a loaf, thanks.”  
+> - “Just this, thanks.”  
 >   *Buy something and leave it there. Next time you’re a face he knows.*
 > - Leave
 
@@ -212,7 +212,7 @@ change: Frank Russo now believes Henry Tedesco is with the Corrente family (he s
 > **What you can say**
 > - “$40 a week, and nothing happens to the place.”  
 >   *Put it to him plainly.*
-> - “Just a loaf, thanks.”  
+> - “Just this, thanks.”  
 >   *Leave it at an introduction.*
 > - Leave
 
@@ -232,14 +232,14 @@ meaning: counter.protection · pleading · toward request · private intent: cou
 
 
 > **What you can say**
-> - “$30. Fridays.”  
+> - “$30 a week, then.”  
 >   *Take his figure. It’s agreed.*
 > - “I’m asking now.”  
 >   *Hold out for yours. He may fold, or turn you down.*
 > - Leave
 
-**You:** “$30. Fridays.”
-> **Outcome:** Agreed: $30 a week, Fridays. He says he wants the street kept quiet for it.
+**You:** “$30 a week, then.”
+> **Outcome:** Agreed: $30 a week. He says he wants the street kept quiet for it.
 
 ### Frightened Frank
 *Timid; a shop on his street was smashed up last week, and he saw it.*
@@ -264,7 +264,7 @@ meaning: greet.customer · polite · toward speaker · private intent: greet
 >   *Introduce yourself. He’ll know who you are from now on, for better or worse.*
 > - “Nice place. You must do well here.”  
 >   *Get to the point: protection. He doesn’t know you, and he owes you nothing.*
-> - “Just a loaf, thanks.”  
+> - “Just this, thanks.”  
 >   *Buy something and leave it there. Next time you’re a face he knows.*
 > - Leave
 
@@ -287,12 +287,12 @@ change: Frank Russo now believes Henry Tedesco is with the Corrente family (he s
 > **What you can say**
 > - “$40 a week, and nothing happens to the place.”  
 >   *Put it to him plainly.*
-> - “Just a loaf, thanks.”  
+> - “Just this, thanks.”  
 >   *Leave it at an introduction.*
 > - Leave
 
 **You:** “$40 a week, and nothing happens to the place.”
-**Frank:** He looks at the window, then at you. “Fine. $40. Fridays. Just— fine.”
+**Frank:** He looks at the door, then at you. “Fine. $40. Just— fine.”
 
 <details><summary>trace</summary>
 
@@ -305,7 +305,7 @@ meaning: accept.protection.afraid · afraid · toward speaker · private intent:
 ```
 </details>
 
-> **Outcome:** Agreed: $40 a week, Fridays. He said it fast, and he wouldn’t look at you.
+> **Outcome:** Agreed: $40 a week. He said it fast, and he wouldn’t look at you.
 
 ### Connected Frank
 *His cousin is a soldier in another family; nobody else protects him.*
@@ -330,7 +330,7 @@ meaning: greet.customer · polite · toward speaker · private intent: greet
 >   *Introduce yourself. He’ll know who you are from now on, for better or worse.*
 > - “Nice place. You must do well here.”  
 >   *Get to the point: protection. He doesn’t know you, and he owes you nothing.*
-> - “Just a loaf, thanks.”  
+> - “Just this, thanks.”  
 >   *Buy something and leave it there. Next time you’re a face he knows.*
 > - Leave
 
@@ -354,7 +354,7 @@ change: Frank Russo now believes Henry Tedesco is with the Corrente family (he s
 > **What you can say**
 > - “$40 a week, and nothing happens to the place.”  
 >   *Put it to him plainly.*
-> - “Just a loaf, thanks.”  
+> - “Just this, thanks.”  
 >   *Leave it at an introduction.*
 > - Leave
 
@@ -386,7 +386,7 @@ The same indirect remark, before Henry has said who he is. Whether Frank hears a
 >   *Introduce yourself. He’ll know who you are from now on, for better or worse.*
 > - “Nice place. You must do well here.”  
 >   *Get to the point: protection. He doesn’t know you, and he owes you nothing.*
-> - “Just a loaf, thanks.”  
+> - “Just this, thanks.”  
 >   *Buy something and leave it there. Next time you’re a face he knows.*
 > - Leave
 
@@ -416,7 +416,7 @@ meaning: refuse.protection.hasArrangement.inferred · cold · toward third · im
 >   *Introduce yourself. He’ll know who you are from now on, for better or worse.*
 > - “Nice place. You must do well here.”  
 >   *Get to the point: protection. He doesn’t know you, and he owes you nothing.*
-> - “Just a loaf, thanks.”  
+> - “Just this, thanks.”  
 >   *Buy something and leave it there. Next time you’re a face he knows.*
 > - Leave
 
@@ -442,7 +442,7 @@ meaning: reply.compliment · polite · toward speaker · private intent: remark
 >   *Introduce yourself. He’ll know who you are from now on, for better or worse.*
 > - “Nice place. You must do well here.”  
 >   *Get to the point: protection. He doesn’t know you, and he owes you nothing.*
-> - “Just a loaf, thanks.”  
+> - “Just this, thanks.”  
 >   *Buy something and leave it there. Next time you’re a face he knows.*
 > - Leave
 
@@ -468,7 +468,7 @@ meaning: reply.compliment · polite · toward speaker · private intent: remark
 >   *Introduce yourself. He’ll know who you are from now on, for better or worse.*
 > - “Nice place. You must do well here.”  
 >   *Get to the point: protection. He doesn’t know you, and he owes you nothing.*
-> - “Just a loaf, thanks.”  
+> - “Just this, thanks.”  
 >   *Buy something and leave it there. Next time you’re a face he knows.*
 > - Leave
 
@@ -495,7 +495,7 @@ meaning: reply.compliment · polite · toward speaker · private intent: remark
 >   *Introduce yourself. He’ll know who you are from now on, for better or worse.*
 > - “Nice place. You must do well here.”  
 >   *Get to the point: protection. He doesn’t know you, and he owes you nothing.*
-> - “Just a loaf, thanks.”  
+> - “Just this, thanks.”  
 >   *Buy something and leave it there. Next time you’re a face he knows.*
 > - Leave
 
@@ -596,7 +596,7 @@ meaning: react.wait.giveIn · afraid · toward speaker · private intent: giveIn
 >   *Introduce yourself. He’ll know who you are from now on, for better or worse.*
 > - “Nice place. You must do well here.”  
 >   *Get to the point: protection. He doesn’t know you, and he owes you nothing.*
-> - “Just a loaf, thanks.”  
+> - “Just this, thanks.”  
 >   *Buy something and leave it there. Next time you’re a face he knows.*
 > - Leave
 
@@ -620,25 +620,25 @@ private (Henry): honest = false (his captain did not send him)
 
 
 > **What you can say**
-> - “Who did the window at The Gilded Lily?”  
+> - “Who was behind what happened at The Gilded Lily?”  
 >   *Ask what he knows.*
 > - “Let me buy you a drink.”  
 >   *Spend the evening with him.*
 > - Leave
 
-**You:** “Who did the window at The Gilded Lily?”
-**Marty:** “Angelo’s boys. I was across the street.”
+**You:** “Who was behind what happened at The Gilded Lily?”
+**Marty:** “Angelo’s boys. I saw it.”
 
 <details><summary>trace</summary>
 
 ```
 ▶ knows = 1.6: he knows who +1, trust in Henry +0.7, caution -0.1
 meaning: answer.who.knows · flat · toward third · private intent: inform
-change: Henry Tedesco now knows who did it (from Marty Russo, who saw it)
+change: Claim made to Henry Tedesco: Angelo Zito did it (basis: seen; he is the man who saw it)
 ```
 </details>
 
-> **Outcome:** Marty says it was Angelo’s people. He says he saw it.
+> **Outcome:** [missing bank: card.answer.who.knows]
 
 ### Spend time with Marty
 > You spent the evening at Fino’s with Marty. He talked about the fights on Saturday, and who should have won. It was easy. He laughed more than you expected. He likes you better for it.
@@ -872,7 +872,7 @@ change: Vic Rizzo's respect for Henry Tedesco falls a little: he was told and ke
 
 > *A message from Rizzo:* “It’s done. Joe spoke to him. Lou stays away from Nate.”
 
-**Nate:** “Lou’s people haven’t been back. Was that you?”
+**Nate:** [missing bank: followup.observed]
 
 <details><summary>trace</summary>
 
@@ -1085,7 +1085,7 @@ Henry has no access to what Mario did; the truth ($200) is in Gino’s and Mario
 > - Leave
 
 **You:** “About what you owe me.”
-**Gino:** “I paid your man $200 on Tuesday. Ask him.”
+**Gino:** “I paid your man $200 2 days ago. Ask him.”
 
 <details><summary>trace</summary>
 
@@ -1145,11 +1145,12 @@ The lie is on record as a false claim Mario made to Henry
 *Nate asks for help. Henry’s four possible answers are each a different promise, worded as a man would say it; the note under each says what he is undertaking, in plain words. What follows is the world: who does what, and when. The promise is judged by what it actually undertook (spec §6.3, §6.5).*
 
 ### An action promise, kept: “I’ll speak to my captain about it.” Rizzo says no; the promise was to speak to him, and Henry did
-**Nate:** “Lou’s people were in again. I won’t pay him. Can you do anything?”
+**Nate:** “Lou wants money off me. I won’t pay him. Can you do anything?”
 
 <details><summary>trace</summary>
 
 ```
+▶ seekHelp = 1: Lou wants money off him +1
 meaning: seek.help · pleading · toward third · private intent: ask
 ```
 </details>
@@ -1167,7 +1168,7 @@ meaning: seek.help · pleading · toward third · private intent: ask
 > - Leave
 
 **You:** “I’ll speak to my captain about it.”
-**Nate:** “That’s something. Tell him what they did to the window.”
+**Nate:** “That’s something. Tell him what they’ve been doing.”
 
 <details><summary>trace</summary>
 
@@ -1209,11 +1210,12 @@ status: kept (he did it: raise with Vic Rizzo)
 </details>
 
 ### An action promise, broken by a good outcome: Lou stops by himself, but Henry never spoke to his captain
-**Nate:** “Lou’s people were in again. I won’t pay him. Can you do anything?”
+**Nate:** “Lou wants money off me. I won’t pay him. Can you do anything?”
 
 <details><summary>trace</summary>
 
 ```
+▶ seekHelp = 1: Lou wants money off him +1
 meaning: seek.help · pleading · toward third · private intent: ask
 ```
 </details>
@@ -1231,7 +1233,7 @@ meaning: seek.help · pleading · toward third · private intent: ask
 > - Leave
 
 **You:** “I’ll speak to my captain about it.”
-**Nate:** “That’s something. Tell him what they did to the window.”
+**Nate:** “That’s something. Tell him what they’ve been doing.”
 
 <details><summary>trace</summary>
 
@@ -1285,11 +1287,12 @@ status: broken (the time ran out and it was never done (whatever else happened))
 </details>
 
 ### An effort promise, kept by a failed attempt: “I’ll do what I can.” Rizzo refuses; Henry tried
-**Nate:** “Lou’s people were in again. I won’t pay him. Can you do anything?”
+**Nate:** “Lou wants money off me. I won’t pay him. Can you do anything?”
 
 <details><summary>trace</summary>
 
 ```
+▶ seekHelp = 1: Lou wants money off him +1
 meaning: seek.help · pleading · toward third · private intent: ask
 ```
 </details>
@@ -1349,11 +1352,12 @@ status: kept (a real attempt: raise with Vic Rizzo, which he expected might work
 </details>
 
 ### An effort promise, not kept by a gesture: Henry only mentions it to a shopkeeper who has no say
-**Nate:** “Lou’s people were in again. I won’t pay him. Can you do anything?”
+**Nate:** “Lou wants money off me. I won’t pay him. Can you do anything?”
 
 <details><summary>trace</summary>
 
 ```
+▶ seekHelp = 1: Lou wants money off him +1
 meaning: seek.help · pleading · toward third · private intent: ask
 ```
 </details>
@@ -1394,11 +1398,12 @@ status: broken (only a gesture he had no reason to think would work)
 </details>
 
 ### A result promise, broken at the first violation: “I’ll make sure he leaves you alone.” Lou’s people are back on day 12
-**Nate:** “Lou’s people were in again. I won’t pay him. Can you do anything?”
+**Nate:** “Lou wants money off me. I won’t pay him. Can you do anything?”
 
 <details><summary>trace</summary>
 
 ```
+▶ seekHelp = 1: Lou wants money off him +1
 meaning: seek.help · pleading · toward third · private intent: ask
 ```
 </details>
@@ -1464,18 +1469,19 @@ change: Nate Ferrara's trust in Henry Tedesco falls (a broken promise, as he saw
 day 0: promise recorded (result); window to day 30
 day 2: Henry raised it with Rizzo (Henry expected a 0.26 chance he would agree); Rizzo refused
 day 10: still pending: ten clean days are not thirty
-day 12: Lou’s people smash the window at Ferrara’s Grocery
-day 12: → broken on day 12, not day 30: a violation inside the period: Lou Valenti's people smashed the window at Ferrara’s Grocery.
-status: broken (a violation inside the period: Lou Valenti's people smashed the window at Ferrara’s Grocery.)
+day 12: Lou’s people smash up Ferrara’s Bakery
+day 12: → broken on day 12, not day 30: a violation inside the period: Lou Valenti's people smashed up Ferrara’s Bakery.
+status: broken (a violation inside the period: Lou Valenti's people smashed up Ferrara’s Bakery.)
 ```
 </details>
 
 ### A result promise, kept only when the whole period has passed
-**Nate:** “Lou’s people were in again. I won’t pay him. Can you do anything?”
+**Nate:** “Lou wants money off me. I won’t pay him. Can you do anything?”
 
 <details><summary>trace</summary>
 
 ```
+▶ seekHelp = 1: Lou wants money off him +1
 meaning: seek.help · pleading · toward third · private intent: ask
 ```
 </details>
@@ -1516,11 +1522,12 @@ status: kept (the whole 30 days passed cleanly)
 </details>
 
 ### A restraint promise, kept although the secret got out another way: “I won’t tell a soul you came to me.”
-**Nate:** “Lou’s people were in again. I won’t pay him. Can you do anything?”
+**Nate:** “Lou wants money off me. I won’t pay him. Can you do anything?”
 
 <details><summary>trace</summary>
 
 ```
+▶ seekHelp = 1: Lou wants money off him +1
 meaning: seek.help · pleading · toward third · private intent: ask
 ```
 </details>
@@ -1561,11 +1568,12 @@ status: kept (the time passed and he never told anyone (what others found out fo
 </details>
 
 ### A restraint promise, broken: Henry tells Lou himself
-**Nate:** “Lou’s people were in again. I won’t pay him. Can you do anything?”
+**Nate:** “Lou wants money off me. I won’t pay him. Can you do anything?”
 
 <details><summary>trace</summary>
 
 ```
+▶ seekHelp = 1: Lou wants money off him +1
 meaning: seek.help · pleading · toward third · private intent: ask
 ```
 </details>
@@ -1634,7 +1642,7 @@ status: broken (he told Lou Valenti)
 | loan · as it stands | 20 | refuse 20 |
 | loan · knows and trusts him | 20 | accept 10, counter, taken 4, counter 4, refuse 2 |
 | who · as it stands | 36 | withhold 24, unknown 12 |
-| who · knows and trusts him | 36 | knows 14, unknown 12, rumour 10 |
+| who · knows and trusts him | 36 | knows 22, unknown 12, withhold 2 |
 | news · as it stands | 8 | told 8 |
 | news · knows and trusts him | 8 | told 8 |
 | intervention · as it stands | 12 | refuse 12 |
@@ -1660,52 +1668,27 @@ Archetypes met: frightened 25, hothead 3, proud 6, jovial 6, schemer 6, cold 3, 
 
 ### Lines heard from three or more different men
 
-- 21 men: “I didn’t see anything.” `answer.who.withhold`
 - 14 men: “Friday. All right.” `acknowledge.return`
 - 11 men: “I don’t know you well enough for that.” `refuse.doesNotKnow`
+- 10 men: “I didn’t see anything.” `answer.who.withhold.witness`
+- 9 men: “I wouldn’t want to say.” `answer.who.withhold.hearsay`
 - 8 men: “I know where this is going. I already have someone who looks after the place.” `refuse.protection.hasArrangement.inferred`
 - 7 men: “I already pay someone. Please. I can’t pay two people.” `refuse.protection.hasArrangement`
 - 6 men: “I couldn’t tell you. Nobody’s saying.” `answer.who.unknown`
 - 5 men: “I’d like to help. I’d also like to see my money again.” `refuse.risk`
-- 4 men: “I’m looked after. The Santangelo people. Have been for years.” `react.introduction.warnOff.otherFamily`
+- 4 men: “I’m looked after. The Santangelo people.” `react.introduction.warnOff.otherFamily`
 - 4 men: “Everybody’s good for it, until they’re not. I don’t know you.” `refuse.wordNotEnough`
+- 4 men: “I don’t want any more trouble.” `answer.who.withhold.victim`
 - 4 men: “First I’ve heard of it.” `answer.unknownTopic`
-- 4 men: “Mr. Tedesco. Yes. Of course. Whatever you need.” `react.introduction.appease`
-- 3 men: He counts it out without looking at it. “$300. 5 percent a week. Don’t make me come looking.” `accept.loan`
 
 ### Holes and broken lines
 
 No missing banks.
 No unfilled slots.
 
-Lines that misstate what the speaker is to the matter (8):
-- Georgie Valenti, whose own Valenti's Billiard Hall it was: “I didn’t see anything.”
-- Georgie Valenti, whose own Valenti's Billiard Hall it was: “Mickey’s boys. I was across the street.”
-- Joey Conti, whose own Conti's Candy Store it was: “I didn’t see anything.”
-- Joey Conti, whose own Conti's Candy Store it was: “Hank’s boys. I was across the street.”
-- Tommy Pellegrino, whose own Pellegrino's Deli it was: “I didn’t see anything.”
-- Tommy Pellegrino, whose own Pellegrino's Deli it was: “Jimmy’s boys. I was across the street.”
-- Rocco Ferrara, whose own Ferrara's Grocery it was: “I didn’t see anything.”
-- Rocco Ferrara, whose own Ferrara's Grocery it was: “Mickey’s boys. I was across the street.”
+No role mismatches detected.
 
-NPC lines asserting something from the worked examples that the decision did not establish (45 of 334):
-- “for years” ×8: “I’m looked after. The Santangelo people. Have been for years.”
-- “bakery” ×8: “Maybe. A bakery’s not much of an envelope.”
-- “for years” ×6: “I’m looked after. The Brancato people. Have been for years.”
-- “across the street” ×3: “Mickey’s boys. I was across the street.”
-- “for years” ×2: “I’m looked after. The Marchetti people. Have been for years.”
-- “across the street” ×2: “Hank’s boys. I was across the street.”
-- “across the street” ×2: “Jimmy’s boys. I was across the street.”
-- “window” ×2: He looks at the window, then at you. “Fine. $110. Fridays. Just— fine.”
-- “window” ×2: He looks at the window, then at you. “Fine. $30. Fridays. Just— fine.”
-- “window” ×2: He looks at the window, then at you. “Fine. $80. Fridays. Just— fine.”
-- “across the street” ×2: “Georgie’s boys. I was across the street.”
-- “window” ×1: He looks at the window, then at you. “Fine. $35. Fridays. Just— fine.”
-- “across the street” ×1: “Angelo’s boys. I was across the street.”
-- “across the street” ×1: “Nate’s boys. I was across the street.”
-- “across the street” ×1: “Carmine’s boys. I was across the street.”
-- “across the street” ×1: “Frankie’s boys. I was across the street.”
-- “across the street” ×1: “Louie’s boys. I was across the street.”
+No fixture assumptions in NPC lines.
 
 ### Representative transcripts
 
@@ -1718,10 +1701,12 @@ NPC lines asserting something from the worked examples that the decision did not
 >   *Introduce yourself.*
 > - “Nice place. You must do well here.”  
 >   *Get to the point: protection.*
+> - “Just the paper, thanks.”  
+>   *Buy something and leave it there.*
 > - Leave
 
 **You:** “Henry Tedesco. I’m with the Corrente family.”
-**Danny:** “I’m looked after. The Santangelo people. Have been for years.”
+**Danny:** “I’m looked after. The Santangelo people.”
 
 <details><summary>trace</summary>
 
@@ -1786,6 +1771,8 @@ change: Danny Sorrento's own next step, privately: tell Joey Lupo that Henry Ted
 >   *Introduce yourself.*
 > - “Nice place. You must do well here.”  
 >   *Get to the point: protection.*
+> - “Just this, thanks.”  
+>   *Buy something and leave it there.*
 > - Leave
 
 **You:** “Henry Tedesco. I’m with the Corrente family.”
@@ -1811,7 +1798,7 @@ change: Gino Marino now believes Henry Tedesco is with the Corrente family (he s
 > - Leave
 
 **You:** “$110 a week, and I’m around if anyone gives you trouble.”
-**Gino:** He looks at the window, then at you. “Fine. $110. Fridays. Just— fine.”
+**Gino:** He looks at the door, then at you. “Fine. $110. Just— fine.”
 
 <details><summary>trace</summary>
 
@@ -1832,10 +1819,12 @@ meaning: accept.protection.afraid · afraid · toward speaker · private intent:
 >   *Introduce yourself.*
 > - “Nice place. You must do well here.”  
 >   *Get to the point: protection.*
+> - “Just the paper, thanks.”  
+>   *Buy something and leave it there.*
 > - Leave
 
 **You:** “Henry Tedesco. I’m with the Corrente family.”
-**Danny:** “I’m looked after. The Santangelo people. Have been for years.”
+**Danny:** “I’m looked after. The Santangelo people.”
 
 <details><summary>trace</summary>
 
@@ -1900,10 +1889,12 @@ change: Danny Sorrento's own next step, privately: tell Joey Lupo that Henry Ted
 >   *Introduce yourself.*
 > - “Nice place. You must do well here.”  
 >   *Get to the point: protection.*
+> - “Just this, thanks.”  
+>   *Buy something and leave it there.*
 > - Leave
 
 **You:** “Nice place. You must do well here.”
-**Charlie:** He looks at the window, then at you. “Fine. $35. Fridays. Just— fine.”
+**Charlie:** He looks at the door, then at you. “Fine. $35. Just— fine.”
 
 <details><summary>trace</summary>
 
@@ -2029,18 +2020,19 @@ change: Agreement: Paulie Orsini lends Henry Tedesco $500 at 5% a week (a debt, 
 #### Georgie Valenti (frightened; civilian, Valenti's Billiard Hall), seed 3: as it stands (trust 0.10, known 0.00)
 
 > **What you can say**
-> - “Who did the window at Valenti's Billiard Hall?”  
+> - “Who was behind what happened at Valenti's Billiard Hall?”  
 >   *Ask him who did it.*
 > - Leave
 
-**You:** “Who did the window at Valenti's Billiard Hall?”
-**Georgie:** “I didn’t see anything.”
+**You:** “Who was behind what happened at Valenti's Billiard Hall?”
+**Georgie:** “I don’t want any more trouble.”
 
 <details><summary>trace</summary>
 
 ```
+constraints: fear (Mickey Sorrento did it to him)
 ▶ withhold = 0.96: he knows who +1, trust in Henry +0.1, caution -0.14
-meaning: answer.who.withhold · flat · toward third · private intent: withhold (not honest)
+meaning: answer.who.withhold · flat · toward third · private intent: withhold
 ```
 </details>
 
@@ -2048,11 +2040,11 @@ meaning: answer.who.withhold · flat · toward third · private intent: withhold
 #### Richie Valenti (cold; soldier), seed 3: as it stands (trust 0.10, known 0.00)
 
 > **What you can say**
-> - “Who did the window at Valenti's Billiard Hall?”  
+> - “Who was behind what happened at Valenti's Billiard Hall?”  
 >   *Ask him who did it.*
 > - Leave
 
-**You:** “Who did the window at Valenti's Billiard Hall?”
+**You:** “Who was behind what happened at Valenti's Billiard Hall?”
 **Richie:** “I couldn’t tell you. Nobody’s saying.”
 
 <details><summary>trace</summary>
@@ -2067,38 +2059,39 @@ meaning: answer.who.unknown · flat · toward third · private intent: withhold
 #### Georgie Valenti (frightened; civilian, Valenti's Billiard Hall), seed 3: knows and trusts him (trust 0.65, known 0.60)
 
 > **What you can say**
-> - “Who did the window at Valenti's Billiard Hall?”  
+> - “Who was behind what happened at Valenti's Billiard Hall?”  
 >   *Ask him who did it.*
 > - Leave
 
-**You:** “Who did the window at Valenti's Billiard Hall?”
-**Georgie:** “Mickey’s boys. I was across the street.”
+**You:** “Who was behind what happened at Valenti's Billiard Hall?”
+**Georgie:** “I don’t want any more trouble.”
 
 <details><summary>trace</summary>
 
 ```
-▶ knows = 1.51: he knows who +1, trust in Henry +0.65, caution -0.14
-meaning: answer.who.knows · flat · toward third · private intent: inform
-change: Henry Tedesco now knows who did it (from Georgie Valenti, who saw it)
+constraints: fear (Mickey Sorrento did it to him)
+▶ withhold = 1.51: he knows who +1, trust in Henry +0.65, caution -0.14
+meaning: answer.who.withhold · flat · toward third · private intent: withhold
 ```
 </details>
 
 
-#### Richie Valenti (cold; soldier), seed 3: knows and trusts him (trust 0.65, known 0.60)
+#### Vincent Leone (frightened; civilian), seed 3: knows and trusts him (trust 0.65, known 0.60)
 
 > **What you can say**
-> - “Who did the window at Valenti's Billiard Hall?”  
+> - “Who was behind what happened at Valenti's Billiard Hall?”  
 >   *Ask him who did it.*
 > - Leave
 
-**You:** “Who did the window at Valenti's Billiard Hall?”
-**Richie:** “I couldn’t tell you. Nobody’s saying.”
+**You:** “Who was behind what happened at Valenti's Billiard Hall?”
+**Vincent:** “Mickey’s boys. I saw it.”
 
 <details><summary>trace</summary>
 
 ```
-▶ unknown = 0.58: he knows who +0, trust in Henry +0.65, caution -0.07
-meaning: answer.who.unknown · flat · toward third · private intent: withhold
+▶ knows = 1.5: he knows who +1, trust in Henry +0.65, caution -0.15
+meaning: answer.who.knows · flat · toward third · private intent: inform
+change: Claim made to Henry Tedesco: Mickey Sorrento did it (basis: seen; he is the man who saw it)
 ```
 </details>
 
@@ -2157,7 +2150,7 @@ change: Tommy Corrente now knows what Henry told him: Valenti's Billiard Hall (f
 
 ```
 ▶ refuse = 0.3: not ours, not worth the friction +0.2, he has not heard of trouble on his streets +0.1
-  accept = -0.41: Lou’s people on his own streets (as he knows it) +0, his regard for Henry +0.09, arguments +0, trouble with another captain -0.5, the man is not one of ours +0
+  accept = -0.41: Richie’s people on his own streets (as he knows it) +0, his regard for Henry +0.09, arguments +0, trouble with another captain -0.5, the man is not one of ours +0
 reason given: notOurs
 meaning: refuse.intervention.notOurs · flat · toward request · private intent: refuse
 ```
@@ -2181,7 +2174,7 @@ meaning: refuse.intervention.notOurs · flat · toward request · private intent
 
 ```
 ▶ refuse = 0.3: not ours, not worth the friction +0.2, he has not heard of trouble on his streets +0.1
-  accept = -0.46: Lou’s people on his own streets (as he knows it) +0, his regard for Henry +0.09, arguments -0.05, trouble with another captain -0.5, the man is not one of ours +0
+  accept = -0.46: Richie’s people on his own streets (as he knows it) +0, his regard for Henry +0.09, arguments -0.05, trouble with another captain -0.5, the man is not one of ours +0
 reason given: notOurs
 meaning: condition.intervention · firm · toward request · private intent: refuse
 change: Louie Costa has refused once already this visit; argument 1 adds -0.05
@@ -2198,13 +2191,13 @@ change: Louie Costa has refused once already this visit; argument 1 adds -0.05
 >   *Let it go.*
 
 **You:** “There’s money in bringing Danny under our protection.”
-**Louie:** “Maybe. A bakery’s not much of an envelope.”
+**Louie:** “Maybe. A newsstand’s not much of an envelope.”
 
 <details><summary>trace</summary>
 
 ```
 ▶ refuse = 0.3: not ours, not worth the friction +0.2, he has not heard of trouble on his streets +0.1
-  accept = -0.46: Lou’s people on his own streets (as he knows it) +0, his regard for Henry +0.09, arguments -0.05, trouble with another captain -0.5, the man is not one of ours +0
+  accept = -0.46: Richie’s people on his own streets (as he knows it) +0, his regard for Henry +0.09, arguments -0.05, trouble with another captain -0.5, the man is not one of ours +0
 reason given: notOurs
 meaning: weigh.argument.money · firm · toward request · private intent: refuse
 change: Louie Costa has refused once already this visit; argument 2 adds 0
@@ -2226,7 +2219,7 @@ change: Louie Costa has refused once already this visit; argument 2 adds 0
 
 ```
 ▶ refuse = 0.3: not ours, not worth the friction +0.2, he has not heard of trouble on his streets +0.1
-  accept = -0.34: Lou’s people on his own streets (as he knows it) +0, his regard for Henry +0.16, arguments +0, trouble with another captain -0.5, the man is not one of ours +0
+  accept = -0.34: Richie’s people on his own streets (as he knows it) +0, his regard for Henry +0.16, arguments +0, trouble with another captain -0.5, the man is not one of ours +0
 reason given: notOurs
 meaning: refuse.intervention.notOurs · flat · toward request · private intent: refuse
 ```
@@ -2250,7 +2243,7 @@ meaning: refuse.intervention.notOurs · flat · toward request · private intent
 
 ```
 ▶ refuse = 0.3: not ours, not worth the friction +0.2, he has not heard of trouble on his streets +0.1
-  accept = -0.39: Lou’s people on his own streets (as he knows it) +0, his regard for Henry +0.16, arguments -0.05, trouble with another captain -0.5, the man is not one of ours +0
+  accept = -0.39: Richie’s people on his own streets (as he knows it) +0, his regard for Henry +0.16, arguments -0.05, trouble with another captain -0.5, the man is not one of ours +0
 reason given: notOurs
 meaning: condition.intervention · firm · toward request · private intent: refuse
 change: Louie Costa has refused once already this visit; argument 1 adds -0.05
@@ -2267,13 +2260,13 @@ change: Louie Costa has refused once already this visit; argument 1 adds -0.05
 >   *Let it go.*
 
 **You:** “There’s money in bringing Danny under our protection.”
-**Louie:** “Maybe. A bakery’s not much of an envelope.”
+**Louie:** “Maybe. A newsstand’s not much of an envelope.”
 
 <details><summary>trace</summary>
 
 ```
 ▶ refuse = 0.3: not ours, not worth the friction +0.2, he has not heard of trouble on his streets +0.1
-  accept = -0.39: Lou’s people on his own streets (as he knows it) +0, his regard for Henry +0.16, arguments -0.05, trouble with another captain -0.5, the man is not one of ours +0
+  accept = -0.39: Richie’s people on his own streets (as he knows it) +0, his regard for Henry +0.16, arguments -0.05, trouble with another captain -0.5, the man is not one of ours +0
 reason given: notOurs
 meaning: weigh.argument.money · firm · toward request · private intent: refuse
 change: Louie Costa has refused once already this visit; argument 2 adds 0

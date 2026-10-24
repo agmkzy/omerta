@@ -189,14 +189,13 @@ describe('generalisation and determinism', () => {
     assert.notDeepStrictEqual(g.decisions['loan · as it stands'], g.decisions['loan · knows and trusts him']);
     assert.ok(kinds('protection · as it stands').length >= 2);
   });
-  // A known failure (Gate 1 limitation): the meaning of an answer carries no place for what the speaker is to the matter, so the
-  // man whose own shop was hit is given a bystander's line. Expected to fail until the meaning carries his role.
-  ok.fails('a victim is never given a bystander’s line', { tags: ['scenario'] }, () => {
+  // (Gate 1 found the man whose own shop was hit given a bystander's line; Gate 2a gave the meaning his role. A regression now.)
+  ok('a victim is never given a bystander’s line, and the meaning’s role is the one his knowledge gives him', { tags: ['scenario'] }, () => {
     assert.deepStrictEqual(g.roleMismatch, []);
   });
-  // A known failure (Gate 1 limitation): some lines still carry the worked examples' particulars (a bakery, a window, a Tuesday,
-  // "for years", "across the street") that the decision never established for this man.
-  ok.fails('no line asserts a particular the decision did not establish', { tags: ['scenario'] }, () => {
+  // (Gate 1 found lines carrying the worked examples' particulars: a bakery, a window, a Tuesday, "for years", "across the street".
+  // Gate 2a moved every particular into a slot filled from perception. A regression now.)
+  ok('no line asserts a particular the decision did not establish', { tags: ['scenario'] }, () => {
     assert.deepStrictEqual(g.assumed, []);
   });
 });

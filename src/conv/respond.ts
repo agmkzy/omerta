@@ -1,10 +1,11 @@
 // The response decision (spec §4.4), minimal for Gate 1: first what he cannot or must not do (constraints), then what each
 // permissible move is worth to him, from his own perception. Every term is recorded, so the trace can say why.
-import type { Character } from '../types';
+import { DAY, type Character } from '../types';
 import type { Perception } from './perception';
-import type { Candidate, Decision, Meaning, Term } from './types';
+import { CLAIMABLE, type Candidate, type Decision, type Meaning, type Role, type Term } from './types';
 import type { EncounterMemory } from './encounter';
 
+const agoWords = (now: number, t: number) => { const d = Math.floor(now / DAY) - Math.floor(t / DAY); return d <= 0 ? 'today' : d === 1 ? 'yesterday' : d < 7 ? `${d} days ago` : 'last week'; };
 const r2 = (x: number) => Math.round(x * 100) / 100;
 const first = (n: string) => n.split(' ')[0];
 const sur = (n: string) => n.split(' ').slice(-1)[0];
@@ -45,7 +46,7 @@ export function onIntroduction(p: Perception, speaker: Character, family: string
     cand('neutral', [{ name: 'nothing to say about it', value: 0.3 }]),
   ];
   const c = best(cs);
-  const youName = speaker.name, slots: Record<string, string> = { youName, youFamily: family, youSurname: sur(youName) };
+  const youName = speaker.name, slots: Record<string, string> = { youName, youFamily: family, youSurname: sur(youName), since: p.particulars.protectedSince() ?? '' };
   let key = 'react.introduction.' + c.move;
   if (c.move === 'warnOff.protector' && arr) { key = 'react.introduction.warnOff.' + (arr.family === family ? 'sameFamily' : 'otherFamily'); Object.assign(slots, { collectorFirst: first(arr.collector), collectorFamily: arr.family }); }
   if (c.move === 'warnOff.kin' && kin) { key = 'react.introduction.warnOff.kin'; Object.assign(slots, { kinFirst: first(kin.name), kinFamily: kin.family! }); }
@@ -78,7 +79,7 @@ export function onProtectionDemand(p: Perception, asker: Character, fee: number,
   const c = best(cs);
   // the reason he gives: the decisive factor, or a cover for it
   let grounds = 'doesNotKnow', honest = true, stance: Meaning['stance'] = 'flat', toward: Meaning['toward'] = 'speaker', implies: Meaning['implies'] = 'none';
-  const slots: Record<string, string> = { youName: asker.name, youSurname: sur(asker.name), youFamily: who.family ?? '', amt: `$${fee}` };
+  const slots: Record<string, string> = { youName: asker.name, youSurname: sur(asker.name), youFamily: who.family ?? '', amt: `$${fee}`, ownNoun: p.particulars.ownShopNoun() ?? '' };
   let key = 'refuse.protection';
   let counterAmt: number | undefined;
   if (c.move === 'refuse') {
@@ -108,12 +109,12 @@ export function onProtectionDemand(p: Perception, asker: Character, fee: number,
 }
 
 // ---------------------------------------------------------------- a stated intention: he hears it; it binds nobody
-export function onAnnouncement(p: Perception, speaker: Character): Reply {
+export function onAnnouncement(p: Perception, speaker: Character, day = ''): Reply {
   const arr = p.own.arrangement, t = p.temper;
   const plan = arr && t.caution > 0.5 ? `tell ${arr.collector} that ${speaker.name} came asking` : t.caution > 0.55 ? `ask around about ${speaker.name}` : t.pride > 0.6 ? 'give the same answer' : 'think it over';
   return {
     decision: { by: p.self.id, constraints: [], candidates: [cand('acknowledge', [{ name: 'he heard it; he has promised nothing', value: 1 }])], chosen: 'acknowledge', aim: 'end the conversation' },
-    meaning: { key: 'acknowledge.return', stance: t.pride > 0.6 ? 'cold' : 'flat', toward: 'speaker' }, intent: 'acknowledge', honest: true,
+    meaning: { key: 'acknowledge.return', stance: t.pride > 0.6 ? 'cold' : 'flat', toward: 'speaker', slots: { day: day ? day[0].toUpperCase() + day.slice(1) : '' } }, intent: 'acknowledge', honest: true,
     changes: [`Recorded: ${speaker.name}'s stated intention to come back (binds nobody)`, `${p.self.name}'s own next step, privately: ${plan}`],
   };
 }
@@ -163,11 +164,11 @@ export function onIntervention(p: Perception, henry: Character, forC: Character,
   }
   const order = 0.35 + t.caution * 0.3 + Math.max(0, fc.trust - fc.grudge) * 0.2; // the cost of going to another captain over a civilian
   const cs = [
-    cand('accept', [{ name: 'Lou’s people on his own streets (as he knows it)', value: k.knowsTrouble ? 0.75 : 0, basis: k.trouble?.shop }, { name: `his regard for ${first(henry.name)}`, value: fh.trust * 0.25 }, { name: 'arguments', value: argSum }, { name: 'trouble with another captain', value: -order }, { name: 'the man is not one of ours', value: k.forProtected ? 0 : -0.15 }]),
+    cand('accept', [{ name: `${first(against.name)}’s people on his own streets (as he knows it)`, value: k.knowsTrouble ? 0.75 : 0, basis: k.trouble?.shop }, { name: `his regard for ${first(henry.name)}`, value: fh.trust * 0.25 }, { name: 'arguments', value: argSum }, { name: 'trouble with another captain', value: -order }, { name: 'the man is not one of ours', value: k.forProtected ? 0 : -0.15 }]),
     cand('refuse', [{ name: 'not ours, not worth the friction', value: (k.forProtected ? 0 : 0.25) + order * 0.4 }, { name: 'he has not heard of trouble on his streets', value: k.knowsTrouble ? -0.3 : 0.1 }]),
   ];
   const c = best(cs);
-  const slots = { forFirst: first(forC.name), againstFirst: first(against.name), theirCaptainFirst: first(k.theirCaptain.name), hitShop: k.trouble?.shop ?? '' };
+  const slots = { forFirst: first(forC.name), againstFirst: first(against.name), theirCaptainFirst: first(k.theirCaptain.name), hitShop: k.trouble?.shop ?? '', forNoun: p.particulars.shopNounOf(forC.id) ?? '', youFirst: first(henry.name) };
   const liable = c.move === 'accept' && order > 0.4;
   // within the visit: a refusal he has already given, argued again without anything new, is answered as such
   if (mem && c.move === 'refuse' && mem.has('reason:notOurs') && args.length) {
@@ -210,17 +211,25 @@ export function onProgressQuestion(p: Perception, henry: Character, forC: Charac
 
 // ---------------------------------------------------------------- a question between men: what he knows, and whether he'll say it
 export function onWhoQuestion(p: Perception, asker: Character, factId: string, actor: Character | undefined): Reply {
-  const k = p.self.known[factId], f = p.feelingFor(asker), t = p.temper;
+  const fact = p.knownFacts((x) => x.id === factId)[0], f = p.feelingFor(asker), t = p.temper;
+  const k = p.self.known[factId];
+  // what he is to it decides how he can speak of it and what he can honestly claim: the man it was done to speaks of his own
+  // loss, a witness of what he saw, a man who heard of it only of what is said (types.CLAIMABLE)
+  const role: Role = fact ? p.roleIn(fact) : 'none';
   const knowsWho = !!k?.knowsActor && !!actor;
   const protects = !!actor && p.feelingFor(actor).affection >= 0.6;
-  const willSay = knowsWho && !protects && f.trust >= 0.45;
-  const seen = k?.from === 'witness' || k?.from === 'self';
-  const key = !k || !knowsWho ? 'answer.who.unknown' : !willSay ? 'answer.who.withhold' : seen ? 'answer.who.knows' : 'answer.who.rumour';
+  const afraid = role === 'victim' && !!actor && (p.feelingFor(actor).fear ?? 0) + (1 - t.courage) * 0.4 > 0.5;
+  const willSay = knowsWho && !protects && !afraid && f.trust >= 0.45;
+  const move = !k || !knowsWho ? 'unknown' : !willSay ? 'withhold' : 'knows';
+  const key = 'answer.who.' + move;
+  const basis = CLAIMABLE[role][0];
+  // withholding what he saw by saying he saw nothing is a lie; a victim or a man who only heard, keeping quiet, says so plainly
+  const honest = !(move === 'withhold' && role === 'witness');
   return {
-    decision: { by: p.self.id, constraints: protects ? [{ kind: 'loyalty', source: `he is close to ${actor!.name}` }] : [], candidates: [cand(key.split('.').pop()!, [{ name: 'he knows who', value: knowsWho ? 1 : 0 }, { name: `trust in ${first(asker.name)}`, value: f.trust }, { name: 'caution', value: -t.caution * 0.2 }])], chosen: key.split('.').pop()!, aim: willSay ? 'help you' : undefined },
-    meaning: { key, stance: 'flat', toward: 'third', slots: { actorFirst: actor ? first(actor.name) : '', basis: seen ? 'I was across the street.' : '' } },
-    intent: willSay ? 'inform' : 'withhold', honest: !(key === 'answer.who.withhold' && knowsWho),
-    changes: willSay ? [`${asker.name} now knows who did it (from ${p.self.name}, who ${seen ? 'saw it' : 'heard it'})`] : [],
+    decision: { by: p.self.id, constraints: [...(protects ? [{ kind: 'loyalty', source: `he is close to ${actor!.name}` }] : []), ...(afraid ? [{ kind: 'fear', source: `${actor!.name} did it to him` }] : [])], candidates: [cand(move, [{ name: 'he knows who', value: knowsWho ? 1 : 0 }, { name: `trust in ${first(asker.name)}`, value: f.trust }, { name: 'caution', value: -t.caution * 0.2 }])], chosen: move, aim: willSay ? 'help you' : undefined },
+    meaning: { key, stance: 'flat', toward: 'third', role, slots: { actorFirst: actor && move === 'knows' ? first(actor.name) : '' } },
+    intent: willSay ? 'inform' : 'withhold', honest,
+    changes: willSay ? [`Claim made to ${asker.name}: ${actor!.name} did it (basis: ${basis}; he is the ${role === 'victim' ? 'man it was done to' : role === 'witness' ? 'man who saw it' : 'man who heard of it'})`] : !honest ? [`Claim made to ${asker.name}: he saw nothing (honest: false; he saw it)`] : [],
   };
 }
 
@@ -290,13 +299,18 @@ export function onUnknownTopic(p: Perception, asker: Character, topic: string): 
 
 // ---------------------------------------------------------------- the man you promised, when you come back (spec §6.7, §17.9 C)
 // He opens with where things stand as HE knows it: still waiting, or he has seen Lou's people stop coming and wonders why.
-export function onReturnToPromisee(p: Perception, henry: Character, seenStop: boolean, daysSince: number): Reply {
+export function onReturnToPromisee(p: Perception, henry: Character, seenStop: boolean, daysSince: number, against?: Character): Reply {
   const t = p.temper;
   const key = seenStop ? 'followup.observed' : 'followup.pending';
   return {
     decision: { by: p.self.id, constraints: [], candidates: [cand(key, [{ name: seenStop ? 'he has seen Lou’s people stay away' : 'he has heard nothing from you', value: 1 }, { name: 'days since you promised', value: daysSince * 0.1 }, { name: 'patience (caution, agreeable)', value: t.caution * 0.2 + t.agreeable * 0.2 }])], chosen: key, aim: seenStop ? 'find out who to thank' : 'hold you to it' },
-    meaning: { key, stance: seenStop ? 'warm' : 'flat', toward: 'speaker' }, intent: 'question', honest: true,
+    meaning: { key, stance: seenStop ? 'warm' : 'flat', toward: 'speaker', slots: { againstFirst: against ? first(against.name) : '', lastSeen: against ? p.particulars.lastAt(HOSTILE_KINDS, against.id) ?? '' : '' } }, intent: 'question', honest: true,
   };
+}
+const HOSTILE_KINDS = ['vandalism', 'threat', 'beating', 'protection_refused', 'robbery'];
+// A man in trouble asks for help: with what he knows of it (who, and when he last saw them), from his own knowledge.
+export function onSeekHelp(p: Perception, against: Character): Reply {
+  return { decision: { by: p.self.id, constraints: [], candidates: [cand('seekHelp', [{ name: `${first(against.name)} wants money off him`, value: 1 }])], chosen: 'seekHelp', aim: `get someone to make ${first(against.name)} stop` }, meaning: { key: 'seek.help', stance: 'pleading', toward: 'third', role: 'victim', slots: { againstFirst: first(against.name), lastSeen: p.particulars.lastAt(HOSTILE_KINDS, against.id) ?? '' } }, intent: 'ask', honest: true };
 }
 export function onReport(p: Perception, henry: Character, kind: 'honest' | 'stall' | 'done' | 'admitNotDone'): Reply {
   const t = p.temper;
@@ -331,10 +345,11 @@ export function onCollectionReport(p: Perception, boss: Character, debtor: Chara
   };
 }
 // What the debtor says when asked about it: from his own state, so it is the truth as he knows it.
-export function onDebtQuestion(p: Perception, asker: Character, paid: number, to: Character, day: string): Reply {
+export function onDebtQuestion(p: Perception, asker: Character, paid: number, to: Character): Reply {
+  const when = p.knownFacts((x) => x.kind === 'debt_paid' && x.actor === p.self.id).sort((a, b) => b.t - a.t)[0];
   return {
     decision: { by: p.self.id, constraints: [], candidates: [cand('answer', [{ name: 'he paid, and wants it known', value: 1 }])], chosen: 'answer', aim: 'not be asked twice for the same money' },
-    meaning: { key: 'answer.debt.paid', stance: 'firm', toward: 'third', slots: { amt: `$${paid}`, day, toFirst: first(to.name) } },
+    meaning: { key: 'answer.debt.paid', stance: 'firm', toward: 'third', role: 'actor', slots: { amt: `$${paid}`, when: when ? agoWords(p.at, when.t) : '', toFirst: first(to.name) } },
     intent: 'inform', honest: true, changes: [`Claim made to ${asker.name}: "I paid ${to.name} $${paid}" (honest: true)`],
   };
 }
@@ -354,12 +369,12 @@ export function onConfrontation(p: Perception, accuser: Character, lied: boolean
   };
 }
 // How a man in trouble takes what you've promised him (the kind of promise is in what you said, never named on screen).
-export function onPromise(p: Perception, henry: Character, type: 'action' | 'effort' | 'result' | 'restraint'): Reply {
+export function onPromise(p: Perception, henry: Character, type: 'action' | 'effort' | 'result' | 'restraint', against?: Character): Reply {
   const t = p.temper;
   const relief = { action: 0.4, effort: 0.25, result: 0.8, restraint: 0.5 }[type];
   return {
     decision: { by: p.self.id, constraints: [], candidates: [cand('acknowledge', [{ name: 'what it gives him', value: relief }, { name: 'trust in you', value: p.feelingFor(henry).trust * 0.3 }])], chosen: 'acknowledge', aim: type === 'result' ? 'hold you to it' : undefined },
-    meaning: { key: 'ack.promise.' + type, stance: type === 'result' ? 'warm' : 'flat', toward: 'speaker' }, intent: 'acknowledge', honest: true,
+    meaning: { key: 'ack.promise.' + type, stance: type === 'result' ? 'warm' : 'flat', toward: 'speaker', slots: { againstFirst: against ? first(against.name) : '' } }, intent: 'acknowledge', honest: true,
     changes: [`${p.self.name}'s trust in ${henry.name} rises a little now (more for a bigger promise); it will move again when he sees what comes of it`, ...(t.caution > 0.6 ? ['He keeps his own counsel on whether to believe it'] : [])],
   };
 }
