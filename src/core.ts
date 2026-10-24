@@ -378,7 +378,8 @@ export function addFact(
     ...f,
     id: newId(w, 'f'),
     t: w.now,
-    district: f.district ?? actor?.district ?? victim?.district ?? DISTRICTS[0],
+    // (what happens at a business happens where the business is, not where the man who did it lives)
+    district: f.district ?? (f.business ? w.biz[f.business]?.district : undefined) ?? actor?.district ?? victim?.district ?? DISTRICTS[0],
   };
   w.facts[fact.id] = fact;
   // two men who were in it together, either side of it, now know each other better (core.knowMore)

@@ -88,15 +88,25 @@ ok('a man who already pays someone goes to him; the protector warns the player o
 });
 
 ok('a superior who hears his man brought trouble wants a word', () => {
-  const w = createWorld(5, 'Tony Marino'), p = P(w);
-  const b = shop(w, (x) => !x.protection), o = w.chars[b.ownerId];
-  const s = openAsk(w, 'protect', p, o, { biz: b.id, amt: 60 })!;
-  move(w, s, 'ask'); move(w, s, 'force');
-  const boss = w.chars[p.bossId!];
-  const f = Object.values(w.facts).find((x) => x.story === 'sit:' + s.id && x.kind === 'vandalism')!;
-  boss.known[f.id] = { t: w.now, from: o.id, knowsActor: true };
-  s.next = w.now; advance(w, w.now + 2 * DAY);
-  assert.ok(w.enc.some((e) => e.kind === 'word' && e.from === boss.id), 'he calls the player in');
+  // (a shopkeeper who gives in on the spot closes the matter before anyone above hears of it; the rule is about one who holds out,
+  // so the first shop whose owner does not give in at once is used: what each owner does is his own, under street pressure)
+  for (let i = 0; i < 8; i++) {
+    const w = createWorld(5, 'Tony Marino'), p = P(w);
+    const b = Object.values(w.biz).filter((x) => x.open && !x.protection && w.chars[x.ownerId]?.rank === 'civilian')[i], o = w.chars[b.ownerId];
+    const s = openAsk(w, 'protect', p, o, { biz: b.id, amt: 60 });
+    if (!s) continue;
+    move(w, s, 'ask'); move(w, s, 'force');
+    const boss = w.chars[p.bossId!];
+    const f = Object.values(w.facts).find((x) => x.story === 'sit:' + s.id && x.kind === 'vandalism');
+    if (!f) continue;
+    boss.known[f.id] = { t: w.now, from: o.id, knowsActor: true };
+    s.next = w.now; advance(w, w.now + 60);
+    if (s.stage === 'resolved') continue;
+    advance(w, w.now + 2 * DAY);
+    assert.ok(w.enc.some((e) => e.kind === 'word' && e.from === boss.id), 'he calls the player in');
+    return;
+  }
+  assert.fail('no shopkeeper held out long enough to test it');
 });
 
 ok('NPCs pursue matters on their own: shops are approached once at a time, matters end in different ways, the world stays sound', () => {

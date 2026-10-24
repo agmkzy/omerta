@@ -6,7 +6,7 @@ import { DAY } from '../types';
 import type { Store } from './obligations';
 
 export interface Agreement { id: Id; t: number; parties: Id[]; terms: string; madeIn?: Id; witnesses: Id[]; obligations: Id[] }
-export type Wants = 'intervene' | 'order';
+export type Wants = 'intervene' | 'order' | 'progress' | 'confront' | 'report';
 // A request (spec §6.1): one man asking another for something, on someone's behalf or his own, serving an obligation or not. Where
 // the world already has an ask for it (asks.ts), the request rides on it (`sit`), and the ask's own lifecycle carries it.
 export interface Request {
@@ -15,6 +15,7 @@ export interface Request {
   parent?: Id;                 // the obligation it serves
   sit?: Id;                    // the world's ask it rides on
   rode?: { ak?: string; out?: string }; // what that ask was and how it ended (the world sweeps closed asks; the request keeps this)
+  reported?: boolean;          // the man it was for has been sent word of how it ended
   status: 'open' | 'agreed' | 'refused' | 'referred' | 'lapsed' | 'done';
   next?: number;               // when the man asked answers (NPC to NPC)
   hist: { t: number; event: string }[];
@@ -24,6 +25,7 @@ export interface Social extends Store {
   // Gate 2b (all optional: a store from Gate 2a loads as it is)
   said?: import('./minds').Said[]; held?: import('./minds').Held[]; revisions?: import('./minds').Revision[]; judged?: import('./minds').Judged[];
   pursuits?: import('./pursuits').Pursuit[];
+  talks?: Record<Id, import('./visit').TalkMemory>; // Gate 3: what has passed between the player and each man, as it bears on what is said next
 }
 export const social = (w: World): Social => (w.social ??= { obs: [], log: [], n: 0, agreements: [], requests: [] });
 export const sid = (s: Social, p: string) => p + ++s.n;

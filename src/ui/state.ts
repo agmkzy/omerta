@@ -35,6 +35,7 @@ export type View =
   | { t: 'meeting'; m: Meeting; lines: string[] }
   | { t: 'guests'; picked: Id[] }
   | { t: 'talk'; convo: Convo; lines: string[]; q?: string; history?: { q?: string; lines: string[] }[]; ended?: boolean }
+  | { t: 'talk2'; v: import('../conv/visit').Visit } // (Gate 3: the new conversation screen, behind a switch: ui/talk2.ts)
   | { t: 'people' }
   | { t: 'brief' }
   | { t: 'sunday' }

@@ -152,7 +152,7 @@ describe('the Ferrara dispute end to end, on real records', () => {
   ok('a result can be kept with no credit: the trouble stops, but not through anything Henry set going', { tags: ['scenario'] }, () => {
     // (whichever of the men the world has turns out this way: found, not chosen)
     let r: ReturnType<typeof chain> | undefined;
-    for (let n = 0; n < 6 && !(r && r.o1?.status === 'kept' && r.o1.credit === 'none'); n++) { const c = cast(7, n); if (c) r = chain(c, 'result', { days: 40 }); }
+    for (let n = 0; n < 6 && !(r && r.o1?.status === 'kept' && r.o1.credit === 'none'); n++) { const c = cast(11, n); if (c) r = chain(c, 'result', { days: 40 }); }
     assert.equal(r!.o1!.status, 'kept'); assert.equal(r!.o1!.credit, 'none');
   });
 });

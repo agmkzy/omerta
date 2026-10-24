@@ -220,7 +220,9 @@ describe('long runs (priority 8)', () => {
   ok('emergence floors (set from the first baseline, held as regressions): pursuits through two or more people, plans changed by what was learnt, requests answered between NPCs', { tags: ['sim'] }, () => {
     const sum = (k: 'throughTwo' | 'revisionsChangedPlan' | 'requests' | 'pursuits') => runs.reduce((a, r) => a + r.e[k], 0);
     assert.ok(sum('pursuits') >= 80, `${sum('pursuits')} pursuits`);
-    assert.ok(sum('throughTwo') >= 8, `${sum('throughTwo')} through two or more people`);
+    // (re-baselined at Gate 3 after the fix that records a deed at a business in the business's district: captains now see trouble on
+    // their own ground and settle more at the first man, so fewer matters need a second)
+    assert.ok(sum('throughTwo') >= 6, `${sum('throughTwo')} through two or more people`);
     assert.ok(sum('revisionsChangedPlan') >= 4, `${sum('revisionsChangedPlan')} plans changed by a revision`);
     assert.ok(sum('requests') >= 80, `${sum('requests')} requests`);
   });

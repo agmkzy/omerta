@@ -86,3 +86,8 @@ export function spendTime(w: World, a: Character, b: Character, about = ''): Act
   if (c > 0.15) feel(w, b, a.id, 'trust', 0.03, 'an evening together');
   return record(w, { actor: a.id, act: 'spendTime', target: b.id, about });
 }
+// introduce: the player and a man now know each other by name (the player's record of who he has met; core.knowMore)
+export function introduce(w: World, p: Character, t: Character): void {
+  if (!p.intro?.[t.id]) (p.intro ??= {})[t.id] = w.now;
+  if ((t.rels[p.id]?.known ?? 0) < 0.1) knowMore(p, t, 0.1);
+}

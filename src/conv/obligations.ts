@@ -62,7 +62,7 @@ function doneBy(w: World, s: Store, ob: Obligation, acts: string[], about: strin
 // hostility by his people against the man (or his place) inside the period
 export function violation(w: World, sp: Extract<Spec, { kind: 'noHostility' }>, from: number, until: number): Fact | undefined {
   const men = menOf(w, sp.actor);
-  return Object.values(w.facts).find((f) => HOSTILE.has(f.kind) && f.actor && men.has(f.actor) && (f.victim === sp.target || (!!sp.biz && f.business === sp.biz)) && f.t > from && f.t <= until);
+  return Object.values(w.facts).find((f) => HOSTILE.has(f.kind) && !!offender(f) && men.has(offender(f)!) && (injured(f) === sp.target || (!!sp.biz && f.business === sp.biz)) && f.t > from && f.t <= until);
 }
 // impossible, by nobody's doing he could be blamed for: the man it was for is dead, or the place it was about is gone
 function impossible(w: World, ob: Obligation): string | undefined {

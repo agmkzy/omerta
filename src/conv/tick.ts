@@ -9,7 +9,7 @@ import { onClose } from '../situ';
 import type { Character, Id, World } from '../types';
 import { DAY } from '../types';
 import { newSession, perceive } from './perception';
-import { conflicts, HOSTILE, settle, type Obligation, type Settlement } from './obligations';
+import { conflicts, HOSTILE, offender, settle, type Obligation, type Settlement } from './obligations';
 // (pursuits listen here: a promise an NPC makes, or is made to, starts his own pursuit of it)
 export const onPromise: ((w: World, ob: Obligation) => void)[] = [];
 import { note, prune, sid, social, type Agreement, type Request } from './social';
@@ -48,7 +48,8 @@ export function request(w: World, r: Omit<Request, 'id' | 't' | 'status' | 'hist
 export function captaincyOf(w: World, captain: Character, forC: Character, against: Character, asker?: Character): Captaincy {
   const p = perceive(w, newSession(), captain), ground = crewGround(w, captain), b = ownerBiz(w, forC.id);
   const men = new Set([against.id, ...Object.values(w.chars).filter((c) => c.bossId === against.id).map((c) => c.id)]);
-  const trouble = p.knownFacts((f) => HOSTILE.has(f.kind) && !!f.actor && men.has(f.actor) && ground.has(f.district) && w.now - f.t < 30 * DAY).sort((x, y) => y.t - x.t)[0];
+  // (trouble by the man or his people on this captain's ground, as he knows it: a demand made there counts, as well as harm done)
+  const trouble = p.knownFacts((f) => HOSTILE.has(f.kind) && !!offender(f) && men.has(offender(f)!) && ground.has(f.district) && w.now - f.t < 30 * DAY).sort((x, y) => y.t - x.t)[0];
   const asked = asker ? social(w).log.filter((a) => a.actor === asker.id && a.act === 'raise' && a.target === captain.id).length : 0;
   return {
     groundHasFor: !!b && ground.has(b.district), forProtected: !!b?.protection && b.protection.familyId === captain.familyId && captainOf(w, w.chars[b.protection.collectorId] ?? captain)?.id === captain.id,
@@ -78,7 +79,7 @@ function judgements(w: World) {
         (ob as Obligation & { handled?: number }).handled = w.now;
         const d = onDisobedience(perceive(w, newSession(), boss), man);
         enter({ t: w.now, who: boss.id, with: man.id, what: `${boss.name} believes ${man.name} went against his order: ${d.decision.chosen}`, reply: d });
-        const why = Object.values(w.facts).filter((f) => HOSTILE.has(f.kind) && boss.known[f.id] && f.t >= ob.from && (f.actor === man.id || w.chars[f.actor ?? '']?.bossId === man.id)).sort((x, y) => y.t - x.t)[0];
+        const why = Object.values(w.facts).filter((f) => HOSTILE.has(f.kind) && boss.known[f.id] && f.t >= ob.from && (offender(f) === man.id || w.chars[offender(f) ?? '']?.bossId === man.id)).sort((x, y) => y.t - x.t)[0];
         if (d.decision.chosen === 'discipline') { door.grudge(w, boss, man.id, 0.2, `${man.name} went against what he was told`); door.discipline(w, boss, man, why?.id ?? '', 100); }
         else if (d.decision.chosen === 'rebuke') { door.grudge(w, boss, man.id, 0.1, `${man.name} went against what he was told`); door.regard(w, man, boss.id, 'fear', 0.1, `${boss.name} took him to task`); }
       }
@@ -149,6 +150,17 @@ export function socialDay(w: World) {
       else { r.status = 'refused'; note(r, w.now, `${of.name} refused`); door.happened(w, { kind: 'rumour', minor: true, actor: of.id, victim: by.id, text: `${of.name} would not rein in ${man.name} for ${by.name}.` }, { witnesses: [by.id] }); }
     } else if (hooks.intervene) hooks.intervene(w, r);
     else { r.status = 'referred'; note(r, w.now, `${of.name} cannot order ${man.name}`); }
+  }
+  // 2b. news for the player: a man who took the player's matter further has heard back (he comes to tell him); requests of the player
+  //     that he never came to answer lapse after a week
+  for (const r of s.requests) {
+    if (r.status === 'open' && w.chars[r.of]?.isPlayer && w.now - r.t > 7 * DAY) { r.status = 'lapsed'; note(r, w.now, 'he never came'); }
+    // (only a request made of someone else to act is reported back: never the reports, follow-ups and confrontations themselves)
+    if ((r.status === 'refused' || r.status === 'done') && r.parent && !r.reported && (r.wants === 'order' || r.wants === 'intervene') && !w.chars[r.of]?.isPlayer) {
+      const ob = s.obs.find((o) => o.id === r.parent), h = ob ? w.chars[ob.beneficiary] : undefined;
+      r.reported = true;
+      if (ob && h?.isPlayer && ob.obligor === r.by) request(w, { by: r.by, of: h.id, wants: 'report', about: r.about, parent: ob.id });
+    }
   }
   // 3. what people are pursuing, each by his own lights
   for (const f of hooks.day) f(w);

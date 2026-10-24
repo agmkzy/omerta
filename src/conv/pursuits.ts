@@ -121,7 +121,7 @@ function stopTrouble(w: World, p: Pursuit) {
   const v = live(w, p.who), a = live(w, p.against);
   if (!v || !a) return done(w, p, 'abandoned', 'the man is gone');
   const b = ownerBiz(w, v.id), dem = demandOf(w, v, a);
-  const last = Object.values(w.facts).filter((f) => HOSTILE.has(f.kind) && f.actor && (f.actor === a.id || w.chars[f.actor]?.bossId === a.id) && (f.victim === v.id || (!!b && f.business === b.id)) && v.known[f.id]).reduce((m, f) => Math.max(m, f.t), p.since);
+  const last = Object.values(w.facts).filter((f) => HOSTILE.has(f.kind) && !!offender(f) && (offender(f) === a.id || w.chars[offender(f)!]?.bossId === a.id) && (injured(f) === v.id || (!!b && f.business === b.id)) && v.known[f.id]).reduce((m, f) => Math.max(m, f.t), p.since);
   if (!dem && w.now - last > 21 * DAY) return done(w, p, 'achieved', `${a.name} has left him alone for three weeks`);
   // waiting on something already set going
   if (p.waitingOn) {
@@ -264,6 +264,11 @@ function followUp(w: World, p: Pursuit) {
   if (!ob || !b) return done(w, p, 'abandoned', 'nothing to follow');
   judge(w, b, ob);
   const bel = belief(w, b, 'ob:' + ob.id), bv = bel.value;
+  // found out he was lied to, by the player: he will say so to his face
+  if (o?.isPlayer && (s.judged ?? []).some((j) => j.who === b.id && j.ob === ob.id && j.lied) && !s.requests.some((r) => r.by === b.id && r.wants === 'confront' && r.parent === ob.id)) {
+    request(w, { by: b.id, of: o.id, wants: 'confront', about: 'lie', parent: ob.id });
+    enter({ t: w.now, who: b.id, with: o.id, what: `${b.name} goes to find ${o.name}: he knows now he was lied to`, chain: p.id });
+  }
   // what settles his question depends on what was promised (spec §6.3): told credibly that the thing was done settles a promise to
   // do it, or to try; a promise of a result, or to stay away, is settled by the result, not by the man saying he did his part
   const deed = ob.type === 'action' || ob.type === 'effort';
@@ -294,6 +299,12 @@ function followUp(w: World, p: Pursuit) {
     : last?.value === 'notYet' && quietFor >= p.patience ? 'he was told “not yet”, and has waited'
     : daysLeft <= 1 && daysLeft >= 0 && !heardSinceAsked && !(deed && last?.value === 'done') ? 'the time is nearly up'
     : undefined;
+  // the player is asked in person: he comes to find him (a request of the player, which the player answers when they meet)
+  if (o?.isPlayer && reason && !(last && last.value === 'done') && !s.requests.some((r) => r.by === b.id && r.of === o.id && r.wants === 'progress' && r.parent === ob.id && (r.status === 'open' || w.now - r.t < p.patience * DAY))) {
+    p.waitedFrom = w.now;
+    request(w, { by: b.id, of: o.id, wants: 'progress', about: (ob.spec as { about?: string }).about ?? 'promise', parent: ob.id, for: ob.matter?.for, against: ob.matter?.against });
+    enter({ t: w.now, who: b.id, with: o.id, what: `${b.name} goes to find ${o.name}, to ask where his promise stands (${reason})`, chain: p.id });
+  }
   if (o && reason && !o.isPlayer && !(last && last.value === 'done')) {
     p.waitedFrom = w.now;
     const did = spec.kind === 'actionDone' ? s.log.some((x) => x.actor === ob.obligor && x.act === (spec as { act: string }).act && x.about === (spec as { about: string }).about && x.t >= ob.from) : false;

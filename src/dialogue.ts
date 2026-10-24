@@ -614,6 +614,8 @@ function leadPuts(w: World, p: Character, t: Character, puts: DOpt[]): DOpt[] {
   const want = ROLE_PUTS[role];
   return want.map((k) => puts.find((o) => o.code.split(':')[0] === k)).filter((o): o is DOpt => !!o).slice(0, 2);
 }
+// Gate 3: what a man would naturally put to this one first, by code (the new conversation screen offers these up front)
+export const leadCodes = (w: World, p: Character, t: Character): string[] => { const g = gather(w, p, t, startConvo(t.id)); return leadPuts(w, p, t, putRows(w, p, t, g)).map((o) => o.code); };
 // Everything between you, for the "other things" row (the hub shows only the most pressing three).
 function hubBetween(w: World, p: Character, t: Character, c: Convo): DOpt[] {
   const full = hub(w, p, t, { ...c, ctx: { ...c.ctx, focus: undefined, cold: true } }, true);
