@@ -8,6 +8,7 @@ import { addFavour } from '../../encounters';
 import { openAsk, playerMove } from '../../asks';
 import { replies as exReplies } from '../../exchange';
 import { mkJob } from '../../jobs';
+import { addEnc } from '../../encounters';
 import { social } from '../../conv/social';
 import { DAY, type Character, type World } from '../../types';
 import { newWorld, P } from '../helpers';
@@ -247,4 +248,64 @@ describe('Gate 4 parity, Stage C: the family', () => {
     { name: 'taking a man on', who: (x) => x.shop, setup: (x, t) => { t.prospect = true; x.p.rank = 'soldier'; x.p.cash = 1000; }, old: 'recruit_offer' },
   ];
   for (const cs of C) ok(cs.name, { tags: ['compat'] }, () => check(cs));
+});
+
+describe('Gate 4 parity, Stage D: having things out, his ask, and what is on his mind', () => {
+  const D: Case[] = [
+    { name: 'demanding an explanation', who: (x) => x.fam, setup: (x, t) => { t.cash = 900; return { f: event(x.w, 'robbery', t, x.p, [{ c: x.p, actor: true }, { c: t, actor: true }], 300).id }; }, old: (s) => 'demand:' + s.f, node: 'disputes', both: true },
+    { name: 'he lied, and the player knows', who: (x) => x.fam, setup: (x, t) => { const f = event(x.w, 'beating', t, x.shop, [{ c: t, actor: true }]); x.p.known[f.id] = { t: 0, from: x.boss.id, knowsActor: true }; (t.denied ??= {})[f.id] = 0; t.traits.courage = 0.8; return { f: f.id }; }, old: (s) => 'confront:' + s.f, both: true },
+    { name: 'the bad blood, raised', who: (x) => x.fam, setup: (x, t) => { rel(t, x.p.id).grudge = 0.4; }, old: 'f:amends', now: 'amends' },
+    { name: 'owning up', who: (x) => x.fam, setup: (x, t) => ({ f: event(x.w, 'beating', x.p, t, [{ c: t, actor: true }]).id }), old: (s) => 'a_own:' + s.f, node: 'amends' },
+    { name: 'paying to make it right', who: (x) => x.fam, setup: (x, t) => { x.p.cash = 2000; return { f: event(x.w, 'beating', x.p, t, [{ c: t, actor: true }], 200).id }; }, old: (s) => 'a_pay:' + s.f, node: 'amends' },
+    { name: 'he started it', who: (x) => x.fam, setup: (x, t) => { event(x.w, 'beating', t, x.p, [{ c: x.p, actor: true }]); t.traits.violence = 0.7; return { f: event(x.w, 'beating', x.p, t, [{ c: t, actor: true }]).id }; }, old: (s) => 'a_start:' + s.f, node: 'amends', both: true },
+    { name: 'I would do it again', who: (x) => x.fam, setup: (x, t) => ({ f: event(x.w, 'beating', x.p, t, [{ c: t, actor: true }]).id }), old: (s) => 'a_defy:' + s.f, node: 'amends' },
+    { name: 'what has he got against me', who: (x) => x.fam, setup: (x, t) => { rel(t, x.p.id).grudge = 0.4; }, old: 'a_ask', node: 'amends' },
+    { name: 'a drink to let it lie', who: (x) => x.fam, setup: (x, t) => { rel(t, x.p.id).grudge = 0.4; }, old: 'a_gift', node: 'amends' },
+    { name: 'a broken word, made right', who: (x) => x.fam, setup: (x, t) => { addFact(x.w, { kind: 'ruling', actor: x.p.id, victim: t.id, text: `${x.p.name} did not keep his word to ${t.name}.`, district: t.district }, { witnesses: [] }); }, old: 'word_make' },
+    { name: 'what is outstanding: a promise', who: (x) => x.fam, setup: (x, t) => { const j = mkJob(x.w, { kind: 'handle', title: 'x', brief: 'x', giver: t.id, via: 'tip', assignee: x.p.id, target: x.rival.id, pay: 0, status: 'done', days: 14 } as never); t.memos.push({ id: 'mm1', t: 0, other: x.p.id, kind: 'promise', text: 'You promised.', ref: j.id }); }, old: 'memo:mm1', node: 'memos' },
+    { name: 'what is outstanding: a threat', who: (x) => x.fam, setup: (x, t) => { t.memos.push({ id: 'mm2', t: 0, other: x.p.id, kind: 'threat', text: 'You threatened him.' }); }, old: 'memo:mm2', node: 'memos' },
+    { name: 'what was found out', who: (x) => x.shop, setup: (x, t) => { const f = event(x.w, 'robbery', x.rival, t, [{ c: x.p, actor: true }]); t.memos.push({ id: 'mm3', t: 0, other: x.p.id, kind: 'question', text: 'Find out.', ref: f.id }); }, old: 'answer:mm3', node: 'memos' },
+    { name: 'warning a rival off', who: (x) => x.rival, old: 'rv_warn', node: 'rival' },
+    { name: 'easing the warning', who: (x) => x.rival, old: 'fl:rv_ease', now: 'rv_ease', node: 'follow' },
+  ];
+  for (const cs of D) ok(cs.name, { tags: ['compat'] }, () => check(cs));
+  // what he has come to ask (an encounter of his), answered, put off, or turned away
+  const asks = (x: Cast, t: Character) => ({ e: addEnc(x.w, { kind: 'crew', from: t.id, title: 'A word', lines: [`${t.name} wants a word.`, '"Can you lend me a hand?"'], opts: [{ code: 'no', label: 'No', hint: 'x' }], data: { what: 'none' } } as never).id });
+  const E: Case[] = [
+    { name: 'his ask: answered', who: (x) => x.fam, setup: asks, old: (s) => `enc:${s.e}:no` },
+    { name: 'his ask: can it wait', who: (x) => x.fam, setup: asks, old: (s) => `apx:wait:${s.e}` },
+    { name: 'his ask: not now', who: (x) => x.fam, setup: asks, old: (s) => `apx:no:${s.e}` },
+  ];
+  for (const cs of E) ok(cs.name, { tags: ['compat'] }, () => check(cs));
+  // what is on his mind (conv/subjects): raised, and answered
+  const troubled = (_x: Cast, t: Character) => { t.problem = { kind: 'gambling', sev: 0.6, since: 0, revealed: true } as never; t.traits.vice = 0.7; };
+  const T: Case[] = [
+    { name: 'his trouble: raised', who: (x) => x.crew, setup: troubled, old: 'tk:trouble' },
+    { name: 'his trouble: pressed', who: (x) => x.crew, setup: (x, t) => { troubled(x, t); t.problem!.revealed = false; }, old: 'tk:trouble:press' },
+    { name: 'his trouble: money, no strings', who: (x) => x.crew, setup: (x, t) => { troubled(x, t); x.p.cash = 3000; }, old: 'tk:trouble:gift' },
+    { name: 'his trouble: a loan', who: (x) => x.crew, setup: (x, t) => { troubled(x, t); x.p.cash = 3000; }, old: 'tk:trouble:lend' },
+    { name: 'his trouble: straighten out', who: (x) => x.crew, setup: troubled, old: 'tk:trouble:straighten' },
+    { name: 'his trouble: listened to', who: (x) => x.crew, setup: troubled, old: 'tk:trouble:listen' },
+    { name: 'his shop: raised', who: (x) => x.shop, old: 'tk:shop' },
+    { name: 'his shop: a place like this could use friends', who: (x) => x.shop, old: 'tk:shop:friends' },
+    { name: 'his shop: money put in', who: (x) => x.shop, setup: (x) => { x.p.cash = 3000; }, old: 'tk:shop:invest' },
+    { name: 'what he wants: raised', who: (x) => x.crew, setup: (_x, t) => { t.want = { kind: 'made', since: 0 }; }, old: 'tk:want' },
+    { name: 'what he wants: not ready', who: (x) => x.crew, setup: (_x, t) => { t.want = { kind: 'made', since: 0 }; }, old: 'tk:want:doubt' },
+    { name: 'what he wants: a stake', who: (x) => x.crew, setup: (x, t) => { t.want = { kind: 'rich', since: 0 }; t.cash = 100; x.p.cash = 5000; }, old: 'tk:want:fund' },
+    { name: 'a man he cannot stand: raised', who: (x) => x.fam, setup: (x, t) => { rel(t, x.boss.id).grudge = 0.6; return { o: x.boss.id }; }, old: (s) => 'tk:op:' + s.o },
+    { name: 'a man he cannot stand: agreed with', who: (x) => x.fam, setup: (x, t) => { rel(t, x.boss.id).grudge = 0.6; return { o: x.boss.id }; }, old: (s) => `tk:op:${s.o}:agree`, both: true },
+    { name: 'a man he cannot stand: defended', who: (x) => x.fam, setup: (x, t) => { rel(t, x.boss.id).grudge = 0.6; return { o: x.boss.id }; }, old: (s) => `tk:op:${s.o}:defend` },
+    { name: 'his boss: raised', who: (x) => x.fam, setup: (x, t) => { if (t.bossId) rel(t, t.bossId).grudge = 0.4; }, old: 'tk:boss' },
+    { name: 'his boss: loyal', who: (x) => x.fam, setup: (x, t) => { if (t.bossId) rel(t, t.bossId).grudge = 0.4; }, old: 'tk:boss:loyal' },
+    { name: 'his money, light: raised', who: (x) => x.crew, setup: (_x, t) => { t.books.arrears = 200; t.books.history.push({ week: 0, gross: 300, due: 100, paid: 40, expected: 300, declared: 200, tone: 'underreported' } as never); }, old: 'tk:earn' },
+    { name: 'his money, light: make it up', who: (x) => x.crew, setup: (_x, t) => { t.cash = 500; t.books.arrears = 200; t.books.history.push({ week: 0, gross: 300, due: 100, paid: 40, expected: 300, declared: 200, tone: 'underreported' } as never); }, old: 'tk:earn:makeup' },
+    { name: 'his money, light: a week', who: (x) => x.crew, setup: (_x, t) => { t.books.arrears = 200; t.books.history.push({ week: 0, gross: 300, due: 100, paid: 40, expected: 300, declared: 200, tone: 'underreported' } as never); }, old: 'tk:earn:week' },
+    { name: 'his money, light: a warning', who: (x) => x.crew, setup: (_x, t) => { t.books.arrears = 200; t.books.history.push({ week: 0, gross: 300, due: 100, paid: 40, expected: 300, declared: 200, tone: 'underreported' } as never); }, old: 'tk:earn:warn' },
+    { name: 'a debt owed him: pay now', who: (x) => x.fam, setup: (x, t) => ({ d: (t.cash = 600, createDebt(x.w, x.p.id, t.id, 500, 0.05, 'a loan')).id }), old: (s) => `tk:debt:${s.d}:now` },
+    { name: 'a debt owed him: leaned on', who: (x) => x.fam, setup: (x, t) => ({ d: (t.cash = 600, createDebt(x.w, x.p.id, t.id, 500, 0.05, 'a loan')).id }), old: (s) => `tk:debt:${s.d}:lean` },
+    { name: 'a debt owed him: forgiven', who: (x) => x.fam, setup: (x, t) => ({ d: createDebt(x.w, x.p.id, t.id, 500, 0.05, 'a loan').id }), old: (s) => `tk:debt:${s.d}:forgive` },
+    { name: 'a debt I owe him: paid', who: (x) => x.fam, setup: (x, t) => { x.p.cash = 3000; return { d: createDebt(x.w, t.id, x.p.id, 500, 0.05, 'a loan').id }; }, old: (s) => `tk:debt:${s.d}:pay` },
+    { name: 'which places are hurting', who: (x) => x.fam, old: 'tk:hurting' },
+  ];
+  for (const cs of T) ok(cs.name, { tags: ['compat'] }, () => check(cs));
 });

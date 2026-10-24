@@ -204,7 +204,7 @@ const deal: Act = {
     // favour the second promises is never written. Kept for parity; reported as a defect of the old engine, Gate 4 report §limitations)
     if (!dl) { line(x, temper(t).agreeable > 0.5 ? '“Whenever you’re ready. You don’t owe me anything.”' : 'He nods. “Another time.”'); return out(3); }
     if (what === 'nothing') { tweak(x, 0.03, 0.02, 0.03); line(x, `${t.name} nods, and the suspicion goes out of him a little. “Then thank you.”`); return out(5); }
-    if (what === 'remember') { door.favour(w, p, t, 1, 'cut his weekly fee'); line(x, `“I’ll remember,” says ${t.name}, and you can see he means it.`); return out(5); }
+    if (what === 'remember') { door.owe(w, p, t, 1, 'cut his weekly fee'); line(x, `“I’ll remember,” says ${t.name}, and you can see he means it.`); return out(5); }
     const b = dl.biz ? w.biz[dl.biz] : undefined;
     if (what === 'drop') { c.v.lines.push({ who: 'narr', text: `You let it lie. ${t.name} watches you do it.` }); c.v.th.deal = undefined; return out(5); }
     if (dl.kind === 'fee' && b?.protection) {
@@ -512,7 +512,7 @@ const extra = (big: boolean): Act => ({
     door.tribute(w, p, t, amt, 'over and above the envelope');
     tweak(x, big ? 0.12 : 0.05, big ? 0.06 : 0.02, 0.03);
     door.repute(w, p, big ? 3 : 1, 'tribute');
-    if (big) door.favour(w, p, t, 2, 'a thousand dollars pressed into his hand with no reason given');
+    if (big) door.owe(w, p, t, 2, 'a thousand dollars pressed into his hand with no reason given');
     c.v.lines.push({ who: 'narr', text: big ? `You add another ${money(amt)}, unasked. ${t.name} looks at it, then at you. "That’s a lot of respect." He is very still. "I’ll remember it."` : `You add ${money(amt)} on top. ${t.name} raises an eyebrow, then lets it go. "Appreciated."` });
     return out(15);
   },

@@ -100,7 +100,7 @@
 | Mediate his feud | `mediate` | grievance + `openSitdown` | `acts/info` · P | migrated (Stage A; parity) |
 | His trouble (situation) | `sit_ask`, `sit_cover`, `sit_lend`, `sit_rival`, `sit_leave` | `situations.askAbout`, `helpWith` (money, loan, a rival's heat) | `acts/personal` · P/follow | migrated (Stage B; parity) |
 | Something you heard about him / a matter he is in | `mt:<matter>:<code>` | `matters.matterAct` | `acts/info` · P | migrated (Stage B; parity) |
-| What is on his mind | `tk:*` (`talk.ts`, 9 subjects) | as each subject's replies (loans, favours, jobs, notes, grudges) | `conv/subjects/life.ts` · P / "he raises it" | pending (already used by the new screen, through the old engine) |
+| What is on his mind | `tk:*` (`talk.ts`, 9 subjects) | as each subject's replies (loans, favours, jobs, notes, grudges) | `conv/subjects/life.ts` · P / "he raises it" | migrated (Stage D; parity) |
 | A rival family's man: gossip, drink, mood, favour | `rv_ears` (+trade/pass), `rv_drink`, `rv_mood`, `rv_favour` | `learn` facts both ways, cash, favour, heat | `acts/personal` · P | migrated (Stage A; parity) |
 
 ### 3.2 Money and business (Stage B)
@@ -120,7 +120,7 @@
 | A matter between you (a figure, a move, an answer to his point) | `f:m:<matter>`, `mv:`, `x:`, `nm:` | `asks.playerMove`, `nameFigure`, `exchange.reply` | `acts/business` · B/follow | migrated (Stage B; parity) |
 | The shop that pays you: how, why late, ears, hand back, time, lean | `sh_how`, `sh_why`, `sh_ears`, `sh_back`, `sh_time`, `sh_lean` | `evidence`, `bizMove`, `giveTime`, `takeFromBiz`, `clearArrears`, `earn`, `repute` | `acts/business` · B (`sh_lean` C) | migrated (Stage B; parity) |
 | Debts: remind, time, halve, favour, forgive, pay, settle, ask for time, put money down | `d_remind`, `d_time`, `d_half`, `d_favour`, `d_forgive`, `d_pay`, `d_all`, `d_ask`, `deal:part` | `payDebt`, `restructure`, `writeDown`, favour, `repute` | `acts/business` · B (`d_remind` C) | migrated (Stage B; parity) |
-| A debt as a conversation | `tk:debt:*` (`threads.ts`) | as above | `conv/subjects` · B | pending |
+| A debt as a conversation | `tk:debt:*` (`threads.ts`) | as above | `conv/subjects` · B | migrated (Stage D; parity) |
 | The envelope / extra / tribute | `b_envelope`, `b_extra`, `b_extra2`, `b_tribute` | `books.handOver`, cash, `lifetimeKick`, `repute`, favour; may pass news or a job | `acts/business` · his/B (boss) | migrated (Stage B; parity) |
 | Call in a favour he owes | `favcall:<favour>` | `asks.callFavour` + `playerMove` | `acts/business` · B | migrated (Stage B; parity) |
 
@@ -132,29 +132,29 @@
 | Work he offers: take it / not this time | `f:job:` → `jobtake`, `jobpass` | `takeJob`, `declineJob` | `acts/org` · his | migrated (Stage C; parity) |
 | Report on work done | `report` | `j.reported`, relationship, `repute` | `acts/org` · B (first, when due) | migrated (Stage C; parity) |
 | Ask why / refuse an order | `challenge:<job>`, `refuse:<job>` | relationship; refusal: `j.status = declined`, `repute` | `acts/org` · C | migrated (Stage C; parity) |
-| Where you stand / advancement | `b_stand`, `promo`, `fl:promo_*` | `pathInfo`, `readiness` (read only) | the layer's `doAdvance` (Gate 3) · B | partly done |
+| Where you stand / advancement | `b_stand`, `promo`, `fl:promo_*` | `pathInfo`, `readiness` (read only) | the layer's `doAdvance` (Gate 3) · B | migrated (Stage D; parity) |
 | Put in a word for me | `recommend` | memo "favour", the boss's respect | `acts/org` · B | migrated (Stage C; parity) |
 | Back me / what has he said / call in, take, haggle | `rk_back`, `rk_back_ask`, `fl:back_*` | `p.backer`, favours, memos | `acts/org` · B | migrated (Stage C; parity) |
 | A concern about a man | `pick_concern` → `concern:<id>` | `books.react` (a superior acts on skimming), grudge | `acts/org` · B | migrated (Stage C; parity) |
 | Your own man: keep head down / extra income (and resistance) | `assign_low`, `assign_hustle`, `fl:ord_*` | heat, side income, grudge | `acts/org` · B | migrated (Stage C; parity) |
 | Your own man: what's wrong, help, light envelope, look into it, money, thin ice | `cr_ask`, `cr_cash`, `cr_duties`, `cr_drop`, `cr_look`, `cr_money`, `cr_thin`, `fl:th_*` | `helpMan`, problem revealed, notes, restraint, threat fact | `acts/org` · P/C | migrated (Stage C; parity) |
-| His light envelopes as a conversation | `tk:earn` (`threads.ts`) | the books, skimming admitted, payments | `conv/subjects` · C | pending |
-| Work he did for you | `tk:job:` (`threads.ts`) | `questionReport` | `conv/subjects` · B | pending |
+| His light envelopes as a conversation | `tk:earn` (`threads.ts`) | the books, skimming admitted, payments | `conv/subjects` · C | migrated (Stage D; parity) |
+| Work he did for you | `tk:job:` (`threads.ts`) | `questionReport` | `conv/subjects` · B | migrated (Stage D; parity) |
 | Take a man on | `recruit_offer`, `fl:rc_*` | `asks.openAsk('recruit')`, $150 | `acts/org` · B | migrated (Stage C; parity) |
 
 ### 3.4 Confrontation, amends and his own requests (Stage D)
 
 | Legacy interaction | Handler | Gameplay dependency | Replacement · pane | Status |
 |---|---|---|---|---|
-| Demand an explanation | `demand:<fact>` | repayment, grudge, memo "threat" | `acts/confront` · C | pending |
-| You told me it wasn't you | `confront:<fact>` | `learn`, grudge, relationship | `acts/confront` · C | pending |
-| Clear the air: own up, pay, he started it, I'd do it again, what's he got against me, a drink | `a_own`, `a_pay`, `a_start`, `a_defy`, `a_ask`, `a_gift` | `asks.amendsAsk`, `disputes.amends`, grudge, memo "threat", cash | `acts/confront` · C/P | pending |
-| I let you down (a broken word) | `word_make`, `fl:word_*` | `asks.amendsAsk` | `acts/confront` · C | pending |
-| What's outstanding between us / tell him what you found | `memo:<memo>`, `answer:<memo>` | memo done, `learn`, `bear`, `repute` | `acts/confront` · B | pending |
-| Warn a rival off (and ease it) | `rv_warn`, `fl:rv_ease` | family tension, grudge, threat fact | `acts/confront` · C | pending |
-| He wants a word (an encounter): what's it about, wait, not now, his options | `apx:*`, `f:enc:` → `enc:<id>:<option>` | `encounters.choose` | `acts/confront` · his | pending (raised by the new screen, through the old engine) |
+| Demand an explanation | `demand:<fact>` | repayment, grudge, memo "threat" | `acts/confront` · C | migrated (Stage D; parity) |
+| You told me it wasn't you | `confront:<fact>` | `learn`, grudge, relationship | `acts/confront` · C | migrated (Stage D; parity) |
+| Clear the air: own up, pay, he started it, I'd do it again, what's he got against me, a drink | `a_own`, `a_pay`, `a_start`, `a_defy`, `a_ask`, `a_gift` | `asks.amendsAsk`, `disputes.amends`, grudge, memo "threat", cash | `acts/confront` · C/P | migrated (Stage D; parity) |
+| I let you down (a broken word) | `word_make`, `fl:word_*` | `asks.amendsAsk` | `acts/confront` · C | migrated (Stage D; parity) |
+| What's outstanding between us / tell him what you found | `memo:<memo>`, `answer:<memo>` | memo done, `learn`, `bear`, `repute` | `acts/confront` · B | migrated (Stage D; parity) |
+| Warn a rival off (and ease it) | `rv_warn`, `fl:rv_ease` | family tension, grudge, threat fact | `acts/confront` · C | migrated (Stage D; parity) |
+| He wants a word (an encounter): what's it about, wait, not now, his options | `apx:*`, `f:enc:` → `enc:<id>:<option>` | `encounters.choose` | `acts/confront` · his | migrated (Stage D; parity) |
 | The rules around every exchange | `govern`, `POLICY`, social caps, conduct, the ▲▼ card, `recall`, story facts | patience, cooldowns, trust caps, `noteConduct`, `addFact` | `conv/acts/kit` + `visit.ts` | migrated (Stage A; parity) |
-| The opening | `arrive` | `t.talk` stamps, shut cooldown | `visit.ts` `open` | pending |
+| The opening | `arrive` | `t.talk` stamps, shut cooldown | `visit.ts` `open` | migrated (Stage D; parity) |
 
 ### 3.5 World logic misplaced in the old engine
 

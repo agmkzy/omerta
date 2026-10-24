@@ -1,7 +1,7 @@
 // The action catalogue (spec §3.2): everything the conversation layer does to the world goes through here, and everything here goes
 // through a door the world already has. Nothing in src/conv writes a world record directly (architecture test: conv/integration).
 // Each action leaves an act record (social.log) that obligations are kept or broken by, and, where the world records it, a fact.
-import { addFact, bear, compat, ease as coreEase, feel, feelAtLeast, feelToOn, knowMore, learn, payDebt as corePayDebt, rel, repute as coreRepute, transfer } from '../core';
+import { addFact, bear, clamp, compat, ease as coreEase, feel, feelAtLeast, feelToOn, knowMore, learn, payDebt as corePayDebt, regard as coreRegard, rel, repute as coreRepute, transfer, writeDown as coreWriteDown } from '../core';
 import * as deeds from '../deeds';
 import { share, confide as tellAbout } from '../actions';
 import { handOver as booksHandOver, react as booksReact } from '../books';
@@ -13,12 +13,14 @@ import { reply as exReply } from '../exchange';
 import { amends as disputeAmends, playerActed, touchDispute } from '../disputes';
 import { helpMan as peopleHelpMan } from '../people';
 import { openSitdown } from '../meetings';
+import { questionReport } from '../orders';
 import { recall as memoryRecall } from '../memory';
-import { noteConduct } from '../temper';
+import { noteConduct, noteHard } from '../temper';
+import { know as situKnow } from '../situ';
 import { wantFor } from '../crewlife';
 import { addFavour } from '../encounters';
 import { discipline as booksDiscipline } from '../books';
-import { agreeAsk, amendsAsk, askBetween, callFavour, layoffFor, move as askMove, nameFigure, openAsk, playerMove, rateAsk, type AskMove } from '../asks';
+import { agreeAsk, amendsAsk, askBetween, callFavour, layoffFor, move as askMove, nameFigure, openAsk, playerMove, rateAsk, stance, type AskMove } from '../asks';
 import type { Business, Character, Debt, Enc, Fact, Grievance, Id, Job, Memo, Situation, World } from '../types';
 import type { Act } from './obligations';
 import { social, sid } from './social';
@@ -84,7 +86,7 @@ export function favour(w: World, from: Character, to: Character, size: number, w
 }
 // what a man thinks of another moves (core.feel / core.bear): the one door for regard and grudges
 export const regard = (w: World, who: Character, about: Id, f: 'trust' | 'respect' | 'affection' | 'fear', amt: number, why?: string) => feel(w, who, about, f, amt, why);
-export const grudge = (w: World, who: Character, against: Id, amt: number, why: string) => bear(w, who, against, amt, why);
+export const grudge = (w: World, who: Character, against: Id, amt: number, why: string | Fact) => bear(w, who, against, amt, why);
 // something that happened between men, on record for those who were there (core.addFact)
 export const happened = addFact;
 // discipline: a superior punishes a man for going against him (books.discipline: what the family does to a man who crosses it)
@@ -136,7 +138,7 @@ export function insight(p: Character, about: Id, tag: string): void { deeds.insi
 export function noteOn(p: Character, t: Character, text: string): void { deeds.noteOn(p, t, text); }
 export function tagOn(p: Character, t: Id, tag: string): void { deeds.tagOn(p, t, tag); }
 // ---- memos, cooldowns, introductions, what he wants, his troubles
-export function memo(w: World, holder: Character, other: Id, kind: Memo['kind'], text: string, o: { due?: number; ref?: Id } = {}): Memo { return deeds.memo(w, holder, other, kind, text, o); }
+export function memo(w: World, holder: Character, other: Id, kind: Memo['kind'], text: string, o: { due?: number; ref?: Id; done?: boolean } = {}): Memo { return deeds.memo(w, holder, other, kind, text, o); }
 export function memoOnce(w: World, holder: Character, other: Id, kind: Memo['kind'], text: string, due?: number): void { deeds.memoOnce(w, holder, other, kind, text, due); }
 export function memoDone(m: Memo): void { deeds.memoDone(m); }
 export function denied(w: World, t: Character, fact: Id): void { deeds.denied(w, t, fact); }
@@ -207,3 +209,27 @@ export function putOff(w: World, e: Enc, until: number): void { deeds.putOffEnc(
 export function situationAsk(w: World, p: Character, c: Character): string[] { return sitAskAbout(w, p, c); }
 export function situationHelp(w: World, p: Character, c: Character, how: 'cover' | 'lend' | 'leave' | 'rival'): string[] { return sitHelpWith(w, p, c, how); }
 export function matterAct(w: World, p: Character, sid: Id, code: string, who?: Id): { lines: string[]; minutes: number } { return mAct(w, p, sid, code, who); }
+
+// ---- Gate 4 Stage D: what the subjects of a man's life (conv/subjects) do
+// a favour owed, on the record and nothing more (the layer's own record of acts, favour(), is for what the layer itself decides)
+export function owe(w: World, from: Character, to: Character, size: number, what: string): void { addFavour(w, from.id, to.id, size, what); }
+// regard that grows less the more often the same kind of thing is done in a week (core.regard)
+export function esteem(w: World, who: Character, about: Character, f: 'trust' | 'respect' | 'affection', amt: number, kind: string): number { return coreRegard(w, who, about, f, amt, kind); }
+export function talkNote(w: World, t: Character, key: string, sig: string): void { deeds.talkNote(w, t, key, sig); }
+export function talkStamp(w: World, t: Character, key: string, sig = 'x'): void { deeds.talkStamp(w, t, key, sig); }
+export function easeProblem(t: Character, d: number): void { deeds.easeProblem(t, d); }
+export function skimOwned(t: Character): void { deeds.skimOwned(t); }
+export function madeUp(w: World, t: Character, p: Character, amt: number): number { return deeds.madeUp(w, t, p, amt); }
+export function toldDirect(w: World, c: Character, f: Fact, from: Id): void { deeds.toldDirect(w, c, f, from); }
+export function knowsWho(p: Character, f: Fact): void { deeds.knowsWho(p, f); }
+export function introducedThrough(w: World, p: Character, o: Character, trust: number): void { deeds.introducedThrough(w, p, o, trust); }
+export function hardWith(w: World, p: Character, t: Character, k: 'threats' | 'force', n = 1): void { noteHard(w, p, t, k, n); }
+export function writeOff(w: World, d: Debt, amt: number): void { coreWriteDown(w, d, amt); }
+export function lean(w: World, s: Situation, id: Id, good: number, resolve: number): void { const S = stance(w, s, id); S.good = clamp(S.good + good); S.resolve = clamp(S.resolve + resolve); }
+export function heardOf(s: Situation, id: Id): void { s.m = { ...(s.m ?? {}), ['heard:' + id]: 1 }; }
+export function learnsOf(w: World, s: Situation, id: Id, l: 1 | 2, via: string): void { situKnow(w, s, id, l, via); }
+export function work(w: World, spec: Parameters<typeof mkJob>[1]): Job { return mkJob(w, spec); }
+// a man's account of a job put to him again (orders.questionReport: he may hold to it, or it may come apart)
+export function questionAgain(w: World, j: Job): string[] { return questionReport(w, j); }
+// an offer of amends that comes with money: what is on the table is at least that
+export function raiseTerms(s: Situation, amt: number): void { if (s.terms) s.terms.amt = Math.max(s.terms.amt ?? 0, amt); }

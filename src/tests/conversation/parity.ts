@@ -7,6 +7,8 @@ import { deserialize, serialize } from '../../engine';
 import { say, startConvo, type Convo } from '../../dialogue';
 import { ctx, newThread, type Visit } from '../../conv/kit';
 import { perform } from '../../conv/run';
+import { withCandour } from '../../talk';
+import { candourOf } from '../../conv/acts/subjects';
 import type { World } from '../../types';
 
 const r3 = (x: unknown) => (typeof x === 'number' ? Math.round(x * 1e6) / 1e6 : x);
@@ -46,7 +48,9 @@ export interface Run { w: World; lines: string[]; changed: string[]; ledger: num
 export function legacy(w0: World, npc: string, code: string, at: Partial<Convo> = {}): Run {
   const w = deserialize(serialize(w0)), before = state(w), led = (w.ledger?.length ?? 0);
   const c0 = startConvo(npc), c: Convo = { ...c0, ...at, ctx: { ...c0.ctx, ...(at.ctx ?? {}) } };
-  const r = say(w, w.chars[w.playerId!], w.chars[npc], c, code);
+  // (a man's own life, talked about on the conversation screen, is told as candidly as he is with the player: the same on both sides)
+  const go = () => say(w, w.chars[w.playerId!], w.chars[npc], c, code);
+  const r = code.startsWith('tk:') ? withCandour(npc, candourOf(ctx(w, { npc, where: '', t0: w.now, lines: [], choices: [], relation: '', mem: { said: [], argued: [], pressed: 0, points: [], offered: {} }, th: newThread() })), go) : go();
   return { w, lines: r.lines, changed: diff(before, state(w)), ledger: (w.ledger?.length ?? 0) - led };
 }
 // the conversation layer: the same thing said in a visit, with what is in hand

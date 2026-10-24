@@ -2,7 +2,7 @@
 // talk.ts, threads.ts) did these inline, mixed with its decisions and words; here they are the world's own, with the rules they always
 // had, and the conversation layer reaches them only through its doors (conv/doors.ts). Nothing here decides anything: whether a man
 // agrees, pays or admits a thing is decided before one of these is called.
-import { addFact, bearOn, clamp, createDebt, earn, feelOn, payDebt, rel, repute, restructure, transfer, writeDown } from './core';
+import { link, addFact, bearOn, clamp, createDebt, earn, feelOn, payDebt, rel, repute, restructure, transfer, writeDown } from './core';
 import { post } from './ledger';
 import { addFavour } from './encounters';
 import { bizMove, clearArrears, giveTime, setCollector, takeFromBiz } from './econ';
@@ -31,8 +31,8 @@ export function tribute(w: World, p: Character, boss: Character, amt: number, wh
 }
 
 // ---------------------------------------------------------------- what is on record between two men
-export function memo(w: World, holder: Character, other: Id, kind: Memo['kind'], text: string, o: { due?: number; ref?: Id } = {}): Memo {
-  const m: Memo = { id: 'm' + w.nextId++, t: w.now, other, kind, text, ...(o.due ? { due: o.due } : {}), ...(o.ref ? { ref: o.ref } : {}) };
+export function memo(w: World, holder: Character, other: Id, kind: Memo['kind'], text: string, o: { due?: number; ref?: Id; done?: boolean } = {}): Memo {
+  const m: Memo = { id: 'm' + w.nextId++, t: w.now, other, kind, text, ...(o.due ? { due: o.due } : {}), ...(o.ref ? { ref: o.ref } : {}), ...(o.done !== undefined ? { done: o.done } : {}) };
   holder.memos.push(m);
   return m;
 }
@@ -199,3 +199,18 @@ export function friendLoan(w: World, p: Character, t: Character, amt: number, ra
   p.cash -= amt; t.cash += amt; // (the loan itself is posted once, by createDebt)
   return createDebt(w, p.id, t.id, amt, rate, why);
 }
+
+// ---------------------------------------------------------------- what a man remembers of what was said with him (Character.talk)
+// asked again: the count goes up; stamped: once, as of today
+export function talkNote(w: World, t: Character, key: string, sig: string): void { const m = (t.talk ??= {}), o = m[key]; m[key] = { d: Math.floor(w.now / DAY), sig, n: (o?.n ?? 0) + 1 }; }
+export function talkStamp(w: World, t: Character, key: string, sig = 'x'): void { (t.talk ??= {})[key] = { d: Math.floor(w.now / DAY), sig, n: 1 }; }
+// ---------------------------------------------------------------- his troubles, his books
+export function easeProblem(t: Character, d: number): void { if (t.problem) t.problem.sev = clamp(t.problem.sev + d); }
+export function skimOwned(t: Character): void { delete t.books.skim; delete t.books.hide; }
+// what a man of the player's owes up, made up there and then, from what he has on him (posted as money paid back)
+export function madeUp(w: World, t: Character, p: Character, amt: number): number { const x = transfer(w, t, p, amt, 'repay', 'what he owed up'); t.books.arrears = Math.max(0, t.books.arrears - x); return x; }
+// ---------------------------------------------------------------- what a man knows, told him directly (not through the rumour mill)
+export function toldDirect(w: World, c: Character, f: Fact, from: Id): void { c.known[f.id] = { t: w.now, from, knowsActor: true }; }
+export function knowsWho(p: Character, f: Fact): void { const k = p.known[f.id]; if (k) k.knowsActor = true; }
+// introduced through a man: the player knows him now, and the two have a footing (core.link)
+export function introducedThrough(w: World, p: Character, o: Character, trust: number): void { (p.intro ??= {})[o.id] = w.now; link(p, o, trust); }

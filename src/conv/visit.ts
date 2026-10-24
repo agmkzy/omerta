@@ -28,12 +28,16 @@ import { compat } from '../core';
 import * as door from './doors';
 import { newThread, acquainted, agoWords, card, ctx, first, him, lastOf, line, memo, memOf, narr, plain, r2, relationOf, remember, talks, you, PANES, type Choice, type Ctx, type Pane, type Say, type TalkMemory, type Visit } from './kit';
 export { acquainted, relationOf, PANES, type Choice, type Pane, type Say, type TalkMemory, type Visit } from './kit';
-import { groupOf, introduced, leadCodes, options as oldOptions, say as oldSay, startConvo, type Convo, type DOpt } from '../dialogue';
 import type { Meeting } from '../meetings';
-import { subjectsOf, withCandour } from '../talk';
+import { subjectsOf } from './subjects/life';
+import { candourOf, subjectsHeldBy } from './acts/subjects';
 import { pathInfo } from '../path';
 import { readiness } from '../career';
 import { standingWord } from '../jobs';
+import { brokenWord } from '../memos';
+import { temper } from '../temper';
+import { arch } from '../voice';
+import { settled } from './decide';
 import { actOf, offersNow, perform } from './run';
 import { streetNews } from './acts/info';
 import { strangerHere } from './acts/personal';
@@ -66,7 +70,16 @@ export function begin(w: World, npcId: Id, o: { approach?: Id } = {}): Visit {
   const rel0 = relationOf(w, h, n);
   v.relation = rel0.words;
   if (o.approach) narr(c, `${n.name} has come to find you.`);
+  // he decides whether there is a conversation at all: a man who threw the player out today won't start another one
+  if ((h.cooldown[`shut:${n.id}`] ?? 0) > w.now && !o.approach) {
+    const tp = temper(n);
+    says(c, tp.volatility + tp.pride > 1.15 ? '“I told you once today. Out.”' : tp.agreeable > 0.55 ? '“Not today. Please.”' : 'He turns his back on you. He has nothing to say today.', settled(n.id, 'will not talk', 'he threw you out earlier today'));
+    v.th.shut = true; v.choices = [{ id: 'leave', label: 'Leave', group: 'leave' }];
+    door.met(w, h, n);
+    return v;
+  }
   open(c, rel0.level);
+  arrival(c);
   const m = memOf(w, n.id); m.visits++; m.last = w.now;
   door.introduce(w, h, n);
   // (they have met: the world's record of it, which the weekly fading of trust and liking between men who never see each other reads;
@@ -111,6 +124,27 @@ function open(c: Ctx, level: string) {
   general(c);
   raiseHis(c);
   void pn;
+}
+
+// What comes up as he greets the player, unprompted, once (the old screen's arrival): a promise of the player's falling due soon, a
+// good turn the player did him, a word the player broke; and what shows on him, if something is weighing on him and he has nothing
+// to put to the player
+function arrival(c: Ctx) {
+  const { w, h: p, n: t } = c, day = Math.floor(w.now / DAY);
+  const prm = t.memos.find((m) => m.kind === 'promise' && m.other === p.id && !m.done && m.due && m.due > w.now && m.due - w.now <= 5 * DAY && !t.talk?.['prm:' + m.id]);
+  const words: string[] = [];
+  if (prm) { door.talkStamp(w, t, 'prm:' + prm.id); words.push('“You said you’d see to it. Don’t leave it too long.”'); }
+  const helped = w.favours.find((f) => !f.settled && f.from === p.id && f.to === t.id && w.now - f.t < 120 * DAY);
+  if (helped && day - (t.talk?.['ack:' + helped.id]?.d ?? -99) >= 14) {
+    door.talkStamp(w, t, 'ack:' + helped.id);
+    const a0 = arch(t);
+    words.push(a0 === 'proud' ? '“I don’t forget a thing like what you did. You know that.”' : a0 === 'cold' ? '“I remember what you did. I pay my debts.”' : a0 === 'jovial' ? '“There he is. The man who stood by me. Sit, sit.”' : a0 === 'frightened' ? '“I haven’t forgotten. What you did for me. I haven’t.”' : '“I haven’t forgotten what you did for me.”');
+  }
+  const broke = brokenWord(w, p, t);
+  if (broke && !t.talk?.['said:' + broke.id]) { door.talkStamp(w, t, 'said:' + broke.id); words.push(({ hothead: '“You gave me your word. I’m still waiting.”', proud: '“I haven’t forgotten what you said you’d do. Neither should you.”', cold: '“You said you’d do something. You didn’t.”' } as Record<string, string>)[arch(t)] ?? '“About what you promised me. Nothing came of it.”'); }
+  const shows = w.enc.some((e) => e.status === 'open' && e.from === t.id && e.expires > w.now && e.opts.length) ? undefined : subjectsOf(w, p, t).find((x) => x.nudge && x.weight >= 0.5)?.nudge;
+  if (shows) narr(c, shows);
+  for (const l of words) says(c, l);
 }
 
 // ---------------------------------------------------------------- he came for help
@@ -238,16 +272,12 @@ function openNews(c: Ctx, ob?: Obligation, req?: Request) {
 const PANE_WORD: Record<Pane, string> = { business: 'Business', personal: 'Personal', confront: 'Confront' };
 const PANE_MORE: Record<Pane, string> = { business: 'Other business…', personal: 'Something else personal…', confront: 'Something else to have out…' };
 // where one of the old engine's subjects belongs, by its code
-const CONFRONT = /^(confront:|f:amends|demand|challenge|a_defy|d_remind|cr_thin|cr_drop|cr_look|sh_lean|sh_why|rv_warn|refuse)/;
-const PERSONAL = /^(inc:|word_make|f:sit|tk:(?!shop|racket|earn|debt:|job:)|how|old_times|congrats|welcome|help_gift|help_loan|a_gift|cr_money|cr_ask|a_ask|ask_|pick_member|leaders|about|rv_ears|rv_mood|f:think|pick_incident|suspect|sit_ask|b_stand)/;
-export const paneOf = (code: string): Pane => (CONFRONT.test(code) ? 'confront' : PERSONAL.test(code) ? 'personal' : 'business');
-const oldIn = (c: Ctx, k: Pane, xs: Choice[]) => xs.filter((x) => (x.pane ?? paneOf(x.id.slice(2))) === k);
 
 // What can be raised under a heading: everything plausible (all), or what is worth raising now
 function subjects(c: Ctx, k: Pane, all = false): Choice[] { return memo(c, `subj:${k}:${all}`, () => subjectsNow(c, k, all)); }
 function subjectsNow(c: Ctx, k: Pane, all: boolean): Choice[] {
   const { w, h, n } = c, out: Choice[] = [];
-  const pending = [...actRows(c, k, ['his', 'between', 'mind']), ...oldIn(c, k, oldRows(c, 'pending'))];
+  const pending = actRows(c, k, ['his', 'between', 'mind']);
   if (k === 'business') {
     for (const ob of owedHere(c)) {
       const prev = lastOf(w, n.id, mkey(ob)), same = prev?.out === 'refused' && prev.sig === interveneSig(c, ob);
@@ -261,14 +291,14 @@ function subjectsNow(c: Ctx, k: Pane, all: boolean): Choice[] {
     if (unreported(c)) { const r = actRows(c, 'business', ['between']).find((x) => x.id === 'a:report'); if (r) out.push(r); }
     out.push(...pending);
     // what a man in your position would naturally put to him: work from your boss, orders to your own man
-    out.push(...actRows(c, k, ['lead']), ...oldRows(c, 'lead'));
+    out.push(...actRows(c, k, ['lead']));
     if (shopOf(c) && protectAvailable(c)) { const prev = lastOf(w, n.id, 'protect'); out.push({ id: 'protect', label: line(c, 'demand.protection', { amt: `$${feeOf(c)}` }), note: !prev ? undefined : prev.out === 'counter' ? `He offered less ${agoWords(w.now, prev.t)}.` : prev.out === 'agreed' ? undefined : `He turned you down ${agoWords(w.now, prev.t)}.`, group: 'matter' }); }
     if (all) {
-      const ways = oldGroups(c, ['business', 'org', 'settle']).filter((x) => paneOf(x.id.slice(2)) === 'business');
-      if ((n.rank !== 'civilian' || n.cash >= 600) && !ways.some((x) => x.id.startsWith('o:borrow'))) out.push({ id: 'loan:500', label: line(c, 'ask.loan', { amt: '$500' }), group: 'matter' });
+      const ways = actRows(c, k, ['other']);
+      if ((n.rank !== 'civilian' || n.cash >= 600) && !ways.some((x) => x.id.startsWith('a:borrow'))) out.push({ id: 'loan:500', label: line(c, 'ask.loan', { amt: '$500' }), group: 'matter' });
       // who a man answers to: the men troubling people the player has promised to help
       for (const id of new Set(social(w).obs.filter((o) => o.obligor === h.id && o.status === 'pending' && o.matter?.against).map((o) => o.matter!.against!))) { const m = w.chars[id]; if (m && m.id !== n.id) out.push({ id: 'answers:' + m.id, label: line(c, 'ask.answersTo', { manFirst: first(m.name) }), group: 'matter' }); }
-      out.push(...ways, ...actRows(c, k, ['other']));
+      out.push(...ways);
     }
   }
   if (k === 'personal') {
@@ -282,14 +312,14 @@ function subjectsNow(c: Ctx, k: Pane, all: boolean): Choice[] {
     // who did something the player knows of but not who did it, where this man might know
     for (const f of Object.values(w.facts).filter((f) => h.known[f.id] && !h.known[f.id].knowsActor && HOSTILE.has(f.kind) && f.business && (f.district === n.district || ownerBiz(w, n.id)?.district === f.district)).sort((a, b) => b.t - a.t).slice(0, 1)) out.push({ id: 'who:' + f.id, label: line(c, 'ask.who', { shop: w.biz[f.business!].name }), group: 'matter' });
     out.push(...actRows(c, k, ['lead']));
-    if (all) out.push(...actRows(c, k, ['other']), ...oldGroups(c, ['social', 'ask']).filter((x) => paneOf(x.id.slice(2)) === 'personal'));
+    if (all) out.push(...actRows(c, k, ['other']));
   }
   if (k === 'confront') {
     // what the player can put to him from this layer's records: his word, not kept as the player sees it; something he knows he did
     for (const ob of hisWordToMe(c)) { const tg = c.w.chars[(ob.spec as { target?: Id }).target ?? '']; out.push({ id: 'hisword:' + ob.id, label: line(c, tg ? 'confront.hisWord' : 'confront.hisWord.plain', { targetFirst: tg ? first(tg.name) : '' }), group: 'matter' }); }
     // (what it was, said as it was: to the player himself, to one of his, or at a place)
     for (const f of knownAgainstMine(c)) { const vic = w.chars[injured(f) ?? '']; out.push({ id: 'accuse:' + f.id, label: line(c, vic?.id === h.id ? 'accuse.act.me' : f.business ? 'accuse.act' : 'accuse.act.man', { shop: f.business ? w.biz[f.business]?.name ?? '' : '', victimFirst: vic ? first(vic.name) : '' }), group: 'matter' }); }
-    out.push(...pending, ...actRows(c, k, ['lead', 'other']), ...oldGroups(c, ['settle']).filter((x) => paneOf(x.id.slice(2)) === 'confront'));
+    out.push(...pending, ...actRows(c, k, ['lead', 'other']));
   }
   return out.filter((x, i) => out.findIndex((y) => y.id === x.id) === i);
 }
@@ -306,7 +336,7 @@ function pane(c: Ctx, k: Pane, all = false) {
 // The headings: what he brings up himself first (answered directly, no heading), then Business, Personal, Confront, and leaving
 function home(c: Ctx) {
   c.v.pane = undefined; c.v.more = false; c.v.topic = undefined;
-  const his = [...actRows(c, undefined, ['his']), ...oldRows(c, 'pending').filter((x) => x.group === 'reply')].slice(0, 2);
+  const his = actRows(c, undefined, ['his']).slice(0, 2);
   const heads: Choice[] = PANES.filter((k) => subjects(c, k).length || subjects(c, k, true).length).map((k) => ({ id: 'u:' + k, label: PANE_WORD[k], group: 'intent' }));
   c.v.choices = [...his, ...heads, { id: 'leave', label: 'Leave', group: 'leave' }];
 }
@@ -337,6 +367,10 @@ function doAct(c: Ctx, code: string, label: string): { minutes: number; meeting?
   if (r.settle) return { minutes: r.minutes, settle: c.n.id };
   if (!afterAct(c, r.next ?? [], code.split(':')[0]) && !r.keepTopic) { c.v.th.fact = undefined; c.v.th.subject = undefined; c.v.th.denied = false; general(c); }
   else if (!c.v.choices.length) general(c);
+  // (his money, his shop, his racket come up and he is short: a gift or a loan is what can be said next; and once a visit, a subject
+  // of his own life that came back guarded says what he is to the player)
+  if (/^tk:(racket|trouble|shop)$/.test(code)) offerHelp(c);
+  guardedCue(c, code);
   return { minutes: r.minutes };
 }
 // what he has just said leaves the player these answers (not already given in this visit), the way back to the talk, and leaving
@@ -347,121 +381,22 @@ function afterAct(c: Ctx, offers: Offer[], topic: string): boolean {
   c.v.topic = 'act:' + topic;
   return true;
 }
-// ---------------------------------------------------------------- the rest of the game's business (V90 engine, until the cut-over)
-// The conversation layer decides promises, requests, disputes and what is new; everything else a man can take up with another (work,
-// jobs, envelopes, debts, shops, rackets, standing, the crew, proposals) is still decided by dialogue.ts. The visit offers it in the
-// same few choices: what is pending between you on the screen, the five ways into the rest under "Something else…". Choosing one
-// runs dialogue.say, so its consequences are the old engine's own, unchanged.
-const LAYERED = new Set(['chat', 'drink']); // (what is new, and an evening out, are the conversation layer's own)
-// (protection put to a shop is the layer's own where it may be put; otherwise, as before, the old engine's)
-// (and the trouble a man is under, once he has brought it to the player, is the matter between them: not asked about again as news)
-// (and "how do you find working for him?" is not asked of a man who has just said he has no use for him: the guarded answer would
-// contradict what he said)
+// What he keeps from the conversation as a subject of its own, once it has become something else between them: how he finds
+// working for a boss he has just said he has no use for (the guarded answer would contradict him), and who has been leaning on him once
+// he has brought it to the player as a matter (the matter is the subject now)
 const soured = (c: Ctx) => { const b = c.w.chars[c.n.bossId ?? '']; return !!b && ((lastOf(c.w, c.n.id, 'mind:op:' + b.id)?.sig ?? '').startsWith('h') || (c.h.insight?.[c.n.id] ?? []).some((x) => x.startsWith(`n:Can’t stand ${b.name}.`))); };
-const layered = (c: Ctx, code: string) => (code === 'tk:boss' && soured(c)) || LAYERED.has(code.split(':')[0]) || !!actOf(code) || (code.startsWith('fl:') && !!actOf(code.slice(3))) || (code === 'suggest' && protectAvailable(c)) || (code.startsWith('tk:pressed:') && (!!myPromiseTo(c) || social(c.w).requests.some((r) => r.by === c.n.id && r.of === c.h.id && r.wants === 'intervene')));
-const oldConvo = (c: Ctx): Convo | undefined => (introduced(c.w, c.h, c.n) ? (c.v.old ??= startConvo(c.n.id)) : undefined);
-// (a hint is shown only where it says what a choice costs or risks, and only if it is short: the rest is for the old screen)
-// (a subject the old engine names as a title, said as what it is: "About his trouble with Lou Santoro", "About what he asked: …")
-function speakable(o: DOpt): string {
-  const l = o.label.replace(/"([^"]*)"/g, '‘$1’'); // (the old engine's plain quotes inside a label)
-  if (/^[“"]/.test(l) || /[?.!]$/.test(l)) return l;
-  if (/^f:(enc|job):/.test(o.code)) return `About what he asked: ${l}`;
-  if (/^f:(mt:|m:|disputes|sit|debt|shop|crew|amends|memos)/.test(o.code)) return 'About ' + l.replace(/^(His|Her|The|What|Your|Protection|Trouble|Bad|Money|Loan|Debt|Stake|Arrangement|A)\b/, (x) => x.toLowerCase());
-  return l;
-}
-// (what the player cannot pay for is not offered: a gift, a fee, an envelope larger than the money in his pocket)
-const unaffordable = (c: Ctx, o: DOpt) => { const m = /^(Give|Pay|Go, with|Make a call, put up|Take this|Put|Hand|Cover)\b[^$]*\$([\d,]+)/.exec(o.label); return !!m && Number(m[2].replace(/,/g, '')) > c.h.cash; };
-function oldChoice(o: DOpt, group: Choice['group']): Choice { const note = o.hint && (o.big || o.amount) && o.hint.length <= 70 && !/[“"]/.test(o.hint) && !/\$0\b/.test(o.hint) ? o.hint : undefined; return { id: 'o:' + o.code, label: speakable(o), note, group, ...(o.amount ? { amount: o.amount } : {}) }; }
-// The old engine keeps some matters behind a door of their own (his debt, his shop, your crew man, the bad blood, what is outstanding):
-// opened here, so each thing under it is a subject in its own right and finds its heading (a light envelope is had out, not "business")
-const DOOR = /^f:(debt|shop|crew|amends|memos|disputes|sit|more)$/;
-const NAV = (o: DOpt) => o.code === 'root' || o.code === 'f:' || o.code.startsWith('f:g:') || o.done;
-// the old engine's options at the top of a conversation, under one of its subjects or ways in (focus), for this screen
-const atRoot = (c: Ctx, cv: Convo, focus?: string): DOpt[] => memo(c, 'opts:' + (focus ?? ''), () => oldOptions(c.w, c.h, c.n, { ...cv, node: 'root', ctx: { ...cv.ctx, focus, follow: undefined } }));
-function opened(c: Ctx, cv: Convo, opts: DOpt[], depth = 0): DOpt[] {
-  return opts.flatMap((o) => {
-    if (!DOOR.test(o.code) || depth > 1) return [o];
-    const inner = atRoot(c, cv, o.code.slice(2)).filter((x) => !NAV(x));
-    return inner.length ? opened(c, cv, inner, depth + 1).map((x) => ({ ...x, group: o.group })) : [];
-  });
-}
-function oldRows(c: Ctx, which: 'pending' | 'ways' | 'lead'): Choice[] {
-  const cv = oldConvo(c);
-  if (!cv) return [];
-  if (which === 'lead') return memo(c, 'lead', () => leadCodes(c.w, c.h, c.n)).filter((k) => !layered(c, k)).flatMap((k) => {
-    const o = atRoot(c, cv, 'g:' + groupOf(k)).find((x) => x.code === k && !x.done);
-    return o ? [oldChoice(o, 'matter')] : [];
-  });
-  const opts = atRoot(c, cv).filter((o) => !o.done && !layered(c, o.code) && !unaffordable(c, o));
-  if (which === 'ways') return opts.filter((o) => o.code.startsWith('f:g:') && o.code !== 'f:g:social').map((o) => oldChoice(o, 'matter'));
-  // (what is on his mind is a personal matter, whatever it is about)
-  return opened(c, cv, opts.filter((o) => o.group === 'He brings it up' || o.group === 'Between you' || o.group === 'On his mind')).filter((o) => !layered(c, o.code)).map((o) => ({ ...oldChoice(o, o.group === 'He brings it up' ? 'reply' : 'matter'), ...(o.group === 'On his mind' ? { pane: 'personal' as const } : {}) }));
-}
-// the leaves of the old engine's five ways in (its business, social, ask, org and settle groups), each as a subject of its own
-function oldGroups(c: Ctx, gs: string[]): Choice[] {
-  const cv = oldConvo(c);
-  if (!cv) return [];
-  return gs.flatMap((g) => opened(c, cv, atRoot(c, cv, 'g:' + g).filter((o) => !NAV(o))).filter((o) => !layered(c, o.code) && !unaffordable(c, o)).map((o) => oldChoice(o, 'matter')));
-}
-// within one of the old engine's subjects: its answers, and back to the visit
-function oldSubject(c: Ctx, all = false) {
-  const cv = c.v.old!;
-  const opts = oldOptions(c.w, c.h, c.n, cv).filter((o) => !o.done && !layered(c, o.code) && !unaffordable(c, o));
-  const rows = opts.filter((o) => !NAV(o) && o.code !== 'f:more').map((o) => oldChoice(o, 'reply'));
-  if (!rows.length) return general(c);
-  // (the four likeliest answers; the rest of what can be said to it, a figure or a threat, one step further)
-  const shown = all ? rows : rows.slice(0, 4);
-  c.v.choices = [...shown, ...(rows.length > shown.length ? [{ id: 'ways', label: 'Other ways to put it…', group: 'more' as const }] : []), { id: 'back', label: 'Talk about something else', group: 'more' }, { id: 'leave', label: 'Leave', group: 'leave' }];
-  c.v.more = all;
-}
-// What he has come to ask of the player (the old engine's requests and offered work): he raises it himself, and the screen is his
-// question with its answers, not a heading to find it under
+const heldBack = (c: Ctx, code: string) => (code === 'tk:boss' && soured(c)) || (code.startsWith('tk:pressed:') && (!!myPromiseTo(c) || social(c.w).requests.some((r) => r.by === c.n.id && r.of === c.h.id && r.wants === 'intervene')));
+subjectsHeldBy(heldBack);
+// What he has come to ask of the player (an encounter, or work he has offered): he raises it himself, and the screen is his question
+// with its answers, not a heading to find it under
 function raiseHis(c: Ctx) {
-  const his = oldRows(c, 'pending').find((x) => x.group === 'reply' && /^o:f:(enc|job):/.test(x.id));
-  if (his) doOld(c, his.id.slice(2), '');
-}
-function doOld(c: Ctx, code: string, label: string): { minutes: number; meeting?: Meeting } {
-  const cv = oldConvo(c);
-  if (!cv) { general(c); return { minutes: 0 }; }
-  // (what was said is remembered by this visit too, so the next one can answer to it: see SLIGHT)
-  if (label) remember(c.w, c.n.id, 'said:' + code.split(':').slice(0, 3).join(':'), 'said');
-  // (talking about his own life, he is as candid as he is with this man: see candourOf)
-  const res = code.startsWith('tk:') ? withCandour(c.n.id, candourOf(c), () => oldSay(c.w, c.h, c.n, cv, code)) : oldSay(c.w, c.h, c.n, cv, code);
-  // (what he says is his; what happens is told; a card is a card. The old engine writes lines as text, so they are sorted by shape)
-  const fn = first(c.n.name);
-  if (label && res.q && res.q !== label) c.v.lines[c.v.lines.length - 1] = { who: 'you', text: res.q };
-  const from = c.v.lines.length;
-  for (const l0 of res.lines) {
-    // (the old engine writes plain quotes, puts a speaker's name before his words, and names him in full at the start of what he
-    // does; on this screen his words are already under his name, and he is "he")
-    const l = l0.replace(/"([^"]*)"/g, '“$1”').replace(new RegExp(`^(${c.n.name}|${fn}): (?=“)`), '').replace(new RegExp(`^${c.n.name} `), 'He ');
-    if (l.startsWith('⟡')) c.v.lines.push({ who: 'card', text: l.replace(/^⟡\s*/, '') });
-    // (his words: a line that opens with them, or with him and then them; everything else is what happened, told)
-    else c.v.lines.push({ who: /^“/.test(l) || new RegExp(`^(He|His|${fn})\\b[^“]{0,80}“`).test(l) ? 'him' : 'narr', text: l });
-  }
-  // (asked the same thing and answered the same way, with nothing changed since: he says that, not the same words again)
-  const said = c.v.lines.slice(from).filter((l) => l.who === 'him').map((l) => l.text).join(' '), ak = 'ans:' + code.split(':').slice(0, 3).join(':'), was = lastOf(c.w, c.n.id, ak);
-  if (label && said && was && was.sig === said.slice(0, 120) && c.w.now - was.t < 21 * DAY && c.w.now - was.t > 60) { // (only what the player asked: a man raising his own matter again says it again)
-    const keep = c.v.lines.slice(from).filter((l) => l.who !== 'him');
-    c.v.lines.splice(from); c.v.lines.push(...keep); him(c, plain(c.n.id, 'again.same', { ago: agoWords(c.w.now, was.t) }, 'flat'));
-  }
-  if (said) remember(c.w, c.n.id, ak, 'said', said.slice(0, 120));
-  if (typeof res.meeting === 'string') narr(c, res.meeting);
-  if (!res.convo) { c.v.old = startConvo(c.n.id); c.v.ended = true; c.v.choices = []; return { minutes: res.minutes, meeting: typeof res.meeting === 'object' ? res.meeting : undefined }; }
-  c.v.old = res.convo;
-  if (typeof res.meeting === 'object') { c.v.ended = true; c.v.choices = []; return { minutes: res.minutes, meeting: res.meeting }; }
-  // (still in a subject: a node of its own, a matter in hand, or answers he has just made natural; "talk" is the old screen's way of
-  // saying a subject has run its course and the everyday questions are next, which here is the heading the talk is under)
-  const inSubject = res.convo.node !== 'root' || (!!res.convo.ctx.focus && res.convo.ctx.focus !== 'talk') || !!res.convo.ctx.follow?.length;
-  if (inSubject) oldSubject(c); else { c.v.old = { ...res.convo, ctx: { ...res.convo.ctx, focus: undefined } }; general(c); }
-  if (/^tk:(racket|trouble|shop)$/.test(code)) offerHelp(c);
-  guardedCue(c, code);
-  return { minutes: res.minutes };
+  const his = actRows(c, undefined, ['his']).find((x) => /^a:(enc_open|job):/.test(x.id));
+  if (his) doAct(c, his.id.slice(2), '');
 }
 // When his money has come up and he is short (the old engine offers a gift or a loan only then: less than $300, or his shop in the
 // red), those are what the player can say next, beside whatever the subject itself allows
 function offerHelp(c: Ctx) {
-  const help = oldGroups(c, ['social', 'business']).filter((x) => /^o:(help_gift|help_loan|offer_loan|cr_cash)\b/.test(x.id) && !c.v.choices.some((y) => y.id === x.id)).slice(0, 2);
+  const help = actRows(c, undefined, ['between', 'lead', 'other']).filter((x) => /^a:(help_gift|help_loan|offer_loan|cr_cash)\b/.test(x.id) && !c.v.choices.some((y) => y.id === x.id)).slice(0, 2);
   if (!help.length) return;
   const i = c.v.choices.findIndex((x) => x.group === 'more' || x.group === 'leave' || x.group === 'intent');
   c.v.choices.splice(i < 0 ? c.v.choices.length : i, 0, ...help.map((x) => ({ ...x, group: 'reply' as const })));
@@ -522,13 +457,11 @@ function chooseIn(w: World, v: Visit, id: string): { v: Visit; minutes: number; 
   // moving between the headings is not said aloud and takes no time
   if (kind === 'u' || kind === 'all') { if (PANES.includes(a1 as Pane)) pane(c, a1 as Pane, kind === 'all'); return { v, minutes: 0 }; }
   if (id === 'home' || id === 'more') { home(c); return { v, minutes: 0 }; }
-  if (id === 'ways') { if (v.old) oldSubject(c, true); return { v, minutes: 0 }; }
-  if (id === 'back') { if (v.old) v.old = { ...v.old, node: 'root', ctx: { ...v.old.ctx, focus: undefined, follow: undefined } }; v.th.fact = undefined; v.th.subject = undefined; v.th.denied = false; v.topic = undefined; general(c); return { v, minutes: 0 }; }
+  if (id === 'back') { v.th.fact = undefined; v.th.subject = undefined; v.th.denied = false; v.topic = undefined; general(c); return { v, minutes: 0 }; }
   // (a figure the player names goes after the choice it belongs to: o:<code>:<amount>[:<rate>])
   const base = [...v.choices, ...everything(w, v)].find((x) => x.id === id || (!!x.amount && id.startsWith(x.id + ':') && /^:\d+(:[\d.]+)?$/.test(id.slice(x.id.length))));
   const label = base?.label;
   // (where he stands: answered from the family's actual conditions, and against what he was told last time: see doAdvance)
-  if (label && kind === 'o') { you(c, label); const r = doOld(c, id.slice(2), label); return { v, ...r }; }
   if (label && kind === 'a') { you(c, base?.says ?? label); return { v, ...doAct(c, id.slice(2), label) }; }
   // (an approach is chosen by name and said in words: what the player says is the line it stands for)
   const spoken = base?.says ?? label;
@@ -865,7 +798,7 @@ const HIS_OWN = /^(trouble|shop|racket|want|op:|kin:|boss|pressed:)/;
 function onHisMind(c: Ctx, floor: number): { key: string; weight: number; sig: string } | undefined {
   // (said already, and nothing about it has changed: he has nothing new to say of it, unless it is weighing on him)
   const stale = (x: { key: string; sig: string }) => { const l = lastOf(c.w, c.n.id, 'mind:' + x.key), a = lastOf(c.w, c.n.id, 'ans:tk:' + x.key); return (!!l && (l.sig === x.sig || c.w.now - l.t < 14 * DAY)) || (!!a && c.w.now - a.t < 14 * DAY); }; // (or asked about lately)
-  const xs = subjectsOf(c.w, c.h, c.n).filter((x) => HIS_OWN.test(x.key) && x.weight >= floor && !layered(c, 'tk:' + x.key));
+  const xs = subjectsOf(c.w, c.h, c.n).filter((x) => HIS_OWN.test(x.key) && x.weight >= floor && !heldBack(c, 'tk:' + x.key));
   const s = xs.find((x) => !stale(x)) ?? (xs[0] && xs[0].weight >= 0.5 ? xs[0] : undefined);
   return s ? { key: s.key, weight: s.weight, sig: s.sig } : undefined;
 }
@@ -914,12 +847,6 @@ function doNews(c: Ctx) {
   }
   general(c);
 }
-// How freely he talks about his own life (not his secrets, not favours: those are trust) to a man he has been getting to know: what
-// he thinks of him, how well they know each other, how much he likes him, and his own nature; a grudge against him shuts it
-function candourOf(c: Ctx): number {
-  const r = peek(c.n, c.h.id), t = c.pn().temper;
-  return r.trust + 0.5 * (r.known ?? 0) + 0.25 * (r.affection ?? 0) + 0.15 * (c.n.traits.sociability - 0.5) - 0.1 * (t.caution - 0.5) - (r.grudge ?? 0);
-}
 // What the player said that a man takes as a slight: told he is not ready, put on thin ice, leaned on, told to straighten himself out,
 // loyalty to a boss he resents thrown at him, called a liar or worse
 const SLIGHT = /^(said:tk:want:doubt|said:tk:trouble:straighten|said:tk:boss:loyal|said:cr_thin|said:sh_lean|said:demand|said:challenge|accuse:)/;
@@ -930,7 +857,7 @@ function confided(c: Ctx, key: string, sig: string): boolean {
 }
 // He brings it up himself: the subject's first exchange (talk.ts, through the old engine), with its answers
 // (asked what is new, he gets onto it: said so, since what he says next is his side of a subject the player did not name)
-function heRaises(c: Ctx, key: string, sig = '', lead = false) { remember(c.w, c.n.id, 'mind:' + key, 'raised', sig); if (lead) narr(c, `He gets onto ${aboutWords(c, key)}.`); doOld(c, 'tk:' + key, ''); }
+function heRaises(c: Ctx, key: string, sig = '', lead = false) { remember(c.w, c.n.id, 'mind:' + key, 'raised', sig); if (lead) narr(c, `He gets onto ${aboutWords(c, key)}.`); doAct(c, 'tk:' + key, ''); }
 // An evening together: what they talk about is what each of them knows and has lived lately, and what is between them
 function doSpend(c: Ctx): number {
   const { w, h, n } = c;

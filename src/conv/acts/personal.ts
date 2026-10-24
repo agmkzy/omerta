@@ -347,7 +347,7 @@ const rvFavour: Act = {
   offers: (c) => one(rival(c) && !c.v.th.asked.includes('rv_favour') && R(T(c)).trust > 0.45, offer(c, 'rv_favour', 'Offer a favour across the line', 'It builds a bridge. It may also be noticed.')),
   run: (c) => {
     const x = T(c), { w, p, t } = x; c.v.th.asked.push('rv_favour');
-    door.favour(w, p, t, 1, 'did him a good turn across family lines');
+    door.owe(w, p, t, 1, 'did him a good turn across family lines');
     c.v.lines.push({ who: 'narr', text: `You send a small kindness ${t.name}’s way. A man of another family now owes you, quietly. Your own people may not like that.` });
     tweak(x, 0.06, 0.03, 0.02);
     door.heat(p, 0.02);
