@@ -17,7 +17,7 @@ import { BASE_RATE, emptyBooks, settleWeek } from './books';
 import { addStake, bizMove, businessWeek, seizeShare } from './econ';
 import { daily, ventureWeek } from './jobs';
 import { pendingTick, purge } from './consequences';
-import { memoTick } from './dialogue';
+import { memoTick } from './memos';
 import { socialDay } from './conv/tick';
 import './conv/pursuits'; // (Gate 2b: registers pursuits, and where they start, on the tick)
 import './conv/deciders'; // (Gate 2b: the conversation layer's decisions for the world's asks, in worlds that run it)

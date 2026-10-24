@@ -10,6 +10,8 @@ import { addFavour } from './encounters';
 import { RECRUIT_COST } from './orders';
 import { amendsAsk, askBetween, openAsk, playerMove, playerMoves, type AskMove } from './asks';
 import { arch } from './voice';
+import { brokenWord } from './memos';
+export { brokenWord } from './memos';
 import { standingWord } from './jobs';
 import { PROBLEM_LABEL } from './people';
 import { Character, DAY, Id, Situation, World } from './types';
@@ -351,11 +353,6 @@ export function sitdownTalk(w: World, p: Character, t: Character, other: Charact
   const prior = (p.cooldown[`sd:${t.id}`] ?? 0) > w.now - 20 * DAY ? ' “And let’s not have another one like the last.”' : '';
   p.cooldown[`sd:${t.id}`] = w.now;
   return [`${lead}${prior}`, `He expects ${other.name.split(' ')[0]} to be there, and he expects you to be fair.`];
-}
-
-// A promise to him that lapsed unkept, and that he has not yet been dealt with over.
-export function brokenWord(w: World, p: Character, t: Character) {
-  return Object.values(w.facts).find((f) => f.kind === 'ruling' && f.actor === p.id && f.victim === t.id && /keep his word/.test(f.text) && w.now - f.t < 30 * DAY && !t.talk?.['word:' + f.id]);
 }
 
 // What stands between you and the next rank, as things you can ask him about, one at a time.

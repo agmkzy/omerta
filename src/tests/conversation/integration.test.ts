@@ -30,7 +30,8 @@ describe('every action goes through an existing door', { tags: ['architecture'] 
   ok('nothing in src/conv writes a world record directly, except doors.ts', () => {
     const bad: string[] = [];
     const WRITE = /\.(cash|trust|respect|affection|grudge|fear|heat|hurtUntil|protection|rank|bossId|familyId|known|balance|status)\s*[-+*]?=[^=]|\b(w|world)\.(debts|favours|jobs|enc|ledger|situations)\.push|\bw\.facts\[[^\]]+\]\s*=|\brel\(|\bfeelTo\(/;
-    for (const f of readdirSync(conv).filter((x) => x.endsWith('.ts') && !FIXTURES.has(x) && x !== 'doors.ts')) {
+    // (every file of the layer, its interaction modules in conv/acts included)
+    for (const f of (readdirSync(conv, { recursive: true }) as string[]).filter((x) => x.endsWith('.ts') && !FIXTURES.has(x) && x !== 'doors.ts')) {
       readFileSync(conv + f, 'utf8').split('\n').forEach((l, i) => {
         if (!WRITE.test(l)) return;
         // the layer's own records (requests, obligations: r.status, ob.status, o3.intends) are its to write

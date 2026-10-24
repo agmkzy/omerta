@@ -29,6 +29,8 @@ import { WANT_LINE, wantFor, knows, learnAbout, repLines, crewEnvelopesWaiting }
 import { pathInfo } from './path';
 import { amends, playerActed, touchDispute } from './disputes';
 import { Character, DAY, Fact, Grievance, Id, Job, World } from './types';
+import { introduced, introducers } from './acquaint';
+export { introduced, introducers } from './acquaint';
 
 export interface DOpt {
   code: string;
@@ -120,24 +122,6 @@ const isSuperior = (w: World, t: Character, p: Character) => {
   }
   return false;
 };
-// You can't talk business with a man you haven't met. Your own boss, your own men, your kin and anyone who's come to you already don't count as strangers.
-export function introduced(w: World, p: Character, t: Character): boolean {
-  if (t.id === p.id || p.intro?.[t.id] != null) return true;
-  if (t.id === p.bossId || t.bossId === p.id || t.id === p.backer || t.id === p.sponsor) return true;
-  if (p.bossId && t.bossId === p.bossId) return true; // (V90: men in the same crew know each other)
-  if (w.life && (w.life.partner?.id === t.id || w.life.kin.some((k) => k.id === t.id))) return true;
-  if (w.enc.some((e) => e.from === t.id)) return true;
-  if (ownerBiz(w, t.id)?.protection?.collectorId === p.id) return true;
-  if (w.debts.some((x) => (x.creditor === p.id && x.debtor === t.id) || (x.creditor === t.id && x.debtor === p.id))) return true;
-  if (w.jobs.some((j) => j.giver === t.id && j.assignee === p.id)) return true;
-  // (V90: a man you have put terms to, or who has put terms to you, has met you)
-  if ((w.situations ?? []).some((s) => s.kind === 'ask' && ((s.terms?.by === p.id && s.terms?.of === t.id) || (s.terms?.by === t.id && s.terms?.of === p.id)))) return true;
-  return false;
-}
-export function introducers(w: World, p: Character, t: Character): Character[] {
-  const cand = [p.bossId, p.backer, p.sponsor].filter(Boolean).map((id) => w.chars[id!]).filter((c) => c?.alive && c.id !== t.id);
-  return cand.filter((c) => c.bossId === t.id || t.bossId === c.id || (c.familyId && c.familyId === t.familyId) || (c.rels[t.id] && c.rels[t.id].lastMet > -1e8) || (c.familyId && t.rank === 'civilian' && w.fam[c.familyId]?.districts.includes(t.district))).slice(0, 2);
-}
 const inFamily = (p: Character, t: Character) => !!p.familyId && p.familyId === t.familyId;
 
 // A man telling his own story says "me" and "my", not his own full name.
@@ -2820,27 +2804,4 @@ function promotionLines(w: World, p: Character, t: Character): string[] {
   return out;
 }
 
-// ----------------------------------------------------------------- memory
-
-// Promises have a day of reckoning. A man who breaks his word is remembered for it.
-export function memoTick(w: World) {
-  for (const c of Object.values(w.chars)) {
-    if (!c.alive || !c.memos.length) continue;
-    for (const m of c.memos) {
-      if (m.done || !m.due || m.due > w.now) continue;
-      const p = w.chars[m.other];
-      if (!p) continue;
-      let kept = false;
-      if (m.kind === 'promise' && m.ref) kept = w.jobs.find((j) => j.id === m.ref)?.status === 'done';
-      else if (m.kind === 'promise') kept = p.books.arrears === 0;
-      else if (m.kind === 'question' && m.ref) kept = !!p.known[m.ref]?.knowsActor && !!c.known[m.ref]?.knowsActor;
-      m.done = true;
-      if (kept) continue;
-      feel(w, c, p.id, 'trust', -0.1);
-      feel(w, c, p.id, 'respect', -0.06);
-      if (p.isPlayer) repute(w, p, -1, 'broke word');
-      addFact(w, { kind: 'ruling', actor: p.id, victim: c.id, minor: true, text: `${p.name} didn’t keep his word to ${c.name}.`, district: c.district }, { witnesses: [c.id] });
-    }
-    if (c.memos.length > 24) c.memos = c.memos.filter((m) => !m.done).slice(-24);
-  }
-}
+export { memoTick } from './memos';
