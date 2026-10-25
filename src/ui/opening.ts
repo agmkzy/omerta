@@ -5,9 +5,9 @@ import { BACKGROUNDS, bgLabel, bgOf } from '../background';
 import { cleanName, rollFirst, rollName, rollSurname } from '../names';
 import { SKILL_LABEL } from '../people';
 import { savedRaw } from '../savestore';
-import type { Character, Look, World } from '../types';
+import type { Character, Look, Rank, World } from '../types';
 import { esc, S } from './links';
-import { LOOK_OPTIONS, portrait, randomLook as rollLook, type LookOption, type LookX } from './portrait';
+import { LOOK_GROUPS, LOOK_OPTIONS, portrait, randomLook as rollLook, resolveLook, type LookGroup, type LookOption, type LookX } from './portrait';
 
 // ------------------------------------------------------------------ the saved game, read without opening it
 export interface SaveSummary { name: string; place: string; when: string; days: number; ended: boolean; char: Character; w: Pick<World, 'fam' | 'now'> }
@@ -75,8 +75,15 @@ export function openingAct(v: string): void {
     case 'last': D().last = rollSurname(Math.random, D().last); return;
     case 'bg': if (bgOf(x)) D().bg = x; return;
     case 'shuffle': S.look = { ...randomLook() }; return;
-    case 'lg': D().lg = x as 'Face' | 'Hair' | 'Details'; return;
-    case 'look': { const [key, val] = x.split(':'); (S.look as Record<string, number | string>)[key] = Number(val); return; }
+    // (the group names are LOOK_GROUPS; ui/state.ts types draft.lg with the three older names, so it is written through a cast)
+    case 'lg': if ((LOOK_GROUPS as string[]).includes(x)) (D() as { lg?: string }).lg = x; return;
+    case 'look': {
+      const [key, val] = x.split(':');
+      if (key === '@rank') { if (PREVIEW_RANKS.includes(val as Rank)) previewRank = val as Rank; return; } // the preview only: how he would dress at a rank
+      const n = Number(val);
+      if (LOOK_OPTIONS.some((o) => o.key === key) && Number.isInteger(n)) (S.look as Record<string, number | string>)[key] = n;
+      return;
+    }
   }
 }
 function enter() { D(); S.intro = 'create'; }
@@ -134,10 +141,18 @@ function titleView(n: string): string {
 // ------------------------------------------------------------------ the man
 const radio = (on: boolean) => `role="radio" aria-checked="${on}"`;
 // The appearance controls come from the portrait painter's own list (LOOK_OPTIONS), so every option it can paint is offered.
-const val = (key: string) => (S.look as LookX & Record<string, unknown>)[key];
-const control = (o: LookOption) => o.kind === 'swatch'
-  ? `<div class="om-swatches" role="radiogroup" aria-label="${o.label}">${o.options.map((x, i) => `<button class="om-swatch" ${radio(val(o.key) === i)} style="--sw:${x.colour}" data-a="om:look|${o.key}:${i}" aria-label="${x.label}" title="${x.label}"><i></i></button>`).join('')}</div>`
-  : `<div class="om-chips" role="radiogroup" aria-label="${o.label}">${o.options.map((x, i) => `<button class="om-chip" ${radio(val(o.key) === i)} data-a="om:look|${o.key}:${i}">${esc(x.label)}</button>`).join('')}</div>`;
+// An option he has not chosen still shows the one in effect (resolveLook): his seed decided it, and that is what is painted.
+const PREVIEW_RANKS: Rank[] = ['associate', 'soldier', 'capo', 'boss'];
+const RANK_LABEL: Record<string, string> = { associate: 'Associate', soldier: 'Soldier', capo: 'Capo', boss: 'Boss' };
+let previewRank: Rank = 'associate';
+const previewChar = () => { const d = D(); return { id: 'preview', name: esc(`${d.first} ${d.last}`.trim()), rank: previewRank, familyId: null, traits: { greed: 0.5, violence: 0.45, ambition: 0.7, caution: 0.5, sociability: 0.6, vice: 0.3, courage: 0.7 }, hurtUntil: 0, look: S.look } as unknown as Character; };
+const control = (o: LookOption, eff: Record<string, unknown>) => {
+  const order = o.order ?? o.options.map((_, i) => i);
+  const on = (i: number) => ((S.look as LookX & Record<string, unknown>)[o.key] ?? eff[o.key]) === i;
+  return o.kind === 'swatch'
+    ? `<div class="om-swatches" role="radiogroup" aria-label="${o.label}">${order.map((i) => { const x = o.options[i]; return `<button class="om-swatch" ${radio(on(i))} style="--sw:${x.colour}" data-a="om:look|${o.key}:${i}" aria-label="${x.label}" title="${x.label}"><i></i></button>`; }).join('')}</div>`
+    : `<div class="om-chips" role="radiogroup" aria-label="${o.label}">${order.map((i) => `<button class="om-chip" ${radio(on(i))} data-a="om:look|${o.key}:${i}">${esc(o.options[i].label)}</button>`).join('')}</div>`;
+};
 const group = (label: string, inner: string) => `<div class="om-group"><div class="om-group__label">${label}</div>${inner}</div>`;
 const next = (sec: string, label: string) => `<button class="om-next" data-a="om:sec|${sec}"><span>Next</span> ${label} ${ARROW}</button>`;
 
@@ -151,13 +166,21 @@ function namePanel(): string {
   return `${field('om-first', 'First name', d.first, 'first', 'Another first name')}${field('om-last', 'Surname', d.last, 'last', 'Another surname')}
     <div class="om-row om-row--split"><button class="om-btn om-btn--ghost" data-a="om:both">${DICE}<span>Another name</span></button>${next('look', 'Appearance')}</div>`;
 }
-const GROUPS = ['Face', 'Hair', 'Details'] as const;
 function lookPanel(): string {
-  // One group at a time, so twelve choices never sit on the screen together.
-  const g = D().lg ?? 'Face';
-  const tabs = `<div class="om-subtabs" role="tablist">${GROUPS.map((x) => `<button class="om-chip" role="tab" aria-selected="${g === x}" data-a="om:lg|${x}">${x}</button>`).join('')}</div>`;
-  const rows = LOOK_OPTIONS.filter((o) => o.group === g).map((o) => group(o.label, control(o))).join('');
-  const nxt = g === 'Details' ? next('history', 'History') : `<button class="om-next" data-a="om:lg|${GROUPS[GROUPS.indexOf(g) + 1]}"><span>Next</span> ${GROUPS[GROUPS.indexOf(g) + 1]} ${ARROW}</button>`;
+  // One group at a time, so two dozen choices never sit on the screen together.
+  const cur = (D() as { lg?: string }).lg ?? '';
+  const g: LookGroup = (LOOK_GROUPS as string[]).includes(cur) ? (cur as LookGroup) : 'Face';
+  const eff = resolveLook(previewChar()) as unknown as Record<string, unknown>;
+  // (the inline flex-wrap lets the five tabs wrap onto two lines on a phone even before web/css/opening-look.css is loaded)
+  const tabs = `<div class="om-subtabs om-subtabs--look" role="tablist" style="flex-wrap:wrap">${LOOK_GROUPS.map((x) => `<button class="om-chip" role="tab" aria-selected="${g === x}" data-a="om:lg|${x}">${x}</button>`).join('')}</div>`;
+  let rows = LOOK_OPTIONS.filter((o) => o.group === g).map((o) => group(o.label, control(o, eff))).join('');
+  if (g === 'Clothes') {
+    // his taste is his own; his rank decides how far he has to dress it up. Let him see it.
+    const ranks = PREVIEW_RANKS.map((r) => `<button class="om-chip" ${radio(previewRank === r)} data-a="om:look|@rank:${r}">${RANK_LABEL[r]}</button>`).join('');
+    rows = group('Dressed as', `<div class="om-chips om-chips--rank" role="radiogroup" aria-label="Preview at a rank">${ranks}</div><p class="om-footnote om-look-note">You start as an associate. A promotion dresses the same taste up: a leather jacket becomes a car coat over a suit.</p>`) + rows;
+  }
+  const gi = LOOK_GROUPS.indexOf(g);
+  const nxt = gi === LOOK_GROUPS.length - 1 ? next('history', 'History') : `<button class="om-next" data-a="om:lg|${LOOK_GROUPS[gi + 1]}"><span>Next</span> ${LOOK_GROUPS[gi + 1]} ${ARROW}</button>`;
   return `<div class="om-panel__head"><p class="om-panel__intro">How the neighbourhood will remember your face.</p><button class="om-btn om-btn--ghost om-btn--sm" data-a="om:shuffle">${DICE}<span>New face</span></button></div>
     ${tabs}${rows}
     <div class="om-row om-row--end">${nxt}</div>`;
@@ -180,7 +203,9 @@ function createView(n: string, saved: boolean): string {
   const d = D();
   const fade = lastSec !== d.sec ? ' om-fade' : '';
   lastSec = d.sec;
-  const preview = { id: 'preview', name: esc(`${d.first} ${d.last}`.trim()), rank: 'associate', familyId: null, traits: { greed: 0.5, violence: 0.45, ambition: 0.7, caution: 0.5, sociability: 0.6, vice: 0.3, courage: 0.7 }, hurtUntil: 0, look: S.look } as unknown as Character;
+  // painted at the rank chosen under Clothes ("Dressed as"), and only while the Appearance tab is open; otherwise as he starts
+  if (d.sec !== 'look') previewRank = 'associate';
+  const preview = previewChar();
   const tab = (id: typeof d.sec, label: string, n2: string) => `<button class="om-seg__tab" role="tab" aria-selected="${d.sec === id}" data-a="om:sec|${id}"><i>${n2}</i>${label}</button>`;
   const panel = d.sec === 'name' ? namePanel() : d.sec === 'look' ? lookPanel() : historyPanel();
   return `<div class="om om-create">
