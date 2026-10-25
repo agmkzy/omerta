@@ -8,8 +8,6 @@ import type { Move, SchemeOpt } from '../jobs';
 // The overhaul's five sections are today (shown as World), people, family, business and journal; life is your own page, opened from
 // your portrait. rackets, crew and stories are older names: links and saved back-stacks that use them land in the section that holds them.
 export type Tab = 'today' | 'people' | 'family' | 'business' | 'journal' | 'life' | 'rackets' | 'crew' | 'stories';
-// V89: four rooms (see ui/lifeview.ts). Older names still arrive from links and are mapped there (roomOf).
-export type LifeSub = 'you' | 'people' | 'business' | 'known';
 
 export type View =
   | { t: 'tab'; name: Tab }
@@ -63,7 +61,6 @@ export const S = {
   chips: [] as { t: string; tone: 'good' | 'bad' | '' }[],
   opts: [] as Action[],
   planOpts: [] as OrderOpt[],
-  lifeSub: 'you' as LifeSub,
   sub: {} as Record<string, string>, // which room of each section is open (family: men/org, business: rackets/money, journal: stories/known)
   worldFilter: 'all',
   look: { skin: 1, hairColour: 1, style: 0, beard: 0, glasses: 0, jaw: 1, seed: 'you1' } as import('./portrait').LookX,

@@ -30,7 +30,7 @@ export function queueView(): string {
   const near = (x: QRow) => (eligible(x.r) ? 'ready now' : x.r.score >= 0.75 ? 'close' : x.r.score >= 0.45 ? 'getting there' : 'a long way off');
   let out = `<h2 class="lf-h">Next in line for ${to === 'soldier' ? 'soldier' : 'captain'}<small>${open ? (open > 1 ? open + ' seats open' : 'a seat is open') : 'no seat open'}</small></h2>`;
   out += `<p class="lf-note">The family weighs what a man has earned, how far the boss trusts him, his name, and who will vouch for him. ${mine === 0 ? 'Right now, that’s you.' : mine === 1 ? 'One man is ahead of you.' : mine > 1 ? `${mine} men are ahead of you.` : ''}</p>`;
-  out += `<ul class="rows q lf-line">` + rows.map((x, i) => ({ ...x, i })).filter((x) => x.i < 3 || Math.abs(x.i - mine) <= 1).map((x, k, arr) => {
+  out += `<ul class="ui-list q lf-line">` + rows.map((x, i) => ({ ...x, i })).filter((x) => x.i < 3 || Math.abs(x.i - mine) <= 1).map((x, k, arr) => {
     const { c, r, i } = x;
     const you = c.id === p.id;
     const boss = c.bossId ? w.chars[c.bossId] : undefined;

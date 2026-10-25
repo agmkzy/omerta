@@ -8,6 +8,7 @@ export const title = (text: string, lede = '') => `<h1 class="ui-title">${esc(te
 export const h = (text: string, note = '') => `<h2 class="ui-h">${esc(text)}${note ? `<small>${esc(note)}</small>` : ''}</h2>`;
 export const label = (text: string) => `<span class="ui-label">${esc(text)}</span>`;
 export const quiet = (html: string) => `<p class="ui-quiet">${html}</p>`;
+export const note = (html: string) => `<p class="ui-note">${html}</p>`;
 
 // ------------------------------------------------------------------ rows
 export interface Row {
@@ -43,17 +44,20 @@ export interface Pick {
   a: string;
   label: string;          // plain
   hint?: string;          // plain
-  kind?: '' | 'out' | 'more' | 'lead';
+  kind?: '' | 'out' | 'more' | 'lead' | 'danger';
   fig?: string;           // html: the inputs for a figure, and the button that puts it
+  off?: boolean;          // shown, with its reason in the hint, but not open now
+  sel?: boolean;          // picked (a list you choose several from: guests, a crew)
 }
 export function choices(ps: Pick[], aria = 'What you say'): string {
   const out = ps.map((p, i) => {
     const n = p.kind === 'out' ? OUT : `${i + 1}`;
-    const cls = `ui-choice${p.kind ? ' is-' + p.kind : ''}${p.fig ? ' is-fig' : ''}`;
+    const cls = `ui-choice${p.kind ? ' is-' + p.kind : ''}${p.fig ? ' is-fig' : ''}${p.off ? ' is-off' : ''}${p.sel ? ' is-sel' : ''}`;
     const inner = `<span class="ui-choice__n" aria-hidden="true">${n}</span><span class="ui-choice__label">${esc(p.label)}</span>${p.hint ? `<span class="ui-choice__hint">${esc(p.hint)}</span>` : ''}`;
     // a figure is a group, not a button: its own inputs and its own "put it to him" (the number keys focus its first input)
     if (p.fig) return `<li><div class="${cls}" role="group" aria-label="${esc(p.label)}" data-n="${i + 1}">${inner}<div class="ui-figrow">${p.fig}</div></div></li>`;
-    return `<li><button class="${cls}" data-a="${esc(p.a)}"${p.kind === 'out' ? ' data-out="1"' : ` data-n="${i + 1}"`}>${inner}${p.kind === 'out' ? '' : GO_C}</button></li>`;
+    if (p.off) return `<li><button class="${cls}" disabled>${inner}</button></li>`;
+    return `<li><button class="${cls}" data-a="${esc(p.a)}"${p.kind === 'out' ? ' data-out="1"' : ` data-n="${i + 1}"`}${p.sel !== undefined ? ` aria-pressed="${p.sel}"` : ''}>${inner}${p.kind === 'out' ? '' : GO_C}</button></li>`;
   }).join('');
   return `<ol class="ui-choices" aria-label="${esc(aria)}">${out}</ol>`;
 }

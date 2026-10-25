@@ -3,6 +3,7 @@
 // heard of; each story says where it stands in words, what he knows in order (when he learned each thing, and from whom), who is in
 // it, what he can do, and, honestly, what he does not know. Nothing here is read from what the world knows privately: only facts the
 // player has seen or been told (p.known), the records he is himself a party to, and the words the matters give for where they stand.
+import { choices, h, kv, note, quiet, rows, title, type KV, type Pick, type Row } from './kit';
 import { classOf } from '../exchange';
 import { asker, askee, playerMoves, read as mRead, titleOf as mTitle } from '../asks';
 import { factText, fmtTime, money } from '../core';
@@ -515,37 +516,31 @@ const GROUPS: [Group | 'done', string, string][] = [
   ['in', 'You’re in it', 'Your money, your men, your name.'],
   ['heard', 'Around you', 'Other men’s business that has reached you.'],
 ];
-function row(w: World, s: Story): string {
+function row(w: World, s: Story): Row {
   const last = s.lastText ? lk(s.lastText.length > 120 ? s.lastText.slice(0, 117) + '…' : s.lastText).replace(/<a [^>]*>(.*?)<\/a>/g, '$1') : '';
-  return `<button class="st-row${s.closed ? ' st-row--done' : ''}" data-a="story:${esc(s.key)}">`
-    + `<span class="st-mark ${s.tone || 'green'}" aria-hidden="true"></span>`
-    + `<span class="st-row__body">`
-    + `<span class="st-row__top"><span class="st-origin">${esc(s.origin ?? '')}</span><span class="st-when">${isNew(s) ? '<b>new</b> · ' : ''}${s.timeline.length ? `heard ${esc(ago(w.now, s.last))}` : esc(ago(w.now, s.last))}</span></span>`
-    + `<span class="st-row__title">${esc(s.title)}</span>`
-    + `<span class="st-row__stage">${esc(s.stage)}</span>`
-    + (last ? `<span class="st-row__last">${last}</span>` : '')
-    + `</span></button>`;
+  const when = `${isNew(s) ? 'new · ' : ''}${s.timeline.length ? `heard ${ago(w.now, s.last)}` : ago(w.now, s.last)}`;
+  return { mark: s.closed ? 'dead' : s.tone || 'green', kick: `${s.origin ?? ''}${s.origin ? ' · ' : ''}${when}`, title: esc(s.title), sub: `${esc(s.stage)}${last ? `<br><i>${last}</i>` : ''}`, a: `story:${s.key}` };
 }
 export function storiesTab(): string {
   const w = W(), p = P();
   const all = storiesOf(w);
   const run = all.filter((s) => !s.closed), done = all.filter((s) => s.closed);
   const need = run.filter((s) => s.group === 'now').length;
-  let out = `<header class="st-top"><h1 class="page">Stories</h1><p class="st-lede">${run.length ? `${run.length} running${need ? `, <b>${need} ${need > 1 ? 'need' : 'needs'} you</b>` : ''}.` : 'Nothing is running.'} Only what you have seen or been told.</p></header>`;
-  if (!all.length) out += `<p class="st-empty">Nothing is unfolding that you know of. Matters start when something happens to you, your men or your shops, or when word of other men’s business reaches you. They show up here, and you can follow each one from the beginning.</p>`;
-  for (const [g, h, sub] of GROUPS) {
+  let out = title('Stories', `${run.length ? `${run.length} running${need ? `, <b>${need} ${need > 1 ? 'need' : 'needs'} you</b>` : ''}.` : 'Nothing is running.'} Only what you have seen or been told.`);
+  if (!all.length) out += quiet('Nothing is unfolding that you know of. Matters start when something happens to you, your men or your shops, or when word of other men’s business reaches you. They show up here, and you can follow each one from the beginning.');
+  for (const [g, hd, sub] of GROUPS) {
     const xs = run.filter((s) => s.group === g);
-    if (xs.length) out += `<section class="st-group st-group--${g}"><h2 class="st-h">${h}<small>${esc(sub)}</small></h2>${xs.map((s) => row(w, s)).join('')}</section>`;
+    if (xs.length) out += h(hd, sub) + rows(xs.map((s) => row(w, s)));
   }
-  if (done.length) out += `<details class="st-done"><summary>Ended or gone quiet <span>${done.length}</span></summary>${done.map((s) => row(w, s)).join('')}</details>`;
+  if (done.length) out += `<details class="ui-fold"><summary>Ended or gone quiet (${done.length})</summary>${rows(done.map((s) => row(w, s)))}</details>`;
   S.seenTab = w.now;
-  // beside the list (desktop): the names that keep coming up in what you are following
+  // beside the list: how to read it, and the names that keep coming up in what you are following
   const count = new Map<Id, number>();
   for (const s of run) for (const x of s.people ?? []) count.set(x.id, (count.get(x.id) ?? 0) + 1);
   const names = [...count.entries()].filter(([id, n]) => n >= 2 && w.chars[id] && id !== p.id).sort((a, b) => b[1] - a[1]).slice(0, 5);
-  let side = `<div class="st-side"><h3 class="cv-h">How to read this</h3><p>A story is what you know of a matter, in the order you learned it. Men act on their own time; a story can move while you are elsewhere, and you hear of it only when someone tells you.</p>`;
-  if (names.length) side += `<h3 class="cv-h">Names that keep coming up</h3>${names.map(([id, n]) => `<div class="st-person">${avatar(w.chars[id])}<div>${pl(w.chars[id])}<span>in ${n} of your stories</span></div></div>`).join('')}`;
-  toSide(side + `</div>`);
+  let side = h('How to read this') + note('A story is what you know of a matter, in the order you learned it. Men act on their own time; a story can move while you are elsewhere, and you hear of it only when someone tells you.');
+  if (names.length) side += h('Names that keep coming up') + rows(names.map(([id, n]): Row => ({ face: avatar(w.chars[id]), title: esc(w.chars[id].name), sub: `in ${n} of your stories`, a: `ent:${id}` })));
+  toSide(side);
   return out;
 }
 
@@ -558,12 +553,12 @@ function timeline(w: World, s: Story): string {
   const older = tl.slice(0, Math.max(0, tl.length - 6)), recent = tl.slice(older.length);
   return (older.length ? `<details class="st-older"><summary>Earlier (${older.length})</summary><ol class="st-tl">${older.map(one).join('')}</ol></details>` : '') + `<ol class="st-tl">${recent.map(one).join('')}</ol>`;
 }
-function peopleHtml(w: World, s: Story): string {
+// the people in it: each one a tap from a conversation (his page is a tap from there)
+function peopleRows(w: World, s: Story): string {
   const ps = (s.people ?? []).map((x) => ({ c: w.chars[x.id], role: x.role })).filter((x) => x.c);
-  if (!ps.length) return '';
-  return `<div class="st-people">${ps.map(({ c, role }) => `<div class="st-person">${avatar(c)}<div>${pl(c)}<span>${esc(role)}${c.alive ? '' : ' · dead'}</span></div>${c.alive && !c.isPlayer ? `<button class="mini" data-a="talk:${c.id}">Talk</button>` : ''}</div>`).join('')}</div>`;
+  return rows(ps.map(({ c, role }): Row => ({ face: avatar(c), title: esc(c.name), sub: `${esc(role)}${c.alive ? '' : ' · dead'}${c.alive && !c.isPlayer ? ' · go and see him' : ''}`, a: c.alive && !c.isPlayer ? `talk:${c.id}` : `ent:${c.id}` })));
 }
-const actBtn = (x: Act) => `<button class="cv-c cv-topic${x.big ? ' cv-weight' : ''}${x.off ? ' st-off' : ''}" ${x.off ? 'disabled' : `data-a="${esc(x.a)}"`}><b>${lk(x.label)}</b><span>${esc(x.off ?? x.hint)}</span></button>`;
+const actPick = (x: Act): Pick => ({ a: x.a, label: x.label.replace(/<[^>]+>/g, ''), hint: x.off ?? x.hint, off: !!x.off, kind: x.big ? 'lead' : '' });
 
 export function storyPage(key: string, lines: string[] = []): string {
   const s = storiesOf(W()).find((x) => x.key === key);
@@ -583,28 +578,31 @@ function render(s: Story, lines: string[]): string {
   if ((S.seen[key] ?? 0) < w.now) { before[key] = S.seen[key] ?? 0; S.seen[key] = w.now; }
   const wasSeen = before[key] ?? 0;
   let out = back();
-  out += `<header class="st-head"><span class="st-origin">${esc(s.origin ?? '')}${s.closed ? ' · ended' : ''}</span><h1>${esc(s.title)}</h1>`
-    + `<p class="st-stage"><span class="st-mark ${s.tone || 'green'}" aria-hidden="true"></span>${esc(s.stage)}</p>`
-    + `${s.blurb && !s.timeline.some((e) => e.text === s.blurb) ? `<p class="st-blurb">${lk(s.blurb)}</p>` : ''}<p class="st-why">${esc(s.why ?? '')}</p></header>`;
+  out += `<header class="st-head"><p class="ui-label">${esc(s.origin ?? '')}${s.closed ? ' · ended' : ''}</p>${title(s.title)}`
+    + `<p class="st-stage"><span class="ui-mark ${s.tone || 'green'}" aria-hidden="true"></span>${esc(s.stage)}</p>`
+    + `${s.blurb && !s.timeline.some((e) => e.text === s.blurb) ? `<p class="st-blurb">${lk(s.blurb)}</p>` : ''}${s.why ? note(esc(s.why)) : ''}</header>`;
   // what just happened, when he has just done something about it
-  if (lines.length) out += `<div class="cv-ex cv-now st-now"><div class="cv-him">${lines.map((l) => `<p class="${/[“"]/.test(l) ? 'cv-say' : 'cv-nar'}">${lk(l)}</p>`).join('')}</div></div>`;
+  if (lines.length) out += `<div class="sc-said">${lines.map((l) => `<p class="${/[“"]/.test(l) ? 'sc-say' : 'sc-narr'}">${lk(l)}</p>`).join('')}</div>`;
   // a question put to him about it comes first: it is waiting on him
   if (s.pending) {
     const e = s.pending, c = e.from ? w.chars[e.from] : undefined;
-    out += `<section class="st-ask"><h2 class="st-h">Waiting on your answer<small>${c ? esc(first(c)) + ' · ' : ''}until ${esc(fmtDay(e.expires))}</small></h2>${e.lines.map((l) => `<p class="${/[“"]/.test(l) ? 'cv-say' : 'cv-nar'}">${lk(l)}</p>`).join('')}<div class="cv-replies">${e.opts.map((o) => `<button class="cv-c cv-reply" data-a="echoose:${e.id}|${esc(o.code)}"><b>${lk(o.label)}</b>${o.hint ? `<span>${esc(o.hint)}</span>` : ''}</button>`).join('')}</div></section>`;
+    out += h('Waiting on your answer', `${c ? first(c) + ' · ' : ''}until ${fmtDay(e.expires)}`) + `<div class="sc-said">${e.lines.map((l) => `<p class="${/[“"]/.test(l) ? 'sc-say' : 'sc-narr'}">${lk(l)}</p>`).join('')}</div>`
+      + choices(e.opts.map((o) => ({ a: `echoose:${e.id}|${o.code}`, label: o.label, hint: o.hint })), 'How you answer');
   }
-  if (s.terms?.length) out += `<dl class="st-terms">${s.terms.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>`;
+  if (s.terms?.length) out += kv(s.terms.map(([k, v]): KV => [k, esc(v)]));
   if (s.extra) out += s.extra;
-  out += `<h2 class="st-h">What you know<small>in order, and how you came to know it</small></h2>` + timeline(w, s);
-  if (s.unknown?.length) out += `<h2 class="st-h">What you don’t know</h2><div class="st-unknown">${s.unknown.map((u) => `<p>${esc(u)}</p>`).join('')}</div>`;
+  out += h('What you know', 'in order, and how you came to know it') + timeline(w, s);
+  if (s.unknown?.length) out += h('What you don’t know') + s.unknown.map((u) => quiet(esc(u))).join('');
   if (!s.closed) {
-    out += `<h2 class="st-h">What you can do</h2>`;
-    if (s.waiting || !s.actions?.length) out += `<p class="st-quiet">${esc(s.waiting ?? 'Nothing is yours to do about it right now.')}</p>`;
-    if (s.actions?.length) out += `<div class="cv-list">${s.actions.map(actBtn).join('')}</div>`;
+    out += h('What you can do');
+    if (s.waiting || !s.actions?.length) out += quiet(esc(s.waiting ?? 'Nothing is yours to do about it right now.'));
+    if (s.actions?.length && !s.pending) out += choices(s.actions.map(actPick), 'What you can do');
+    else if (s.actions?.length) out += rows(s.actions.filter((x) => !x.off).map((x): Row => ({ title: esc(x.label.replace(/<[^>]+>/g, '')), sub: esc(x.hint), a: x.a })));
   }
   // the people in it: under the story on a phone, beside it on a desktop
-  const people = peopleHtml(w, s);
-  if (people) out += `<div class="st-inline"><h2 class="st-h">Who is in it</h2>${people}</div>`;
-  toSide(`<div class="st-side">${people ? `<h3 class="cv-h">Who is in it</h3>${people}` : ''}<h3 class="cv-h">Since you last looked</h3><p>${wasSeen ? (s.timeline.some((e) => (e.learned ?? 0) > wasSeen) ? `You have heard ${s.timeline.filter((e) => (e.learned ?? 0) > wasSeen).length === 1 ? 'one new thing' : 'new things'} since you last looked, ${esc(ago(w.now, wasSeen).replace(/^today$/, 'earlier today'))}.` : `Nothing new since you last looked, ${esc(ago(w.now, wasSeen).replace(/^today$/, 'earlier today'))}.`) : 'You haven’t opened this one before.'}</p>${s.timeline.length ? `<p>First heard ${esc(ago(w.now, Math.min(...s.timeline.map((e) => e.learned ?? e.t))))}; last ${esc(ago(w.now, s.last))}.</p>` : ''}</div>`);
+  const people = peopleRows(w, s);
+  if (people) out += `<div class="st-inline">${h('Who is in it')}${people}</div>`;
+  const since = wasSeen ? (s.timeline.some((e) => (e.learned ?? 0) > wasSeen) ? `You have heard ${s.timeline.filter((e) => (e.learned ?? 0) > wasSeen).length === 1 ? 'one new thing' : 'new things'} since you last looked, ${esc(ago(w.now, wasSeen).replace(/^today$/, 'earlier today'))}.` : `Nothing new since you last looked, ${esc(ago(w.now, wasSeen).replace(/^today$/, 'earlier today'))}.`) : 'You haven’t opened this one before.';
+  toSide(`${people ? h('Who is in it') + people : ''}${h('Since you last looked')}${note(since)}${s.timeline.length ? note(`First heard ${esc(ago(w.now, Math.min(...s.timeline.map((e) => e.learned ?? e.t))))}; last ${esc(ago(w.now, s.last))}.`) : ''}`);
   return out;
 }

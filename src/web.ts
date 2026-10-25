@@ -45,7 +45,7 @@ import { goalsView, disputeView, storyView, storyExists } from './ui/views_c';
 import { encView, factView, bizView, attentionCount, personView, todayView } from './ui/views_a';
 import { choose as encChoose } from './encounters';
 import {
-  approachView, booksView, crewList, crewView, dayjobView, delegateView, familyTab, grudgesView, settleView, guestsView, helpView, jobView, lifeTab, meetingView,
+  approachView, booksView, crewList, crewView, dayjobView, delegateView, familyTab, grudgesView, settleView, guestsView, helpView, jobView, meetingView,
   menuView, placesView, opStartView, opView, hijackView, ordersView, peopleView, placeView, planView, recruitView, reportView, sendView, waitChoices, waitView,
 } from './ui/views_b';
 import { treeView } from './ui/views_a';
@@ -384,7 +384,7 @@ function handle(a: string, v: string) {
     case 'tab': return tab(v as Tab);
     // (leaving the new conversation by the top button is leaving it: whatever he came to you about goes unanswered, as it would)
     case 'back': if (S.view.t === 'talk2' && !S.view.v.ended) chooseVisit(w, S.view.v, 'leave'); return pop();
-    case 'career': S.lifeSub = 'you'; return tab('life');
+    case 'career': return tab('life');
     case 'paper': S.paperAt = Number(v); return;
     case 'tog': S.open[v] = !S.open[v]; return;
     case 'ent': return go({ t: 'person', id: v });
@@ -918,7 +918,8 @@ document.addEventListener('keydown', (e) => {
   const el = e.target as HTMLElement;
   const typing = el?.tagName === 'INPUT' || el?.tagName === 'TEXTAREA' || el?.isContentEditable;
   if (e.key === 'Escape') {
-    const out = list.querySelector('[data-out]') as HTMLElement | null;
+    // the screen's own way out, or else its back button
+    const out = (list.querySelector('[data-out]') ?? document.querySelector('.ui-back')) as HTMLElement | null;
     if (out) { e.preventDefault(); out.click(); }
     return;
   }

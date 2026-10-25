@@ -4,6 +4,7 @@
    anything read as information, typed figures for money and dates. */
 :root {
   /* grounds, from the room to the raised surface */
+  --c-black: #090807;
   --c-ground: #0d0c0b;
   --c-rail: #110f0e;
   --c-raise: #161412;
@@ -25,11 +26,13 @@
   /* the decisive act, and harm */
   --c-wine: #6e1f2b;
   --c-wine-2: #8a2a3a;
+  --c-wine-soft: rgba(138, 42, 58, .22);
   --c-danger: #d4776b;
   --c-danger-soft: rgba(212, 119, 107, .12);
   /* good news, and the plain record */
   --c-good: #95b99f;
   --c-good-soft: rgba(149, 185, 159, .11);
+  --c-on-good: #0e1410;
   --c-info: #93b2c9;
   --c-info-soft: rgba(147, 178, 201, .11);
   /* the five families, as a man would recognise their colours on a chip */
@@ -42,6 +45,8 @@
 
   /* space, shape, motion */
   --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px; --s-6: 32px; --s-7: 48px;
+  --s-8: 72px;
+  --track: .18em;   /* the spacing of small capitals */
   --radius: 3px;
   --tap: 44px;
   --ease: cubic-bezier(.2, .7, .2, 1);
@@ -55,24 +60,4 @@
 
   color-scheme: dark;
 
-  /* Older names, kept while legacy.css is retired: each points at the token above that replaced it. */
-  --bg: var(--c-ground); --card: var(--c-raise); --soft: var(--c-raise-2); --raise: var(--c-raise-3); --line: var(--c-line); --line-2: var(--c-line-2);
-  --ink: var(--c-cream); --ink-2: var(--c-cream-2); --muted: var(--c-muted); --dim: var(--c-dim); --fg: var(--c-cream);
-  --green: var(--c-good); --green-soft: var(--c-good-soft); --on-green: #0e1410;
-  --brass: var(--c-gold); --brass-2: var(--c-gold-2); --brass-soft: var(--c-gold-soft);
-  --wine: var(--c-wine); --wine-2: var(--c-wine-2); --wine-soft: rgba(138, 42, 58, .22);
-  --red: var(--c-danger); --red-soft: var(--c-danger-soft); --blue: var(--c-info); --blue-soft: var(--c-info-soft);
-  --f0: var(--c-f0); --f1: var(--c-f1); --f2: var(--c-f2); --f3: var(--c-f3); --f4: var(--c-f4); --fx: var(--c-fx);
-  --accent: var(--c-gold-2);
-  --display: var(--f-display); --body: var(--f-ui); --type: var(--f-fig); --r: var(--radius);
-  --om-black: #090807; --om-bg: var(--c-ground); --om-surface: var(--c-raise); --om-surface-2: var(--c-raise-2); --om-surface-3: var(--c-raise-3);
-  --om-line: var(--c-line); --om-line-2: var(--c-line-2);
-  --om-ivory: var(--c-cream); --om-ivory-2: var(--c-cream-2); --om-ivory-3: var(--c-muted);
-  --om-brass: var(--c-gold); --om-brass-2: var(--c-gold-2); --om-brass-soft: var(--c-gold-soft);
-  --om-wine: var(--c-wine); --om-wine-2: var(--c-wine-2); --om-wine-soft: rgba(138, 42, 58, .24);
-  --om-danger: var(--c-danger);
-  --om-serif: var(--f-display); --om-sans: var(--f-ui); --om-track: .18em;
-  --om-1: var(--s-1); --om-2: var(--s-2); --om-3: var(--s-3); --om-4: var(--s-4); --om-5: var(--s-5); --om-6: var(--s-6); --om-7: var(--s-7); --om-8: 72px;
-  --om-radius: var(--radius); --om-tap: var(--tap);
-  --om-ease: var(--ease); --om-fast: var(--t-fast); --om-mid: var(--t-mid);
 }

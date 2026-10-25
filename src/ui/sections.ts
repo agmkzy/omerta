@@ -4,20 +4,22 @@
 //   People    everyone you know, and the people at home                                      (was Life > People)
 //   Family    your men, and the family you belong to                                         (was Crew, Family)
 //   Business  your rackets, and the money: the envelope, what is owed either way             (was Rackets, Life > Business)
-//   Journal   the stories you are following, and everything you have seen or been told      (was Stories, Life > What you know)
+//   Journal   the stories you are following, your word (favours and promises either way), and everything you have seen or
+//             been told                                                                     (was Stories, Life > What you know)
 import { todayView } from './views_a';
 import { crewList, crewView, familyTab } from './views_b';
 import { racketsView } from './views_c';
 import { storiesTab } from './stories';
 import { businessRoom, knownRoom, peopleRoom, youRoom } from './lifeview';
 import { P, S } from './links';
+import { wordRoom } from './word';
 import type { Tab } from './state';
 
 type Room = [id: string, label: string, view: () => string];
 const ROOMS: Partial<Record<Tab, Room[]>> = {
   family: [['men', 'Your men', crewView], ['org', 'The family', familyTab]],
   business: [['rackets', 'Rackets', racketsView], ['money', 'Money', businessRoom]],
-  journal: [['stories', 'Stories', storiesTab], ['known', 'What you know', knownRoom]],
+  journal: [['stories', 'Stories', storiesTab], ['word', 'Your word', wordRoom], ['known', 'What you know', knownRoom]],
 };
 // Where an older name lands: the section, and the room in it.
 export const LEGACY: Partial<Record<Tab, [Tab, string]>> = { rackets: ['business', 'rackets'], crew: ['family', 'men'], stories: ['journal', 'stories'] };

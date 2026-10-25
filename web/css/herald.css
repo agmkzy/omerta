@@ -1,0 +1,27 @@
+/* The Herald (src/ui/brief.ts): a 1970 front page, set apart from the night on newsprint. */
+.herald__issues { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 2px 0 12px; font-size: 12px; color: var(--c-muted); }
+.herald__issues .mini:disabled { opacity: .3; cursor: default; }
+.herald { --np-ink: #1c1914; --np-rule: #2b251c; position: relative; color: var(--np-ink); padding: 16px 15px 16px; border-radius: 1px; background: linear-gradient(180deg, rgba(255, 251, 236, .45), rgba(130, 100, 50, .12)), url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .3 0 0 0 0 .22 0 0 0 .22 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"), #e7dfca; box-shadow: 0 26px 50px -26px #000, 0 0 0 1px rgba(0, 0, 0, .5); font-family: "Old Standard TT", Georgia, "Times New Roman", serif; }
+.herald__mast { text-align: center; border-bottom: 3px double var(--np-rule); padding-bottom: 6px; }
+.herald__ears { display: flex; justify-content: space-between; align-items: flex-start; font: 700 8.5px/1.25 "Old Standard TT", Georgia, serif; letter-spacing: .12em; text-transform: uppercase; }
+.herald__ears span { border: 1px solid var(--np-rule); padding: 3px 6px; }
+.herald__name { font: 700 clamp(29px, 9.2vw, 60px)/1.05 "UnifrakturCook", "Old English Text MT", "Old Standard TT", Georgia, serif; margin: 4px 0 6px; color: var(--np-ink); }
+.herald__date { display: flex; justify-content: space-between; gap: 8px; border-top: 1px solid var(--np-rule); padding-top: 5px; font: 400 10px "Old Standard TT", Georgia, serif; letter-spacing: .14em; text-transform: uppercase; }
+.herald__lead { font: 700 clamp(25px, 7.2vw, 46px)/1.03 "Old Standard TT", Georgia, serif; text-transform: uppercase; text-align: center; margin: 14px 0 12px; padding-bottom: 13px; border-bottom: 1px solid var(--np-rule); color: var(--np-ink); }
+.herald__cols { column-gap: 24px; column-rule: 1px solid rgba(43, 37, 28, .45); }
+.herald__item { break-inside: avoid; padding: 0 0 10px; margin: 0 0 10px; border-bottom: 1px solid rgba(43, 37, 28, .28); }
+.herald__item h3 { font: 700 17px/1.16 "Old Standard TT", Georgia, serif; margin: 0 0 5px; color: var(--np-ink); }
+.herald__item.first h3 { font-size: 21px; }
+.herald__item p { font-size: 14px; line-height: 1.42; margin: 0; text-align: justify; hyphens: auto; -webkit-hyphens: auto; }
+.herald__item.first p::first-letter { float: left; font: 700 37px/.85 "Old Standard TT", Georgia, serif; margin: 4px 5px 0 0; }
+.herald__also { border-top: 3px double var(--np-rule); margin-top: 4px; padding-top: 9px; }
+.herald__also h4 { font: 700 10px "Old Standard TT", Georgia, serif; letter-spacing: .18em; text-transform: uppercase; margin: 0 0 6px; text-align: center; }
+.herald__also p { font-size: 13.5px; line-height: 1.4; margin: 5px 0; padding-left: 14px; position: relative; }
+.herald__also p::before { content: "\25AA"; position: absolute; left: 0; top: 0; }
+.herald__note, .herald__quiet { font: italic 12px/1.4 "Old Standard TT", Georgia, serif; color: #5b5244; margin: 12px 0 0; text-align: center; }
+.herald__quiet { font-size: 14px; color: var(--np-ink); }
+@media (min-width: 560px) {
+  .herald { padding: 24px 30px 22px; }
+  .herald__cols { columns: 2; }
+  .herald__ears { font-size: 9.5px; }
+}

@@ -1,4 +1,8 @@
 // Rackets and ways to earn: what is running, what you could start, and exactly what is on offer right now.
+import { avatar } from './common';
+import { acts, btn, choices, h, quiet, rows, type Pick, type Row } from './kit';
+import { week, weekLine } from './money';
+import { powerOptions } from '../powers2';
 import { SOURCE_LABEL } from '../books';
 import { money, ownerBiz, shortTime } from '../core';
 import { schemes, ventureOf } from '../jobs';
@@ -9,7 +13,7 @@ import { isMade } from '../politics';
 import { DAY, Id, Op, World } from '../types';
 import { progress, bandOf } from '../ambition';
 import { WAYS, WAY_CATS, Way, wayById } from '../ways';
-import { back, strip, svg } from './common';
+import { back, svg } from './common';
 import { toSide } from './layout';
 import { bl, esc, lk, P, pl, S, W } from './links';
 
@@ -104,33 +108,35 @@ export function racketsView(): string {
   const b = bucket(w);
   const sts = new Map(WAYS.map((x) => [x.id, statusOf(w, x, b)] as const));
   let out = '';
-  const gross = Object.entries(p.books.gross).filter(([, v]) => v > 0).sort((x, y) => y[1] - x[1]);
-  const total = gross.reduce((a, [, v]) => a + v, 0);
   // what is running
   const live = WAYS.filter((x) => sts.get(x.id)!.tone === 'run');
   const jobsOut = w.jobs.filter((j) => j.status === 'active' && crew(w).some((c) => c.id === j.assignee));
-  out += `<h2 class="sect">Your rackets<small>${live.length ? live.length + ' running' : 'nothing running'}</small></h2>`;
+  out += `<h2 class="ui-h">Your rackets<small>${live.length ? live.length + ' running' : 'nothing running'}</small></h2>`;
   if (!live.length && !jobsOut.length) out += `<p class="muted pad">Nothing is running yet. Pick a way to earn below and set it in motion.</p>`;
   out += live.map((x) => cardOf(x, sts.get(x.id)!)).join('');
-  if (jobsOut.length) out += `<div class="card"><h2>Crew out on jobs<small>${jobsOut.length}</small></h2><div class="list">${jobsOut.map((j) => `<button class="opt" data-a="job:${j.id}"><b>${esc(j.title)}</b><span class="because">${esc(w.chars[j.assignee].name)}${j.orders ? ' · ' + (j.orders === 'hard' ? 'by any means' : 'quietly') : ''}</span></button>`).join('')}</div></div>`;
+  if (jobsOut.length) out += h('Crew out on jobs', String(jobsOut.length)) + rows(jobsOut.map((j): Row => ({ face: avatar(w.chars[j.assignee]), title: esc(j.title), sub: `${esc(w.chars[j.assignee].name)}${j.orders ? ' · ' + (j.orders === 'hard' ? 'by any means' : 'quietly') : ''}`, a: `job:${j.id}` })));
 
   // the catalogue: what you could start now, by kind; what is not open to you yet, folded away
   const ready = WAYS.filter((x) => sts.get(x.id)!.tone === 'ok');
   const locked = WAYS.filter((x) => sts.get(x.id)!.tone === 'lock');
-  out += `<h2 class="sect">Ways to earn<small>${ready.length} open to you</small></h2>`;
+  out += `<h2 class="ui-h">Ways to earn<small>${ready.length} open to you</small></h2>`;
   for (const cat of WAY_CATS) {
     const list = ready.filter((x) => x.cat === cat);
-    if (list.length) out += `<h3 class="sub">${esc(cat)}</h3><div class="g-ways">${list.map((x) => rowOf(x, sts.get(x.id)!)).join('')}</div>`;
+    if (list.length) out += `<h3 class="ui-h">${esc(cat)}</h3><div class="g-ways">${list.map((x) => rowOf(x, sts.get(x.id)!)).join('')}</div>`;
   }
-  if (locked.length) out += `<details class="fold g-locked"><summary class="more">Not open to you yet (${locked.length}) &rsaquo;</summary><div class="g-ways">${locked.map((x) => rowOf(x, sts.get(x.id)!)).join('')}</div></details>`;
+  if (locked.length) out += `<details class="fold g-locked"><summary class="ui-btn ui-btn--quiet">Not open to you yet (${locked.length}) &rsaquo;</summary><div class="g-ways">${locked.map((x) => rowOf(x, sts.get(x.id)!)).join('')}</div></details>`;
 
-  // beside it: the week's money, and the money nobody else counts
-  { let out = '';
-  out += `<div class="card"><h2>Earning this week<small>${money(Math.round(total))}</small></h2>${gross.length ? `<ul class="rows">${gross.map(([s, v]) => `<li><span>${esc(SOURCE_LABEL[s] ?? s)}</span><span class="v good">+${money(Math.round(v))}</span></li>`).join('')}</ul>` : '<p class="muted">Nothing yet. Pick a way to earn below.</p>'}</div>`;
-  { const side = p.books.side ?? 0, known = !!p.books.sideKnown;
-    out += `<h2 class="sect">Hidden racket<small>${side ? money(Math.round(side)) + ' a week' : 'none yet'}</small></h2><div class="card"><p>${side ? `You have side deals paying about <b>${money(Math.round(side))}</b> a week straight into your pocket. None of it goes in your envelope. ${known ? '<b>Your boss knows about it now.</b>' : 'Nobody upstairs knows. Each week there’s a small chance somebody finds out.'}` : 'A deal outside the family’s books: $800 in, about $120 a week out. It never counts in your envelope, and if your boss finds it you will have to explain. You set one up from “Make a side arrangement” under World.'}</p></div>`; }
-
-    toSide(out); }
+  // beside it: the week's money (ui/money.ts, the same account Business › Money shows), and the money nobody else counts
+  { const wk = week(w, p);
+    let side = h('Your week') + `<p class="ui-note">${esc(weekLine(wk))}</p>`;
+    side += rows(wk.comingIn.slice(0, 5).map((f): Row => ({ title: esc(f.label), sub: f.note ? esc(f.note) : '', end: `<span class="fig">+${esc(money(f.amt))}</span>`, tone: 'good' })));
+    side += acts(btn('sub:business.money', 'The whole week', 'quiet'));
+    const sideAmt = p.books.side ?? 0, known = !!p.books.sideKnown;
+    const sidearr = powerOptions(w, p).find((o) => o.code === 'sidearr');
+    side += h('Hidden racket', sideAmt ? `${money(Math.round(sideAmt))} a week` : 'none yet');
+    side += `<p class="ui-note">${sideAmt ? `Side deals pay you about <b>${money(Math.round(sideAmt))}</b> a week, straight into your pocket and never into your envelope. ${known ? '<b>Your boss knows about it now.</b>' : 'Nobody upstairs knows. Each week there’s a small chance somebody finds out.'}` : 'A deal outside the family’s books: $800 in, about $120 a week out. It never counts in your envelope, and if your boss finds it you will have to explain.'}</p>`;
+    if (sidearr && !sideAmt) side += sidearr.off ? `<p class="ui-note">${esc(sidearr.hint)}</p>` : acts(btn('power:sidearr', 'Make a side arrangement ($800)'));
+    toSide(side); }
   return out;
 }
 
@@ -145,69 +151,69 @@ export function wayView(id: string, lines: string[] = []): string {
   let out = back();
   out += `<div class="pers"><div class="avatar fx" style="border-radius:16px;width:56px;height:56px">${svg(way.icon, 26)}</div><div><h1>${esc(way.name)}</h1><div class="sub">${esc(way.cat)}</div></div></div>`;
   out += `<div class="tags"><span class="tag ${st.tone === 'run' ? 'green' : st.tone === 'ok' ? 'blue' : ''}">${esc(st.badge)}</span></div>`;
-  if (lines.length) out += `<div class="card">${lines.map((l) => `<p>${lk(l)}</p>`).join('')}</div>`;
-  out += `<div class="card"><h2>How it works</h2>${way.how.map((x) => `<p>${esc(x)}</p>`).join('')}</div>`;
-  out += `<div class="card"><ul class="rows"><li><span>Pays</span><span class="v">${esc(way.pays)}</span></li><li><span>You need</span><span class="v">${esc(way.needs)}</span></li><li><span>Goes wrong when</span><span class="v">${esc(way.risks)}</span></li></ul><div class="callout"><b>Advice.</b> ${esc(way.tip)}</div></div>`;
+  if (lines.length) out += `<div class="ui-card">${lines.map((l) => `<p>${lk(l)}</p>`).join('')}</div>`;
+  out += `<div class="ui-card"><h2>How it works</h2>${way.how.map((x) => `<p>${esc(x)}</p>`).join('')}</div>`;
+  out += `<div class="ui-card"><ul class="ui-list"><li><span>Pays</span><span class="v">${esc(way.pays)}</span></li><li><span>You need</span><span class="v">${esc(way.needs)}</span></li><li><span>Goes wrong when</span><span class="v">${esc(way.risks)}</span></li></ul><div class="ui-callout"><b>Advice.</b> ${esc(way.tip)}</div></div>`;
 
   const optList = (xs: { o: OrderOpt; i: number }[], empty: string) =>
-    xs.length ? `<div class="list">${xs.map(({ o, i }) => `<button class="opt" data-a="plan:${i}"><b>${lk(o.label)}</b>${o.hint ? `<span class="because">${esc(o.hint)}</span>` : ''}</button>`).join('')}</div>` : `<p class="muted pad">${esc(empty)}</p>`;
+    xs.length ? choices(xs.map(({ o, i }) => ({ a: `plan:${i}`, label: o.label, hint: o.hint })), way.name) : (empty ? quiet(esc(empty)) : '');
 
   switch (way.kind) {
     case 'op': {
       const d = OPS[way.op!];
       const run = myOps(w, way.op!);
       if (run.length) {
-        out += `<h2 class="sect">Running<small>${run.length}</small></h2>` + run.map((o) => opCard(w, o)).join('');
+        out += `<h2 class="ui-h">Running<small>${run.length}</small></h2>` + run.map((o) => opCard(w, o)).join('');
       }
       const dists = d.districts ?? [p.district];
       const err = canStart(w, p, way.op!, dists[0]);
       const fam = p.familyId ? w.fam[p.familyId] : undefined;
       const open = (d.districts ?? [p.district, ...(fam?.districts ?? [])]).some((x) => !canStart(w, p, way.op!, x));
-      out += `<h2 class="sect">${run.length ? 'Open another' : 'Set it up'}</h2>`;
-      out += open ? `<button class="btn primary" data-a="opstart:${way.op}">${run.length ? 'Open another' : 'Set it up'}${d.cost ? ` (${money(d.cost)})` : ''}</button>` : `<div class="callout bad">${esc(err ?? 'You already cover every district you can work.')}</div>`;
+      out += `<h2 class="ui-h">${run.length ? 'Open another' : 'Set it up'}</h2>`;
+      out += open ? `<button class="ui-btn ui-btn--primary" data-a="opstart:${way.op}">${run.length ? 'Open another' : 'Set it up'}${d.cost ? ` (${money(d.cost)})` : ''}</button>` : `<div class="ui-callout is-bad">${esc(err ?? 'You already cover every district you can work.')}</div>`;
       break;
     }
     case 'protection': {
       const sh = protectedShops(w);
-      if (sh.length) out += `<h2 class="sect">Shops paying you<small>${money(sh.reduce((a, x) => a + x.protection!.fee, 0))} a week</small></h2><div class="card"><ul class="rows">${sh.map((x) => `<li><span>${bl(x.id)} <small class="muted">${lk(w.chars[x.ownerId].name)}</small></span><span class="v ${lateOf(x) ? 'warn' : ''}">${lateOf(x) ? 'late · ' : ''}${money(x.protection!.fee)}/wk · ${money(x.protection!.total ?? 0)} so far</span></li>`).join('')}</ul></div>`;
-      if (b.shake.length) out += `<h2 class="sect">Late payers<small>${b.shake.length}</small></h2>` + optList(b.shake, '');
-      out += `<h2 class="sect">Shops you could lean on<small>${b.lean.length}</small></h2>` + optList(b.lean, 'Nothing worth leaning on right now. Shops that already pay your family are off the table, and so are casinos.');
+      if (sh.length) out += `<h2 class="ui-h">Shops paying you<small>${money(sh.reduce((a, x) => a + x.protection!.fee, 0))} a week</small></h2><div class="ui-card"><ul class="ui-list">${sh.map((x) => `<li><span>${bl(x.id)} <small class="muted">${lk(w.chars[x.ownerId].name)}</small></span><span class="v ${lateOf(x) ? 'warn' : ''}">${lateOf(x) ? 'late · ' : ''}${money(x.protection!.fee)}/wk · ${money(x.protection!.total ?? 0)} so far</span></li>`).join('')}</ul></div>`;
+      if (b.shake.length) out += `<h2 class="ui-h">Late payers<small>${b.shake.length}</small></h2>` + optList(b.shake, '');
+      out += `<h2 class="ui-h">Shops you could lean on<small>${b.lean.length}</small></h2>` + optList(b.lean, 'Nothing worth leaning on right now. Shops that already pay your family are off the table, and so are casinos.');
       break;
     }
     case 'loans': {
       const ds = myDebts(w);
-      if (ds.length) out += `<h2 class="sect">Out on the street<small>${money(ds.reduce((a, d) => a + d.balance, 0))} owed</small></h2><div class="card"><ul class="rows">${ds.map((d) => `<li><span>${lk(w.chars[d.debtor].name)}</span><span class="v ${d.missed ? 'warn' : ''}">${money(d.balance)} owed · ${money(d.paid ?? 0)} back so far${d.missed ? ` · ${d.missed} missed` : ''}</span></li>`).join('')}</ul></div>`;
-      if (b.collect.length) out += `<h2 class="sect">Behind on payments<small>${b.collect.length}</small></h2>` + optList(b.collect, '');
-      out += `<h2 class="sect">Lend some money</h2><div class="list"><button class="opt" data-a="cat:lend"><b>Find someone who needs a loan</b><span class="because">Men who are short, and what you’d lend them. You can also offer one in conversation.</span></button></div>`;
+      if (ds.length) out += `<h2 class="ui-h">Out on the street<small>${money(ds.reduce((a, d) => a + d.balance, 0))} owed</small></h2><div class="ui-card"><ul class="ui-list">${ds.map((d) => `<li><span>${lk(w.chars[d.debtor].name)}</span><span class="v ${d.missed ? 'warn' : ''}">${money(d.balance)} owed · ${money(d.paid ?? 0)} back so far${d.missed ? ` · ${d.missed} missed` : ''}</span></li>`).join('')}</ul></div>`;
+      if (b.collect.length) out += `<h2 class="ui-h">Behind on payments<small>${b.collect.length}</small></h2>` + optList(b.collect, '');
+      out += h('Lend some money') + choices([{ a: 'cat:lend', label: 'Find someone who needs a loan', hint: 'Men who are short, and what you’d lend them. You can also offer one in conversation.' }], 'Lend');
       break;
     }
     case 'cars':
-      out += `<h2 class="sect">Do it</h2>` + optList(b.cars, 'Nothing to do.');
+      out += `<h2 class="ui-h">Do it</h2>` + optList(b.cars, 'Nothing to do.');
       if (p.cars) out += `<p class="muted pad">You’re holding ${p.cars} car${p.cars > 1 ? 's' : ''}. See “Selling stolen goods”.</p>`;
       break;
     case 'burglary':
-      out += `<h2 class="sect">Places worth a look<small>${b.burglary.length}</small></h2>` + optList(b.burglary, 'No suitable target right now. Protected places and casinos are left out.');
+      out += `<h2 class="ui-h">Places worth a look<small>${b.burglary.length}</small></h2>` + optList(b.burglary, 'No suitable target right now. Protected places and casinos are left out.');
       break;
     case 'scams':
-      out += `<h2 class="sect">Possible marks<small>${b.scams.length}</small></h2>` + optList(b.scams, 'No obvious marks right now.');
+      out += `<h2 class="ui-h">Possible marks<small>${b.scams.length}</small></h2>` + optList(b.scams, 'No obvious marks right now.');
       break;
     case 'favours':
-      out += `<h2 class="sect">What you could do<small>${b.favours.length}</small></h2>` + optList(b.favours, 'Nothing needs doing.');
+      out += `<h2 class="ui-h">What you could do<small>${b.favours.length}</small></h2>` + optList(b.favours, 'Nothing needs doing.');
       break;
     case 'hijack': {
       const out2 = w.ops.filter((o) => o.owner === p.id && o.kind === 'hijack' && o.state === 'out');
-      if (out2.length) out += `<h2 class="sect">Out now</h2>` + out2.map((o) => `<div class="card"><p>${esc(o.note ?? '')}.</p><p class="muted">${(o.crew ?? []).map((cid) => lk(w.chars[cid].name)).join(', ')} · back ${esc(shortTime(o.due ?? w.now))}</p></div>`).join('');
+      if (out2.length) out += `<h2 class="ui-h">Out now</h2>` + out2.map((o) => `<div class="ui-card"><p>${esc(o.note ?? '')}.</p><p class="muted">${(o.crew ?? []).map((cid) => lk(w.chars[cid].name)).join(', ')} · back ${esc(shortTime(o.due ?? w.now))}</p></div>`).join('');
       const free = crew(w).filter((c) => c.jailedUntil <= w.now && c.hurtUntil <= w.now);
-      out += `<h2 class="sect">Plan one</h2>` + (free.length >= 2 ? `<button class="btn primary" data-a="hijack:">Pick the crew</button>` : `<div class="callout bad">You need two free men you trust. You have ${free.length}.</div>`);
+      out += `<h2 class="ui-h">Plan one</h2>` + (free.length >= 2 ? `<button class="ui-btn ui-btn--primary" data-a="hijack:">Pick the crew</button>` : `<div class="ui-callout is-bad">You need two free men you trust. You have ${free.length}.</div>`);
       break;
     }
     case 'fence': {
       const mv = schemes(w, p).filter((s) => s.move);
       S.schemeMoves = mv;
-      out += `<h2 class="sect">Your options<small>${mv.length}</small></h2>`;
-      out += mv.length ? `<div class="list">${mv.map((s, i) => `<button class="opt" data-a="scheme:${i}"><b>${esc(s.label)}</b>${s.hint ? `<span class="because">${esc(s.hint)}</span>` : ''}</button>`).join('')}</div>` : `<p class="muted pad">You’ve nothing to sell, and no buyer to sell to.</p>`;
+      out += `<h2 class="ui-h">Your options<small>${mv.length}</small></h2>`;
+      out += mv.length ? choices(mv.map((s, i) => ({ a: `scheme:${i}`, label: s.label, hint: s.hint })), 'Your options') : quiet('You’ve nothing to sell, and no buyer to sell to.');
       const v = ventureOf(w, p);
-      if (v) out += `<div class="card"><h2>Your chop shop</h2><p>${bl(v.bizId)}: ${v.stock} waiting, ${money(v.takings)} taken so far.</p></div>`;
+      if (v) out += `<div class="ui-card"><h2>Your chop shop</h2><p>${bl(v.bizId)}: ${v.stock} waiting, ${money(v.takings)} taken so far.</p></div>`;
       break;
     }
   }
@@ -236,9 +242,9 @@ export function goalsView(): string {
     const reward = x.a.reward.cash || x.a.reward.standing ? `<p class="muted"><b>Reward:</b> ${[x.a.reward.cash ? money(x.a.reward.cash) : '', x.a.reward.standing ? 'standing +' + x.a.reward.standing : ''].filter(Boolean).join(', ')}</p>` : '';
     return `<details class="g-goal ${x.a.head ? 'headgoal' : ''}"${x.a.head ? ' open' : ''}><summary><span class="g-goal__t">${esc(x.a.title)}${x.a.head ? ' <i class="tag amber">the big one</i>' : ''}</span><span class="g-goal__n">${unit(Math.min(x.have, x.need))} of ${unit(x.need)}</span><span class="bar"><i style="width:${Math.round(x.pct * 100)}%"></i></span></summary><div class="g-goal__body"><p>${esc(x.a.why)}</p><p class="muted"><b>How:</b> ${esc(x.a.how)}</p>${reward}</div></details>`;
   };
-  let out = back() + `<h2 class="sect">Milestones<small>${esc(p.rank)}</small></h2><p class="muted pad">What the family expects at your rank. They change as you rise, and meeting one pays a reward. Tap one to see what it takes.</p>`;
+  let out = back() + `<h2 class="ui-h">Milestones<small>${esc(p.rank)}</small></h2><p class="muted pad">What the family expects at your rank. They change as you rise, and meeting one pays a reward. Tap one to see what it takes.</p>`;
   out += now.filter((x) => x.a.head).map(row).join('') + now.filter((x) => !x.a.head).sort((a, b) => b.pct - a.pct).map(row).join('');
-  if (done.length) out += `<h2 class="sect">Done<small>${done.length}</small></h2><div class="card"><ul class="rows">${done.map((x) => `<li><span>${esc(x.a.title)}</span><span class="v good">&#10003;</span></li>`).join('')}</ul></div>`;
+  if (done.length) out += `<h2 class="ui-h">Done<small>${done.length}</small></h2><div class="ui-card"><ul class="ui-list">${done.map((x) => `<li><span>${esc(x.a.title)}</span><span class="v good">&#10003;</span></li>`).join('')}</ul></div>`;
   return out;
 }
 
@@ -263,31 +269,29 @@ const TONE: Record<string, string> = { open: 'amber', settled: 'green', violated
 export function disputeView(id: string, lines: string[]): string {
   const w = W(), p = P();
   const d = (w.disputes ?? []).find((x) => x.id === id);
-  if (!d) return back() + `<div class="card"><p>That matter is closed.</p></div>`;
+  if (!d) return back() + `<div class="ui-card"><p>That matter is closed.</p></div>`;
   // V89: laid out like every other story (stories.ts); the old card below is kept for a quarrel whose people are gone
   const page = disputePage(id, lines);
   if (page) return page;
   const a = w.chars[d.a], b = w.chars[d.b];
   const opp = d.a === p.id || a?.bossId === p.id ? b : a;
   const biz = d.biz ? w.biz[d.biz] : undefined;
-  let out = back() + `<div class="card"><h2>${biz ? esc(biz.name) : 'A quarrel'}<small><span class="tag ${TONE[d.status]}">${WORD[d.status]}</span></small></h2><p><b>Where it stands:</b> ${esc(stageOf(w, d))}.</p>`;
+  let out = back() + `<div class="ui-card"><h2>${biz ? esc(biz.name) : 'A quarrel'}<small><span class="tag ${TONE[d.status]}">${WORD[d.status]}</span></small></h2><p><b>Where it stands:</b> ${esc(stageOf(w, d))}.</p>`;
   const nm = (x: import('../types').Character) => (x.id === P().id ? (x === a ? 'You' : 'you') : pl(x));
   out += `<p class="muted">${nm(a)} (${esc(famName(w, a))}) against ${nm(b)} (${esc(famName(w, b))}). Started ${ago(w, d.created)} day${ago(w, d.created) > 1 ? 's' : ''} ago.</p>`;
-  if (d.terms && d.status === 'settled') out += `<div class="callout"><b>Agreed:</b> ${esc(d.terms.text)}. Good until ${shortTime(d.terms.by)}.</div>`;
-  if (d.status === 'violated') out += `<div class="callout bad"><b>The agreement has been broken.</b> It’s open again.</div>`;
+  if (d.terms && d.status === 'settled') out += `<div class="ui-callout"><b>Agreed:</b> ${esc(d.terms.text)}. Good until ${shortTime(d.terms.by)}.</div>`;
+  if (d.status === 'violated') out += `<div class="ui-callout is-bad"><b>The agreement has been broken.</b> It’s open again.</div>`;
   if (d.found) out += `<p>${d.older ? `What you found: ${esc(d.older)}.` : 'You looked into it and found no real claim behind it.'}</p>`;
   out += `</div>`;
-  if (lines.length) out += `<div class="card">${lines.map((l) => `<p>${lk(l)}</p>`).join('')}</div>`;
-  out += `<h2 class="sect">The story so far<small>newest first</small></h2><div class="card"><ul class="rows">${d.history.slice().reverse().map((h) => `<li><span>${esc(shortTime(h.t))}</span><span class="v" style="text-align:left;margin-left:12px">${lk(h.text)}</span></li>`).join('')}</ul></div>`;
+  if (lines.length) out += `<div class="ui-card">${lines.map((l) => `<p>${lk(l)}</p>`).join('')}</div>`;
+  out += `<h2 class="ui-h">The story so far<small>newest first</small></h2><div class="ui-card"><ul class="ui-list">${d.history.slice().reverse().map((h) => `<li><span>${esc(shortTime(h.t))}</span><span class="v" style="text-align:left;margin-left:12px">${lk(h.text)}</span></li>`).join('')}</ul></div>`;
   if ((d.status === 'open' || d.status === 'violated') && opp?.alive) {
-    const o = (code: string, label: string, hint: string, cls = '') => `<button class="opt ${cls}" data-a="dv:${code}|${d.id}"><b>${esc(label)}</b><span class="because">${esc(hint)}</span></button>`;
-    out += `<h2 class="sect">What you can do</h2><div class="list">`;
-    out += o('talk', `Find ${opp.name} and talk`, 'Face to face. He’ll answer for himself.');
-    if (!d.found) out += o('look', 'Find out what’s behind it', 'Ask around. It takes a couple of hours.');
-    if (opp.familyId !== p.familyId) out += o('sit', `Call a sit-down with ${opp.name}`, 'A formal meeting with terms. It takes a few days to arrange.');
-    out += o('settle', 'Other ways: superiors, force, or letting it go', 'Take it to a boss, send a message, or end it.');
-    if (!d.ignored) out += o('ignore', 'Leave it alone for now', 'It won’t go away by itself, but you stop pressing.');
-    out += `</div>`;
+    const picks: Pick[] = [{ a: `dv:talk|${d.id}`, label: `Find ${opp.name} and talk`, hint: 'Face to face. He’ll answer for himself.' }];
+    if (!d.found) picks.push({ a: `dv:look|${d.id}`, label: 'Find out what’s behind it', hint: 'Ask around. It takes a couple of hours.' });
+    if (opp.familyId !== p.familyId) picks.push({ a: `dv:sit|${d.id}`, label: `Call a sit-down with ${opp.name}`, hint: 'A formal meeting with terms. It takes a few days to arrange.' });
+    picks.push({ a: `dv:settle|${d.id}`, label: 'Other ways: superiors, force, or letting it go', hint: 'Take it to a boss, send a message, or end it.' });
+    if (!d.ignored) picks.push({ a: `dv:ignore|${d.id}`, label: 'Leave it alone for now', hint: 'It won’t go away by itself, but you stop pressing.' });
+    out += h('What you can do') + choices(picks, 'What you can do');
   }
   return out;
 }
@@ -296,7 +300,7 @@ export function disputesList(): string {
   const w = W();
   const list = myDisputes(w);
   if (!list.length) return '';
-  return `<h2 class="sect">Disputes<small>${list.length}</small></h2><div class="card"><ul class="rows">${list.map((d) => { const a = w.chars[d.a], b = w.chars[d.b]; return `<li><a href="#" class="nm" style="text-decoration:none" data-a="dispute:${d.id}">${esc(d.biz ? w.biz[d.biz]?.name ?? 'A shop' : 'A quarrel')}: ${esc(a.name.split(' ')[0])} and ${esc(b.name.split(' ')[0])}</a><span class="v"><span class="tag ${TONE[d.status]}">${WORD[d.status]}</span></span></li>`; }).join('')}</ul></div>`;
+  return h('Quarrels', String(list.length)) + rows(list.map((d): Row => { const a = w.chars[d.a], b2 = w.chars[d.b]; return { mark: TONE[d.status] === 'red' ? 'red' : TONE[d.status] === 'amber' ? 'amber' : 'green', title: `${esc(d.biz ? w.biz[d.biz]?.name ?? 'A shop' : 'A quarrel')}: ${esc(a.name.split(' ')[0])} and ${esc(b2.name.split(' ')[0])}`, end: esc(WORD[d.status]), a: `dispute:${d.id}` }; }));
 }
 void disputesOf;
 

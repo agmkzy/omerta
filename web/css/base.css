@@ -23,3 +23,13 @@ p { margin: var(--s-2) 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
+
+/* Words inside text, wherever they appear (the simulation's own lines use them too): a name that opens its page, a quiet aside,
+   harm, good news. */
+a.nm { color: var(--c-gold-2); text-decoration: none; border-bottom: 1px solid rgba(223, 194, 139, .35); font-weight: 500; }
+a.nm:hover { border-bottom-color: var(--c-gold-2); }
+.muted { color: var(--c-muted); }
+.hurt { color: var(--c-danger); }
+.good { color: var(--c-good); }
+.small-note { font-size: 12px; color: var(--c-muted); }
+input[type=text] { width: 100%; padding: 12px; min-height: var(--tap); border: 1px solid var(--c-line-2); border-radius: var(--radius); background: var(--c-raise-2); color: var(--c-cream); font: inherit; }

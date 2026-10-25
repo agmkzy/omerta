@@ -64,6 +64,12 @@ button.ui-row:hover .ui-row__go, a.ui-row:hover .ui-row__go { color: var(--c-gol
 .ui-choice.is-out .ui-choice__label { color: var(--c-cream-2); font-size: 19px; }
 /* a way on to more subjects ("Other business…", "Something else") */
 .ui-choice.is-more .ui-choice__label { font-size: 18.5px; color: var(--c-cream-2); font-style: italic; }
+/* not open now (its reason is the hint); picked, in a list you choose several from; the one that cannot be taken back */
+.ui-choice.is-off { opacity: .45; cursor: default; }
+.ui-choice.is-off:hover { background: transparent; border-color: transparent; }
+.ui-choice.is-sel { border-color: var(--c-gold-line); background: var(--c-gold-soft); }
+.ui-choice.is-sel .ui-choice__n { border-color: var(--c-gold); color: var(--c-gold-2); }
+.ui-choice.is-danger .ui-choice__label { color: #ec9f94; }
 /* a figure to name before it is said */
 .ui-choice.is-fig { cursor: default; align-items: start; }
 .ui-choice.is-fig:hover { background: var(--c-raise); }
@@ -115,3 +121,50 @@ button.ui-row:hover .ui-row__go, a.ui-row:hover .ui-row__go { color: var(--c-gol
 
 /* ---------------------------------------------------------------- quiet text */
 .ui-quiet { font: italic 400 16.5px/1.5 var(--f-display); color: var(--c-cream-2); margin: var(--s-3) 0; }
+
+/* ---------------------------------------------------------------- a choice of one, kept (how straight you are with him) */
+.ui-seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--c-line-2); border-radius: var(--radius); overflow: hidden; margin: var(--s-2) 0; }
+.ui-seg__b { min-height: 40px; padding: 0 16px; border: 0; border-right: 1px solid var(--c-line-2); background: transparent; color: var(--c-cream-2); font: 500 13.5px var(--f-ui); transition: background var(--t-fast), color var(--t-fast); }
+.ui-seg__b:last-child { border-right: 0; }
+.ui-seg__b:hover { color: var(--c-cream); background: var(--c-raise); }
+.ui-seg__b.is-on { background: var(--c-gold-soft); color: var(--c-cream); box-shadow: inset 0 -2px 0 var(--c-gold); }
+/* a note under something: what it means */
+.ui-note { margin: var(--s-2) 0; font-size: 13px; line-height: 1.5; color: var(--c-muted); }
+.ui-row__end small { font-size: 11.5px; color: var(--c-muted); }
+
+/* ---------------------------------------------------------------- a fold: more of the same, one step down */
+.ui-fold { margin: var(--s-3) 0; }
+.ui-fold > summary { cursor: pointer; list-style: none; min-height: var(--tap); display: flex; align-items: center; font: 600 11.5px var(--f-ui); letter-spacing: .12em; text-transform: uppercase; color: var(--c-gold-2); }
+.ui-fold > summary::-webkit-details-marker { display: none; }
+.ui-fold > summary::after { content: " ›"; margin-left: 4px; }
+.ui-fold[open] > summary::after { content: " ‹"; }
+
+/* ---------------------------------------------------------------- a panel: things that belong together (a record, a career, a guide) */
+.ui-card { display: block; width: 100%; margin: var(--s-4) 0; padding: 16px 18px; border: 1px solid var(--c-line); border-radius: var(--radius); background: linear-gradient(180deg, rgba(255, 244, 222, .018), transparent 40%), var(--c-raise); text-align: left; color: inherit; }
+button.ui-card { cursor: pointer; transition: border-color var(--t-fast); }
+button.ui-card:hover { border-color: var(--c-gold-line); }
+.ui-card > h2 { display: flex; justify-content: space-between; gap: var(--s-3); margin: 0 0 10px; font: 600 11px/1.3 var(--f-ui); letter-spacing: .16em; text-transform: uppercase; color: var(--c-gold); }
+.ui-card > h2 small { font: 500 12px var(--f-ui); letter-spacing: .02em; text-transform: none; color: var(--c-muted); }
+.ui-card p { margin: 6px 0; }
+h3.ui-h { margin: var(--s-5) 0 var(--s-2); }
+
+/* ---------------------------------------------------------------- a callout: a plain notice inside a screen (the context box is for a man) */
+.ui-callout { margin: var(--s-3) 0; padding: 10px 14px; border-left: 2px solid var(--c-line-2); border-radius: 2px; background: var(--c-raise-2); font-size: 14px; line-height: 1.5; color: var(--c-cream-2); }
+.ui-callout.is-bad { background: var(--c-danger-soft); border-left-color: var(--c-danger); color: #f0c2bb; }
+.ui-callout.is-info { background: var(--c-info-soft); border-left-color: var(--c-info); color: #cfe0ec; }
+.ui-callout .ui-pill { margin-left: 6px; }
+
+/* ---------------------------------------------------------------- pills: a filter or a toggle among several */
+.ui-pills { display: flex; flex-wrap: wrap; gap: 6px; margin: var(--s-3) 0; }
+.ui-pill { min-height: 38px; padding: 0 14px; border: 1px solid var(--c-line-2); border-radius: 999px; background: transparent; color: var(--c-cream-2); font: 500 13px var(--f-ui); transition: border-color var(--t-fast), color var(--t-fast), background var(--t-fast); }
+.ui-pill:hover { border-color: var(--c-gold-line); color: var(--c-cream); }
+.ui-pill.is-on { background: var(--c-gold-soft); border-color: var(--c-gold); color: var(--c-cream); }
+.ui-pill.is-small { min-height: 32px; padding: 0 12px; font-size: 12.5px; }
+.ui-pill:disabled { opacity: .45; }
+
+/* ---------------------------------------------------------------- a list of label and value, inside a panel */
+.ui-list { margin: 4px 0 0; padding: 0; list-style: none; }
+.ui-list li { display: flex; justify-content: space-between; gap: var(--s-3); padding: 10px 0; border-bottom: 1px solid var(--c-line); font-size: 14px; }
+.ui-list li:last-child { border-bottom: 0; }
+.ui-list li .v { font-weight: 500; text-align: right; color: var(--c-cream); }
+.ui-list li .v.good { color: var(--c-good); } .ui-list li .v.bad { color: var(--c-danger); } .ui-list li .v.warn { color: var(--c-gold-2); }

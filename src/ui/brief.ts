@@ -35,7 +35,7 @@ export function briefView(): string {
   else out += `<p class="muted pad">The Herald comes out on Mondays. The first edition isn’t out yet.</p>`;
   // V88: the paper is the page; your own week goes beside it.
   let side = '';
-  side += `<h2 class="sect">Your week<small>${prev ? 'since ' + esc(shortTime(prev.t)) : 'so far'}</small></h2>`;
+  side += `<h2 class="ui-h">Your week<small>${prev ? 'since ' + esc(shortTime(prev.t)) : 'so far'}</small></h2>`;
   const delta = (cur: number, was: number, f: (n: number) => string) => { const d = cur - was; return d === 0 ? 'no change' : (d > 0 ? '+' : '') + f(d); };
   if (prev) {
     const rows = [
@@ -44,21 +44,21 @@ export function briefView(): string {
       ['Heat', p.heat > prev.heat + 0.05 ? 'rising' : p.heat < prev.heat - 0.05 ? 'cooling' : 'steady'],
     ];
     if (p.rank !== prev.rank) rows.push(['Rank', `${prev.rank} → ${p.rank}`]);
-    side += `<div class="card"><ul class="rows">${rows.map(([k, v]) => `<li><span>${k}</span><span class="v">${esc(v)}</span></li>`).join('')}</ul></div>`;
-  } else side += `<div class="card"><p class="muted">Nothing to compare with yet. Give it a week.</p></div>`;
+    side += `<div class="ui-card"><ul class="ui-list">${rows.map(([k, v]) => `<li><span>${k}</span><span class="v">${esc(v)}</span></li>`).join('')}</ul></div>`;
+  } else side += `<div class="ui-card"><p class="muted">Nothing to compare with yet. Give it a week.</p></div>`;
 
   const since = prev?.t ?? w.now - 7 * DAY;
   const news = Object.entries(p.known).map(([id]) => w.facts[id]).filter((f) => f && !f.minor && f.t >= since).sort((a, b) => b.t - a.t).slice(0, 8);
-  out += `<h2 class="sect">What you’ve heard<small>word on the street</small></h2><div class="card">${news.length ? news.map((f) => `<div class="note">${lk(f.text)}<div class="src">${esc(shortTime(f.t))}</div></div>`).join('') : '<p class="muted">Quiet. Which means nothing.</p>'}</div>`;
+  out += `<h2 class="ui-h">What you’ve heard<small>word on the street</small></h2><div class="ui-card">${news.length ? news.map((f) => `<div class="note">${lk(f.text)}<div class="src">${esc(shortTime(f.t))}</div></div>`).join('') : '<p class="muted">Quiet. Which means nothing.</p>'}</div>`;
 
   const run = storiesOf(w).filter((s) => !s.closed).slice(0, 4);
-  if (run.length) out += `<h2 class="sect">Still brewing</h2><div class="list">${run.map((s) => `<button class="need" data-a="story:${s.key}"><span class="dot ${s.tone === 'red' ? 'red' : 'amber'}"></span><span><span class="t">${esc(s.title)}</span><span class="s" style="display:block">${esc(s.stage)}</span></span></button>`).join('')}</div>`;
+  if (run.length) out += `<h2 class="ui-h">Still brewing</h2><div class="list">${run.map((s) => `<button class="need" data-a="story:${s.key}"><span class="dot ${s.tone === 'red' ? 'red' : 'amber'}"></span><span><span class="t">${esc(s.title)}</span><span class="s" style="display:block">${esc(s.stage)}</span></span></button>`).join('')}</div>`;
 
   const cu = comingUp();
-  if (cu.length) side += `<h2 class="sect">Coming up</h2><div class="card"><ul class="rows">${cu.map((c) => `<li><span>${esc(shortTime(c.t))}</span><span class="v" style="text-align:left;margin-left:12px">${esc(c.text)}</span></li>`).join('')}</ul></div>`;
+  if (cu.length) side += `<h2 class="ui-h">Coming up</h2><div class="ui-card"><ul class="ui-list">${cu.map((c) => `<li><span>${esc(shortTime(c.t))}</span><span class="v" style="text-align:left;margin-left:12px">${esc(c.text)}</span></li>`).join('')}</ul></div>`;
 
   const pins = pinned(w, p).slice(0, 5);
-  if (pins.length) side += `<h2 class="sect">People you’re watching</h2><div class="card"><ul class="rows">${pins.map((c) => `<li><button class="rowbtn" data-a="ent:${c.id}" style="display:flex;justify-content:space-between;width:100%;text-align:left"><span>${esc(c.name)}</span><span class="v">${esc((p.notes?.[c.id]?.tags ?? []).join(', ') || 'pinned')}</span></button></li>`).join('')}</ul></div>`;
+  if (pins.length) side += `<h2 class="ui-h">People you’re watching</h2><div class="ui-card"><ul class="ui-list">${pins.map((c) => `<li><button class="rowbtn" data-a="ent:${c.id}" style="display:flex;justify-content:space-between;width:100%;text-align:left"><span>${esc(c.name)}</span><span class="v">${esc((p.notes?.[c.id]?.tags ?? []).join(', ') || 'pinned')}</span></button></li>`).join('')}</ul></div>`;
   toSide(side);
   return out;
 }

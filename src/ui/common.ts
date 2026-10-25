@@ -1,5 +1,5 @@
 import { portrait } from './portrait';
-// Shared pieces for the views: banners, icons, the header strip, small formatters.
+// Shared pieces for the views: banners, icons, small formatters.
 import { fmtTime, money } from '../core';
 import { influence, influenceWord } from '../books';
 import { standingWord, traitWords } from '../jobs';
@@ -25,18 +25,16 @@ export const sink: { on: string[] | null } = { on: null };
 export function banner(id: string, icon: string, tone: 'g' | 'a' | 'b' | 'r', title: string, sub: string, body: string, mode: 'live' | 'avail' | '' = ''): string {
   const open = !!S.open[id];
   if (!mode) mode = id.startsWith('p:') || id.startsWith('o:') ? 'avail' : id === 'op:hijack' ? (sub.includes('out right now') ? 'live' : 'avail') : id.startsWith('op:') ? (sub.includes('running') ? 'live' : 'avail') : id.startsWith('r:') ? (/^(0 |none)/.test(sub) ? 'avail' : 'live') : '';
-  const html = `<div class="banner ${mode} ${open ? 'open' : ''}"><button type="button" data-a="tog:${id}" aria-expanded="${open}"><span class="ico ${tone}">${svg(icon)}</span><span class="bt"><b>${esc(title)}${mode === 'live' ? '<i class="pill">running</i>' : mode === 'avail' ? '<i class="pill off">available</i>' : ''}</b><span>${esc(sub)}</span></span>${chevron}</button><div class="body">${body}</div></div>`;
+  const html = `<div class="banner ${mode} ${open ? 'open' : ''}"><button type="button" data-a="tog:${id}" aria-expanded="${open}"><span class="ico ${tone}">${svg(icon)}</span><span class="bt"><b>${esc(title)}${mode === 'live' ? '<i class="ui-pill">running</i>' : mode === 'avail' ? '<i class="ui-pill off">available</i>' : ''}</b><span>${esc(sub)}</span></span>${chevron}</button><div class="body">${body}</div></div>`;
   if (sink.on) { sink.on.push(html); return ''; }
   return html;
 }
 
 export { backTo as back } from './kit'; // (one back button, the same on every screen)
 
-// The status strip used to open every tab; since V88 it lives once, in the frame (ui/layout.ts).
-export const strip = (): string => '';
 
 export function skillBars(c: Character): string {
-  return `<ul class="rows">${SKILLS.map((k) => `<li><span>${SKILL_LABEL[k]}</span><span class="v">${skillWord(c.skills[k])}</span></li>`).join('')}</ul>`;
+  return `<ul class="ui-list">${SKILLS.map((k) => `<li><span>${SKILL_LABEL[k]}</span><span class="v">${skillWord(c.skills[k])}</span></li>`).join('')}</ul>`;
 }
 export const skillLine = (c: Character) => SKILLS.map((k) => ({ k, v: c.skills[k] })).sort((a, b) => b.v - a.v).slice(0, 2).map(({ k, v }) => `${skillWord(v)} ${SKILL_LABEL[k].toLowerCase()}`).join(', ');
 
