@@ -299,7 +299,8 @@ function event(x: X): Subject | undefined {
   const short = versionOf(w, p, f).replace(/\.$/, '');
   return {
     key, sig: String(f.id), weight: 0.4,
-    label: `“What do you know about what happened${f.business && w.biz[f.business] ? ` at ${w.biz[f.business].name}` : f.victim && w.chars[f.victim] ? ` to ${first(w.chars[f.victim])}` : ''}?”`,
+    // (asked of the man it happened to, it is his own story: "what happened to you", not to him by name)
+    label: f.victim === t.id ? '“What happened to you?”' : f.actor === t.id ? '“What was that business you were in?”' : `“What do you know about what happened${f.business && w.biz[f.business] ? ` at ${w.biz[f.business].name}` : f.victim && w.chars[f.victim] ? ` to ${first(w.chars[f.victim])}` : ''}?”`,
     hint: short.length > 70 ? short.slice(0, 68).replace(/\s+\S*$/, '') + '…' : short,
     open: () => evOpen(x, f, key),
     reply: (x, code) => evTurn(x, f, key, code),

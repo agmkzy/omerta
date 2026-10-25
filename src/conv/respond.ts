@@ -241,7 +241,8 @@ export function onWhoQuestion(p: Perception, asker: Character, factId: string, a
 }
 
 // ---------------------------------------------------------------- spending time: an account of what happened, not a score
-export function spendTimeAccount(pa: Perception, pb: Perception, b: Character, venue: string, compat: number, salt = '', between?: string, moved?: number): { text: string; changes: string[] } {
+// (part: the time of day it is; a morning is a coffee, an afternoon a drink, only an evening is an evening)
+export function spendTimeAccount(pa: Perception, pb: Perception, b: Character, venue: string, compat: number, salt = '', between?: string, moved?: number, part: 'morning' | 'afternoon' | 'evening' = 'evening'): { text: string; changes: string[] } {
   const tb = pb.temper, shop = pb.own.shop, kin = pb.own.kin[0];
   // what's on his mind: what has happened to him or around him lately, as he knows it, and otherwise the things men talk about;
   // which of them tonight is the evening's own (the same two men don't have the same evening twice)
@@ -256,14 +257,19 @@ export function spendTimeAccount(pa: Perception, pb: Perception, b: Character, v
   const went = between ? (compat > 0.15 ? pick(['He seemed easier for having said it.', 'He kept coming back to it, and you let him.']) : pick(['He kept coming back to it.', 'It was all he wanted to talk about.'])) : compat > 0.15 ? pick(['It was easy. He laughed more than you expected.', 'The hours went quickly.', 'He ordered another round without being asked.']) : compat > -0.1 ? pick(['It was pleasant enough, and no more than that.', 'Nobody said anything that mattered.', 'He was polite, and a little tired.']) : pick(['It never quite caught. He kept looking at the door.', 'The silences went on too long.']);
   // (what it did between them, said from what actually changed when it is known, not guessed from how well they get on)
   const change = moved === undefined ? (compat > 0.15 ? 'He likes you better for it.' : compat > -0.1 ? 'You’re no closer than you were, and no further.' : 'If anything, you’re further apart.') : moved > 0.03 ? pick(['He likes you better for it.', 'You leave on better terms than you came.']) : moved > 0.005 ? pick(['You know each other a little better.', 'Another evening; it counts for something.']) : moved < -0.01 ? 'If anything, you’re further apart.' : 'You’re no closer than you were, and no further.';
-  return { text: `You spent the evening at ${venue} with ${first(b.name)}. He talked about ${topic}. ${went} ${change}`, changes: [`familiarity up (time together)`, compat > 0.15 ? 'his liking for you up (compatibility)' : compat < -0.1 ? 'a little friction (compatibility)' : 'no change in his regard'] };
+  const opening = part === 'morning' ? `You had coffee with ${first(b.name)} at ${venue}.` : part === 'afternoon' ? `You sat over a drink with ${first(b.name)} at ${venue} for an hour or so.` : `You spent the evening at ${venue} with ${first(b.name)}.`;
+  const went0 = part === 'evening' ? went : went.replace('The hours went quickly.', 'The time went quickly.').replace('He ordered another round without being asked.', 'He was in no hurry to get back to his day.');
+  const change0 = part === 'evening' ? change : change.replace('Another evening; it counts for something.', 'It counts for something.');
+  return { text: `${opening} He talked about ${topic}. ${went0} ${change0}`, changes: [`familiarity up (time together)`, compat > 0.15 ? 'his liking for you up (compatibility)' : compat < -0.1 ? 'a little friction (compatibility)' : 'no change in his regard'] };
 }
 const hashStr = (x: string) => { let h = 0; for (let i = 0; i < x.length; i++) h = (h * 31 + x.charCodeAt(i)) >>> 0; return h; };
 
 // ---------------------------------------------------------------- a request the worked examples never covered: a loan
 // The same two stages: what he can't do (spare the money), then what each answer is worth to him, from what he believes of the man
 // asking. Reasons, counters and what the player can say back follow from the decision, as for any request.
-export function onLoanRequest(p: Perception, asker: Character, amt: number, mem: EncounterMemory, offered: { rate?: number; reputation?: boolean; promise?: string } = {}): Reply & { counter?: { amt: number; rate: number }; followups: { key: string; note: string; slots?: Record<string, string> }[] } {
+// (offered: every term the player has put on the table in this negotiation so far; arg: the one he has just made, which is what the
+// answer speaks to. The arguments made are the negotiation's: none is offered twice, and a new one is never answered as a repeat.)
+export function onLoanRequest(p: Perception, asker: Character, amt: number, mem: EncounterMemory, offered: { rate?: number; reputation?: boolean; promise?: string } = {}, arg?: 'rep' | 'rate' | 'promise', made: string[] = []): Reply & { counter?: { amt: number; rate: number }; followups: { key: string; note: string; slots?: Record<string, string> }[] } {
   const t = p.temper, f = p.feelingFor(asker), who = p.identityOf(asker);
   const missed = p.knownFacts((x) => x.kind === 'debt_missed' && x.actor === asker.id);
   const spare = Math.max(0, p.own.cash - 300);
@@ -271,7 +277,9 @@ export function onLoanRequest(p: Perception, asker: Character, amt: number, mem:
   const constraints: Decision['constraints'] = [];
   if (spare < amt * 0.4) constraints.push({ kind: 'cannot', source: `he has about $${Math.round(p.own.cash / 50) * 50} on him, and needs most of it` });
   // what he believes of the risk: how well he knows you, what he has heard, and that a family man is hard to chase
-  const risk = 0.55 - f.trust * 0.5 - f.known * 0.2 + missed.length * 0.25 - (offered.reputation && who.known ? 0.08 : 0) + (who.known ? 0.05 : 0);
+  // (his word on when: worth something from a man whose word he has heard is good, and less than nothing from one he knows broke it)
+  const broke = p.knownFacts((x) => x.kind === 'ruling' && x.actor === asker.id && /keep his word/.test(x.text)).length + missed.length;
+  const risk = 0.55 - f.trust * 0.5 - f.known * 0.2 + missed.length * 0.25 - (offered.reputation && who.known ? 0.08 : 0) + (who.known ? 0.05 : 0) + (offered.promise ? (broke ? 0.1 : -0.04 - f.known * 0.06) : 0);
   const gain = rate * 4; // a month of vig, as he thinks of it
   const cs = [
     cand('accept', [{ name: 'what it earns him', value: gain * 2 }, { name: 'the chance he never sees it again', value: -risk }, { name: 'greed', value: p.self.traits.greed * 0.2 }, ...(spare < amt ? [{ name: 'he hasn’t got it to spare', value: -1 }] : [])], spare < amt ? ['cannot'] : []),
@@ -280,7 +288,8 @@ export function onLoanRequest(p: Perception, asker: Character, amt: number, mem:
   ];
   let c = best(cs);
   // the same request, pushed with nothing new, is answered as the same request
-  if (mem.has('answered:loan') && !offered.rate && !offered.reputation && !offered.promise) c = cs.find((x) => x.move === 'refuse')!;
+  const repeated = mem.has('answered:loan') && (!arg || made.filter((x) => x === arg).length > 1);
+  if (repeated) c = cs.find((x) => x.move === 'refuse')!;
   const slots: Record<string, string> = { amt: `$${amt}`, youName: asker.name, youFirst: first(asker.name) };
   let meaning: Meaning, counter: { amt: number; rate: number } | undefined;
   const followups: { key: string; note: string; slots?: Record<string, string> }[] = [];
@@ -290,15 +299,16 @@ export function onLoanRequest(p: Perception, asker: Character, amt: number, mem:
     meaning = { key: 'counter.loan', stance: 'flat', toward: 'request', grounds: risk > 0.3 ? 'risk' : 'cannotSpare', slots: { ...slots, amt: `$${counter.amt}`, rate: `${Math.round(counter.rate * 100)} percent` } };
     followups.push({ key: 'accept.counter.loan', note: 'Take what he offers, on his terms.', slots: { amt: `$${counter.amt}`, rate: `${Math.round(counter.rate * 100)}` } });
   } else {
-    const nothingNew = !offered.rate && !offered.reputation && !offered.promise;
-    const g = mem.has('answered:loan') && nothingNew ? 'already' : spare < amt * 0.4 ? 'cannotSpare' : offered.reputation && !mem.has('argued:reputation') ? 'wordNotEnough' : f.known < 0.3 && !offered.rate ? 'doesNotKnow' : 'risk';
-    meaning = { key: 'refuse.loan', stance: g === 'already' ? 'weary' : 'flat', toward: g === 'doesNotKnow' ? 'speaker' : 'request', grounds: g, slots };
+    // (the reason he gives answers what was just said: a name, a better rate, a promise of when; the first refusal gives his own)
+    const left = (['rep', 'rate', 'promise'] as const).filter((x) => !made.includes(x));
+    const g = repeated ? 'already' : spare < amt * 0.4 ? (arg ? 'cannotSpare.terms' : 'cannotSpare') : arg === 'rep' ? 'wordNotEnough' : arg === 'rate' ? 'rateNotEnough' : arg === 'promise' ? (broke ? 'promiseBroken' : 'promiseNotEnough') : f.known < 0.3 ? (f.known >= 0.15 ? 'notClose' : 'doesNotKnow') : 'risk';
+    meaning = { key: 'refuse.loan', stance: g === 'already' ? 'weary' : 'flat', toward: g === 'doesNotKnow' || g === 'notClose' ? 'speaker' : 'request', grounds: !left.length && arg && !repeated && !g.startsWith('cannotSpare') ? g + '.last' : g, slots };
   }
   mem.note('answered:loan');
   if (c.move !== 'accept') {
-    if (!offered.reputation && !mem.has('argued:reputation')) followups.push({ key: 'argue.reputation', note: 'Stand on your name. It counts for what he’s heard of you.' });
-    if (!offered.rate) followups.push({ key: 'sweeten.rate', note: 'Pay more for the money.', slots: { rate: '8' } });
-    if (!offered.promise) followups.push({ key: 'promise.repay', note: 'Give him your word on when. He’ll hold you to it.', slots: { when: 'the end of the month' } });
+    if (!made.includes('rep') && !offered.reputation) followups.push({ key: 'argue.reputation', note: 'Stand on your name. It counts for what he’s heard of you.' });
+    if (!made.includes('rate') && !offered.rate) followups.push({ key: 'sweeten.rate', note: 'Pay more for the money.', slots: { rate: '8' } });
+    if (!made.includes('promise') && !offered.promise) followups.push({ key: 'promise.repay', note: 'Give him your word on when. He’ll hold you to it.', slots: { when: 'the end of the month' } });
   }
   if (offered.reputation) mem.note('argued:reputation');
   return { decision: { by: p.self.id, constraints, candidates: cs, chosen: c.move, grounds: meaning.grounds ? { factor: meaning.grounds, said: meaning.grounds, honest: true } : undefined, aim: c.move === 'refuse' ? 'keep his money' : 'make money on it' }, meaning, intent: c.move, honest: true, counter, followups, changes: c.move === 'accept' ? [`Agreement: ${p.self.name} lends ${asker.name} $${amt} at ${Math.round(rate * 100)}% a week (a debt, through core.createDebt)`] : [] };

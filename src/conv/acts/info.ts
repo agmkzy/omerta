@@ -13,7 +13,7 @@ import * as door from '../doors';
 import { chance, settled, term } from '../decide';
 import type { Act, Ctx, Offer } from '../kit';
 import { first, line, out, R, T, tweak, voice } from './common';
-import { BORING, connected, first1, grudgeTarget, holdsBack, HUMILIATING, incidentsOf, inHisVoice, involvedIn, openness, RKN, SCENE, takeOn, thenLine, told, TROUBLE } from './words';
+import { BORING, connected, DEALS, first1, grudgeTarget, holdsBack, HUMILIATING, incidentsOf, inHisVoice, involvedIn, openness, RKN, SCENE, takeOn, thenLine, told, TROUBLE } from './words';
 import { said } from './personal';
 
 const money = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
@@ -29,6 +29,17 @@ function questions(c: Ctx): Offer[] {
   const mineToHim = f.actor === p.id && f.victim === t.id, hisToMe = f.actor === t.id && f.victim === p.id;
   const learn: Offer[] = [], spec: Offer[] = [], act: Offer[] = [], urgent: Offer[] = [];
   const q = (xs: Offer[], code: string, label: string, note?: string) => { if (!asked(c, code)) xs.push({ code, label: said(c, code, label), note }); };
+  // (an arrangement is not a crime: nobody asks who did it, what it cost, or what is behind it; what there is to ask is how it came
+  // about and whether anyone else has a claim on the place)
+  const deal = DEALS.has(f.kind);
+  if (deal) {
+    const b0 = f.business ? w.biz[f.business] : undefined;
+    if (b0 && f.actor !== t.id && b0.ownerId !== t.id) q(spec, 'p_claim', 'Does anyone else have a claim on it?');
+    const view0 = asked(c, 'view') || f.actor === t.id ? [] : [{ code: 'view', label: 'What do you make of it?' }];
+    if (b0 && f.actor === t.id) { q(spec, 'p_how', 'How did you come by that arrangement?'); q(spec, 'p_claim', 'Does anyone else have a claim on it?'); q(spec, 'p_owner', 'How did the owner take it?'); }
+    else if (b0 && b0.ownerId === t.id) { q(spec, 'p_how', 'How did it come about?'); q(spec, 'p_claim', 'Is anyone else leaning on you?'); }
+    return [...spec, ...view0, ...(incidentsOf(w, t).length > 1 ? [{ code: 'pick_incident', label: 'What else have you heard?' }] : [])];
+  }
   if (k?.knowsActor && f.actor && f.actor !== p.id && !pk?.knowsActor) q(learn, 'who', inv ? 'Who was it?' : 'Who have you heard it was?');
   if (f.victim === t.id && f.amount && !mineToHim) q(learn, 'how_much', 'What did it cost you?');
   if (inv && SCENE.has(f.kind)) q(learn, 'witness', 'Who else was there?');
@@ -86,7 +97,8 @@ const inc: Act = {
     }
     const inv = involvedIn(w, t, f), pk = p.known[id];
     const ac = f.actor ? w.chars[f.actor] : undefined, vc = f.victim ? w.chars[f.victim] : undefined;
-    const take = ac && ac.id !== p.id && (t.rels[ac.id]?.grudge ?? 0) >= 0.3 ? `"${first(ac)}? I’m not surprised. That one has it coming."`
+    const take = DEALS.has(f.kind) ? `"${takeOn(w, t, p, f).replace(/^[“"]|[”"]$/g, '')}"`
+      : ac && ac.id !== p.id && (t.rels[ac.id]?.grudge ?? 0) >= 0.3 ? `"${first(ac)}? I’m not surprised. That one has it coming."`
       : ac && ac.id !== p.id && (t.rels[ac.id]?.trust ?? 0) >= 0.4 ? `"Doesn’t sound like ${first(ac)}. Somebody’s stirring."`
       : vc && vc.familyId === t.familyId && vc.id !== t.id ? `"That’s one of ours. It doesn’t get forgotten."`
       : temper(t).volatility > 0.6 ? `"Some things you settle with a bat, not a conversation."`
@@ -106,7 +118,16 @@ const pickIncident: Act = {
     const x = T(c), { w, p, t } = x, tp = temper(t), hot = tp.volatility + tp.pride > 1.15;
     line(x, hot ? '“Which business? There’s always something.”' : '“What, the business with…? Which one?”');
     const fn = (id?: string) => (id && w.chars[id] ? first(w.chars[id]) : '');
-    const topic = (f: Fact) => { const b = f.business ? w.biz[f.business] : undefined, k = p.known[f.id]; return f.actor === p.id ? 'What have you heard about me?' : b ? `What’s the story with ${b.name}?` : k?.knowsActor && f.actor && f.victim ? `What went on between ${fn(f.actor)} and ${fn(f.victim)}?` : f.victim && f.victim !== t.id ? `What happened to ${fn(f.victim)}?` : 'What’s that about?'; };
+    // (said to him, about him and the player as "you" and "me": never the man in front of him, or the player himself, by name)
+    const topic = (f: Fact) => {
+      const b = f.business ? w.biz[f.business] : undefined, k = p.known[f.id], parties = [f.actor, f.victim];
+      if (parties.includes(p.id) && parties.includes(t.id)) return 'About what happened between us';
+      if (parties.includes(p.id)) return f.actor === p.id ? 'What have you heard about me?' : `What do you know about what happened to me?`;
+      if (b) return `What’s the story with ${b.name}?`;
+      if (f.victim === t.id) return k?.knowsActor && f.actor ? `What happened with you and ${fn(f.actor)}?` : 'What happened to you?';
+      if (f.actor === t.id) return f.victim ? `What happened with you and ${fn(f.victim)}?` : 'What’s that about?';
+      return k?.knowsActor && f.actor && f.victim ? `What went on between ${fn(f.actor)} and ${fn(f.victim)}?` : f.victim ? `What happened to ${fn(f.victim)}?` : 'What’s that about?';
+    };
     const next: Offer[] = [], seen = new Set<string>(), all = incidentsOf(w, t);
     for (const { f } of all.filter(({ f }) => p.known[f.id])) { const l = topic(f); if (seen.has(l) || seen.size >= 3) continue; seen.add(l); next.push({ code: 'inc:' + f.id, label: l }); }
     const fresh = all.find(({ f }) => !p.known[f.id]);

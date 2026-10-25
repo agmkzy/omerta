@@ -578,7 +578,7 @@ export function playerMoves(w: World, p: Character, s: Situation): PlayerMove[] 
   if (!S.last) { add('drop', '“Never mind. Forget I said anything.”', 'Walk away before it starts.'); return out; }
   const better = K.better?.(w, s);
   add('sweeten', better !== undefined ? K.sweeten?.(better) ?? q(`Call it ${money(better)}.`) : '“I can do better.”', K.low ? 'More from you, easier for him.' : 'Less for you, easier for him.', better === undefined ? (K.low ? 'You can’t go higher.' : 'You can’t go lower.') : undefined);
-  add('persuade', s.ak === 'protect' ? '“Think about it. Who looks after you if something happens?”' : '“Be sensible. This is good for both of us.”', tried(S, 'persuade') >= 2 ? 'He’s heard your arguments.' : 'Reason with him.');
+  add('persuade', s.ak === 'protect' ? '“Think about it. Who looks after you if something happens?”' : s.ak === 'amends' ? '“I was wrong. I want it put right between us.”' : '“Be sensible. This is good for both of us.”', tried(S, 'persuade') >= 2 ? 'He’s heard your arguments.' : 'Reason with him.');
   const lv = leverageOf(w, p, t);
   add('leverage', lv ? q(`I know about ${lv.what}.`) : '“I know things about you.”', lv ? 'Remind him what you know. He won’t thank you for it.' : 'You need something on him first.', lv ? undefined : 'You have nothing on him.');
   add('pressure', s.ak === 'protect' ? '“It’d be a shame if something happened to the place.”' : s.ak === 'collect' ? '“I’d hate for this to get ugly.”' : '“I’d think hard before saying no to me.”', 'Lean on him. Fear works. So does resentment, later.');

@@ -79,9 +79,17 @@ const offered = (c: Ctx) => c.w.jobs.find((j) => j.giver === c.n.id && j.status 
 const hasAsk = (c: Ctx) => c.w.enc.some((e) => e.status === 'open' && e.from === c.n.id && e.expires > c.w.now && e.opts.length);
 const jobOffer: Act = {
   base: 'job', pane: 'business', opens: true,
-  offers: (c) => { const j = offered(c); return j && !hasAsk(c) ? [{ code: 'job:' + j.id, label: `About what he asked: ${j.title}`, says: 'You had something for me?', note: `Pays ${money(j.pay ?? 0)}. He wants an answer.`, kind: 'his' }] : []; },
+  // (once he has put it to the player in this visit, coming back to it is "about that work", not asking whether he has any)
+  offers: (c) => { const j = offered(c); return j && !hasAsk(c) ? [{ code: 'job:' + j.id, label: `About what he asked: ${j.title}`, says: c.v.th.raised.includes('job:' + j.id) ? 'About that work you mentioned.' : 'You had something for me?', note: `${j.pay ? `Pays ${money(j.pay)}. ` : ''}He wants an answer.`, kind: 'his' }] : []; },
   offersFor: (c, id) => { const j = c.w.jobs.find((q) => q.id === id && q.status === 'offered'); return j ? [{ code: 'jobtake:' + j.id, label: 'I’ll take care of it', note: `It’s yours. Pays ${money(j.pay ?? 0)}.` }, { code: 'jobpass:' + j.id, label: 'Not this time', note: 'He will think a little less of you for it.' }] : []; },
-  run: (c, code) => { const x = T(c), id = code.split(':')[1], j = c.w.jobs.find((q) => q.id === id); if (!j) return out(2); line(x, jobSaid(j)); if (j.brief) line(x, j.brief); return { minutes: 2, next: jobOffer.offersFor!(c, id) }; },
+  run: (c, code) => {
+    const x = T(c), id = code.split(':')[1], j = c.w.jobs.find((q) => q.id === id);
+    if (!j) return out(2);
+    // (said once in a visit; asked about again, he wants his answer)
+    if (c.v.th.raised.includes('job:' + id)) line(x, temper(x.t).volatility > 0.55 ? '“So? Are you taking it or not?”' : '“So. Will you take care of it?”');
+    else { line(x, jobSaid(j)); if (j.brief) line(x, j.brief); c.v.th.raised.push('job:' + id); }
+    return { minutes: 2, next: jobOffer.offersFor!(c, id) };
+  },
 };
 const jobAnswer = (take: boolean): Act => ({
   base: take ? 'jobtake' : 'jobpass', pane: 'business',

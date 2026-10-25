@@ -9,7 +9,7 @@
 // says next answers what you said; follow-ups answer his reply, not a menu. Nothing technical is shown: commitments are in the words.
 import { ownerBiz, peek } from '../core';
 import { crewGround } from '../econ';
-import { openAsk } from '../asks';
+import { askBetween, openAsk } from '../asks';
 import { whereIs } from '../where';
 import { DAY, type Character, type Fact, type Id, type World } from '../types';
 import { newSession, perceive, type Perception, type Session } from './perception';
@@ -26,7 +26,7 @@ import { belief, judge, say } from './minds';
 import { onConfrontation, onProgressAsked } from './respond';
 import { compat } from '../core';
 import * as door from './doors';
-import { newThread, acquainted, agoWords, card, ctx, first, him, lastOf, line, memo, memOf, narr, plain, r2, relationOf, remember, talks, you, PANES, type Choice, type Ctx, type Pane, type Say, type TalkMemory, type Visit } from './kit';
+import { newThread, restate, acquainted, agoWords, card, ctx, first, him, lastOf, line, memo, memOf, narr, plain, r2, relationOf, remember, talks, you, PANES, type Choice, type Ctx, type Pane, type Say, type TalkMemory, type Visit } from './kit';
 export { acquainted, relationOf, PANES, type Choice, type Pane, type Say, type TalkMemory, type Visit } from './kit';
 import type { Meeting } from '../meetings';
 import { subjectsOf } from './subjects/life';
@@ -51,11 +51,11 @@ import type { Offer } from './kit';
 // ---------------------------------------------------------------- the matters between them, as each side knows them
 const MY_CAPTAIN = (c: Ctx) => captainOf(c.w, c.h);
 // a promise of the player's to this man, still open
-const myPromiseTo = (c: Ctx) => social(c.w).obs.filter((o) => o.obligor === c.h.id && o.beneficiary === c.n.id && (o.status === 'pending' || c.w.now - (o.settled ?? c.w.now) < 10 * DAY)).at(-1);
+const myPromiseTo = (c: Ctx) => social(c.w).obs.filter((o) => o.obligor === c.h.id && o.beneficiary === c.n.id && o.matter?.against !== c.h.id && (o.status === 'pending' || c.w.now - (o.settled ?? c.w.now) < 10 * DAY)).at(-1);
 // something the player promised someone that needs this man: raise it with him
 // (and, once his own captain has refused it, the man above that captain: going over his head, which the captain will feel)
 const overHead = (c: Ctx, o: Obligation) => { const cap = MY_CAPTAIN(c), above = cap ? superiors(c.w, cap).find((x) => x.alive) : undefined; return !!cap && above?.id === c.n.id && (o.type === 'effort' || o.type === 'result') && lastOf(c.w, cap.id, mkey(o))?.out === 'refused'; };
-const owedHere = (c: Ctx) => social(c.w).obs.filter((o) => o.obligor === c.h.id && o.status === 'pending' && ((o.spec.kind === 'actionDone' && o.spec.target === c.n.id) || ((o.type === 'effort' || o.type === 'result') && MY_CAPTAIN(c)?.id === c.n.id) || overHead(c, o)) && !social(c.w).log.some((a) => a.actor === c.h.id && a.act === 'raise' && a.target === c.n.id && a.t >= o.from && social(c.w).requests.some((r) => r.by === c.h.id && r.of === c.n.id && r.status === 'agreed' && r.parent === o.id)));
+const owedHere = (c: Ctx) => social(c.w).obs.filter((o) => o.obligor === c.h.id && o.status === 'pending' && o.matter?.against !== c.h.id && ((o.spec.kind === 'actionDone' && o.spec.target === c.n.id) || ((o.type === 'effort' || o.type === 'result') && MY_CAPTAIN(c)?.id === c.n.id) || overHead(c, o)) && !social(c.w).log.some((a) => a.actor === c.h.id && a.act === 'raise' && a.target === c.n.id && a.t >= o.from && social(c.w).requests.some((r) => r.by === c.h.id && r.of === c.n.id && r.status === 'agreed' && r.parent === o.id)));
 // what he came to say, if he came looking for the player
 const openFrom = (c: Ctx) => social(c.w).requests.filter((r) => r.by === c.n.id && r.of === c.h.id && r.status === 'open').sort((a, b) => b.t - a.t);
 // his own promise to the player that has an outcome he has not yet told him
@@ -151,7 +151,9 @@ function arrival(c: Ctx) {
 // ---------------------------------------------------------------- he came for help
 function openHelp(c: Ctx, r: Request) {
   const a = c.w.chars[r.against ?? ''];
-  if (!a) return general(c);
+  // (a request against the player himself is never his to answer: it is the trouble between them, not help he can give)
+  if (a?.id === c.h.id) { r.status = 'lapsed'; note(r, c.w.now, 'it is against the man asked'); }
+  if (!a || a.id === c.h.id) return general(c);
   c.v.topic = 'help:' + r.id;
   // he has been here before with this: he says so, and what he asks is what else can be done
   const before = social(c.w).obs.filter((o) => o.obligor === c.h.id && o.beneficiary === c.n.id && o.matter?.against === a.id && o.status !== 'pending').at(-1);
@@ -298,7 +300,7 @@ function subjectsNow(c: Ctx, k: Pane, all: boolean): Choice[] {
       const ways = actRows(c, k, ['other']);
       if ((n.rank !== 'civilian' || n.cash >= 600) && !ways.some((x) => x.id.startsWith('a:borrow'))) out.push({ id: 'loan:500', label: line(c, 'ask.loan', { amt: '$500' }), group: 'matter' });
       // who a man answers to: the men troubling people the player has promised to help
-      for (const id of new Set(social(w).obs.filter((o) => o.obligor === h.id && o.status === 'pending' && o.matter?.against).map((o) => o.matter!.against!))) { const m = w.chars[id]; if (m && m.id !== n.id) out.push({ id: 'answers:' + m.id, label: line(c, 'ask.answersTo', { manFirst: first(m.name) }), group: 'matter' }); }
+      for (const id of new Set(social(w).obs.filter((o) => o.obligor === h.id && o.status === 'pending' && o.matter?.against).map((o) => o.matter!.against!))) { const m = w.chars[id]; if (m && m.id !== n.id && m.id !== h.id) out.push({ id: 'answers:' + m.id, label: line(c, 'ask.answersTo', { manFirst: first(m.name) }), group: 'matter' }); }
       out.push(...ways);
     }
   }
@@ -307,7 +309,7 @@ function subjectsNow(c: Ctx, k: Pane, all: boolean): Choice[] {
     out.push(...pending.slice(0, 2));
     // (a man who has turned cold on the player is in no mood for small talk: what is between them, and that is all)
     if (!c.v.mem.points.includes('news') && !c.v.th.cold) out.push({ id: 'news', label: line(c, 'ask.news'), group: 'social' });
-    if (!c.v.mem.points.includes('spend') && !c.v.th.cold) out.push({ id: 'spend', label: line(c, acquainted(w, h, n) ? 'spend.time' : 'introduce.self'), group: 'social' });
+    if (!c.v.mem.points.includes('spend') && !c.v.th.cold) out.push({ id: 'spend', label: line(c, acquainted(w, h, n) ? 'spend.time.' + partOfDay(w.now) : 'introduce.self'), group: 'social' });
     out.push(...pending.slice(2));
     // something the player knows that bears on this man: trouble on his street, or by his people
     for (const f of Object.values(w.facts).filter((f) => h.known[f.id] && !n.known[f.id] && !f.minor && HOSTILE.has(f.kind) && f.business && w.now - f.t < 21 * DAY && (f.district === (ownerBiz(w, n.id)?.district ?? n.district) || offender(f) === n.id || w.chars[offender(f) ?? '']?.bossId === n.id || crewGround(w, n).has(f.district))).sort((a, b) => b.t - a.t).slice(0, 1)) out.push({ id: 'tell:' + f.id, label: line(c, 'tell.news', { topic: w.biz[f.business!].name }), group: 'matter' });
@@ -348,7 +350,7 @@ function general(c: Ctx) { c.memo.clear(); if (c.v.pane) pane(c, c.v.pane); else
 export function everything(w: World, v: Visit): Choice[] {
   const c = ctx(w, v), out: Choice[] = [];
   for (const k of PANES) out.push(...subjects(c, k, true));
-  if (!v.th.cold && !v.th.shut) out.push({ id: 'news', label: line(c, 'ask.news'), group: 'social' }, { id: 'spend', label: line(c, 'spend.time'), group: 'social' });
+  if (!v.th.cold && !v.th.shut) out.push({ id: 'news', label: line(c, 'ask.news'), group: 'social' }, { id: 'spend', label: line(c, 'spend.time.' + partOfDay(w.now)), group: 'social' });
   out.push({ id: 'home', label: 'Never mind', group: 'more' }, { id: 'leave', label: 'Leave', group: 'leave' });
   return out.filter((x, i) => out.findIndex((y) => y.id === x.id) === i);
 }
@@ -452,12 +454,23 @@ const interveneSig = (c: Ctx, ob: Obligation) => { const a = ob.matter?.against 
 
 // ---------------------------------------------------------------- choosing
 export function choose(w: World, v: Visit, id: string): { v: Visit; minutes: number; meeting?: Meeting; settle?: Id } {
+  // (what the player has chosen in this visit: only a choice made before is "again"; moving between the headings is not saying anything)
+  const picked = (v.th.picked ??= []), again = picked.includes(id), said = !/^(u|all):|^(home|more|back|leave)$/.test(id);
   const from = v.lines.length, r = chooseIn(w, v, id);
+  if (said && !again) picked.push(id);
   // he does not say the same thing twice in a visit, whichever part of the conversation it came from: a long line he has already said
-  // is left out, and if that leaves him nothing to say, he says so
+  // is left out; if that leaves him nothing to say, he restates it as a man does when asked about it once more, or, if the player really
+  // is asking the same thing again, he says so
   const prev = new Set(v.lines.slice(0, from).filter((l) => l.who === 'him').map((l) => l.text)), mine = v.lines.slice(from);
   const kept = mine.filter((l) => !(l.who === 'him' && l.text.length > 30 && prev.has(l.text)));
-  if (kept.length !== mine.length) { v.lines.splice(from); v.lines.push(...kept); if (!kept.some((l) => l.who === 'him')) { const c = ctx(w, v), alr = vsay(w, c.n, c.h, 'already'); v.lines.push(prev.has(alr) ? { who: 'narr', text: 'He has nothing more to say on it.' } : { who: 'him', text: alr }); } }
+  if (kept.length !== mine.length) {
+    v.lines.splice(from); v.lines.push(...kept);
+    if (!kept.some((l) => l.who === 'him')) {
+      const dropped = mine.find((l) => l.who === 'him' && prev.has(l.text) && /^“/.test(l.text) && !/^“Like I said/.test(l.text));
+      if (!again && dropped) v.lines.push({ ...dropped, text: prev.has(restate(dropped.text)) ? '“My answer’s the same.”' : restate(dropped.text) });
+      else { const c = ctx(w, v), alr = vsay(w, c.n, c.h, 'already'); v.lines.push(prev.has(alr) ? { who: 'narr', text: 'He has nothing more to say on it.' } : { who: 'him', text: alr }); }
+    }
+  }
   return { ...r, v: notNow(w, r.v) };
 }
 // While a man who came with something is still waiting on an answer, the way out is an answer: "Not now", said, not a silent exit
@@ -626,12 +639,17 @@ function doProtect(c: Ctx, how: string) {
 function doLoan(c: Ctx, amt: number, how?: string) {
   const { w, h, n } = c;
   const mem = new EncounterMemory(2); mem.said = new Set(c.v.mem.points);
-  const offered = { ...(how === 'rep' ? { reputation: true } : {}), ...(how === 'rate' ? { rate: 0.08 } : {}), ...(how === 'promise' ? { promise: 'the end of the month' } : {}) };
+  // the negotiation in hand: every argument made in it, in order, and so every term now on the table (a new argument adds to them)
+  const neg = (c.v.th.loan ??= { amt, made: [] });
+  const arg = how === 'rep' || how === 'rate' || how === 'promise' ? how : undefined;
+  if (arg) neg.made.push(arg);
+  const made = neg.made;
+  const offered = { ...(made.includes('rep') ? { reputation: true } : {}), ...(made.includes('rate') ? { rate: 0.08 } : {}), ...(made.includes('promise') ? { promise: 'the end of the month' } : {}) };
   if (how === 'take' && c.v.mem.offered.loan) { const sit = openAsk(w, 'borrow', h, n, { amt: Number(c.v.mem.offered.loan) }); if (sit) door.agree(w, sit, 'loan'); says(c, temper(n).agreeable > 0.55 ? '“Good. We understand each other.”' : '“Done. Don’t make me come looking for it.”', settled(n.id, 'agrees', 'you took his figure')); card(c, 'card.agreed.loan', { amt: `$${c.v.mem.offered.loan}`, rate: String(c.v.mem.offered.rate ?? 5) }); remember(w, n.id, 'loan', 'agreed'); return general(c); }
-  const r = onLoanRequest(c.pn(), h, amt, mem, offered);
+  const r = onLoanRequest(c.pn(), h, amt, mem, offered, arg, made);
   c.v.mem.points = [...mem.said];
   him(c, r);
-  if (r.decision.chosen === 'accept') { const sit = openAsk(w, 'borrow', h, n, { amt }); if (sit) door.agree(w, sit, 'loan'); card(c, 'card.agreed.loan', { amt: `$${amt}`, rate: '5' }); remember(w, n.id, 'loan', 'agreed'); return general(c); }
+  if (r.decision.chosen === 'accept') { const rate = offered.rate ? 8 : 5; const sit = openAsk(w, 'borrow', h, n, { amt }); if (sit) door.agree(w, sit, 'loan'); card(c, 'card.agreed.loan', { amt: `$${amt}`, rate: String(rate) }); remember(w, n.id, 'loan', 'agreed'); c.v.th.loan = undefined; return general(c); }
   remember(w, n.id, 'loan', r.decision.chosen);
   if (r.counter) { c.v.mem.offered.loan = r.counter.amt; c.v.mem.offered.rate = Math.round(r.counter.rate * 100); }
   c.v.choices = [...r.followups.slice(0, 3).map((f) => ({ id: `loan:${amt}:${f.key === 'accept.counter.loan' ? 'take' : f.key === 'argue.reputation' ? 'rep' : f.key === 'sweeten.rate' ? 'rate' : 'promise'}`, label: line(c, f.key, f.slots ?? {}), group: 'reply' as const })), { id: 'back', label: line(c, 'let.go'), group: 'reply' }, { id: 'leave', label: 'Leave', group: 'leave' }];
@@ -823,6 +841,16 @@ function aboutWords(c: Ctx, key: string): string {
   const k = key.split(':')[0], o = c.w.chars[key.split(':')[1] ?? ''], b = c.w.chars[c.n.bossId ?? ''], biz = ownerBiz(c.w, c.n.id);
   return k === 'want' ? 'what he wants out of all this' : (k === 'op' || k === 'kin') && o ? first(o.name) : k === 'pressed' ? 'who has been leaning on him' : k === 'boss' && b ? `working for ${first(b.name)}` : k === 'trouble' ? 'what is weighing on him' : k === 'family' ? 'his family' : k === 'shop' && biz ? biz.name : k === 'racket' ? 'his racket' : 'his own business';
 }
+// Asked what is new by the man who is leaning on him: the trouble on his mind is the man asking. He says so, in his manner and as far as
+// he dares, and what can be said next is what can be said about the demand itself (the matter between them), not help against anyone.
+function yourTrouble(c: Ctx, pid: Id) {
+  const { w, h, n } = c, b = ownerBiz(w, n.id), sit = b ? askBetween(w, 'protect', h.id, n.id, b.id) : undefined, fear = peek(n, h.id).fear ?? 0;
+  him(c, plain(n.id, fear >= 0.3 ? 'news.yourDemand.afraid' : 'news.yourDemand', { shop: b?.name ?? '' }, fear >= 0.3 ? 'afraid' : 'cold'));
+  remember(w, n.id, 'trouble:' + pid, 'you');
+  const next = sit ? ACTS.m?.offersFor?.(c, sit.id) ?? [] : [];
+  if (next.length) return afterAct(c, next, 'news');
+  general(c);
+}
 function doNews(c: Ctx) {
   const { w, h, n } = c, pn = c.pn(), r = peek(n, h.id);
   c.v.mem.points.push('news');
@@ -831,6 +859,8 @@ function doNews(c: Ctx) {
   // can then offer what he would have offered had he been asked
   const his = (social(w).pursuits ?? []).find((p) => p.who === n.id && p.status === 'active' && p.kind === 'stopTrouble');
   const a = his ? w.chars[his.against ?? ''] : undefined;
+  // the trouble on his mind is the player himself: that is what he says, to his face, and the matter between them is what is in hand
+  if (his && a?.id === h.id) return yourTrouble(c, his.id);
   if (his && a && willTell && !myPromiseTo(c) && !(talks(w)[n.id]?.topics ?? []).some((x) => x.k === 'trouble:' + his.id)) {
     him(c, onSeekHelp(pn, a));
     const req = social(w).requests.find((x) => x.by === n.id && x.of === h.id && x.status === 'open') ?? request(w, { by: n.id, of: h.id, wants: 'intervene', about: 'trouble:' + a.id, for: n.id, against: a.id, biz: ownerBiz(w, n.id)?.id, fact: his.fact });
@@ -892,20 +922,26 @@ function doSpend(c: Ctx): number {
   const bv = mine ? belief(w, n, 'ob:' + mine.id).value : undefined;
   const mind = !mine && !trouble ? onHisMind(c, 0.1) : undefined;
   const between = mind ? aboutWords(c, mind.key) : mine && a0 ? (bv === 'kept' ? `how quiet it has been since ${first(a0.name)} stopped coming round` : bv === 'done' ? `${first(a0.name)}, and whether what you did will be enough` : `${first(a0.name)}, and what you were going to do about him`) : trouble ? `${first(trouble.name)}, and not much else` : undefined;
-  const venue = n.rank === 'civilian' ? (ownerBiz(w, n.id) ? 'his place after closing' : `a bar in ${n.district}`) : 'the club';
+  // (the hour it is: a coffee in the morning and a drink in the afternoon are part of the visit; an evening is the rest of the day)
+  const part = partOfDay(w.now);
+  const venue = n.rank === 'civilian' ? (ownerBiz(w, n.id) ? (part === 'evening' ? 'his place after closing' : 'the counter of his place') : part === 'morning' ? `a diner in ${n.district}` : `a bar in ${n.district}`) : part === 'morning' ? 'the club, over the morning papers' : 'the club';
   const r0 = peek(n, h.id), before = (r0.affection ?? 0) + r0.trust + (r0.known ?? 0) * 0.3;
   door.spendTime(w, h, n, 'visit');
   const r1 = peek(n, h.id), moved = (r1.affection ?? 0) + r1.trust + (r1.known ?? 0) * 0.3 - before;
-  const a = spendTimeAccount(c.ph(), c.pn(), n, venue, compat(w, h, n), String(Math.floor(w.now / DAY)), between, moved);
+  const a = spendTimeAccount(c.ph(), c.pn(), n, venue, compat(w, h, n), String(Math.floor(w.now / DAY)), between, moved, part);
   narr(c, a.text);
   // over the evening he passes on what he has heard (he only tells what he knows, and only a man he trusts enough or likes company)
   const heard: string[] = [], toldF = door.passOn(w, n, h, heard);
   for (const l of heard) says(c, speechFor(w, h, n, l));
   // what the evening turned on, he comes back to before you part: what he said of it, and what you say to that
   if (mind && subjectsOf(w, h, n).some((x) => x.key === mind.key)) { heRaises(c, mind.key, mind.sig); if (c.v.choices.some((x) => x.group === 'reply')) return 120; }
-  if (toldF.length) { c.v.th.fact = toldF[0].id; c.v.th.asked = []; afterAct(c, ACTS.inc.questions?.(c) ?? [], 'spend'); return 120; }
-  c.v.ended = true;
-  return 120;
+  const mins = part === 'morning' ? 45 : part === 'afternoon' ? 75 : 120;
+  if (toldF.length) { c.v.th.fact = toldF[0].id; c.v.th.asked = []; afterAct(c, ACTS.inc.questions?.(c) ?? [], 'spend'); return mins; }
+  // (an evening is the end of the day; over a coffee or an afternoon drink the talk can go on)
+  if (part === 'evening') c.v.ended = true; else general(c);
+  return mins;
 }
+// the part of the day a visit falls in, for what can be done in it: a morning, an afternoon, an evening (night counts as evening)
+export function partOfDay(t: number): 'morning' | 'afternoon' | 'evening' { const hr = Math.floor((t % DAY) / 60); return hr >= 5 && hr < 12 ? 'morning' : hr >= 12 && hr < 17 ? 'afternoon' : 'evening'; }
 export const engineVersion = 1;
 void r2;

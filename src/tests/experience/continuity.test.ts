@@ -60,10 +60,11 @@ describe('a scene happens at the hour it is in', { tags: ['scenario'] }, () => {
   ok('a drink in the morning is not an evening, and the visit does not end mid-matter for it', () => {
     const w = worldFor(3), cap = captain(w);
     standWith(w, cap, { trust: 0.4, affection: 0.3, known: 0.5 });
-    advance(w, Math.floor(w.now / days(1)) * days(1) + days(1) + 8 * 60 - w.now); // 08:00 the next day
+    advance(w, Math.floor(w.now / days(1)) * days(1) + days(1) + 8 * 60); // 08:00 the next day
     const t = new Talk(w, cap);
     const r = t.say(/buy you a drink|Let me buy/);
     const said = [...r.narr, ...r.his].join(' ');
     assert.ok(!/evening|tonight|after closing|night/i.test(said), `a drink at 08:00:\n${t.transcript()}`);
+    assert.ok(!t.ended, 'a coffee does not end the visit');
   });
 });

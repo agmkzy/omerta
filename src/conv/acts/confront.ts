@@ -145,7 +145,8 @@ const RAISE: Record<string, string> = { promise: 'About what I promised you', ag
 const dueWords = (now: number, due: number) => { const d = Math.floor(due / 1440) - Math.floor(now / 1440); return d < 0 ? 'overdue' : d === 0 ? 'due today' : d === 1 ? 'due tomorrow' : d < 7 ? `due in ${d} days` : 'due next week or after'; };
 const memoA: Act = {
   base: 'memo', pane: 'business',
-  offers: (c) => c.n.memos.filter((m) => m.other === c.h.id && !m.done).map((m) => ({ code: 'memo:' + m.id, label: RAISE[m.kind] ?? 'About what’s between us', note: `${m.text}${m.due ? ` (${dueWords(c.w.now, m.due)})` : ''}`, kind: 'between' as const, pane: (m.kind === 'threat' ? 'confront' : 'business') as never })),
+  // (two of a kind are told apart by what they were about, so no two choices read the same)
+  offers: (c) => c.n.memos.filter((m) => m.other === c.h.id && !m.done).map((m, _i, all) => ({ code: 'memo:' + m.id, label: (RAISE[m.kind] ?? 'About what’s between us') + (all.filter((x) => x.kind === m.kind).length > 1 ? `: ${clip(m.text, 40)}` : ''), note: `${m.text}${m.due ? ` (${dueWords(c.w.now, m.due)})` : ''}`, kind: 'between' as const, pane: (m.kind === 'threat' ? 'confront' : 'business') as never })),
   run: (c, code) => {
     const x = T(c), { w, t } = x, m = t.memos.find((q) => q.id === code.split(':')[1]), r = R(x);
     if (!m) return out(2);

@@ -38,7 +38,7 @@ describe('a decision made over the player’s head is told to him', { tags: ['sc
 describe('a punishment is told, with its reason', { tags: ['scenario'] }, () => {
   ok('when his captain raises his share for ignoring him, the player knows it and why', () => {
     const w = worldFor(3), p = P(w), cap = captain(w);
-    cap.traits.volatility = 0.2; // (a man who raises a share rather than sending someone round)
+    cap.traits.violence = 0.1; // (a man who raises a share rather than sending someone round)
     const t0 = w.now;
     for (let i = 0; i < 2; i++) mkJob(w, { kind: 'summons', title: `${cap.name} wants to see you`, brief: 'Come by.', giver: cap.id, via: 'boss', assignee: p.id, pay: 0, days: 1 });
     advance(w, w.now + 2 * DAY); daily(w);

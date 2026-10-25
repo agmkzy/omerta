@@ -11,7 +11,7 @@ import { say as vsay } from '../voicesheet';
 import { openAsks } from '../asks';
 import type { Character, World } from '../types';
 import * as door from './doors';
-import { agoWords, him, lastOf, plain, remember, says, type Act, type Ctx, type Offer, type Out } from './kit';
+import { agoWords, him, lastOf, plain, remember, restate, says, type Act, type Ctx, type Offer, type Out } from './kit';
 import { answered, asksOf, speechFor } from './acts/words';
 import { ACTS } from './acts';
 
@@ -79,7 +79,7 @@ export function perform(c: Ctx, code: string, label: string): Done {
   if (!act) return { minutes: 0 };
   const [base] = code.split(':'), arg = code.includes(':') ? code.slice(code.indexOf(':') + 1) : '';
   door.footing(w, p, t);
-  const used = (v.th.used ??= []), key = code;
+  const used = (v.th.used ??= []), key = code, picked0 = [...(v.th.picked ?? [])];
   // said or done already in this visit: it changes nothing until the player comes back
   if (!act.nav && !act.opens && used.includes(key) && act.repeat?.round !== true) { says(c, 'You’ve already been over that.'); return { minutes: 0 }; }
   // asked lately, and nothing has changed since: he says so, and it pays nothing; asked over and over, he tires of it
@@ -140,9 +140,18 @@ export function perform(c: Ctx, code: string, label: string): Done {
     if (k && !['cr_cash', 'cr_duties'].includes(base)) door.happened(w, { kind: 'favour', actor: p.id, victim: t.id, story: k, minor: true, text: `${p.name} spoke to ${t.name}: “${label}”.`, district: t.district }, { witnesses: [p.id, t.id] });
   }
   // he does not say the same thing twice in a visit: a long line already said is dropped, and if that leaves no answer he says so
+  // (only a thing the player has already put to him in this visit is "again"; coming back to something he raised himself, or making a
+  // new point that happens to get the same answer, gets the answer said as a man restates himself)
   {
     const prev = new Set(v.th.spoken), mine = v.lines.slice(from), kept = mine.filter((l) => l.who === 'you' || l.who === 'card' || l.text.length <= 30 || !prev.has(l.text));
-    if (kept.length !== mine.length) { const alr = vsay(w, t, p, 'already'); v.lines.splice(from); v.lines.push(...kept); if (!kept.some((l) => l.who === 'him')) says(c, prev.has(alr) ? 'He has nothing more to say on it.' : alr); }
+    if (kept.length !== mine.length) {
+      v.lines.splice(from); v.lines.push(...kept);
+      if (!kept.some((l) => l.who === 'him')) {
+        const again = picked0.includes('a:' + code), dropped = mine.find((l) => l.who === 'him' && prev.has(l.text));
+        if (!again && dropped) v.lines.push({ ...dropped, text: prev.has(restate(dropped.text)) ? '“My answer’s the same.”' : restate(dropped.text) });
+        else { const alr = vsay(w, t, p, 'already'); says(c, prev.has(alr) ? 'He has nothing more to say on it.' : alr); }
+      }
+    }
     v.th.spoken = [...v.th.spoken, ...v.lines.slice(from).filter((l) => l.who === 'him' && l.text.length > 30).map((l) => l.text)].slice(-60);
   }
   // asked the same thing and answered the same way, with nothing changed since: he says that, not the same words again (only what the

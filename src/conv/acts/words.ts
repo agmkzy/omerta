@@ -3,6 +3,7 @@
 // name as "I", the men he mentions by first name). Nothing here decides or changes anything.
 import { flavour, isResolved, ownerBiz } from '../../core';
 import { arch } from '../../voice';
+import { temper } from '../../temper';
 import { introduced } from '../../acquaint';
 import { DAY, type Character, type Fact, type Id, type World } from '../../types';
 
@@ -60,8 +61,21 @@ function selfVerb(v: string): string {
   if (SELF_VERB[l]) return SELF_VERB[l];
   return l.length > 3 && l.endsWith('s') && !l.endsWith('ss') ? l.slice(0, -1) : l;
 }
+// (the man he is talking to is "you": "Lawrence was light" said to Lawrence is "you were light")
+const YOU_VERB: Record<string, string> = { is: 'are', was: 'were', has: 'have', does: 'do', 'doesn’t': 'don’t', 'isn’t': 'aren’t', 'wasn’t': 'weren’t', 'hasn’t': 'haven’t', had: 'had' };
+const youVerb = (v: string) => YOU_VERB[v.toLowerCase()] ?? (v.length > 3 && v.endsWith('s') && !v.endsWith('ss') ? v.slice(0, -1) : v);
+function toYou(w: World, p: Character, s: string): string {
+  const f = p.name.split(' ')[0], solo = !Object.values(w.chars).some((c) => c.id !== p.id && c.alive && c.name.split(' ')[0] === f);
+  for (const n of [rx(p.name), ...(solo ? [rx(f)] : [])]) {
+    s = s.replace(new RegExp(`\\b${n}[’']s\\b`, 'g'), 'your');
+    s = s.replace(new RegExp(`(^|[.!?;,—]\\s+|\\b(?:and|but|then|so|after|before|when|because|until|since|if|that|while) )${n} ((?:now |just |also |still |never |only )?)([A-Za-z’']+)`, 'g'), (_x, pre: string, adv: string, v: string) => `${pre}${pre ? 'you' : 'You'} ${adv}${youVerb(v)}`);
+    s = s.replace(new RegExp(`\\b${n}\\b`, 'g'), 'you');
+  }
+  return s.replace(/(^|[.!?]\s+)you\b/g, (_m, a: string) => `${a}You`);
+}
 export function speechFor(w: World, p: Character, t: Character, line: string): string {
   if (!/["“]/.test(line)) return line;
+  if (p.isPlayer && t.id !== p.id && (line.includes(p.name) || line.includes(p.name.split(' ')[0]))) line = line.replace(/(["“])([^"“”]+)(["”])/g, (_m, a: string, body: string, z: string) => `${a}${toYou(w, p, body)}${z}`);
   const found = Object.values(w.chars).filter((c) => c.id !== p.id && line.includes(c.name));
   if (!found.length) return line;
   const first = (n: string) => n.split(' ')[0];
@@ -111,13 +125,27 @@ export function takeOn(w: World, t: Character, p: Character, f: Fact): string {
   const ac = f.actor ? w.chars[f.actor] : undefined;
   const vc = f.victim ? w.chars[f.victim] : undefined;
   const fa = ac && ac.id !== p.id ? ac.name.split(' ')[0] : '';
+  // what he is to it comes first: the man it was done to speaks of it as his own (what he means to do, or what he can't), the man who
+  // did it as his doing; only a man with no part in it speaks as an onlooker
+  const bz = f.business ? w.biz[f.business] : undefined;
+  if (f.kind === 'protection_started') {
+    if (f.actor === t.id) return pick(['“It’s a good little place. It pays on time.”', '“It’s mine now. Nobody else had thought to ask.”']);
+    if (bz?.ownerId === t.id) return pick(['“I pay. What else am I going to do?”', '“It’s a cost of doing business. That’s what I tell my wife.”']);
+    return pick(['“Another envelope. That’s the neighbourhood now.”', '“It’s a living, if you’re the one holding the envelope.”', '“Somebody’s making a decent week out of that place.”']);
+  }
+  if ((f.victim === t.id || (bz && bz.ownerId === t.id)) && !DEALS.has(f.kind)) {
+    const byFa = fa && f.actor !== t.id;
+    if (t.traits.violence > 0.6 || temper(t).pride > 0.65) return pick([byFa ? `“${fa} will hear from me. I won’t say more than that.”` : '“It won’t be left like this. That’s all I’ll say.”', '“It was done to me. I’ll answer it, my way, when I’m ready.”']);
+    if (t.traits.caution > 0.6 || temper(t).courage < 0.4) return pick(['“What can I do? I keep my head down and hope it doesn’t happen again.”', '“I want it to stop. That’s all I want.”']);
+    return pick([byFa ? `“I haven’t decided. Not yet. But I haven’t forgotten it was ${fa}.”` : '“I haven’t decided. I want to know who first.”', '“I’m thinking about it. Something has to be done.”']);
+  }
+  if (f.actor === t.id) return pick(['“It was what it was. He had it coming.”', '“I did what I had to.”']);
   const tension = ac?.familyId && vc?.familyId && ac.familyId !== vc.familyId ? (w.fam[ac.familyId].tension[vc.familyId] ?? 0) : 0;
   if (fa && (t.rels[ac!.id]?.grudge ?? 0) >= 0.3) return pick([`“${fa}? I’m not surprised. That one has it coming.”`, `“${fa}. Of course it was ${fa}.”`, `“I’ve been waiting for ${fa} to do something like that.”`]);
   if (fa && (t.rels[ac!.id]?.trust ?? 0) >= 0.4) return pick([`“Doesn’t sound like ${fa}. Somebody’s stirring.”`, `“I’d want to hear it from ${fa} before I believed it.”`]);
   if (vc && vc.familyId === t.familyId && vc.id !== t.id) return pick(['“That’s one of ours. It doesn’t get forgotten.”', '“He’s one of ours. Somebody will answer for it.”']);
   if (f.kind === 'poach' && tension >= 2) return pick(['“Reaching into another house’s collection is how it starts. Those two don’t need the excuse.”', '“Two houses already looking for a reason, and one hands it to them.”']);
   if (f.kind === 'poach') return pick(['“A man takes what another man was collecting, and nobody’s asked first. That never ends quietly.”', '“Somebody’s going to want that back.”']);
-  if (f.kind === 'protection_started') return pick(['“Another envelope. That’s the neighbourhood now.”', '“It’s a living, if you’re the one holding the envelope.”', '“Somebody’s making a decent week out of that place.”']);
   if (t.traits.violence > 0.6) return pick(['“Some things you settle with a bat, not a conversation.”', '“If it were mine, there’d be nothing left to discuss.”']);
   if (t.traits.caution > 0.6) return pick(['“Best nobody in this room gets involved.”', '“I’d keep my head down and let it play out.”']);
   return pick(['“Not my business unless it becomes my business.”', '“I’ll know what I think when I know who it touches.”', '“I hear a lot. I don’t do much with it.”']);
@@ -181,6 +209,8 @@ export function told(w: World, t: Character, f: Fact, knows: boolean): string {
   if (m && m[2] === t.name) return `${m[1]} beat ${t.name} up.`;
   return flavour(f, raw);
 }
+// arrangements between men, not crimes: talked of as business (how it came about, who else has a claim), never as "who did it"
+export const DEALS = new Set(['protection_started', 'protection_ended', 'partnership', 'sale', 'deal']);
 export const SCENE = new Set(['beating', 'murder', 'robbery', 'vandalism', 'theft', 'burglary', 'raid', 'attempt', 'threat']);
 export const first1 = (w: World, id: string) => (w.chars[id]?.name.split(' ')[0] ?? 'the owner');
 

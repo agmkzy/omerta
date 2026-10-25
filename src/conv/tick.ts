@@ -38,7 +38,10 @@ export function promise(w: World, o: Omit<Obligation, 'id' | 'status'>, a?: Agre
   return x;
 }
 export function request(w: World, r: Omit<Request, 'id' | 't' | 'status' | 'hist'>): Request {
-  const s = social(w), x: Request = { ...r, id: sid(s, 'r'), t: w.now, status: 'open', hist: [] };
+  // (nobody is asked to act against himself, or on his own behalf against himself: such a request is never put, and is kept only as
+  // the record that it was not, so a caller holding its id finds it closed)
+  const self = !!r.against && (r.of === r.against || r.for === r.against || r.by === r.against);
+  const s = social(w), x: Request = { ...r, id: sid(s, 'r'), t: w.now, status: self ? 'lapsed' : 'open', hist: self ? [{ t: w.now, event: 'not put: the man asked is the man it is against' }] : [] };
   s.requests.push(x);
   return x;
 }

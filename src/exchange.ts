@@ -55,8 +55,9 @@ function reasonWords(cls: AskClass, ak: string, c: Claim, hot: boolean, above: b
       money: ak === 'recruit' ? ['“It isn’t enough to live on.”', '“For that? I can do better on my own.”'] : ['“I couldn’t pay it back. Not on those terms.”'],
       taken: ['“I’m already spoken for.”'],
       you: ak === 'amends' ? (hot ? ['“Saying it doesn’t undo it.”', '“You think that fixes it?”'] : ['“I hear you. It doesn’t undo it.”']) : hot ? ['“Not from you.”'] : ['“I can’t take anything from you. Not now.”'],
-      pride: ak === 'amends' && amt ? ['“You think money fixes this?”'] : ['“I don’t need your help.”', '“I manage. I always have.”'],
-      doubt: ['“What’s the catch?”', '“Nobody offers something for nothing.”'],
+      // (amends is an apology, not a favour on offer: he doubts the man, not the deal, and his pride is about the wrong, not his need)
+      pride: ak === 'amends' ? (amt ? ['“You think money fixes this?”'] : ['“Saying sorry is easy.”', '“You’ll have to show me. Telling me isn’t enough.”']) : ['“I don’t need your help.”', '“I manage. I always have.”'],
+      doubt: ak === 'amends' ? ['“I’ve heard you say things before.”', '“We’ll see whether you mean it.”'] : ['“What’s the catch?”', '“Nobody offers something for nothing.”'],
       time: ['“I need to think it over.”', '“Let me sleep on it.”'],
     } as Record<Claim, string[]>)[c];
     case 'trade': return ({
@@ -164,8 +165,8 @@ function repliesTo(w: World, p: Character, s: Situation, t: Character): Reply[] 
       default: return [];
     }
     if (cls === 'offer') switch (claim) {
-      case 'doubt': return [{ k: 'nocatch', label: 'No catch. I want you on my side.', hint: 'He may believe you, if he trusts you at all.' }];
-      case 'pride': return [{ k: 'asking', label: 'Nobody says you need it. I’m offering.', hint: 'Let him keep his pride.' }];
+      case 'doubt': return [{ k: 'nocatch', label: s.ak === 'amends' ? 'I mean it this time. Watch me.' : 'No catch. I want you on my side.', hint: 'He may believe you, if he trusts you at all.' }];
+      case 'pride': return [{ k: 'asking', label: s.ak === 'amends' ? 'I’m not asking you to forget it. Let me make it right.' : 'Nobody says you need it. I’m offering.', hint: 'Let him keep his pride.' }];
       case 'you': return [{ k: 'past', label: s.ak === 'amends' ? 'I know. I’m trying to put it right.' : 'Whatever happened, that’s behind us.', hint: 'A man with a heart may meet you halfway. A proud one won’t.' }];
       case 'money': return [{ k: 'manage', label: 'What would it take?', hint: 'Let him name his terms.' }];
       case 'time': return [{ k: 'give', label: 'Take your time.', hint: 'He’ll remember you gave it.' }];
@@ -278,8 +279,8 @@ export function reply(w: World, p: Character, s: Situation, k: string): string[]
     }
     case 'nocatch': {
       const believes = v.trust * 0.6 + tp.agreeable * 0.3 + (1 - tp.caution) * 0.2 > 0.45;
-      if (believes) { S.good = clamp(S.good + 0.1); S.resolve = clamp(S.resolve - 0.1); return settle('“…All right. I’ll take you at your word.”', '“Maybe there isn’t. It’s still no.”', '“All right. On what terms?”'); }
-      beat(undefined); return [soft ? '“There’s always a catch. I’m sorry.”' : '“There’s always a catch.”'];
+      if (believes) { S.good = clamp(S.good + 0.1); S.resolve = clamp(S.resolve - 0.1); return s.ak === 'amends' ? settle('“…All right. I’ll take you at your word.”', '“Maybe you do. Not yet, though.”', '“All right. Show me, then.”') : settle('“…All right. I’ll take you at your word.”', '“Maybe there isn’t. It’s still no.”', '“All right. On what terms?”'); }
+      beat(undefined); return s.ak === 'amends' ? [soft ? '“I want to believe you. I can’t, not yet.”' : '“Words. I’ll believe it when I see it.”'] : [soft ? '“There’s always a catch. I’m sorry.”' : '“There’s always a catch.”'];
     }
     case 'remind': {
       S.fear = clamp(S.fear + 0.06); S.good = clamp(S.good + 0.05); S.anger = clamp(S.anger + tp.pride * 0.06); feel(w, t, p.id, 'affection', -0.02);

@@ -126,6 +126,7 @@ export function familyMen(w: World, rank?: Character['rank']) {
 /** Set how a man stands with the player (and that they have met). */
 export function standWith(w: World, c: Character, r: Partial<{ trust: number; respect: number; affection: number; grudge: number; fear: number; known: number }>) {
   const p = P(w); (p.intro ??= {})[c.id] ??= w.now;
-  c.rels[p.id] = { trust: 0.3, respect: 0.3, affection: 0.2, grudge: 0, fear: 0, known: 0.4, lastMet: w.now, ...(c.rels[p.id] ?? {}), ...r } as never;
+  const base = { trust: 0.3, respect: 0.3, affection: 0.2, grudge: 0, fear: 0, known: 0.4, lastMet: w.now };
+  c.rels[p.id] = Object.assign(base, c.rels[p.id] ?? {}, r) as never;
 }
 export const days = (n: number) => n * DAY;
