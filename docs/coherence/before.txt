@@ -1,0 +1,57 @@
+     × seed 3: coming back to the work he raised, after turning to something else, is not "short memory" 50ms
+     × seed 3: asking a made man for a loan, every distinct argument is answered on its own terms, and none is offered twice 12ms
+     × seed 7: asking a made man for a loan, every distinct argument is answered on its own terms, and none is offered twice 12ms
+     × seed 11: asking a made man for a loan, every distinct argument is answered on its own terms, and none is offered twice 10ms
+     × a drink in the morning is not an evening, and the visit does not end mid-matter for it 237ms
+     × seed 3: the shopkeeper he leaned on, asked what is new, never makes him the man to go to about himself 463ms
+     × seed 7: the shopkeeper he leaned on, asked what is new, never makes him the man to go to about himself 278ms
+     × seed 11: the shopkeeper he leaned on, asked what is new, never makes him the man to go to about himself 268ms
+     × a shop newly under protection is not talked about as an unsolved crime 3ms
+     × an apology for a broken word is not answered as an offer with a catch 12ms
+     × seed 3: offered, accepted, shown, done by doing it, remembered as done, and counted 55ms
+     × seed 7: offered, accepted, shown, done by doing it, remembered as done, and counted 9ms
+     × the player, collecting from a shop, is never offered a job by that shop’s collector (himself) 1208ms
+     × a promise to a man in trouble shows under Your word, with whom and by when 153ms
+     × asked where a promise stands, "Something else…" and back does not lose his question 569ms
+     × when a captain settles a quarrel against the player with the player’s money, the player learns what was paid, to whom, and why 4834ms
+     × arrested for heat, the player learns why he was picked up, how long he was inside, and what it cost 3759ms
+     × seed 3: days 0, 20 and 45 5352ms
+     × seed 7: days 0, 20 and 45 4043ms
+     × seed 11: days 0, 20 and 45 4144ms
+⎯⎯⎯⎯⎯⎯ Failed Tests 20 ⎯⎯⎯⎯⎯⎯⎯
++   "Ride shotgun for Ricci's Meats’s delivery",
++   "You had something for me? → “I already said. Nobody listens,” says Louie Costa.",
++   "“Lawrence wants money off me. I won’t pay him. Can you do anything?”",
++   "“Lawrence wants money off me. I won’t pay him. Can you do anything?”",
++   "“Lawrence wants money off me. I won’t pay him. Can you do anything?”",
++   "“Sorry doesn’t cover it. I don’t need your help.”",
++   "Nobody says you need it. I’m offering. ",
++   "“Be sensible. This is good for both of us.” ",
++   "Louie Costa (capo), walk 0, day 0: \"again\" to something said for the first time: You had something for me? → “I already said. Nobody listens,” says Louie Costa.",
++   "Georgie Giordano (civilian), walk 1, day 0: speaks of the player as a third man: “Lawrence wants money off me. I won’t pay him. Can you do anything?”",
++   "day 0: a request asks Lawrence Oliveri to act against himself (intervene trouble:c89)",
++   "Danny Sorrento (civilian), walk 1, day 20: speaks of the player as a third man: “Lawrence wants money off me. I won’t pay him. Can you do anything?”",
++   "Georgie Gallo (civilian), walk 1, day 20: speaks of the player as a third man: “Lawrence wants money off me. I won’t pay him. Can you do anything?”",
++   "day 20: a request asks Lawrence Oliveri to act against himself (intervene trouble:c89)",
++   "day 45: a request asks Lawrence Oliveri to act against himself (intervene trouble:c89)",
++   "Vincent Bianchi (civilian), walk 1, day 0: speaks of the player as a third man: “Lawrence wants money off me. I won’t pay him. Can you do anything?”",
++   "Sonny Marino (civilian), walk 1, day 0: speaks of the player as a third man: “Lawrence wants money off me. I won’t pay him. Can you do anything?”",
++   "day 0: a request asks Lawrence Oliveri to act against himself (intervene trouble:c91)",
++   "Richie Galante (civilian), walk 0, day 20: speaks of the player as a third man: “Lawrence wants money off me. I won’t pay him. Can you do anything?”",
++   "Vincent Bianchi (civilian), walk 1, day 20: speaks of the player as a third man: “Lawrence wants money off me. I won’t pay him. Can you do anything?”",
++   "day 20: a request asks Lawrence Oliveri to act against himself (intervene trouble:c91)",
++   "Gino Caruso (capo), walk 1, day 45: speaks of the player as a third man: “I counted it twice. Lawrence Oliveri was $64 light.”",
++   "Gino Caruso (capo), walk 1, day 45: the player would speak of himself as another man: What went on between Gino and Lawrence?",
++   "Richie Galante (civilian), walk 2, day 45: speaks of the player as a third man: “Lawrence wants money off me. I won’t pay him. Can you do anything?”",
++   "day 45: a request asks Lawrence Oliveri to act against himself (intervene trouble:c91)",
++   "Rocco Ferrara (civilian), walk 1, day 0: speaks of the player as a third man: “Lawrence wants money off me. I won’t pay him. Can you do anything?”",
++   "day 0: a request asks Lawrence Oliveri to act against himself (intervene trouble:c84)",
++   "Louie Palumbo (civilian), walk 1, day 20: speaks of the player as a third man: “Lawrence wants money off me. I won’t pay him. Can you do anything?”",
++   "day 20: a request asks Lawrence Oliveri to act against himself (intervene trouble:c84)",
++   "day 20: work offered by a man to himself: Ride shotgun for Ferrara's Grocery’s delivery",
++   "Carmine Marino (associate), walk 1, day 45: the player would speak of himself as another man: What went on between Louie and Lawrence?",
++   "Louie Palumbo (civilian), walk 1, day 45: speaks of the player as a third man: “Lawrence wants money off me. I won’t pay him. Can you do anything?”",
++   "day 45: a request asks Lawrence Oliveri to act against himself (intervene trouble:c84)",
++   "day 45: work offered by a man to himself: Ride shotgun for Ferrara's Grocery’s delivery",
+ Test Files  5 failed (5)
+      Tests  20 failed | 7 passed (27)
