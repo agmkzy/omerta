@@ -39,7 +39,7 @@ export function section(): Tab {
   if (['books', 'meeting', 'guests', 'recruit', 'orders', 'sendorder', 'delegate', 'sunday', 'tree', 'manage', 'comm'].includes(v.t)) return 'family';
   if (['plan', 'opstart', 'op', 'hijack', 'way', 'dayjob', 'biz'].includes(v.t)) return 'business';
   if (['story', 'brief', 'fact'].includes(v.t)) return 'journal';
-  if (['people', 'person'].includes(v.t)) return 'people';
+  if (['people', 'person', 'talk2'].includes(v.t)) return 'people';
   if (v.t === 'goals') return 'life';
   return 'today';
 }

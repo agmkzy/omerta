@@ -298,7 +298,8 @@ function render() {
   document.body.classList.toggle('om-open', !S.w);
   document.body.classList.toggle('g-on', !!S.w);
   // Scenes (a conversation, a meeting, an encounter, the card table) take the whole phone: the tabs step aside until you leave.
-  document.body.classList.toggle('g-scene', !!S.w && ['meeting', 'enc', 'bj', 'sunday', 'approach', 'settle'].includes(S.view.t));
+  document.body.classList.toggle('g-scene', !!S.w && ['meeting', 'enc', 'bj', 'sunday', 'approach', 'settle', 'talk2'].includes(S.view.t));
+  document.body.classList.toggle('g-talk', !!S.w && S.view.t === 'talk2');
   takeSide();
   if (!S.w) {
     app.innerHTML = openingView(S.notice, hasSave());
@@ -893,12 +894,50 @@ document.addEventListener('click', (e) => {
   }
   render();
   const inPlace = ['tog', 'gpick', 'lsub', 'sub', 'pf', 'stance', 'tree', 'opdist', 'oprun', 'hjpick'].includes(raw.slice(0, i)) || /^om:(both|first|last|bg|shuffle|look|keep|new|lg)/.test(raw);
-  // a conversation keeps its place: the newest exchange is brought into view, with what was said before it just above
-  const now = S.view.t === 'talk2' && raw.startsWith('t2:') ? document.querySelector('.cv-now') as HTMLElement | null : null;
-  if (now) window.scrollTo(0, Math.max(0, now.getBoundingClientRect().top + window.scrollY - (window.innerWidth >= 900 ? 120 : 90)));
-  else window.scrollTo(0, inPlace ? before : 0);
+  window.scrollTo(0, inPlace ? before : 0);
+  settle(e.detail === 0);
   // On the opening screens a keyboard user keeps their place: the control they pressed has focus again after the redraw.
   if (!S.w && e.detail === 0) (document.querySelector(`[data-a="${CSS.escape(raw)}"]`) as HTMLElement | null)?.focus();
+});
+
+// After a screen is drawn: a conversation brings its newest exchange into view inside its own reading box (the page itself never
+// jumps), and a keyboard user lands on the first choice, so the number keys and the arrows carry on where they were.
+function settle(byKeyboard: boolean) {
+  const read = document.querySelector('.cx-read') as HTMLElement | null, now = document.querySelector('.cx-now') as HTMLElement | null;
+  if (read && now) read.scrollTop = Math.max(0, now.offsetTop - read.offsetTop - 8);
+  if (byKeyboard && S.w) (document.querySelector('.ui-choices .ui-choice') as HTMLElement | null)?.focus();
+}
+
+window.addEventListener('resize', () => settle(false));
+
+// The keyboard, wherever a screen offers numbered choices: 1–9 pick, Escape takes the way out, the arrows move between choices.
+document.addEventListener('keydown', (e) => {
+  if (!S.w || e.metaKey || e.ctrlKey || e.altKey) return;
+  const list = document.querySelector('.ui-choices');
+  if (!list) return;
+  const el = e.target as HTMLElement;
+  const typing = el?.tagName === 'INPUT' || el?.tagName === 'TEXTAREA' || el?.isContentEditable;
+  if (e.key === 'Escape') {
+    const out = list.querySelector('[data-out]') as HTMLElement | null;
+    if (out) { e.preventDefault(); out.click(); }
+    return;
+  }
+  if (typing) return;
+  if (/^[1-9]$/.test(e.key)) {
+    const c = list.querySelector(`[data-n="${e.key}"]`) as HTMLElement | null;
+    if (!c) return;
+    e.preventDefault();
+    // (a figure is named first: the number takes you to it)
+    if (c.tagName === 'BUTTON') c.click(); else (c.querySelector('input') as HTMLInputElement | null)?.focus();
+    return;
+  }
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    const xs = [...list.querySelectorAll('.ui-choice')] as HTMLElement[];
+    const i = xs.indexOf(document.activeElement as HTMLElement);
+    const j = i < 0 ? 0 : Math.max(0, Math.min(xs.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)));
+    const target = xs[j].tagName === 'BUTTON' ? xs[j] : (xs[j].querySelector('input') as HTMLElement | null) ?? xs[j];
+    e.preventDefault(); target.focus();
+  }
 });
 
 document.addEventListener('input', (e) => {

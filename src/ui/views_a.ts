@@ -33,6 +33,7 @@ import { TAGS, noteOf } from '../notebook';
 import { WANT_LINE } from '../crewlife';
 import { comingUp } from './brief';
 import { sundayDue } from './sunday';
+import { byWhenWord } from './when';
 import { avatar, banner, back, chevron, meterRow, skillBars, skillLine, traitTags } from './common';
 import { toSide } from './layout';
 import { bl, chip, esc, fl, known, lk, P, pl, S, statusOf, W, who } from './links';
@@ -55,17 +56,8 @@ export interface Need {
 export const isAttn = (n: Need) => n.dot === 'red' || n.dot === 'amber' || n.a === 'sunday:';
 export const attentionCount = () => needs().filter(isAttn).length;
 
-const WEEKDAY = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const MONTH = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-// When something runs out, as a man would put it: today, tomorrow, by Thursday, by 14 March. (Day 0 is Monday 2 March 1970.)
-export function byWhen(now: number, t: number): string {
-  const d = Math.floor(t / DAY) - Math.floor(now / DAY);
-  if (d <= 0) return 'today';
-  if (d === 1) return 'by tomorrow';
-  if (d < 7) return `by ${WEEKDAY[Math.floor(t / DAY) % 7]}`;
-  const dt = new Date(Date.UTC(1970, 2, 2) + t * 60000);
-  return `by ${dt.getUTCDate()} ${MONTH[dt.getUTCMonth()]}`;
-}
+// (when something runs out, as a man would put it: ui/when.ts)
+export const byWhen = byWhenWord;
 const firstName = (c: Character) => c.name.split(' ')[0];
 // What kind of approach it is, in a word or two (never the record's own label).
 const ENC_K: Record<string, string> = {
