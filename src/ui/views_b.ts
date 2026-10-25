@@ -490,14 +490,14 @@ function orgCard(fid: string): string {
   const rows: string[] = [];
   const row = (k: string, v: string) => rows.push(`<li><span>${k}</span><span class="v">${v}</span></li>`);
   row('Led by', r.leader ? `${esc(r.leader.name)}${r.acting ? ` <small class="muted">(${esc(r.acting.name)} is running things)</small>` : ''}` : 'nobody');
-  row('At the head for', r.leaderSince > 0 ? (years < 0.1 ? 'a few weeks' : `${years} year${years === 1 ? '' : 's'}`) : 'years');
+  row('In the chair', r.leaderSince > 0 ? (years < 0.1 ? 'a few weeks' : `${years} year${years === 1 ? '' : 's'}`) : 'since before your time');
   if (r.hq) row('Headquarters', `${esc(r.hq.name)} <small class="muted">${esc(r.hq.district)}</small>`);
   row('Weight in the city', `${Math.round(r.standing)}<small class="muted">/100</small>`);
   if (mine && RANKS_SEE_FUND.includes(p.rank)) row('Family fund', money(r.treasury));
   const rel = Object.entries(r.relations).filter(([id, x]) => w.fam[id] && (x.deals.length || x.grievance > 0.25 || x.coop > 0.3)).slice(0, 3);
   for (const [id, x] of rel) row(`The ${esc(w.fam[id].name)}`, x.coop > x.comp + 0.15 && x.grievance < 0.3 ? 'friendly' : x.grievance > 0.3 ? 'a grievance' : x.comp > 0.3 ? 'rivals' : 'at ease');
   const hist = r.hist.slice(-3).reverse().map((e) => `<li class="muted"><small>${esc(e.text)}</small></li>`).join('');
-  return `<div class="card"><h2>The ${esc(r.name)} family<small>${esc(r.history)}</small></h2><ul class="rows">${rows.join('')}${hist}</ul></div>`;
+  return `<div class="card"><h2>The ${esc(r.name)} family${r.history && !/^The \w+ family\.?$/.test(r.history) ? `<small>${esc(r.history)}</small>` : ''}</h2><ul class="rows">${rows.join('')}${hist}</ul></div>`;
 }
 const RANKS_SEE_FUND = ['soldier', 'capo', 'underboss', 'boss'];
 export function familyTab(): string {

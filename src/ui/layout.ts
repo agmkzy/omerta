@@ -10,7 +10,7 @@ import { avatar } from './common';
 import { attentionCount } from './views_a';
 import { newStories } from './stories';
 import { esc, P, S, W } from './links';
-import type { Tab } from './state';
+import type { Tab, View } from './state';
 import { LEGACY } from './sections';
 
 // ------------------------------------------------------------------ the context column
@@ -32,16 +32,20 @@ const LABEL: Partial<Record<Tab, string>> = { today: 'World', people: 'People', 
 const SECTIONS: Tab[] = ['today', 'people', 'family', 'business', 'journal'];
 const icon = (t: Tab, size = 22) => `<svg class="ti" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[t]}</svg>`;
 
-// Which section the current screen belongs to, so the right one is lit.
+// Which section each screen belongs to, so the right one is lit and a phone's tabs say where you are. Every screen is listed: a
+// conversation and a man's page are People, his books and orders are Family, a racket is Business, a story is the Journal.
+const HOME: Record<View['t'], Tab> = {
+  tab: 'today', menu: 'today', wait: 'today', job: 'today', approach: 'today', delegate: 'today', sendorder: 'today', report: 'today', dayjob: 'today', brief: 'today', enc: 'today', place: 'today', places: 'today', bj: 'today',
+  person: 'people', talk2: 'people', people: 'people', grudges: 'people', settle: 'people',
+  manage: 'family', comm: 'family', tree: 'family', plan: 'family', orders: 'family', recruit: 'family', books: 'family', meeting: 'family', guests: 'family', sunday: 'family', help: 'family',
+  biz: 'business', way: 'business', opstart: 'business', op: 'business', hijack: 'business',
+  fact: 'journal', dispute: 'journal', story: 'journal',
+  goals: 'life',
+};
 export function section(): Tab {
   const v = S.view;
   if (v.t === 'tab') return LEGACY[v.name]?.[0] ?? v.name;
-  if (['books', 'meeting', 'guests', 'recruit', 'orders', 'sendorder', 'delegate', 'sunday', 'tree', 'manage', 'comm'].includes(v.t)) return 'family';
-  if (['plan', 'opstart', 'op', 'hijack', 'way', 'dayjob', 'biz'].includes(v.t)) return 'business';
-  if (['story', 'brief', 'fact'].includes(v.t)) return 'journal';
-  if (['people', 'person', 'talk2'].includes(v.t)) return 'people';
-  if (v.t === 'goals') return 'life';
-  return 'today';
+  return HOME[v.t];
 }
 
 const badgeOf = (t: Tab) => (t === 'today' ? attentionCount() : t === 'journal' ? newStories(W()) : 0);
@@ -61,13 +65,14 @@ function heat(): { word: string; v: number; hot: boolean } {
 }
 const day = () => fmtTime(W().now);
 
-// Phone: one slim, sticky line. Who (tap for your page), money, the hour, and the heat when there is any.
+// Phone: one slim, sticky line. Who (tap for your page), the money and the hour, where you are and the heat.
+const short = (t: number) => fmtTime(t).replace(/^(\w{3}), (\d+ \w{3})\w* \d{4}, /, '$1 $2 · ');
 export function topBar(): string {
   const p = P(), h = heat();
   return `<header class="g-top">
     <button class="g-top__me" data-a="tab:life" aria-label="Your page">${avatar(p)}</button>
-    <div class="g-top__main"><b class="g-cash">${money(p.cash)}</b><span class="g-when">${esc(day())} · ${esc(p.district)}</span></div>
-    <div class="g-top__heat ${h.hot ? 'hot' : ''}" title="Police attention"><i style="--h:${Math.round(h.v * 100)}%"></i><span>${h.word}</span></div>
+    <div class="g-top__main"><b class="g-cash">${money(p.cash)}</b><span class="g-when">${esc(short(W().now))}</span></div>
+    <div class="g-top__heat ${h.hot ? 'hot' : ''}" title="Police attention"><span>${esc(p.district)}</span><i style="--h:${Math.round(h.v * 100)}%"></i><span>${h.word}</span></div>
   </header>`;
 }
 
@@ -92,6 +97,6 @@ export function rail(): string {
       <dl class="g-words"><dt>Reputation</dt><dd>${esc(standingWord(p.standing))}</dd><dt>Influence</dt><dd>${esc(influenceWord(influence(w, p)))}</dd></dl>
     </div>
     <nav class="g-nav" aria-label="Sections">${nav}</nav>
-    <button class="g-save" data-a="save:">Save</button>
+    <button class="g-save" data-a="save:">Save${S.saveGood ? `<small>Last saved ${esc(S.saveGood)}</small>` : ''}</button>
   </aside>`;
 }

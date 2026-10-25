@@ -1,0 +1,88 @@
+/* The frame every in-game screen sits in (src/ui/layout.ts), to the approved design.
+   Desktop: the rail on the left (who you are, the hour, the money, where you stand, the five sections, Save), the screen, and a
+   context column beside it for what supports the screen. Phone: a slim bar on top, one column, the five sections along the bottom;
+   scenes (a conversation, a meeting, an approach, the card table) take the whole screen and the sections step aside. */
+
+/* the room: near-black, a warm light from above, a little grain at the edges */
+body.g-on { background: radial-gradient(ellipse 120% 80% at 50% 0%, rgba(196, 160, 98, .04), transparent 60%), radial-gradient(ellipse 140% 120% at 50% 50%, transparent 55%, rgba(0, 0, 0, .5) 100%), var(--c-ground); background-attachment: fixed; padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
+body.g-on::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: .05; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+#app { position: relative; z-index: 1; margin: 0 auto; }
+.avatar.pt svg { filter: sepia(.28) saturate(.82) contrast(1.04); }
+
+.g-shell { max-width: 680px; margin: 0 auto; padding: 0 max(16px, env(safe-area-inset-right, 0px)) 28px max(16px, env(safe-area-inset-left, 0px)); }
+.g-rail { display: none; }
+.g-main { min-width: 0; }
+.g-main > :first-child { margin-top: var(--s-4); }
+
+/* ------------------------------------------------------------------ phone: the bar on top */
+.g-top { position: sticky; top: 0; z-index: 15; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--s-3); margin: 0 -16px; padding: max(10px, env(safe-area-inset-top, 0px)) 16px 10px;
+  background: rgba(13, 12, 11, .94); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border-bottom: 1px solid var(--c-line); }
+.g-top__me { border: 0; padding: 0; background: none; border-radius: 50%; }
+.g-top .avatar.pt { width: 38px; height: 38px; box-shadow: 0 0 0 2px var(--c-ground), 0 0 0 3px rgba(196, 160, 98, .3); }
+.g-top__main { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.g-cash { font: 700 19px/1 var(--f-fig); color: var(--c-cream); letter-spacing: -.01em; }
+.g-when { font: 400 11.5px/1.2 var(--f-fig); color: var(--c-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-top__heat { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; font: 600 10px var(--f-ui); letter-spacing: .14em; text-transform: uppercase; color: var(--c-muted); }
+.g-top__heat i, .g-heat i { display: block; width: 56px; height: 3px; border-radius: 2px; background: linear-gradient(90deg, var(--c-gold) var(--h), var(--c-line-2) var(--h)); }
+.g-top__heat.hot, .g-heat.hot b { color: var(--c-danger); }
+.g-top__heat.hot i, .g-heat.hot i { background: linear-gradient(90deg, var(--c-danger) var(--h), var(--c-line-2) var(--h)); }
+
+/* the context column follows the screen on a phone, under its own rule */
+.g-side { margin-top: var(--s-6); padding-top: var(--s-2); border-top: 1px solid var(--c-line-2); }
+.g-side > :first-child { margin-top: var(--s-4); }
+
+/* ------------------------------------------------------------------ phone: the five sections along the bottom */
+.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: linear-gradient(180deg, rgba(17, 15, 14, .97), #0a0908); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border-top: 1px solid rgba(196, 160, 98, .18); }
+.tabs button { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 60px; padding: 0; border: 0; background: none; color: var(--c-muted); font: 600 10px var(--f-ui); letter-spacing: .08em; text-transform: uppercase; transition: color var(--t-fast); }
+.tabs button .ti { display: block; }
+.tabs button.on { color: var(--c-gold-2); }
+.tabs button.on::before { content: ""; position: absolute; top: 0; left: 30%; right: 30%; height: 2px; background: var(--c-gold); }
+.tabs button:focus-visible { outline-offset: -4px; }
+.badge { position: absolute; top: 7px; right: calc(50% - 22px); min-width: 17px; height: 17px; padding: 0 5px; border-radius: 9px; display: flex; align-items: center; justify-content: center; background: var(--c-wine-2); color: #fff; font: 700 10px var(--f-ui); letter-spacing: 0; }
+body.g-scene { padding-bottom: env(safe-area-inset-bottom, 0px); }
+body.g-scene .tabs { display: none; }
+
+/* ------------------------------------------------------------------ desktop: the rail */
+.g-brand { margin: 0 0 var(--s-5); font: 700 28px/1 var(--f-brand); color: var(--c-gold-2); }
+.g-me { display: grid; grid-template-columns: 58px 1fr; column-gap: 14px; align-items: center; width: 100%; padding: 0; border: 0; background: none; text-align: left; border-radius: var(--radius); }
+.g-me .avatar.pt { width: 58px; height: 58px; grid-row: span 2; box-shadow: 0 0 0 2px var(--c-rail), 0 0 0 3px rgba(196, 160, 98, .32); }
+.g-me__name { align-self: end; font: 500 21px/1.1 var(--f-display); color: var(--c-cream); overflow-wrap: anywhere; }
+.g-me__rank { align-self: start; margin-top: 4px; font: 600 10.5px/1.5 var(--f-ui); letter-spacing: .14em; text-transform: uppercase; color: var(--c-gold); }
+.g-me:hover .g-me__name, .g-me.on .g-me__name { color: var(--c-gold-2); }
+.g-status { margin: var(--s-5) 0 var(--s-4); padding: var(--s-4) 0; border-top: 1px solid var(--c-line); border-bottom: 1px solid var(--c-line); }
+.g-status__when { font: 400 12.5px/1.5 var(--f-fig); color: var(--c-cream-2); }
+.g-status__when span { color: var(--c-muted); }
+.g-status__cash { margin: 12px 0 4px; font: 700 31px/1.05 var(--f-fig); letter-spacing: -.01em; color: var(--c-cream); }
+.g-status__carry { margin-bottom: 6px; font-size: 12px; color: var(--c-gold-2); }
+.g-heat { display: grid; grid-template-columns: 1fr auto; align-items: center; row-gap: 7px; margin-top: 14px; font-size: 13px; }
+.g-heat span { color: var(--c-muted); } .g-heat b { font-weight: 500; text-align: right; } .g-heat i { grid-column: 1 / -1; width: 100%; }
+.g-words { display: grid; grid-template-columns: auto 1fr; gap: 8px 10px; margin: 16px 0 0; font-size: 13px; }
+.g-words dt { color: var(--c-muted); } .g-words dd { margin: 0; text-align: right; color: var(--c-cream); text-transform: capitalize; }
+.g-nav { display: flex; flex-direction: column; gap: 2px; }
+.g-nav__item { position: relative; display: flex; align-items: center; gap: 14px; width: 100%; padding: 11px 14px; border: 0; border-radius: var(--radius); background: none; color: var(--c-cream-2); font: 400 17px var(--f-display); text-align: left; transition: background var(--t-fast), color var(--t-fast); }
+.g-nav__item:hover { background: var(--c-raise); color: var(--c-cream); }
+.g-nav__item.on { background: var(--c-raise-2); color: var(--c-cream); box-shadow: inset 2px 0 0 var(--c-gold); }
+.g-nav__item .ti { color: var(--c-muted); } .g-nav__item.on .ti { color: var(--c-gold-2); }
+.g-nav__item:focus-visible { outline-offset: -2px; }
+.g-nav__item .badge { position: static; margin-left: auto; }
+.g-save { margin-top: auto; padding: 18px 14px 0; border: 0; background: none; text-align: left; font: 600 11px var(--f-ui); letter-spacing: .16em; text-transform: uppercase; color: var(--c-muted); }
+.g-save:hover { color: var(--c-cream); }
+.g-save small { display: block; margin-top: 4px; font: 400 11px var(--f-fig); letter-spacing: 0; text-transform: none; color: var(--c-dim); }
+
+@media (min-width: 900px) {
+  body.g-on { padding-bottom: 0; }
+  .tabs, .g-top { display: none; }
+  /* the rail, the screen, and beside it what supports it; nothing wider than it needs to be */
+  .g-shell { max-width: none; display: grid; grid-template-columns: var(--rail-w) minmax(0, var(--main-max)) minmax(260px, var(--side-w)); column-gap: clamp(28px, 3vw, 48px); justify-content: start; padding: 0 var(--s-6) 0 0; margin: 0; }
+  .g-shell.g-noside { grid-template-columns: var(--rail-w) minmax(0, 860px); }
+  .g-rail { display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; overflow-y: auto; padding: 30px 22px 24px; background: linear-gradient(180deg, #110f0e, #0a0908); border-right: 1px solid rgba(196, 160, 98, .12); }
+  .g-main { padding: 28px 0 72px; }
+  .g-main > :first-child { margin-top: 0; }
+  .g-side { margin: 0; padding: 28px 0 72px; border: 0; position: sticky; top: 0; max-height: 100vh; overflow-y: auto; align-self: start; scrollbar-width: thin; scrollbar-color: var(--c-line-2) transparent; }
+  .g-side > :first-child { margin-top: 0; }
+}
+@media (min-width: 1600px) {
+  :root { --main-max: 860px; --side-w: 340px; }
+}

@@ -4,5 +4,6 @@ import './css/tokens.css';
 import './css/legacy.css';
 import './css/base.css';
 import './css/components.css';
+import './css/shell.css';
 import './css/conversation.css';
 import '../src/web';

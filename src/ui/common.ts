@@ -30,7 +30,7 @@ export function banner(id: string, icon: string, tone: 'g' | 'a' | 'b' | 'r', ti
   return html;
 }
 
-export const back = (label = 'Back') => `<button class="back" data-a="back:"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>${esc(label)}</button>`;
+export { backTo as back } from './kit'; // (one back button, the same on every screen)
 
 // The status strip used to open every tab; since V88 it lives once, in the frame (ui/layout.ts).
 export const strip = (): string => '';
