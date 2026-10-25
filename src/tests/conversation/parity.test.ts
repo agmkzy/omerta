@@ -1,6 +1,7 @@
 // Gate 4: side-effect parity between the old engine and the conversation layer, interaction by interaction, on several worlds and at
-// several levels of trust (so both sides of every decision are taken). An empty difference is parity; where the layer deliberately
-// differs (the ledger now records money the old engine moved by hand) the difference is named, not hidden.
+// several levels of trust (so both sides of every decision are taken). The old engine was run on every case before it was deleted and
+// what it changed is recorded (conversation/gate4-parity.json); the layer must change exactly the same. Named, not hidden: the ledger
+// (the layer posts money the old engine moved by hand) and an empty relationship record the old engine made while listing its menus.
 import assert from 'node:assert';
 import { describe, test as ok } from 'vitest';
 import { addFact, createDebt, feelToOn, rel } from '../../core';
@@ -12,13 +13,11 @@ import { addEnc } from '../../encounters';
 import { social } from '../../conv/social';
 import { DAY, type Character, type World } from '../../types';
 import { newWorld, P } from '../helpers';
-import { fingerprint, layer, legacy, parity } from './parity';
-import { writeFileSync } from 'node:fs';
-import { afterAll } from 'vitest';
+import { fingerprint, layer } from './parity';
+import { readFileSync } from 'node:fs';
 
-// (GOLDEN=write: the old engine's effects for every case are recorded, for when the old engine is gone)
-const GOLD: Record<string, string> = {};
-afterAll(() => { if (process.env.GOLDEN === 'write') writeFileSync(new URL('../fixtures/gate4-parity.json', import.meta.url), JSON.stringify(GOLD, Object.keys(GOLD).sort(), 1)); });
+// what the old engine did in each case, recorded before it was deleted (parity.ts)
+const GOLD: Record<string, string> = JSON.parse(readFileSync(new URL('./gate4-parity.json', import.meta.url), 'utf8'));
 
 const SEEDS = [3, 7, 11];
 const TRUST = [0.1, 0.4, 0.75];
@@ -47,22 +46,21 @@ function event(w: World, kind: string, actor: Character | undefined, victim: Cha
   for (const k of knowers) k.c.known[f.id] = { t: w.now, from: 'witness', knowsActor: k.actor };
   return f;
 }
-interface Case { name: string; who: (x: Cast) => Character; setup?: (x: Cast, t: Character) => Record<string, unknown> | void; old: string | ((s: Record<string, unknown>) => string); now?: string | ((s: Record<string, unknown>) => string); node?: string; ctx?: (s: Record<string, unknown>) => Record<string, unknown>; th?: (s: Record<string, unknown>) => Record<string, unknown>; allow?: RegExp[]; both?: boolean }
-// (where the layer posts money the old engine moved by hand: the ledger is the only difference, and it is named)
+interface Case { name: string; who: (x: Cast) => Character; setup?: (x: Cast, t: Character) => Record<string, unknown> | void; old: string | ((s: Record<string, unknown>) => string); now?: string | ((s: Record<string, unknown>) => string); node?: string; ctx?: (s: Record<string, unknown>) => Record<string, unknown>; th?: (s: Record<string, unknown>) => Record<string, unknown>; allow?: RegExp[]; both?: boolean; differs?: { why: string; holds: (w: World, s: Record<string, unknown>) => boolean } }
+// Each case, on each world and level of trust: what the layer changed is what the old engine changed (its recorded fingerprint)
 function check(cs: Case) {
   const outcomes = new Set<string>();
   for (const seed of SEEDS) for (const tr of TRUST) {
     const x = cast(seed), t = cs.who(x);
     trusting(x.w, t, x.p, tr);
     const s = cs.setup?.(x, t) ?? {};
-    const oc = typeof cs.old === 'string' ? cs.old : cs.old(s), nc = cs.now === undefined ? oc : typeof cs.now === 'string' ? cs.now : cs.now(s);
-    const a = legacy(x.w, t.id, oc, { node: cs.node ?? 'root', ctx: { asked: [], ...(cs.ctx?.(s) ?? {}) } as never });
-    const b = layer(x.w, t.id, nc, (cs.th?.(s) ?? {}) as never);
-    const d = parity(a, b, cs.allow);
-    assert.deepEqual(d, [], `${cs.name} (seed ${seed}, trust ${tr})\nold: ${a.lines.join(' / ')}\nnew: ${b.lines.join(' / ')}\nold changed: ${a.changed.join('; ')}\nnew changed: ${b.changed.join('; ')}`);
-    GOLD[`${cs.name}|${seed}|${tr}`] = fingerprint(a.changed);
-    assert.equal(fingerprint(b.changed), fingerprint(a.changed), `${cs.name} (seed ${seed}, trust ${tr}): fingerprints differ\nold: ${a.changed.join('; ')}\nnew: ${b.changed.join('; ')}`);
-    outcomes.add(a.changed.filter((k) => !/\.(cool|talk)\./.test(k)).map((k) => k.split(':')[0]).sort().join(','));
+    const code = cs.now === undefined ? (typeof cs.old === 'string' ? cs.old : cs.old(s)) : typeof cs.now === 'string' ? cs.now : cs.now(s);
+    const b = layer(x.w, t.id, code, (cs.th?.(s) ?? {}) as never), key = `${cs.name}|${seed}|${tr}`;
+    assert.ok(GOLD[key], `no recorded effects for ${key}`);
+    // (a difference made on purpose, and named: where the layer now does what the record does not, what it does instead must hold)
+    if (cs.differs && fingerprint(b.changed) !== GOLD[key]) assert.ok(cs.differs.holds(b.w, s), `${cs.name} (seed ${seed}, trust ${tr}): differs from the record, and not as named (${cs.differs.why})\nchanged: ${b.changed.join('; ')}`);
+    else assert.equal(fingerprint(b.changed), GOLD[key], `${cs.name} (seed ${seed}, trust ${tr}): not what the old engine did\nsaid: ${b.lines.join(' / ')}\nchanged: ${b.changed.join('; ')}`);
+    outcomes.add(b.changed.filter((k) => !/\.(cool|talk)\./.test(k)).map((k) => k.split(':')[0]).sort().join(','));
   }
   // (a decision left to chance: across the worlds and levels of trust tried, it went more than one way, so both ways are proved)
   if (cs.both) assert.ok(outcomes.size >= 2, `${cs.name}: only one outcome was tried`);
@@ -193,7 +191,7 @@ describe('Gate 4 parity, Stage B: money and business', () => {
     { name: 'a matter: raising it', who: (x) => x.shop, setup: matter, old: (s) => 'f:m:' + s.s, now: (s) => 'm:' + s.s },
     { name: 'a matter: asking', who: (x) => x.shop, setup: matter, old: (s) => `mv:${s.s}:ask`, both: true },
     { name: 'a matter: making the case', who: (x) => x.shop, setup: matter, old: (s) => `mv:${s.s}:persuade` },
-    { name: 'a matter: pressure', who: (x) => x.shop, setup: matter, old: (s) => `mv:${s.s}:pressure` },
+    { name: 'a matter: pressure', who: (x) => x.shop, setup: matter, old: (s) => `mv:${s.s}:pressure`, differs: { why: 'a shopkeeper looked after by another man, leaned on, goes to that man (the world’s rule for a demand, restored in the layer’s decision when every game came to run it)', holds: (w, s) => !!(w.situations ?? []).find((q) => q.id === s.s)?.m?.help } },
     { name: 'a matter: a figure named', who: (x) => x.shop, setup: matter, old: (s) => `nm:${s.s}:45` },
   ];
   // (his answer to the ask leaves a point the player can answer: the first such answer, as the screen would offer it)

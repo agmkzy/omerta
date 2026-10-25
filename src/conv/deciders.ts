@@ -5,6 +5,7 @@
 import { askStance, askTried, DECIDERS, kindOf, leverageOf, type Decided } from '../asks';
 import { ASKS } from '../askkinds';
 import { ownerBiz } from '../core';
+import { classOf } from '../exchange';
 import type { Character, Situation, World } from '../types';
 import { newSession, perceive } from './perception';
 import { EncounterMemory } from './encounter';
@@ -28,7 +29,12 @@ DECIDERS.answer.protect = (w, s, a, t) => {
   const r = onProtectionDemand(asked(w, s, a, t), a, s.terms?.amt ?? 0, pressed ? 'lean' : 'plain');
   note(w, t, a, `${t.name} answers ${a.name}'s demand: ${r.decision.chosen}`, r);
   const m = r.decision.chosen;
-  const d: Decided = m === 'accept' ? { move: 'yes' } : m === 'counter' ? { move: 'counter', amt: r.counterAmt, why: r.meaning.grounds ?? 'that’s what the place can carry' } : m === 'refer' ? { move: 'help' } : { move: 'no' };
+  // (a man who refuses because another man already looks after him, and is leaned on for it, or asked once too often, goes to that
+  // man: the world's rule for a demand, asks.seekHelp, kept in the one decision model. Gate 4: in every world, not only those that had
+  // switched the layer on)
+  const T = askStance(w, s, t.id), protectedBy = (r.meaning.grounds ?? '').startsWith('hasArrangement');
+  const goes = m === 'refuse' && ((protectedBy && pressed) || askTried(T, 'no') >= 2);
+  const d: Decided = m === 'accept' ? { move: 'yes' } : m === 'counter' ? { move: 'counter', amt: r.counterAmt, why: r.meaning.grounds ?? 'that’s what the place can carry' } : m === 'refer' || goes ? { move: 'help' } : { move: 'no' };
   return d;
 };
 DECIDERS.answer.layoff = (w, s, a, t) => {
@@ -65,6 +71,8 @@ const general = (w: World, s: Situation, a: Character, t: Character): Decided | 
   const S = askStance(w, s, t.id), worth = K.lean(w, s, a, t), c = K.counter?.(w, s, a, t);
   const r = onAsk(perceive(w, newSession(), t), a, worth, { fear: S.fear, good: S.good, anger: S.anger, resolve: S.resolve, canCounter: !!c && S.last !== 'counter', asked: askTried(S, 'stalled') });
   note(w, t, a, `${t.name}, asked by ${a.name} (${s.ak}): ${r.decision.chosen}`, r);
+  // (a demand refused for the third time: he goes to someone, the world's rule for a demand, asks.seekHelp)
+  if (r.decision.chosen === 'no' && classOf(s) === 'demand' && askTried(S, 'no') >= 2) return { move: 'help' };
   return { move: r.decision.chosen as Decided['move'], ...(r.decision.chosen === 'counter' && c ? { amt: c.amt, why: c.why } : {}) };
 };
 // The asker's next move, for every kind: the same general decision (onPress), the kind saying only which moves make sense in it

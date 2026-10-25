@@ -134,7 +134,7 @@ function stopTrouble(w: World, p: Pursuit) {
     if (!settledBad && patient) { p.next = w.now + 2 * DAY; return; }
     log(w, p, p.route ?? '?', p.with, settledBad ? 'it came to nothing' : 'he ran out of patience waiting');
     enter({ t: w.now, who: v.id, with: p.with, what: `${v.name}: ${settledBad ? `going to ${w.chars[p.with ?? '']?.name ?? 'them'} came to nothing` : `tired of waiting on ${w.chars[p.with ?? '']?.name ?? 'them'}`}; he thinks again`, chain: p.id });
-    p.waitingOn = undefined; p.route = undefined;
+    delete p.waitingOn; delete p.route; // (deleted, not set to undefined: a saved and loaded world must go on byte for byte the same)
     // he takes a day or more to think, longer the more it has gone wrong
     const pause = Math.min(4, 1 + Math.floor((p.turnedDown ?? []).length / 2));
     if (pause > 1) { p.next = w.now + pause * DAY; return; }
@@ -144,8 +144,8 @@ function stopTrouble(w: World, p: Pursuit) {
   if (!top || top.route === 'endure') return done(w, p, 'abandoned', 'there is nothing more he can do');
   const before = p.tried.at(-1);
   if (p.revised && before && (before.route !== top.route || before.with !== top.with)) enter({ t: w.now, who: v.id, what: `${v.name} changes his plan: ${before.route}${before.with ? ' (' + w.chars[before.with]?.name + ')' : ''} → ${top.route}${top.with ? ' (' + w.chars[top.with]?.name + ')' : ''}, because ${p.revised}`, chain: p.id });
-  p.revised = undefined;
-  p.route = top.route; p.with = top.with; p.value = top.value; p.waitedFrom = w.now;
+  delete p.revised;
+  p.route = top.route; if (top.with === undefined) delete p.with; else p.with = top.with; p.value = top.value; p.waitedFrom = w.now;
   const x = top.with ? w.chars[top.with] : undefined, fact = p.fact ? w.facts[p.fact] : undefined;
   if (top.route === 'protector' && x && dem) {
     const h = openAsk(w, 'help', v, x, { about: dem.id, why: `${v.name} wants ${x.name} to deal with ${a.name}` });

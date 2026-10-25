@@ -32,6 +32,7 @@ for (const [node, go, end] of [
 const SOCIAL_ACK = new Set(['how', 'old_times', 'drink', 'rv_drink', 'welcome', 'congrats', 'chat', 'spend', 'news']);
 
 export const actOf = (code: string): Act | undefined => ACTS[code.split(':')[0]];
+const ACT_OPENS = (code: string) => !!actOf(code)?.opens;
 // What can be put to him now, by every interaction that has something to offer (each by its own conditions)
 // (and, of the rest, the two a man in the player's position would naturally put to this man first, by who he is to him: work and a
 // bigger piece from the boss, protection to a shopkeeper, orders to the player's own man, a word to a man of another family)
@@ -80,7 +81,7 @@ export function perform(c: Ctx, code: string, label: string): Done {
   door.footing(w, p, t);
   const used = (v.th.used ??= []), key = code;
   // said or done already in this visit: it changes nothing until the player comes back
-  if (!act.nav && used.includes(key) && act.repeat?.round !== true) { says(c, 'You’ve already been over that.'); return { minutes: 0 }; }
+  if (!act.nav && !act.opens && used.includes(key) && act.repeat?.round !== true) { says(c, 'You’ve already been over that.'); return { minutes: 0 }; }
   // asked lately, and nothing has changed since: he says so, and it pays nothing; asked over and over, he tires of it
   const day0 = Math.floor(w.now / 1440), tkey = base === 'about' ? code : base;
   if (act.repeat) {
@@ -155,7 +156,7 @@ export function perform(c: Ctx, code: string, label: string): Done {
     if (saidNow) remember(w, t.id, ak, 'said', saidNow.slice(0, 120));
   }
   // what needs no words back still gets an answer, in keeping with what it was and how he is with the player
-  if (!r.end && !act.nav && !v.lines.slice(from).some((l) => l.who === 'him' || answered(l.text, t.name.split(' ')[0]))) says(c, ackLine(w, t, p, v.lines.length - from, SOCIAL_ACK.has(base)));
+  if (!r.end && !act.nav && !act.opens && !v.lines.slice(from).some((l) => l.who === 'him' || answered(l.text, t.name.split(' ')[0]))) says(c, ackLine(w, t, p, v.lines.length - from, SOCIAL_ACK.has(base)));
   // what changed, as a card
   {
     const a = snap(), bits: string[] = [];
@@ -169,7 +170,7 @@ export function perform(c: Ctx, code: string, label: string): Done {
   // he remembers what he was asked, and what it stood on, for next time
   if (act.repeat && v.lines.length > from && !r.skip) (t.talk ??= {})[tkey] = { d: day0, sig: act.repeat.sig(c, arg), n: 1 };
   { const m = t.talk ?? {}, ks = Object.keys(m); if (ks.length > 18) delete m[ks.sort((x, y) => m[x].d - m[y].d)[0]]; }
-  if (!act.nav) used.push(key);
+  if (!act.nav && !act.opens) used.push(key);
   if (r.end || r.meeting || act.nav) return { ...r, minutes: r.minutes ?? 10 };
   return { ...r, minutes: r.minutes ?? 10, ...govern(c, code, from) };
 }
@@ -180,7 +181,7 @@ function govern(c: Ctx, code: string, from: number): { end?: boolean; cold?: boo
   const { w, h: p, n: t, v } = c, th = v.th, tp = temper(t), vw = viewOf(w, t, p);
   const start = th.patience ?? clamp(3.5 + tp.agreeable * 2 + vw.trust * 2 + vw.affection * 1.5 + vw.fear * 1.5 - tp.volatility - vw.resent * 2.5, 1.5, 9);
   const already = v.lines.slice(from).some((l) => /already|nothing more to say|heard it before|We’ve been over this|You keep saying/.test(l.text));
-  const cost = (PUSHY.test(code) ? 1.1 + tp.pride * 0.7 + tp.volatility * 0.7 + (/:force$/.test(code) ? 1.5 : 0) : 0.12) + (already ? 0.6 : 0);
+  const cost = (PUSHY.test(code) ? 1.1 + tp.pride * 0.7 + tp.volatility * 0.7 + (/:force$/.test(code) ? 1.5 : 0) : ACT_OPENS(code) ? 0 : 0.12) + (already ? 0.6 : 0);
   const left = start - cost;
   th.patience = left;
   const angry = openAsks(w).some((s) => s.terms?.by === p.id && s.terms?.of === t.id && (s.st?.[t.id]?.anger ?? 0) > 0.45);

@@ -1,7 +1,6 @@
 import { doMove } from './sitmoves';
 import { matterAct } from './matters';
 import { openAsks, playerMove, type AskMove } from './asks';
-import { subjectRows } from './talk';
 // Mobile web front end. Same engine as the CLI, different skin.
 import { generate, perform } from './actions';
 import { crewOf } from './crewlife';
@@ -17,7 +16,6 @@ import { buyLife, courtBoss, propose, setBoss, setConsigliere, setHeir } from '.
 import { auditMember, checkBooks, envelopeSum, handOver, rule, setStance } from './books';
 import { post } from './ledger';
 import { statement } from './ledger';
-import { say, startConvo, introduced, arrive, isNavCode, options, groupOf } from './dialogue';
 import { closeMeeting, choose as meetChoose, current as meetCurrent, openAccountsMeeting, openCrewMeeting, openFamilyMeeting, openGathering, openInduction, openSitdown } from './meetings';
 import { setManager } from './econ';
 import { giveOrder, ownJob, questionReport, recruitProspect, takeDayJob, quitDayJob, workShift } from './orders';
@@ -38,7 +36,7 @@ import { back as backBtn } from './ui/common';
 import { esc, lk, P, S, W } from './ui/links';
 import type { Tab, View } from './ui/state';
 import { storiesTab, newStories } from './ui/stories';
-import { approachesBlock, newTalk, setNewTalk, talk2View } from './ui/talk2';
+import { approachesBlock, talk2View } from './ui/talk2';
 import { begin as beginVisit, choose as chooseVisit, everything as everythingVisit } from './conv/visit';
 import { social } from './conv/social';
 import { gcast } from './conv/scenarioG';
@@ -48,7 +46,7 @@ import { encView, factView, bizView, attentionCount, personView, todayView } fro
 import { choose as encChoose } from './encounters';
 import {
   approachView, booksView, crewList, crewView, dayjobView, delegateView, familyTab, grudgesView, settleView, guestsView, helpView, jobView, lifeTab, meetingView,
-  menuView, placesView, opStartView, opView, hijackView, ordersView, peopleView, placeView, planView, recruitView, reportView, sendView, talkView, waitChoices, waitView,
+  menuView, placesView, opStartView, opView, hijackView, ordersView, peopleView, placeView, planView, recruitView, reportView, sendView, waitChoices, waitView,
 } from './ui/views_b';
 import { treeView } from './ui/views_a';
 import { leaveCrew } from './rank';
@@ -172,7 +170,7 @@ function pop() {
   const prev = S.stack.pop();
   S.view = prev ?? { t: 'tab', name: 'today' };
   // do not return into a dead conversation or meeting
-  while (S.stack.length && (S.view.t === 'talk' || S.view.t === 'talk2' || S.view.t === 'meeting' || S.view.t === 'approach' || S.view.t === 'sendorder')) S.view = S.stack.pop()!;
+  while (S.stack.length && (S.view.t === 'talk2' || S.view.t === 'meeting' || S.view.t === 'approach' || S.view.t === 'sendorder')) S.view = S.stack.pop()!;
 }
 
 function pass(minutes: number, lines: string[], next: View = { t: 'tab', name: 'today' }, from?: number) {
@@ -209,87 +207,33 @@ function doAction(a: import('./types').Action) {
   const prevMet = (a.target ? W().chars[a.target]?.rels[P().id]?.lastMet : undefined) ?? -1e9;
   if (a.kind === 'socialise') a.quiet = true;
   const r = perform(W(), a);
-  if (a.kind === 'socialise' && a.target && W().chars[a.target]?.alive && newTalk()) { social(W()); return pass(r.minutes, [], { t: 'talk2', v: beginVisit(W(), a.target) }); }
-  if (a.kind === 'socialise' && a.target && W().chars[a.target]?.alive) { const x = W().chars[a.target]; const aa = arrive(W(), P(), x, r, whereIs(W(), P(), x), prevMet); return pass(r.minutes, [], { t: 'talk', convo: aa.convo, lines: aa.lines }); }
+  if (a.kind === 'socialise' && a.target && W().chars[a.target]?.alive) return pass(r.minutes, [], { t: 'talk2', v: beginVisit(W(), a.target) });
   pass(r.minutes, r.lines);
 }
 
 const job = (id: string) => W().jobs.find((j) => j.id === id);
 
-// Say one thing in the conversation on the page: his answer, and what can follow it.
-function sayIt(picked: { code: string; label: string }) {
-  const w = W();
-  if (S.view.t !== 'talk') return;
-  const t = w.chars[S.view.convo.id];
-  const tv = S.view;
-  const history = [...(tv.history ?? []), ...(tv.lines.length ? [{ q: tv.q, lines: tv.lines }] : [])].slice(-12);
-  const res = say(w, P(), t, tv.convo, picked.code);
-  if (res.meeting && typeof res.meeting !== 'string') {
-    advance(w, w.now + res.minutes);
-    S.view = { t: 'meeting', m: res.meeting, lines: res.lines };
-    save();
-    return;
-  }
-  const lines = typeof res.meeting === 'string' ? [...res.lines, res.meeting] : res.lines;
-  const keep = isNavCode(picked.code) && !res.lines.length && !!res.convo;
-  // (a conversation that ends stays on the page: the last thing said, and how you left it)
-  return pass(res.minutes, [], res.convo ? (keep ? { t: 'talk', convo: res.convo, lines: tv.lines, q: tv.q, history: tv.history } : { t: 'talk', convo: res.convo, lines, q: res.q ?? (isNavCode(picked.code) ? undefined : picked.label), history }) : { t: 'talk', convo: tv.convo, lines, q: res.q ?? picked.label, history, ended: true });
-}
-
-// Go and see a man. With a matter (a code from the conversation: his debt, his money, a job, a place of his), you open on it,
-// so every record that names a man leads to the conversation about it.
-// A man you have never met is met first; the matter waits until you have been introduced, then comes up.
-let matter: { id: string; code: string } | undefined;
+// Go and see a man (the one conversation: conv/visit.ts). With a matter (what the conversation would call it: his debt, his money, a
+// matter between you), it opens on it, so every record that names a man leads to the conversation about it.
 function talkTo(id: string, about?: string) {
-  goSee(id);
-  matter = about ? { id, code: about } : undefined;
-  raiseMatter();
-}
-function raiseMatter() {
-  if (!matter) return;
-  // (the new conversations: the matter is raised the same way, through the visit)
-  if (S.view.t === 'talk2' && S.view.v.npc === matter.id) {
-    const v = S.view.v, about = matter.code;
-    matter = undefined;
-    const ids = [...v.choices.map((x) => x.id), ...everythingVisit(W(), v).map((x) => x.id)];
-    const id = ids.find((x) => x === 'o:' + about || x === 'o:f:' + about) ?? ids.find((x) => x === 'o:f:g:' + groupOf(about));
-    if (!id) return;
-    const r = chooseVisit(W(), v, id), o = id.startsWith('o:f:g:') ? r.v.choices.find((x) => x.id === 'o:' + about || x.id === 'o:f:' + about) : undefined;
-    const r2 = o ? chooseVisit(W(), r.v, o.id) : undefined;
-    return pass(r.minutes + (r2?.minutes ?? 0), [], { t: 'talk2', v: r.v });
-  }
-  if (S.view.t !== 'talk' || S.view.ended || S.view.convo.id !== matter.id) { matter = undefined; return; }
-  const w = W(), p = P(), x = w.chars[matter.id], about = matter.code;
-  if (!introduced(w, p, x)) return;
-  matter = undefined;
-  // (a way in is offered as f:g:<way>; a matter that lives under one of them opens that way first, as if you had turned the talk to it)
-  const find = (code: string) => S.view.t === 'talk' ? options(w, P(), x, S.view.convo).find((d) => d.code === code || d.code === 'f:' + code) : undefined;
-  if (!find(about) && !about.startsWith('g:')) { const g = find('g:' + groupOf(about)); if (g) sayIt(g); }
-  const o = find(about);
-  if (o) sayIt(o);
-}
-function goSee(id: string) {
-  const w = W();
-  const p = P();
-  const x = w.chars[id];
-  const wh = x ? whereIs(w, p, x) : undefined;
+  const w = W(), p = P(), x = w.chars[id];
+  if (!x?.alive) return;
+  const wh = whereIs(w, p, x);
   if (wh?.kind === 'jail') return pass(5, [`${x.name} is locked up. Nothing to do but wait.`]);
-  // (Gate 3, behind the switch: the new conversation, which runs on the conversation layer: switching it on for this game)
-  if (newTalk() && x) { social(w); return pass(wh?.mins ?? 15, [], { t: 'talk2', v: beginVisit(w, id) }); }
-  const known = introduced(w, p, x);
-  const act = known ? generate(w, p, 'socialise').find((a) => a.target === id) : undefined;
-  if (!known) return pass(wh?.mins ?? 15, [], { t: 'talk', convo: startConvo(id), lines: [wh ? `You find ${x.name}: ${wh.line.replace(/^He’s /, 'he is ')}` : '', `You’ve never met ${x.name}. He has no reason to know who you are.`].filter(Boolean) });
-  if (act) {
-    const prevMet = x.rels[p.id]?.lastMet ?? -1e9;
-    act.quiet = true;
-    const r = perform(w, act);
-    const a = arrive(w, p, x, r, wh!, prevMet);
-    return pass(r.minutes, [], { t: 'talk', convo: a.convo, lines: a.lines });
+  let v = beginVisit(w, id), minutes = wh?.mins ?? 15;
+  // (a link that names a way in rather than a matter, as older pages do: business, catching up, asking, the family, settling things,
+  // opens the heading it belongs under)
+  const HEAD: Record<string, string> = { business: 'business', org: 'business', social: 'personal', ask: 'personal', settle: 'confront' };
+  if (about?.startsWith('g:') && !v.ended) { const k = HEAD[about.slice(2)] ?? 'business'; if (v.choices.some((c) => c.id === 'u:' + k)) chooseVisit(w, v, 'u:' + k); about = undefined; }
+  if (about && !v.ended) {
+    const pick = [...v.choices, ...everythingVisit(w, v)].find((c) => c.id === 'a:' + about);
+    if (pick) {
+      const r = chooseVisit(w, v, pick.id);
+      if (r.meeting) { advance(w, w.now + minutes + r.minutes); S.view = { t: 'meeting', m: r.meeting, lines: r.v.lines.slice(-3).map((l) => l.text) }; save(); return; }
+      v = r.v; minutes += r.minutes;
+    }
   }
-  // (V90: however you came to be in front of him, he greets you, and whatever he has come to raise comes up)
-  const prevMet = x.rels[p.id]?.lastMet ?? -1e9;
-  const a = wh ? arrive(w, p, x, { lines: [], minutes: wh.mins ?? 15 } as never, wh, prevMet) : undefined;
-  pass(wh?.mins ?? 15, [], { t: 'talk', convo: a?.convo ?? startConvo(id), lines: a?.lines ?? [] });
+  pass(minutes, [], { t: 'talk2', v });
 }
 
 // ------------------------------------------------------------------- views
@@ -322,7 +266,6 @@ function body(): string {
     case 'books': return booksView(v.id, v.lines);
     case 'meeting': return meetingView(v);
     case 'guests': return guestsView(v.picked);
-    case 'talk': return talkView(v);
     case 'talk2': return talk2View(v.v);
     case 'people': return peopleView();
     case 'report': return j(v.id) ? reportView(j(v.id)!, v.lines) : todayView();
@@ -355,7 +298,7 @@ function render() {
   document.body.classList.toggle('om-open', !S.w);
   document.body.classList.toggle('g-on', !!S.w);
   // Scenes (a conversation, a meeting, an encounter, the card table) take the whole phone: the tabs step aside until you leave.
-  document.body.classList.toggle('g-scene', !!S.w && ['talk', 'meeting', 'enc', 'bj', 'sunday', 'approach', 'settle'].includes(S.view.t));
+  document.body.classList.toggle('g-scene', !!S.w && ['meeting', 'enc', 'bj', 'sunday', 'approach', 'settle'].includes(S.view.t));
   takeSide();
   if (!S.w) {
     app.innerHTML = openingView(S.notice, hasSave());
@@ -387,15 +330,6 @@ function startMeeting(m: ReturnType<typeof openCrewMeeting>, fail: View = { t: '
 }
 
 function handle(a: string, v: string) {
-  // Stage 4: a figure named in a conversation goes with the choice it belongs to (dialogue.ts 'nm:')
-  if (a === 'sayamt') {
-    const o = S.dopts[Number(v)];
-    const amt = Number((document.getElementById('fig-' + v) as HTMLInputElement | null)?.value);
-    const rateEl = document.getElementById('figr-' + v) as HTMLInputElement | null;
-    if (!o || !Number.isFinite(amt)) return;
-    S.dopts[Number(v)] = { ...o, code: `${o.code}:${Math.round(amt)}${rateEl ? `:${Number(rateEl.value) / 100}` : ''}` };
-    return handle('say', v);
-  }
   const w = S.w;
   const args = v.split('|');
   if (a === 'om') return openingAct(v);
@@ -406,7 +340,7 @@ function handle(a: string, v: string) {
     if (a === 'waitgo') g['g:wait'] = w.now;
     if (['job', 'approach', 'delegate', 'sendorder'].includes(S.view.t) && !['back', 'tab', 'ent', 'biz', 'fact', 'tog'].includes(a)) g['g:job'] = w.now;
     // V89 first-week guide: what's on his mind, a word aside at the club, the Stories page, and one story followed
-    if (a === 'say' && S.view.t === 'talk' && S.dopts[Number(v)]?.code.startsWith('tk:')) g['g:tk'] = w.now;
+    if (a === 't2' && S.view.t === 'talk2' && v.startsWith('a:tk:')) g['g:tk'] = w.now;
     if (a === 'caside' || a === 'cscene') { g['g:aside'] = w.now; if (args[1]) g['g:tk'] = w.now; } // (V90: sitting down with a man at the club is the step)
     if (a === 'tab' && v === 'stories') g['g:stories'] = w.now;
     if (a === 'story') g['g:story'] = w.now;
@@ -473,11 +407,7 @@ function handle(a: string, v: string) {
       // else, opened at the club (a scene already under way in an old save still plays out below).
       const p = P(), cl = clubOf(w, p.familyId), x = w.chars[v];
       if (!cl || !x?.alive) return;
-      const prevMet = x.rels[p.id]?.lastMet ?? -1e9;
-      const act = introduced(w, p, x) ? generate(w, p, 'socialise').find((a) => a.target === v) : undefined;
-      const r = act ? (act.quiet = true, perform(w, act)) : { lines: [] as string[], minutes: 10 };
-      const a = arrive(w, p, x, r, { kind: 'club', name: cl.name, line: `${x.name.split(' ')[0]} is at the club.`, mins: 0 } as never, prevMet);
-      return pass(r.minutes ?? 10, [], { t: 'talk', convo: a.convo, lines: a.lines });
+      return pass(10, [], { t: 'talk2', v: beginVisit(w, v) });
     }
     case 'club': {
       const r = v === 'sit' ? sitAtClub(w, P()) : v === 'shave' ? shave(w, P()) : drinkAt(w, P());
@@ -545,7 +475,6 @@ function handle(a: string, v: string) {
       return handle('t2', `${v}:${Math.round(amt)}${rate ? `:${Number(rate.value) / 100}` : ''}`);
     }
     case 'see2': { const r = w.social?.requests.find((x) => x.id === v); if (!r || !w.chars[r.by]?.alive) return; return pass(5, [], { t: 'talk2', v: beginVisit(w, r.by, { approach: r.id }) }); }
-    case 'talkmode': { setNewTalk(v === 'new'); if (v === 'new') social(w); S.notice = v === 'new' ? 'New conversations are on. Go and see someone.' : 'Back to the old conversations.'; return go({ t: 'tab', name: 'today' }); }
     case 'settle': return W().chars[v]?.alive ? go({ t: 'settle', id: v, lines: [] }) : undefined;
     case 'sv': {
       const [code, id] = v.split('|');
@@ -772,7 +701,6 @@ function handle(a: string, v: string) {
       }
       return;
     }
-    case 'say': if (S.dopts[Number(v)]) { sayIt(S.dopts[Number(v)]); raiseMatter(); } return;
     case 'cmove': {
       const r = performMove(w, S.moves[Number(v)]);
       return pass(r.minutes, r.lines, { t: 'tab', name: 'crew' });
@@ -897,19 +825,12 @@ function handle(a: string, v: string) {
       // conversation opens on it, with what he said, rather than his answer turning up on another screen
       const t = j.target ? w.chars[j.target] : undefined;
       const m = t?.alive ? openAsks(w).find((x) => x.terms?.by === P().id && x.terms?.of === t.id && Number(x.m?.at ?? -1) >= w.now - r.minutes - 1) : undefined;
-      if (t && m) { (P().intro ??= {})[t.id] ??= w.now; return pass(r.minutes, [], { t: 'talk', convo: { ...startConvo(t.id), ctx: { asked: [], focus: 'm:' + m.id } }, lines: r.lines }); }
+      if (t && m) { const v0 = beginVisit(w, t.id), pick = [...v0.choices, ...everythingVisit(w, v0)].find((c) => c.id === 'a:m:' + m.id), r2 = pick ? chooseVisit(w, v0, pick.id) : undefined; return pass(r.minutes + (r2?.minutes ?? 0), r.lines, { t: 'talk2', v: r2?.v ?? v0 }); }
       return pass(r.minutes, r.lines);
     }
     case 'talkm': { // go and see him about a particular matter (from its page): the conversation opens on it
-      const [id, sid] = args, t = w.chars[id];
-      if (!t?.alive) return;
-      talkTo(id);
-      // (and you raise it: what you say and what he answers follow the greeting, as their own exchange)
-      if (S.view.t === 'talk' && introduced(w, P(), t)) {
-        const v = S.view, res = say(w, P(), t, { ...v.convo, ctx: { ...v.convo.ctx, focus: undefined } }, 'f:m:' + sid);
-        if (res.convo) S.view = { t: 'talk', convo: res.convo, lines: res.lines, q: res.q, history: [...(v.history ?? []), { q: v.q, lines: v.lines }] };
-      }
-      return;
+      const [id, sid] = args;
+      return talkTo(id, 'm:' + sid);
     }
     case 'deleg': return go({ t: 'delegate', id: v });
     case 'who': return go({ t: 'sendorder', id: args[0], who: args[1] });
@@ -973,7 +894,7 @@ document.addEventListener('click', (e) => {
   render();
   const inPlace = ['tog', 'gpick', 'lsub', 'sub', 'pf', 'stance', 'tree', 'opdist', 'oprun', 'hjpick'].includes(raw.slice(0, i)) || /^om:(both|first|last|bg|shuffle|look|keep|new|lg)/.test(raw);
   // a conversation keeps its place: the newest exchange is brought into view, with what was said before it just above
-  const now = S.view.t === 'talk' && raw.startsWith('say:') ? document.querySelector('.cv-now') as HTMLElement | null : null;
+  const now = S.view.t === 'talk2' && raw.startsWith('t2:') ? document.querySelector('.cv-now') as HTMLElement | null : null;
   if (now) window.scrollTo(0, Math.max(0, now.getBoundingClientRect().top + window.scrollY - (window.innerWidth >= 900 ? 120 : 90)));
   else window.scrollTo(0, inPlace ? before : 0);
   // On the opening screens a keyboard user keeps their place: the control they pressed has focus again after the redraw.
@@ -1011,7 +932,6 @@ function devScenario() {
   for (let i = 0; i < 4; i++) door.spendTime(c.w, c.henry, c.nate, 'before');
   const dm = door.demand(c.w, c.lou, c.nate, c.biz, Math.max(15, Math.round((c.w.biz[c.biz].income * 0.08) / 5) * 5), 'trouble:' + c.lou.id);
   S.w = c.w; (S.w.goals ??= { done: {} }).done['g:off'] = S.w.now;
-  setNewTalk(true);
   void dm; // (what happened this morning is the world's: Henry hears of it, if he does, the way anyone would)
   S.log = [esc(`You’re Henry Tedesco, an associate in ${c.riz.name}’s crew. You’ve been into ${c.w.biz[c.biz].name} a few evenings; you know ${c.nate.name} to talk to.`)];
   S.view = { t: 'tab', name: 'today' }; S.stack = [];

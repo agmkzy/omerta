@@ -47,7 +47,9 @@ describe('one model of decision (priority 1)', () => {
     assert.equal(out.answer, { accept: 'yes', counter: 'counter', refer: 'help' }[expect as string] ?? 'no');
   });
   ok('in a world without the layer, the ask decides as it always did (nothing of the layer runs)', { tags: ['unit'] }, () => {
-    const w = newWorld(3); annals.length = 0;
+    // (every world has the layer since Gate 4; a world without its record still answers as it always did: the code path is kept for
+    // robustness, and proved here on a world with the record taken away)
+    const w = newWorld(3); delete w.social; annals.length = 0;
     const s = openAsk(w, 'protect', sol(w), civ(w), { biz: ownerBiz(w, civ(w).id)!.id, amt: 40 })!;
     askMove(w, s, 'ask');
     assert.equal(annals.length, 0); assert.equal(w.social, undefined);

@@ -1,14 +1,10 @@
-// Gate 4 parity: the same interaction run by the old engine (dialogue.say) and by the conversation layer (conv/run.perform), each on
-// its own copy of one world, and everything either changed compared: money, regard, what each man knows, memos, cooldowns, insight,
+// Gate 4 parity: an interaction run by the conversation layer (conv/run.perform) on a copy of a world, and everything it changed, as
+// the old engine's runs were recorded (conversation/gate4-parity.json): money, regard, what each man knows, memos, cooldowns, insight,
 // what he remembers being asked, facts, debts, favours, jobs, grievances, situations, families, businesses, the dice. Only the record
 // of a story line's wording and the ledger are compared apart (the layer posts every movement of money; the old engine did not).
-// Removed with the old engine at the end of Gate 4: from then the parity cases stand as the gameplay record (see parity.test.ts).
 import { deserialize, serialize } from '../../engine';
-import { say, startConvo, type Convo } from '../../dialogue';
 import { ctx, newThread, type Visit } from '../../conv/kit';
 import { perform } from '../../conv/run';
-import { withCandour } from '../../talk';
-import { candourOf } from '../../conv/acts/subjects';
 import type { World } from '../../types';
 
 const r3 = (x: unknown) => (typeof x === 'number' ? Math.round(x * 1e6) / 1e6 : x);
@@ -44,34 +40,17 @@ export function diff(a: Map<string, unknown>, b: Map<string, unknown>): string[]
   return out.sort();
 }
 export interface Run { w: World; lines: string[]; changed: string[]; ledger: number }
-// the old engine, as the old screen called it: a conversation at a node, with what was in hand
-export function legacy(w0: World, npc: string, code: string, at: Partial<Convo> = {}): Run {
-  const w = deserialize(serialize(w0)), before = state(w), led = (w.ledger?.length ?? 0);
-  const c0 = startConvo(npc), c: Convo = { ...c0, ...at, ctx: { ...c0.ctx, ...(at.ctx ?? {}) } };
-  // (a man's own life, talked about on the conversation screen, is told as candidly as he is with the player: the same on both sides)
-  const go = () => say(w, w.chars[w.playerId!], w.chars[npc], c, code);
-  const r = code.startsWith('tk:') ? withCandour(npc, candourOf(ctx(w, { npc, where: '', t0: w.now, lines: [], choices: [], relation: '', mem: { said: [], argued: [], pressed: 0, points: [], offered: {} }, th: newThread() })), go) : go();
-  return { w, lines: r.lines, changed: diff(before, state(w)), ledger: (w.ledger?.length ?? 0) - led };
-}
 // the conversation layer: the same thing said in a visit, with what is in hand
 export function layer(w0: World, npc: string, code: string, th: Partial<Visit['th']> = {}, label = '…'): Run {
-  const w = deserialize(serialize(w0)), before = state(w), led = (w.ledger?.length ?? 0);
+  const w = deserialize(serialize(w0)), before = state(w), led = w.ledger?.length ?? 0;
   const v: Visit = { npc, where: '', t0: w.now, lines: [], choices: [], relation: '', mem: { said: [], argued: [], pressed: 0, points: [], offered: {} }, th: { ...newThread(), ...th } };
   perform(ctx(w, v), code, label);
   return { w, lines: v.lines.map((l) => l.text), changed: diff(before, state(w)), ledger: (w.ledger?.length ?? 0) - led };
 }
-// what differs between the two runs' effects (both started from the same world): the paths, with each side's final value
-// (named differences: the old engine, listing its menus, made an empty relationship record, at the default values, for every man it
-// looked at; the layer reads without writing. A default record and none are the same footing.)
-export const DEFAULT_REL = /\.rel\.[^.]+\.(?:(affection: 0\.1|grudge: 0|lastMet: -1000000000|respect: 0\.3|trust: 0\.1) → undefined|(affection|grudge|lastMet|respect|trust): undefined → (0\.1|0|-1000000000|0\.3))$/;
-export function parity(a: Run, b: Run, allow: RegExp[] = []): string[] {
-  const sa = state(a.w), sb = state(b.w);
-  return diff(sa, sb).filter((d) => !DEFAULT_REL.test(d) && !allow.some((re) => re.test(d)));
-}
 
 // The old engine's effects, recorded (Gate 4): before dialogue.ts was deleted, every parity case was run on the old engine and what it
-// changed was written down as a fingerprint (src/tests/fixtures/gate4-parity.json). The layer is held to that record from then on.
-// (a relationship record created at its default values, and nothing more, is no change at all: see DEFAULT_REL)
+// changed was written down as a fingerprint (src/tests/conversation/gate4-parity.json). The layer is held to that record from then on.
+// (a relationship record created at its default values, and nothing more, is no change at all: the old engine made one for every man it listed in its menus)
 const MADE = /\.rel\.[^.]+\.(affection|grudge|lastMet|respect|trust): undefined → (0\.1|0|-1000000000|0\.3)$/;
 export function fingerprint(changed: string[]): string {
   const xs = changed.filter((d) => !MADE.test(d)).sort();

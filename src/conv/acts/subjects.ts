@@ -63,7 +63,7 @@ const tk: Act = {
 // "What do you make of…?": his view of a man, of the family, of the player; a man who will not discuss things with the player says so
 const THINK = ['b_stand', 'pick_member', 'leaders', 'ask_rep', 'ask_history', 'ask_want', 'ask_crew', 'rv_ears', 'rv_mood', 'rk_back_ask', 'about'];
 const think: Act = {
-  base: 'think', pane: 'personal',
+  base: 'think', pane: 'personal', opens: true,
   offers: (c) => [{ code: 'think', label: 'What do you make of…?', note: 'His view of a man, of the family, of you.' }],
   run: (c) => {
     const x = T(c), { w, p, t } = x, tp = temper(t);

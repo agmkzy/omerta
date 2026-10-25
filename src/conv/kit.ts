@@ -35,6 +35,7 @@ export interface Act {
   offers?: (c: Ctx) => Offer[];          // what can be put to him now; none: it is only ever an answer to what he has said
   run: (c: Ctx, code: string) => Out | void;
   nav?: boolean;                         // an answer within what is in hand (a haggle's terms): no patience spent, not 'said' for the visit
+  opens?: boolean;                       // it opens a subject (a matter, his trouble, what he asked): it can be come back to; it costs no patience
   social?: boolean;                      // ordinary talk: worth less the third time in a day, the seventh in a week, and only so much
   repeat?: { window: number; sig: (c: Ctx, arg: string) => string; round?: boolean }; // asked again, unchanged, within the window
   conduct?: (c: Ctx, before: { cash: number }) => void; // what doing it says about the kind of man the player is
@@ -57,7 +58,6 @@ export interface Visit {
   mem: { said: string[]; argued: string[]; pressed: number; points: string[]; offered: Record<string, number | boolean | string> };
   approach?: Id;           // the request he came to you with, when he came to you
   pane?: Pane;             // the heading the talk is under (Business, Personal, Confront), when it is under one
-  old?: import('../dialogue').Convo; // (the old engine's state, while any of its interactions remain: removed at the end of Gate 4)
   th: Thread;              // what this conversation is on
 }
 // What has passed between the player and a man across visits, as it bears on what is said next (kept small: World.social.talks)

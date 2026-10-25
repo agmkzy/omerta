@@ -1,3 +1,4 @@
+import { social } from './conv/social';
 import { ensureOrgs } from './orgs';
 import { FEMALE } from './names';
 import { ensureClubs } from './clubdata';
@@ -308,6 +309,9 @@ export function createWorld(seed: number, playerName = 'Tony Marino', opts: { or
 // have exactly the same shape (and so exactly the same saved text) once the game has run.
 export function ensureShape(w: World) {
   w.jobs ??= [];
+  // (Gate 4: the conversation layer's record is part of every world, new or loaded: who has promised what, who asked whom, what was
+  // said. An older save gets an empty one and the layer takes over from there: no feature switch decides it any more)
+  social(w);
   ensureClubs(w);
   ensureOrgs(w);
   w.ventures ??= [];

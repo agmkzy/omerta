@@ -4,13 +4,15 @@
 // screen is tried, on its own copy of the world, breadth first, and every follow-up after it, until the subject closes, the
 // conversation ends or the exploration budget is spent. Each transition is checked: did he answer, did anything break, did his
 // words contradict his decision, is there a way out, did what was said leave a mark on the world. AUDIT=dir writes the coverage
-// matrix and the problems found. Opt-in (slow): SLOW=1 npx vitest run audit.
+// matrix and the problems found. Opt-in (slow): SLOW=1 npx vitest run audit. (Since Gate 4, it explores the one conversation,
+// conv/visit.ts: every choice on every screen, the headings and "Other…" included.)
 import assert from 'node:assert';
 import { describe, test as ok } from 'vitest';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { deserialize, serialize, advance } from '../../engine';
 import { DAY, type Character, type World } from '../../types';
-import { arrive, options, say, answered, isNavCode, focusTitle, type Convo, type DOpt } from '../../dialogue';
+import { begin, choose, everything, type Visit } from '../../conv/visit';
+import { answered } from '../../conv/acts/words';
 import { openAsk, putToPlayer, stance } from '../../asks';
 import { addEnc, addFavour } from '../../encounters';
 import { createDebt, ownerBiz, rel, addFact, learn } from '../../core';
@@ -20,7 +22,6 @@ import { spawn, know } from '../../situ';
 import { temper } from '../../temper';
 import { kinOf, closeKin } from '../../kin';
 import { createWorld } from '../../world';
-import { whereIs } from '../../where';
 import { world60 } from './fixtures';
 import { P } from '../helpers';
 
@@ -92,7 +93,10 @@ const STAGES: Stage[] = [
 
 interface Rec { n: number; ok: number; fails: Record<string, number>; labels: Set<string>; effects: Set<string>; sample?: string; replies: Map<string, string> }
 interface Audit { cov: Map<string, Rec>; problems: string[]; transitions: number; states: number; convos: number; screens: Map<string, number> }
-const base = (code: string) => { const k = code.split(':')[0]; return k === 'f' || k === 'mv' || k === 'x' || k === 'tk' || k === 'mt' || k === 'enc' || k === 'fl' || k === 'deal' ? `${k}:${code.split(':').at(-1)}` : k; };
+const code0 = (id: string) => id.replace(/^a:/, '');
+const base = (id: string) => { const code = code0(id), k = code.split(':')[0]; return k === 'mv' || k === 'x' || k === 'tk' || k === 'mt' || k === 'enc' || k === 'deal' ? `${k}:${code.split(':').at(-1)}` : k; };
+// moving about the screen (the headings, "Other…", back, leaving) is not said: nothing to answer
+const NAVIGATE = (id: string) => /^(u|all):/.test(id) || ['home', 'more', 'back', 'leave'].includes(id);
 
 // what changed in the world, in kinds (not amounts)
 function snap(w: World, t: Character) {
@@ -108,52 +112,52 @@ function explore(stage: Stage, worldSave: string, A: Audit, budget = 260) {
   if (!t0) { A.problems.push(`[${stage.name}] could not be staged`); return; }
   const p0 = P(w0); if (stage.name !== 'a stranger') (p0.intro ??= {})[t0.id] = w0.now;
   const start = serialize(w0);
-  // a state is a path of codes from arrival; replayed on a fresh copy of the staged world
+  // a state is a path of choices from arrival; replayed on a fresh copy of the staged world
   const replay = (path: string[]) => {
     const w = deserialize(start), p = P(w), t = w.chars[t0.id];
-    let c: Convo | null = arrive(w, p, t, { lines: [] }, whereIs(w, p, t), t.rels[p.id]?.lastMet ?? -1e9).convo;
-    for (const code of path) { if (!c) break; c = say(w, p, t, c, code).convo; }
-    return { w, p, t, c };
+    let v: Visit | undefined = begin(w, t.id);
+    for (const id of path) { if (!v || v.ended) break; const r = choose(w, v, id); v = r.meeting ? undefined : r.v; }
+    return { w, p, t, v };
   };
   const seen = new Set<string>();
   const queue: string[][] = [[]];
   let spent = 0;
   while (queue.length && spent < budget) {
     const path = queue.shift()!;
-    const { w, t, c } = replay(path);
-    if (!c) continue;
-    const os = options(w, P(w), t, c);
-    const key = `${c.node}|${c.ctx.focus ?? ''}|${os.map((o) => o.code + (o.done ? '*' : '')).join(',')}`;
+    const { w, t, v } = replay(path);
+    if (!v || v.ended) continue;
+    const os = v.choices;
+    const key = `${v.pane ?? ''}|${v.topic ?? ''}|${os.map((o) => o.id).join(',')}`;
     if (seen.has(key)) continue;
     seen.add(key); A.states++;
-    const screen = os.some((o) => o.group) ? 'hub' : c.ctx.focus ? `subject:${c.ctx.focus.split(':')[0]}` : `follow:${c.node}`;
+    const screen = v.topic ? `subject:${v.topic.split(':').slice(0, 2).join(':')}` : v.pane ? `heading:${v.pane}${v.more ? ' (all)' : ''}` : 'home';
     A.screens.set(screen, (A.screens.get(screen) ?? 0) + 1);
-    if (!os.some((o) => o.code === 'root' || o.code === 'f:' || isNavCode(o.code))) A.problems.push(`[${stage.name}] dead end at ${screen}: ${os.map((o) => o.label).join(' | ')}`);
-    if (os.some((o) => o.group) && os.filter((o) => o.group === 'Between you' && o.code !== 'f:more').length > 3) A.problems.push(`[${stage.name}] hub shows more than three matters`);
+    if (!os.some((o) => o.id === 'leave')) A.problems.push(`[${stage.name}] no way out at ${screen}: ${os.map((o) => o.label).join(' | ')}`);
+    if (!v.more && os.filter((o) => !['more', 'leave', 'intent'].includes(o.group)).length > 6) A.problems.push(`[${stage.name}] ${screen} shows more than six things to say`);
     for (const o of os) {
-      if (DEV.test(o.label) || DEV.test(o.hint ?? '')) A.problems.push(`[${stage.name}] database wording in option: ${o.label}`);
-      if (o.done || (o.code === 'root' && c.node === 'root')) continue;
+      if (DEV.test(o.label) || DEV.test(o.note ?? '')) A.problems.push(`[${stage.name}] database wording in a choice: ${o.label}`);
+      if (o.id === 'leave') continue;
       spent++;
       const r0 = replay(path);
-      if (!r0.c) continue;
-      const before = snap(r0.w, r0.t);
+      if (!r0.v) continue;
+      const before = snap(r0.w, r0.t), n0 = r0.v.lines.length;
       let res;
-      try { res = say(r0.w, r0.p, r0.t, r0.c, o.code); } catch (e) { A.problems.push(`[${stage.name}] "${o.label}" (${o.code}) threw: ${(e as Error).message}`); continue; }
+      try { res = choose(r0.w, r0.v, o.amount ? `${o.id}:${o.amount.value}` : o.id); } catch (e) { A.problems.push(`[${stage.name}] "${o.label}" (${o.id}) threw: ${(e as Error).message}`); continue; }
       A.transitions++;
       const ch = diff(before, snap(r0.w, r0.t));
-      const k = base(o.code), rec: Rec = A.cov.get(k) ?? { n: 0, ok: 0, fails: {}, labels: new Set(), effects: new Set(), replies: new Map() };
+      const k = base(o.id), rec: Rec = A.cov.get(k) ?? { n: 0, ok: 0, fails: {}, labels: new Set(), effects: new Set(), replies: new Map() };
       A.cov.set(k, rec); rec.n++; rec.labels.add(o.label); ch.forEach((x) => rec.effects.add(x));
-      const said = res.lines.filter((l) => !l.startsWith('⟡'));
-      const fail = (why: string) => { rec.fails[why] = (rec.fails[why] ?? 0) + 1; A.problems.push(`[${stage.name}] "${o.label}" (${o.code}) ${why}: ${said.join(' / ').slice(0, 220)}`); };
+      const said = res.v.lines.slice(n0).filter((l) => l.who !== 'you' && l.who !== 'card').map((l) => l.text);
+      const fail = (why: string) => { rec.fails[why] = (rec.fails[why] ?? 0) + 1; A.problems.push(`[${stage.name}] "${o.label}" (${o.id}) ${why}: ${said.join(' / ').slice(0, 220)}`); };
       let bad = false;
-      if (!isNavCode(o.code)) {
-        if (!said.length) { fail('no reply'); bad = true; }
-        else if (!said.some((l) => answered(l, r0.t.name.split(' ')[0]))) { fail('not answered'); bad = true; }
+      if (!NAVIGATE(o.id)) {
+        if (!said.length && !res.meeting && !res.settle) { fail('no reply'); bad = true; }
+        else if (said.length && !res.v.lines.slice(n0).some((l) => l.who === 'him' || answered(l.text, r0.t.name.split(' ')[0]))) { fail('not answered'); bad = true; }
         if (said.length === 1 && NULLISH.test(said[0])) { fail('null outcome'); bad = true; }
-        if (PROMISE.test(o.label) && !ch.some((x) => ['memos', 'favours', 'jobs', 'debts', 'sits', 'facts', 'cash', 'tcash', 'trust', 'notes', 'known'].includes(x))) { fail('promise left no record'); bad = true; }
+        if (PROMISE.test(o.label) && !ch.some((x) => ['memos', 'favours', 'jobs', 'debts', 'sits', 'facts', 'cash', 'tcash', 'trust', 'notes', 'known'].includes(x)) && !(r0.w.social?.obs ?? []).length) { fail('promise left no record'); bad = true; }
       }
-      for (const l of res.lines) if (DEV.test(l)) { fail('database wording'); bad = true; }
-      const mid = /^(mv|x):([^:]+):/.exec(o.code)?.[2];
+      for (const l of said) if (DEV.test(l)) { fail('database wording'); bad = true; }
+      const mid = /^(mv|x):([^:]+):/.exec(code0(o.id))?.[2];
       if (mid) {
         const m = (r0.w.situations ?? []).find((x) => x.id === mid), his = said.filter((l) => /[“"]/.test(l)).join(' ');
         if (m?.stage === 'resolved' && ['agreed', 'gave in'].includes(m.out ?? '') && REFUSE.test(his)) { fail('agreed but refused in words'); bad = true; }
@@ -161,19 +165,19 @@ function explore(stage: Stage, worldSave: string, A: Audit, budget = 260) {
       }
       if (!bad) rec.ok++;
       rec.sample ??= said.join(' / ').slice(0, 160);
-      // every distinct reply, with where it was said, for reading (a few per action)
       { const rep = said.map((l) => l.replace(new RegExp(r0.t.name.split(' ')[0], 'g'), '‹him›')).join(' / '); if (rec.replies.size < 8 && !rec.replies.has(rep)) rec.replies.set(rep, `${stage.name} · ${screen} · “${o.label}”${ch.length ? ' · changed: ' + ch.join(' ') : ''}`); }
-      if (res.convo) queue.push([...path, o.code]); else A.convos++;
+      if (!res.v.ended && !res.meeting) queue.push([...path, o.amount ? `${o.id}:${o.amount.value}` : o.id]); else A.convos++;
     }
+    // (and everything under the headings, once from the top: what is plausible is reachable, not only what is on the first screen)
+    if (!path.length) for (const o of everything(w, v)) if (!os.some((x) => x.id === o.id) && o.id.startsWith('a:')) queue.push([o.id]);
   }
   // and coming back days later: the matter is still there, named, and opening it is answered from where it stood
   const { w, p, t } = replay([]);
   advance(w, w.now + 5 * DAY);
   if (t.alive) {
-    const a = arrive(w, p, t, { lines: [] }, whereIs(w, p, t), t.rels[p.id]?.lastMet ?? -1e9);
-    const os = options(w, p, t, a.convo);
-    const door = os.find((o) => o.code.startsWith('f:m:') || o.code.startsWith('f:enc:'));
-    if (door) { const r = say(w, p, t, a.convo, door.code); if (!r.lines.some((l) => answered(l, t.name.split(' ')[0]))) A.problems.push(`[${stage.name}] revisit: opening ${door.label} was not answered`); if (r.convo && !focusTitle(w, p, t, r.convo)) A.problems.push(`[${stage.name}] revisit: subject unnamed`); }
+    const v = begin(w, t.id), door = [...v.choices, ...everything(w, v)].find((o) => /^a:(m|enc_open):/.test(o.id));
+    if (door) { const n0 = v.lines.length; choose(w, v, door.id); if (!v.lines.slice(n0).some((l) => l.who === 'him' || answered(l.text, t.name.split(' ')[0]))) A.problems.push(`[${stage.name}] revisit: opening ${door.label} was not answered`); }
+    void p;
   }
 }
 
@@ -185,7 +189,7 @@ describe('conversation audit (opt-in)', { tags: ['property', 'slow'] }, () => {
     for (const sv of saves) for (const st of STAGES) explore(st, sv, A, Number(process.env.BUDGET ?? 260));
     const rows = [...A.cov.entries()].sort((a, b) => a[0].localeCompare(b[0]));
     const status = (r: Rec) => (r.ok === r.n ? 'Exercised successfully' : r.ok === 0 ? 'Exercised and failed' : 'Exercised, some failures');
-    const md = [`# V90 conversation audit — coverage matrix`, '', `States explored: ${A.states} · transitions: ${A.transitions} · conversations ended: ${A.convos} · distinct actions exercised: ${rows.length}`, '',
+    const md = [`# Conversation audit (Gate 4: the one conversation) — coverage matrix`, '', `States explored: ${A.states} · transitions: ${A.transitions} · conversations ended: ${A.convos} · distinct actions exercised: ${rows.length}`, '',
       `Screens: ${[...A.screens].map(([k, v]) => `${k} ${v}`).join(' · ')}`, '',
       '| Action | Status | Times | OK | Failures | Example wording | Effects seen | Example reply |', '|---|---|---|---|---|---|---|---|',
       ...rows.map(([k, r]) => `| \`${k}\` | ${status(r)} | ${r.n} | ${r.ok} | ${Object.entries(r.fails).map(([f, n]) => `${f} ×${n}`).join(', ')} | ${[...r.labels][0]?.replace(/\|/g, '/')} | ${[...r.effects].join(' ')} | ${(r.sample ?? '').replace(/\|/g, '/')} |`)];

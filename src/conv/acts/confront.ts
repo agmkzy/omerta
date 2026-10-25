@@ -83,7 +83,7 @@ const amendsRows = (c: Ctx): Offer[] => {
   return o;
 };
 const amendsDoor: Act = {
-  base: 'amends', pane: 'confront',
+  base: 'amends', pane: 'confront', opens: true,
   offers: (c) => (badBlood(c) ? [{ code: 'amends', label: 'The bad blood between you', says: 'There’s bad blood between us. I don’t want it.', kind: 'between' }] : []),
   run: (c) => { const x = T(c), tp = temper(x.t), hot = tp.volatility + tp.pride > 1.15, soft = tp.agreeable + tp.empathy > 1.1; line(x, hot ? '“What about it?”' : soft ? '“Yes. Let’s talk about it.”' : '“All right.”'); return { minutes: 2, next: amendsRows(c) }; },
 };
@@ -188,7 +188,7 @@ const rvEase: Act = { base: 'rv_ease', pane: 'confront', run: (c) => { const x =
 // ---------------------------------------------------------------- what he has come to ask the player (an encounter), and its answers
 const encRows = (c: Ctx, id: string): Offer[] => { const e = asksOf(c.w, c.n).find((q) => q.id === id); return e ? [...e.opts.map((o) => ({ code: `enc:${e.id}:${o.code}`, label: o.label, note: o.hint })), ...(c.v.th.asked.includes('apx:wait:' + id) ? [] : [{ code: 'apx:wait:' + id, label: 'Can it wait?', note: 'He will wait. He will notice he had to.' }]), { code: 'apx:no:' + id, label: 'Not right now.', note: 'He will take it as it sounds.' }] : []; };
 const encOpen: Act = {
-  base: 'enc_open', pane: 'business',
+  base: 'enc_open', pane: 'business', opens: true,
   offersFor: encRows,
   offers: (c) => asksOf(c.w, c.n).slice(0, 3).map((e, i) => ({ code: 'enc_open:' + e.id, label: `About what he asked: ${e.title}`, says: 'You wanted to ask me something?', note: i ? 'He is waiting on your answer.' : e.lines.at(-1)?.replace(/^[^“"]*(?=[“"])/, ''), kind: (i ? 'between' : 'his') as Offer['kind'] })),
   run: (c, code) => { const x = T(c), id = code.split(':')[1], e = asksOf(x.w, x.t).find((q) => q.id === id); if (!e) { line(x, 'He lets it go.'); return out(2); } c.v.th.raised.push(e.id); c.v.topic = 'enc:' + e.id; const l = e.lines.at(-1); if (l) line(x, l); return { minutes: 2, next: encRows(c, id) }; },

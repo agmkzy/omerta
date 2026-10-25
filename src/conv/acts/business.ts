@@ -16,7 +16,7 @@ import { OPS, lineOf } from '../../rackets';
 import { askAbout as sitAsk, sitOf } from '../../situations';
 import { temper } from '../../temper';
 import { arch } from '../../voice';
-import { subjectsOf } from '../../talk';
+import { subjectsOf } from '../subjects/life';
 import { DAY, type Character, type Id, type Situation, type World } from '../../types';
 import * as door from '../doors';
 import { chance, settled, term } from '../decide';
@@ -563,7 +563,7 @@ export function matterRows(c: Ctx, sid: Id): Offer[] {
   return rows;
 }
 const matterA: Act = {
-  base: 'm', pane: 'business',
+  base: 'm', pane: 'business', opens: true,
   offersFor: matterRows,
   offers: (c) => mine(c).slice(0, 3).map((s) => ({ code: 'm:' + s.id, label: `About ${mTitle(c.w, s).replace(/^(His|Her|The|What|Your|Protection|Trouble|Bad|Money|Loan|Debt|Stake|Arrangement|A)\b/, (q) => q.toLowerCase())}`, says: matterOpen(c.w, s, s.st?.[c.n.id]?.last).replace(/^“|”$/g, ''), note: matterWhere(s, c.n), kind: 'between' as const, pane: (s.ak === 'amends' ? 'confront' : 'business') as never })),
   run: (c, code) => {
@@ -605,7 +605,7 @@ const favcall: Act = {
 };
 // ---------------------------------------------------------------- a matter he is in that the player knows of (matters.ts), and his trouble
 const mtOpen: Act = {
-  base: 'mt_open', pane: 'personal',
+  base: 'mt_open', pane: 'personal', opens: true,
   offers: (c) => { const seen = new Set<string>(), out0: Offer[] = []; for (const { s } of topicsWith(c.w, c.h, c.n)) if (!seen.has(s.id)) { seen.add(s.id); out0.push({ code: 'mt_open:' + s.id, label: `About ${(matterTitle(c.w, s) ?? s.cause).replace(/^(His|Her|The|What|Your|Protection|Trouble|Bad|Money|Loan|Debt|Stake|Arrangement|A)\b/, (q) => q.toLowerCase())}`, says: `This business with ${(matterTitle(c.w, s) ?? s.cause).replace(/^./, (m) => m.toLowerCase())}…`, note: 'Something you both know about.', kind: 'between' }); } return out0; },
   offersFor: (c, sid) => topicsWith(c.w, c.h, c.n).filter((q) => q.s.id === sid).map(({ s, o }) => ({ code: `mt:${s.id}:${o.code}`, label: o.label, note: o.hint })),
   run: (c, code) => {
@@ -633,7 +633,7 @@ function sitRows(c: Ctx): Offer[] {
   return o;
 }
 const sitDoor: Act = {
-  base: 'sit', pane: 'personal',
+  base: 'sit', pane: 'personal', opens: true,
   offers: (c) => { const sit = sitOf(c.w, c.n.id); return sit && sit.kind !== 'ambition' && (sit.told || sit.knows) ? [{ code: 'sit', label: ownerBiz(c.w, c.n.id) ? `About his trouble at ${ownerBiz(c.w, c.n.id)!.name}` : 'About his trouble', says: 'About what you told me.', note: 'What he told you is going wrong.', kind: 'between' }] : []; },
   run: (c) => { const x = T(c), tp = temper(x.t), hot = tp.volatility + tp.pride > 1.15, soft = tp.agreeable + tp.empathy > 1.1; line(x, hot ? '“What about it?”' : soft ? '“Yes. Let’s talk about it.”' : '“All right.”'); return { minutes: 2, next: sitRows(c) }; },
 };

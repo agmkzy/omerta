@@ -14,9 +14,13 @@ import { kinOf, closeKin, madeKin } from '../../kin';
 import { addFact } from '../../core';
 import { ORIGIN, startRivalry, topicsWith, matterAct } from '../../matters';
 import { goalHooks, begin, agencyOf, stepGoal, priceOf, endGoal } from '../../goals';
-import { notesOf, subjectsOf, talkAbout } from '../../talk';
+import { notesOf, subjectsOf, talkAbout } from '../../conv/subjects/life';
+import '../../conv/subjects/between'; // (the matters between men, as subjects)
 import { pass, salience, versionOf } from '../../rumour';
-import { options, say, startConvo } from '../../dialogue';
+import { begin as visit, everything } from '../../conv/visit';
+import { talk } from '../dialogue/fixtures';
+// what can be said to him: everything under the headings of a visit
+const offered = (w: World, t: Character) => { (w.chars[w.playerId!].intro ??= {})[t.id] ??= w.now; const v = visit(w, t.id); return [...v.choices, ...everything(w, v)].map((o) => o.id.replace(/^a:/, '')); };
 import { ownerBiz } from '../../core';
 import { hierarchyIssues } from '../../rank';
 import { sitIssues } from '../../situ';
@@ -260,8 +264,8 @@ ok('anyone can be worth talking to: ordinary men have things on their minds, and
   // and a man in no matter at all still opens with something of his own
   // (his own: not the questions you can always put to him, nor the matters between you, which are threads of their own)
   const quiet = men.find((m) => !(w.situations ?? []).some((s) => s.stage !== 'resolved' && s.parties?.some((x) => x.id === m.id)) && subjectsOf(w, p, m).some((s) => !/^(hurting|ev:|debt:|earn|job:)/.test(s.key)))!;
-  const o = options(w, p, quiet, startConvo(quiet.id));
-  assert.ok(o.some((x) => x.code.startsWith('tk:')), 'his own subjects are offered: ' + o.map((x) => x.code));
+  const o = offered(w, quiet);
+  assert.ok(o.some((x) => x.startsWith('tk:')), 'his own subjects are offered: ' + o.join());
 });
 
 ok('a subject is a conversation: he answers, you answer, and what you say changes things and is remembered', () => {
@@ -297,14 +301,10 @@ ok('the conversation screen carries a subject through its turns and back', () =>
   const w = createWorld(3, 'Tony Marino'), p = P(w);
   const m = Object.values(w.chars).find((c) => c.alive && !c.isPlayer && ownerBiz(w, c.id) && subjectsOf(w, p, c).some((x) => x.key === 'shop'))!;
   rel(m, p.id).trust = 0.6; (p.intro ??= {})[m.id] = w.now;
-  const r = say(w, p, m, startConvo(m.id), 'tk:shop');
+  const r = talk(w, m.id, 'tk:shop');
   assert.ok(r.lines.length, 'he answers');
-  if (r.convo?.node === 'follow') {
-    const next = options(w, p, m, r.convo).find((o) => o.code.startsWith('tk:shop:'))!;
-    assert.ok(next, 'and you can answer him');
-    const r2 = say(w, p, m, r.convo, next.code);
-    assert.ok(r2.convo, 'the conversation goes on');
-  }
+  const next = r.next.find((c) => c.startsWith('tk:shop:'));
+  if (next) { const r2 = talk(w, m.id, next, {}, r.v); assert.ok(r2.lines.length && !r2.r.end, 'the conversation goes on'); }
 });
 
 ok('what you already know opens a man up, and standing up for him is a promise and a matter', () => {
@@ -473,8 +473,11 @@ ok('an offer to join a crew is a negotiation through the asks engine: the young 
   pro.traits.ambition = 1; pro.traits.caution = 0; pro.cash = 50;
   const g = begin(w, cap, 'recruit', 'test', 0.6, { stage: 'approach', target: pro.id });
   g.deadline = w.now + 200 * DAY;
-  driveGoal(w, g, () => !agencyOf(w).goals.includes(g), 30);
+  // (he may name terms first: the plan steps, and the days pass so the negotiation can run its course)
+  driveGoal(w, g, () => !agencyOf(w).goals.includes(g) || (w.situations ?? []).some((x) => (x.ak === 'recruit' || x.ak === 'join') && x.terms?.by === cap.id), 30);
   assert.ok((w.situations ?? []).some((x) => (x.ak === 'recruit' || x.ak === 'join') && x.terms?.by === cap.id), 'the offer was an ask between them');
+  for (let i = 0; i < 20 && agencyOf(w).goals.includes(g) && pro.rank === 'civilian'; i++) advance(w, w.now + DAY);
+  driveGoal(w, g, () => !agencyOf(w).goals.includes(g), 5); // (and his plan sees how it came out)
   if (pro.rank === 'associate') { assert.equal(pro.bossId, cap.id); assert.equal(agencyOf(w).ended.find((x) => x.id === g.id)?.how, 'done'); }
   else assert.ok(g.tries > 0 || !agencyOf(w).goals.includes(g), 'or he said no, and that counted');
   clean(w, 'after a crew offer');
@@ -504,7 +507,7 @@ ok('recruitment: an offer turned down stays open, and there is more than one way
   const w = createWorld(3, 'Tony Marino'), p = P(w), t = prospect(w);
   p.cash = 2000; (p.intro ??= {})[t.id] = w.now;
   t.traits.courage = 1; t.traits.caution = 1; t.traits.ambition = 0; // a careful man, in no hurry to be anybody's
-  const r = say(w, p, t, startConvo(t.id), 'recruit_offer');
+  const r = talk(w, t.id, 'recruit_offer');
   const s = anyAsk(w, 'recruit', p.id, t.id)!;
   assert.ok(s && r.lines.length, 'the offer is a matter between you');
   if (closed(s)) return; // (he took it at once: fine, the next test covers the rest)
@@ -513,15 +516,17 @@ ok('recruitment: an offer turned down stays open, and there is more than one way
   const moves = playerMoves(w, p, s).filter((m) => !m.off).map((m) => m.move);
   for (const m of ['sweeten', 'pressure', 'drop']) assert.ok(moves.includes(m as never), 'he can go on: ' + moves);
   // (V90: the matter is a row on the hub, by name; opening it gives its moves)
-  assert.ok(options(w, p, t, startConvo(t.id)).some((o) => o.code === 'f:m:' + s.id), 'the matter is in the conversation');
-  const inIt = say(w, p, t, startConvo(t.id), 'f:m:' + s.id).convo!;
-  assert.ok(options(w, p, t, inIt).some((o) => o.code.startsWith('mv:' + s.id) || o.code.startsWith('x:' + s.id)), 'and opening it gives what can be said in it');
-  assert.ok(!options(w, p, t, startConvo(t.id)).some((o) => o.code === 'recruit_offer'), 'and the one-shot offer is not offered twice');
+  assert.ok(offered(w, t).includes('m:' + s.id), 'the matter is in the conversation');
+  const inIt = talk(w, t.id, 'm:' + s.id);
+  assert.ok(inIt.next.some((c) => c.startsWith('mv:' + s.id) || c.startsWith('x:' + s.id)), 'and opening it gives what can be said in it');
+  assert.ok(!offered(w, t).includes('recruit_offer'), 'and the one-shot offer is not offered twice');
   clean(w, 'after a refused offer');
 });
 
 ok('recruitment: his counter names the start he needs and why, and taking it puts him on your crew at that figure', () => {
-  const w = createWorld(4, 'Tony Marino'), p = P(w), t = prospect(w);
+// (Gate 4: every game runs the conversation layer, whose decision model answers asks; this checks the asks kind's own counter and its
+  // reason, which the layer uses when it counters, so it runs on a world without the layer's record, where the kind still decides)
+  const w = createWorld(4, 'Tony Marino'), p = P(w), t = prospect(w); delete w.social;
   p.cash = 2000; t.traits.greed = 0.9; t.cash = 100; // greedy, and nothing in his pocket
   const s = openAsk(w, 'recruit', p, t, { amt: 150 })!;
   haggler(w, s, t.id);
@@ -549,7 +554,9 @@ ok('recruitment: NPCs make the same offer on their own, and answers come from th
 });
 
 ok('a quiet word is a matter: a refusal leaves the job open, and when he agrees later the job is done and paid', () => {
-  const w = createWorld(3, 'Tony Marino'), p = P(w);
+// (Gate 4: every game runs the conversation layer, whose decision model answers asks; this checks the asks kind's own counter and its
+  // reason, which the layer uses when it counters, so it runs on a world without the layer's record, where the kind still decides)
+  const w = createWorld(3, 'Tony Marino'), p = P(w); delete w.social;
   const [v, t] = live(w).filter((c) => c.rank === 'civilian' && !ownerBiz(w, c.id)).slice(0, 2);
   const f = addFact(w, { kind: 'beating', actor: t.id, victim: v.id, text: `${t.name} beat up ${v.name}.`, district: v.district }, { witnesses: [v.id] });
   v.cash = 1000; t.cash = 400;
@@ -616,8 +623,8 @@ ok('a favour called in by the player: he offers part, with his reason, and takin
   const t = live(w).find((x) => x.rank === 'soldier' && x.familyId === p.familyId)!;
   const f = addFavour(w, p.id, t.id, 2, 'the money you slipped him');
   t.cash = 350; (p.intro ??= {})[t.id] = w.now;
-  assert.ok(options(w, p, t, startConvo(t.id)).some((o) => o.code === 'favcall:' + f.id), 'the favour can be called in in conversation');
-  say(w, p, t, startConvo(t.id), 'favcall:' + f.id);
+  assert.ok(offered(w, t).includes('favcall:' + f.id), 'the favour can be called in in conversation');
+  talk(w, t.id, 'favcall:' + f.id);
   const s = anyAsk(w, 'favour', p.id, t.id)!;
   assert.ok(s, 'it is a matter between you');
   if (closed(s)) { assert.ok(f.settled); return; }
@@ -653,8 +660,8 @@ ok('making it right after a broken promise: he can refuse, name a price with his
   const t = live(w).find((x) => x.rank === 'soldier' && x.familyId === p.familyId)!;
   addFact(w, { kind: 'ruling', actor: p.id, victim: t.id, minor: true, text: `${p.name} didn’t keep his word to ${t.name}.`, district: t.district }, { witnesses: [t.id] });
   (p.intro ??= {})[t.id] = w.now; p.cash = 3000; t.cash = 100;
-  assert.ok(options(w, p, t, startConvo(t.id)).some((o) => o.code === 'word_make'));
-  say(w, p, t, startConvo(t.id), 'word_make');
+  assert.ok(offered(w, t).includes('word_make'));
+  talk(w, t.id, 'word_make');
   const s = anyAsk(w, 'amends', p.id, t.id)!;
   assert.ok(s, 'making it right is a matter between you');
   dig(w, s);
@@ -671,7 +678,7 @@ ok('making it right after a broken promise: he can refuse, name a price with his
   assert.equal(cash0 - p.cash, offer, 'you pay what he named');
   assert.equal(t.cash - his0, offer, 'to him');
   assert.ok(closed(s), 'and it is made right');
-  if (closed(s)) assert.ok(!options(w, p, t, startConvo(t.id)).some((o) => o.code === 'word_make'), 'and once it is made right it is not raised again');
+  if (closed(s)) assert.ok(!offered(w, t).includes('word_make'), 'and once it is made right it is not raised again');
   clean(w, 'after amends');
 });
 
@@ -714,7 +721,9 @@ ok('asking to pass up less: a counter comes with a real reason, and taking it is
 });
 
 ok('pushing for more money on a job: the giver comes up, meets you part way with his reason, or not; and the figure is real', () => {
-  const w = createWorld(3, 'Tony Marino'), p = P(w);
+// (Gate 4: every game runs the conversation layer, whose decision model answers asks; this checks the asks kind's own counter and its
+  // reason, which the layer uses when it counters, so it runs on a world without the layer's record, where the kind still decides)
+  const w = createWorld(3, 'Tony Marino'), p = P(w); delete w.social;
   const g = live(w).find((x) => x.rank === 'soldier' && x.familyId === p.familyId)!;
   const t = live(w).find((x) => x.rank === 'civilian')!;
   g.cash = 300; rel(g, p.id).trust = 0.6; g.traits.courage = 0.3; g.traits.caution = 0.3; g.traits.greed = 0.3; // a reasonable man, short of cash

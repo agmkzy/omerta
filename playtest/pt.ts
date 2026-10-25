@@ -5,8 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 import { advance, deserialize, serialize } from '../src/engine';
 import { createWorld } from '../src/world';
-import { arrive, options, say, startConvo, introduced, Convo } from '../src/dialogue';
-import { generate, perform } from '../src/actions';
+import { begin, choose as vChoose, everything, type Visit } from '../src/conv/visit';
+import { introduced } from '../src/acquaint';
 import { choose as encChoose } from '../src/encounters';
 import { takeJob, declineJob, staleReason, approaches, resolve } from '../src/jobs';
 import { whereIs } from '../src/where';
@@ -23,7 +23,7 @@ const DIR = process.env.PT_DIR || fileURLToPath(new URL('.', import.meta.url)).r
 const SF = DIR + '/state.json', LOG = DIR + '/actions.log';
 const SEED = 3;
 const BG = process.env.PT_BG; // optional background for a new run (background.ts ids), e.g. PT_BG=connected
-let w: World; let convo: Convo | null = null; let lastWait = 0; let meet: Meeting | null = null;
+let w: World; let convo: Visit | null = null; let lastWait = 0; let meet: Meeting | null = null;
 function load() {
   if (!existsSync(SF)) { w = createWorld(SEED, 'Tony Marino', { bg: BG }); convo = null; save(); appendFileSync(LOG, `# seed ${SEED} name "Tony Marino"${BG ? ` background ${BG}` : ''} start day 0\n`); return; }
   const o = JSON.parse(readFileSync(SF, 'utf8')); w = deserialize(o.world); convo = o.convo; lastWait = o.lastWait ?? 0; meet = o.meet ?? null;
@@ -47,11 +47,12 @@ function status() {
   const memos = Object.values(w.chars).flatMap((c) => c.memos.filter((m) => m.other === p.id && !m.done).map((m) => `${c.name}: ${m.kind} "${m.text}"${m.due ? ` due in ${Math.round((m.due - w.now) / 1440)}d` : ''}`));
   for (const m of memos) console.log(`  [MEMO] ${m}`);
 }
+// what can be said now (the conversation's own choices: the headings, a heading's subjects, or his answers)
 function menu() {
   if (!convo) return;
-  const t = w.chars[convo.id];
-  console.log('  OPTIONS: ' + options(w, P(), t, convo).map((o) => `${o.done ? '~' : ''}{${o.code}} ${o.label}`).join('\n           '));
+  console.log('  OPTIONS: ' + convo.choices.map((o) => `{${o.id}} ${o.label}${o.note ? ` (${o.note})` : ''}`).join('\n           '));
 }
+const said = (v: Visit, from: number) => v.lines.slice(from).map((l) => (l.who === 'you' ? `> ${l.text}` : l.who === 'him' ? `“${l.text.replace(/^“|”$/g, '')}”` : l.who === 'card' ? `⟡ ${l.text}` : l.text)).join('\n');
 function showMeet() {
   if (!meet) return; const it = mCurrent(meet);
   if (!it) { console.log('  (meeting finished: run mclose)'); return; }
@@ -79,28 +80,23 @@ else if (cmd === 'talk') {
   const x = find(rest.join(' ')); if (!x) { console.log('no such man'); process.exit(0); }
   const wh = whereIs(w, p, x);
   if (wh.kind === 'jail') { advance(w, w.now + 5); console.log(`${x.name} is locked up.`); }
-  else if (!introduced(w, p, x)) { advance(w, w.now + (wh.mins ?? 15)); convo = startConvo(x.id); console.log(`You find ${x.name}: ${wh.line}\nYou have never met him.`); menu(); }
   else {
-    const act = generate(w, p, 'socialise').find((a) => a.target === x.id);
-    const prev = x.rels[p.id]?.lastMet ?? -1e9;
-    let mins = wh.mins ?? 15; let lines0: { lines: string[] } = { lines: [] };
-    if (act) { act.quiet = true; const r = perform(w, act); mins = r.minutes; lines0 = r; }
-    advance(w, w.now + mins);
-    const a = arrive(w, p, x, lines0, wh, prev); convo = a.convo;
-    console.log(`[${stamp()}] ${x.name}: ${x.rank}, ${arch(x)}, ${wh.kind}`); console.log(a.lines.join('\n')); menu();
+    advance(w, w.now + (wh.mins ?? 15));
+    convo = begin(w, x.id);
+    console.log(`[${stamp()}] ${x.name}: ${x.rank}, ${arch(x)}, ${wh.kind} (${convo.relation})`); console.log(said(convo, 0)); menu();
   }
 }
 else if (cmd === 'do' && convo) {
-  const t = w.chars[convo.id]; const code = rest.join(' ');
-  const os = options(w, p, t, convo); const o = os.find((q) => q.code === code) ?? os.find((q) => q.label.toLowerCase().includes(code.toLowerCase()));
+  const code = rest.join(' ');
+  const os = [...convo.choices, ...everything(w, convo)];
+  const o = os.find((q) => q.id === code) ?? os.find((q) => q.label.toLowerCase().includes(code.toLowerCase()));
   if (!o) { console.log('no such option'); menu(); process.exit(0); }
-  const before = JSON.stringify([t.rels[p.id]?.trust, t.rels[p.id]?.respect, t.rels[p.id]?.affection, t.rels[p.id]?.grudge, p.cash, p.standing].map((n) => Math.round((n ?? 0) * 100) / 100));
-  console.log(`> ${o.label}${o.done ? ' (already used)' : ''}`);
-  const r = say(w, p, t, convo, o.code);
+  const from = convo.lines.length;
+  const r = vChoose(w, convo, o.id);
   advance(w, w.now + r.minutes);
-  console.log(r.lines.join('\n'));
-  if (r.meeting) console.log(typeof r.meeting === 'string' ? r.meeting : '[a sit-down / meeting is arranged]');
-  convo = r.convo; if (!convo) console.log('[conversation ends]'); else menu();
+  console.log(said(r.v, from));
+  if (r.meeting) console.log('[a sit-down / meeting is arranged]');
+  convo = r.v.ended || r.meeting ? null : r.v; if (!convo) console.log('[conversation ends]'); else menu();
 }
 else if (cmd === 'leave') { convo = null; console.log('You take your leave.'); }
 else if (cmd === 'enc') {

@@ -36,10 +36,15 @@ export function prune(w: World) {
   const s = w.social;
   if (!s) return;
   const old = (t?: number) => t !== undefined && w.now - t > 180 * DAY;
-  s.obs = s.obs.filter((o) => o.status === 'pending' || !old(o.settled));
+  // (a settled promise between two other men is kept 30 days: it was judged when it was settled, and nothing reads it after; one the
+  // player made or was made, 180: what he did or did not do is what men bring up with him. Gate 4: with the layer in every game from the
+  // first day, keeping every settled promise half a year outgrew the save budget)
+  const pl = w.playerId, mine = (o: { obligor: Id; beneficiary?: Id; promisee?: Id }) => o.obligor === pl || o.beneficiary === pl || o.promisee === pl;
+  s.obs = s.obs.filter((o) => o.status === 'pending' || !(mine(o) ? old(o.settled) : o.settled !== undefined && w.now - o.settled > 30 * DAY));
   if (s.obs.length > 400) { const open = s.obs.filter((o) => o.status === 'pending'), closed = s.obs.filter((o) => o.status !== 'pending'); s.obs = [...closed.slice(-200), ...open]; }
   const live = new Set(s.obs.map((o) => o.agreement).filter(Boolean));
-  s.agreements = s.agreements.filter((a) => live.has(a.id) || !old(a.t)).slice(-200);
+  // (an agreement is kept while a promise that came of it is, or 30 days)
+  s.agreements = s.agreements.filter((a) => live.has(a.id) || w.now - a.t <= 30 * DAY).slice(-200);
   // (a finished request is kept 60 days, or while an obligation that came of it is open: what was asked, and who said no, is what
   // later decisions rest on)
   const madeIn = new Set(s.agreements.filter((a) => s.obs.some((o) => o.status === 'pending' && a.obligations.includes(o.id))).map((a) => a.madeIn));

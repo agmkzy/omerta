@@ -1,20 +1,22 @@
 // V90 acceptance: the player's own temperament and reputation, privacy of what nobody saw, persistence across days and saves, and
-// attempts to break the conversation. Each check is a rule, run on real state through the real conversation.
+// attempts to break the conversation. Each check is a rule, run on real state through the real conversation (since Gate 4, the one
+// conversation: conv/visit.ts).
 import assert from 'node:assert';
 import { describe, test as ok } from 'vitest';
 import { advance, deserialize, serialize } from '../../engine';
 import { DAY, type Character, type World } from '../../types';
-import { arrive, options, say, startConvo, focusTitle, type Convo } from '../../dialogue';
+import { begin, choose, everything, type Visit } from '../../conv/visit';
 import { openAsk, playerMove, askBetween, stance } from '../../asks';
 import { addFact, ownerBiz, rel } from '../../core';
 import { characterWords, conductOf, noteHard, temper, viewOf } from '../../temper';
-import { whereIs } from '../../where';
 import { world60 } from './fixtures';
 import { newWorld, P } from '../helpers';
 
 const shop = (w: World, n = 0) => Object.values(w.chars).filter((c) => c.alive && !c.isPlayer && c.rank === 'civilian' && ownerBiz(w, c.id)?.open).sort((a, b) => (a.id < b.id ? -1 : 1))[n];
-const meet = (w: World, t: Character): Convo => { const p = P(w); (p.intro ??= {})[t.id] ??= w.now; return arrive(w, p, t, { lines: [] }, whereIs(w, p, t), t.rels[p.id]?.lastMet ?? -1e9).convo; };
-const codes = (w: World, t: Character, c: Convo) => options(w, P(w), t, c).map((o) => o.code);
+const meet = (w: World, t: Character): Visit => { const p = P(w); (p.intro ??= {})[t.id] ??= w.now; return begin(w, t.id); };
+// what can be said: on the screen now, and everything under the headings
+const codes = (w: World, v: Visit) => [...new Set([...v.choices, ...(v.ended || v.th.shut ? [] : everything(w, v))].map((o) => o.id.replace(/^a:/, '')))];
+const said = (v: Visit, from: number) => v.lines.slice(from).map((l) => l.text);
 
 describe('the player’s temperament and reputation', () => {
   ok('it is not chosen: a new man has none to speak of, and it grows from what he does, in context', { tags: ['scenario'] }, () => {
@@ -42,7 +44,7 @@ describe('the player’s temperament and reputation', () => {
     for (let i = 0; i < 20; i++) { conductOf(P(a)).force++; conductOf(P(b)).deals++; }
     for (const x of [a, b]) { const s = openAsk(x, 'protect', P(x), x.chars[t.id], { biz: ownerBiz(x, t.id)!.id, amt: 40 })!; playerMove(x, P(x), s.id, 'ask'); }
     const ca = meet(a, a.chars[t.id]), cb = meet(b, b.chars[t.id]);
-    assert.deepEqual(codes(a, a.chars[t.id], ca).map((c) => c.split(':')[0]).sort(), codes(b, b.chars[t.id], cb).map((c) => c.split(':')[0]).sort());
+    assert.deepEqual(codes(a, ca).map((c) => c.split(':')[0]).sort(), codes(b, cb).map((c) => c.split(':')[0]).sort());
   });
   ok('what nobody saw stays private until it travels; fear, respect and trust stay separate things', { tags: ['scenario'] }, () => {
     const w = world60(), p = P(w), victim = shop(w, 4), bystander = shop(w, 5);
@@ -71,10 +73,11 @@ describe('persistence', () => {
       const t = w.chars[t0.id], s = askBetween(w, 'protect', P(w).id, t.id);
       if (!s || s.stage === 'resolved' || s.m?.beat !== 'claim') continue; // (he moved on it himself in the meantime)
       assert.equal(s.m?.claim, claim, 'the point he made is kept with the matter');
-      const c = meet(w, t), r = say(w, P(w), t, c, 'f:m:' + s.id);
-      assert.ok(r.lines.some((l) => /Like I said|I told you|still thinking|You know how|You heard/.test(l)), 'he restates where he left it: ' + r.lines.join(' / '));
-      assert.ok(codes(w, t, r.convo!).some((x) => x.startsWith('x:')), 'and what you can answer to it is offered');
-      assert.match(focusTitle(w, P(w), t, r.convo!) ?? '', /Protection/);
+      const v = meet(w, t), row = everything(w, v).find((o) => o.id === 'a:m:' + s.id)!, n0 = v.lines.length;
+      assert.match(row.label, /protection/i, 'the matter is named for what it is');
+      choose(w, v, row.id);
+      assert.ok(said(v, n0).some((l) => /Like I said|I told you|still thinking|You know how|You heard/.test(l)), 'he restates where he left it: ' + said(v, n0).join(' / '));
+      assert.ok(v.choices.some((x) => x.id.startsWith('a:x:')), 'and what you can answer to it is offered');
       tested++;
     }
     assert.ok(tested >= 1, 'at least one negotiation was carried over and checked');
@@ -86,17 +89,17 @@ describe('persistence', () => {
       Object.assign(t.traits, { courage: 1, caution: 0, violence: 1, ambition: 1, greed: 1 });
       const s = openAsk(w, 'protect', P(w), t, { biz: ownerBiz(w, t.id)!.id, amt: 200 });
       if (!s) continue;
-      let c: Convo | null = meet(w, t);
-      c = say(w, P(w), t, c!, 'f:m:' + s.id).convo;
-      for (let i = 0; i < 10 && c; i++) {
-        const o = options(w, P(w), t, c).find((x) => !x.done && /^(mv:[^:]+:(ask|pressure|force)|x:[^:]+:(nochoice|assume|now|notthere))$/.test(x.code));
+      const v = meet(w, t);
+      choose(w, v, 'a:m:' + s.id);
+      for (let i = 0; i < 10 && !v.ended; i++) {
+        const o = v.choices.find((x) => /^a:(mv:[^:]+:(ask|pressure|force)|x:[^:]+:(nochoice|assume|now|notthere))$/.test(x.id));
         if (!o) break;
-        c = say(w, P(w), t, c, o.code).convo;
+        choose(w, v, o.id);
       }
-      if (c || (P(w).cooldown[`shut:${t.id}`] ?? 0) <= w.now) continue; // (he gave in, or went quiet rather than throwing you out)
-      assert.ok(options(w, P(w), t, meet(w, t)).every((o) => o.code === 'root'), 'the same day, he will not talk');
+      if (!v.ended || (P(w).cooldown[`shut:${t.id}`] ?? 0) <= w.now) continue; // (he gave in, or went quiet rather than throwing you out)
+      assert.deepEqual(meet(w, t).choices.map((o) => o.id), ['leave'], 'the same day, he will not talk');
       advance(w, w.now + 2 * DAY);
-      assert.ok(options(w, P(w), t, meet(w, t)).length > 1, 'days later, he will');
+      assert.ok(meet(w, t).choices.length > 1, 'days later, he will');
       tested++;
     }
     assert.ok(tested, 'a man was pushed until he threw you out');
@@ -105,43 +108,49 @@ describe('persistence', () => {
 
 describe('trying to break it', () => {
   ok('the same subject, again and again: used answers grey out, nothing pays twice, the way out is always there', { tags: ['scenario'] }, () => {
-    const w = world60(), t = shop(w, 8); let c: Convo | null = meet(w, t);
+    const w = world60(), t = shop(w, 8), v = meet(w, t);
     const cash0 = P(w).cash;
-    for (let i = 0; i < 12 && c; i++) {
-      const os = options(w, P(w), t, c);
-      assert.ok(os.some((o) => o.code === 'root' || o.code === 'f:'), 'always a way out');
-      const pick = os.find((o) => o.code === 'how') ?? os.find((o) => o.code === 'f:') ?? os.find((o) => o.code === 'root')!;
-      c = say(w, P(w), t, c, pick.code).convo;
+    let gain = -1;
+    for (let i = 0; i < 12 && !v.ended; i++) {
+      assert.ok(v.choices.some((o) => o.id === 'leave'), 'always a way out');
+      const tr = t.rels[P(w).id]?.trust ?? 0;
+      if (!everything(w, v).some((o) => o.id === 'a:how')) break;
+      choose(w, v, 'a:how');
+      if (i >= 1) gain = Math.max(gain, (t.rels[P(w).id]?.trust ?? 0) - tr);
     }
     assert.equal(P(w).cash, cash0);
+    assert.ok(gain <= 0.0001, 'asked again in the same visit, it pays nothing: ' + gain);
   });
   ok('switching subjects in the middle of a negotiation and coming back keeps the point in hand', { tags: ['scenario'] }, () => {
     const w = world60(), t = shop(w, 9);
     const s = openAsk(w, 'protect', P(w), t, { biz: ownerBiz(w, t.id)!.id, amt: 120 })!;
-    let c = meet(w, t);
-    c = say(w, P(w), t, c, 'f:m:' + s.id).convo!;
-    c = say(w, P(w), t, c, `mv:${s.id}:ask`).convo!;
+    const v = meet(w, t);
+    choose(w, v, 'a:m:' + s.id);
+    choose(w, v, `a:mv:${s.id}:ask`);
     const beat = s.m?.beat;
-    c = say(w, P(w), t, c, 'f:').convo!;
-    c = say(w, P(w), t, c, 'chat').convo ?? c;
+    choose(w, v, 'back');
+    if (!v.ended) choose(w, v, 'news');
     assert.equal(s.m?.beat, beat, 'talking about something else does not touch the matter');
-    if (!c || s.stage === 'resolved') return;
-    c = say(w, P(w), t, { ...c, node: 'root', ctx: { ...c.ctx, focus: undefined } }, 'f:m:' + s.id).convo!;
-    if (beat === 'claim') assert.ok(codes(w, t, c).some((x) => x.startsWith('x:')), 'back on it, the answers to his point are there');
+    if (v.ended || s.stage === 'resolved') return;
+    choose(w, v, 'home');
+    if (!everything(w, v).some((o) => o.id === 'a:m:' + s.id)) return;
+    choose(w, v, 'a:m:' + s.id);
+    if (beat === 'claim') assert.ok(v.choices.some((x) => x.id.startsWith('a:x:')), 'back on it, the answers to his point are there');
     void stance;
   });
   ok('a man shut out offers nothing but the door, whatever was open', { tags: ['unit'] }, () => {
     const w = world60(), t = shop(w, 10);
     P(w).cooldown[`shut:${t.id}`] = w.now + DAY;
-    const c = meet(w, t);
-    assert.ok(c.ctx.shut);
-    assert.deepEqual(codes(w, t, c), ['root']);
+    const v = meet(w, t);
+    assert.ok(v.th.shut);
+    assert.deepEqual(v.choices.map((o) => o.id), ['leave']);
   });
   ok('he cannot be asked about what the player does not know', { tags: ['unit'] }, () => {
     const w = world60(), p = P(w);
     for (const t of Object.values(w.chars).filter((c) => c.alive && !c.isPlayer).slice(0, 40)) {
       (p.intro ??= {})[t.id] = w.now;
-      for (const o of options(w, p, t, startConvo(t.id))) if (o.code.startsWith('inc:')) assert.ok(p.known[o.code.slice(4)], `${t.name}: ${o.label}`);
+      const w2 = deserialize(serialize(w)), v = begin(w2, t.id);
+      for (const o of codes(w2, v)) if (o.startsWith('inc:')) assert.ok(p.known[o.slice(4)], `${t.name}: ${o}`);
     }
   });
 });

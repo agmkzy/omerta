@@ -4,7 +4,7 @@
 import assert from 'node:assert';
 import { describe, test as ok } from 'vitest';
 import { createDebt, ownerBiz, rel } from '../../core';
-import { groupOf, options, say, startConvo, type Convo } from '../../dialogue';
+import { begin, choose, everything, type Visit } from '../../conv/visit';
 import { prospects, recruitProspect } from '../../orders';
 import { giveWork, needsOf } from '../../work';
 import { S } from '../../ui/state';
@@ -15,18 +15,14 @@ import type { Character, World } from '../../types';
 import { newWorld, P } from '../helpers';
 
 const byId = (a: { id: string }, b: { id: string }) => (a.id < b.id ? -1 : 1);
-const meet = (w: World, t: Character) => { (P(w).intro ??= {})[t.id] = w.now; return startConvo(t.id); };
+const meet = (w: World, t: Character) => { (P(w).intro ??= {})[t.id] = w.now; return begin(w, t.id); };
 const screen = (w: World, f: () => string) => { S.w = w; return f(); };
-// what the page's link does (web.ts raiseMatter): the matter itself, or the way in it lives under, and then the matter
-function follow(w: World, t: Character, code: string): { c: Convo; codes: string[] } {
-  const p = P(w);
-  let c = meet(w, t);
-  const has = (cv: Convo, x: string) => options(w, p, t, cv).some((o) => o.code === x || o.code === 'f:' + x);
-  if (!has(c, code) && !code.startsWith('g:')) {
-    const g = 'g:' + groupOf(code), o = options(w, p, t, c).find((d) => d.code === g || d.code === 'f:' + g);
-    if (o) c = say(w, p, t, c, o.code).convo ?? c;
-  }
-  return { c, codes: options(w, p, t, c).map((o) => o.code.replace(/^f:/, '')) };
+// what the page's link does (web.ts talkTo): the conversation, and in it the matter itself, or the heading a way in belongs under
+const HEAD: Record<string, string> = { business: 'business', org: 'business', social: 'personal', ask: 'personal', settle: 'confront' };
+function follow(w: World, t: Character, code: string): { v: Visit; codes: string[] } {
+  const v = meet(w, t);
+  if (code.startsWith('g:')) { choose(w, v, 'u:' + (HEAD[code.slice(2)] ?? 'business')); return { v, codes: v.choices.map((o) => o.id.replace(/^a:/, '')) }; }
+  return { v, codes: [...v.choices, ...everything(w, v)].map((o) => o.id.replace(/^a:/, '')) };
 }
 const links = (html: string) => [...html.matchAll(/data-a="talk:([^"|]+)\|([^"]+)"/g)].map((m) => ({ id: m[1], code: m[2] }));
 
@@ -45,14 +41,14 @@ describe('the overhaul, played', () => {
     // the report screen leads to him, on that job
     const l = links(screen(w, () => reportView(j, [])));
     assert.ok(l.some((x) => x.id === m.id && x.code === 'tk:job:' + j.id), 'the report offers the conversation about it');
-    const { c, codes } = follow(w, m, 'tk:job:' + j.id);
+    const { v, codes } = follow(w, m, 'tk:job:' + j.id);
     assert.ok(codes.includes('tk:job:' + j.id), codes.join());
-    let r = say(w, p, m, c, 'tk:job:' + j.id);
-    assert.match(r.lines.join(' '), /Two hundred/, 'he gives his report');
-    const next = options(w, p, m, r.convo!).map((o) => o.code);
-    assert.ok(next.includes(`tk:job:${j.id}:again`) && next.includes(`tk:job:${j.id}:who`), 'and what can follow it: ' + next.join());
-    r = say(w, p, m, r.convo!, `tk:job:${j.id}:again`);
-    assert.ok(r.lines.length, 'told again, from the start');
+    let n0 = v.lines.length; choose(w, v, 'a:tk:job:' + j.id);
+    assert.match(v.lines.slice(n0).map((l) => l.text).join(' '), /Two hundred/, 'he gives his report');
+    const next = v.choices.map((o) => o.id);
+    assert.ok(next.includes(`a:tk:job:${j.id}:again`) && next.includes(`a:tk:job:${j.id}:who`), 'and what can follow it: ' + next.join());
+    n0 = v.lines.length; choose(w, v, `a:tk:job:${j.id}:again`);
+    assert.ok(v.lines.length > n0 + 1, 'told again, from the start');
   });
 
   ok('7. every record that names a man leads to the conversation about it: the matter is there to say when you get there', { tags: ['scenario'] }, () => {
@@ -77,8 +73,8 @@ describe('the overhaul, played', () => {
     assert.ok(all.some((x) => x.id === shop.id && x.code === 'g:business'), 'the place: business with its owner');
     for (const x of all) {
       const t = w.chars[x.id];
-      const { codes } = follow(w, t, x.code);
-      const want = x.code.startsWith('g:') ? codes.some((c) => groupOf(c) === x.code.slice(2)) : codes.includes(x.code);
+      const { v, codes } = follow(w, t, x.code);
+      const want = x.code.startsWith('g:') ? v.pane === (HEAD[x.code.slice(2)] ?? 'business') && codes.length > 2 : codes.includes(x.code);
       assert.ok(want, `${x.code} with ${t.name}: ${codes.join(', ')}`);
     }
   });

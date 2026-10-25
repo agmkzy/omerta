@@ -167,9 +167,12 @@ describe('downstream systems read the records', () => {
     ob.intends = 'break';
     assert.equal(restrainedFrom(w, lou.id, nate.id, biz), false);
   });
-  ok('a world with none of these records is untouched by the new tick', { tags: ['sim'] }, () => {
-    const w = newWorld(7); advance(w, w.now + 10 * DAY);
-    assert.equal(w.social, undefined);
+  // (Gate 4: no switch decides whether the layer runs. Every world carries its record from the start, and the tick keeps it)
+  ok('every world has the conversation layer’s record from the start, and the tick keeps it', { tags: ['sim'] }, () => {
+    const w = newWorld(7);
+    assert.ok(w.social, 'a new game has it');
+    advance(w, w.now + 10 * DAY);
+    assert.ok(w.social && Array.isArray(w.social.obs) && Array.isArray(w.social.requests), 'and keeps it as the world runs');
   });
 });
 

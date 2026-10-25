@@ -3,7 +3,6 @@ import { clubOf, clubOpen, clubPresent, topicsFor, waiting } from '../club';
 import { fmtTime } from '../core';
 import { sundayDue } from './sunday';
 import { avatar, back } from './common';
-import { subjectRows } from '../talk';
 import { esc, lk, P, W } from './links';
 
 export function clubView(): string {

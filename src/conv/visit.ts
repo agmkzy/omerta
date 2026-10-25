@@ -37,6 +37,7 @@ import { standingWord } from '../jobs';
 import { brokenWord } from '../memos';
 import { temper } from '../temper';
 import { arch } from '../voice';
+import { say as vsay } from '../voicesheet';
 import { settled } from './decide';
 import { actOf, offersNow, perform } from './run';
 import { streetNews } from './acts/info';
@@ -304,8 +305,9 @@ function subjectsNow(c: Ctx, k: Pane, all: boolean): Choice[] {
   if (k === 'personal') {
     // (what is on his mind first, then the two things men always say, then what the player knows that bears on him)
     out.push(...pending.slice(0, 2));
-    if (!c.v.mem.points.includes('news')) out.push({ id: 'news', label: line(c, 'ask.news'), group: 'social' });
-    if (!c.v.mem.points.includes('spend')) out.push({ id: 'spend', label: line(c, acquainted(w, h, n) ? 'spend.time' : 'introduce.self'), group: 'social' });
+    // (a man who has turned cold on the player is in no mood for small talk: what is between them, and that is all)
+    if (!c.v.mem.points.includes('news') && !c.v.th.cold) out.push({ id: 'news', label: line(c, 'ask.news'), group: 'social' });
+    if (!c.v.mem.points.includes('spend') && !c.v.th.cold) out.push({ id: 'spend', label: line(c, acquainted(w, h, n) ? 'spend.time' : 'introduce.self'), group: 'social' });
     out.push(...pending.slice(2));
     // something the player knows that bears on this man: trouble on his street, or by his people
     for (const f of Object.values(w.facts).filter((f) => h.known[f.id] && !n.known[f.id] && !f.minor && HOSTILE.has(f.kind) && f.business && w.now - f.t < 21 * DAY && (f.district === (ownerBiz(w, n.id)?.district ?? n.district) || offender(f) === n.id || w.chars[offender(f) ?? '']?.bossId === n.id || crewGround(w, n).has(f.district))).sort((a, b) => b.t - a.t).slice(0, 1)) out.push({ id: 'tell:' + f.id, label: line(c, 'tell.news', { topic: w.biz[f.business!].name }), group: 'matter' });
@@ -346,7 +348,7 @@ function general(c: Ctx) { c.memo.clear(); if (c.v.pane) pane(c, c.v.pane); else
 export function everything(w: World, v: Visit): Choice[] {
   const c = ctx(w, v), out: Choice[] = [];
   for (const k of PANES) out.push(...subjects(c, k, true));
-  out.push({ id: 'news', label: line(c, 'ask.news'), group: 'social' }, { id: 'spend', label: line(c, 'spend.time'), group: 'social' });
+  if (!v.th.cold && !v.th.shut) out.push({ id: 'news', label: line(c, 'ask.news'), group: 'social' }, { id: 'spend', label: line(c, 'spend.time'), group: 'social' });
   out.push({ id: 'home', label: 'Never mind', group: 'more' }, { id: 'leave', label: 'Leave', group: 'leave' });
   return out.filter((x, i) => out.findIndex((y) => y.id === x.id) === i);
 }
@@ -361,6 +363,7 @@ function actRows(c: Ctx, k: Pane | undefined, kinds: NonNullable<Offer['kind']>[
 }
 // One of them said: carried through by the conversation's runner (run.ts), then what follows: his answers to it, or back to the talk
 function doAct(c: Ctx, code: string, label: string): { minutes: number; meeting?: Meeting; settle?: Id } {
+  if (c.v.topic?.startsWith('enc:') && !/^(enc|apx|enc_open):/.test(code)) c.v.topic = undefined; // (the player has turned to something else)
   const r = perform(c, code, label);
   c.memo.clear();
   if (r.end || r.meeting) { c.v.ended = true; c.v.choices = []; return { minutes: r.minutes, meeting: r.meeting }; }
@@ -377,8 +380,11 @@ function doAct(c: Ctx, code: string, label: string): { minutes: number; meeting?
 function afterAct(c: Ctx, offers: Offer[], topic: string): boolean {
   const next = offers.filter((o) => !(c.v.th.used ?? []).includes(o.code) && !(c.h.cash < (o.cost ?? 0)));
   if (!next.length) { general(c); return false; }
-  c.v.choices = [...next.slice(0, 5).map((o) => ({ id: 'a:' + o.code, label: o.label, says: o.says, note: o.note, group: 'reply' as const, ...(o.amount ? { amount: o.amount } : {}) })), { id: 'back', label: 'Talk about something else', group: 'more' }, { id: 'leave', label: 'Leave', group: 'leave' }];
-  c.v.topic = 'act:' + topic;
+  // (five at most; all of them when they are the answers to what he came to ask, with how the player takes being asked)
+  const most = next.every((o) => /^(enc|apx):/.test(o.code)) ? 8 : 5;
+  c.v.choices = [...next.slice(0, most).map((o) => ({ id: 'a:' + o.code, label: o.label, says: o.says, note: o.note, group: 'reply' as const, ...(o.amount ? { amount: o.amount } : {}) })), { id: 'back', label: 'Talk about something else', group: 'more' }, { id: 'leave', label: 'Leave', group: 'leave' }];
+  // (unless he has just broken in with something of his own: then that is what is in hand)
+  if (!c.v.topic?.startsWith('enc:')) c.v.topic = 'act:' + topic;
   return true;
 }
 // What he keeps from the conversation as a subject of its own, once it has become something else between them: how he finds
@@ -443,7 +449,15 @@ const mkey = (ob: Obligation) => 'intervene:' + (ob.matter?.for ?? '') + ':' + (
 const interveneSig = (c: Ctx, ob: Obligation) => { const a = ob.matter?.against ?? '', k = captaincyOf(c.w, c.n, c.w.chars[ob.matter?.for ?? ''] ?? c.n, c.w.chars[a] ?? c.n); return `${Object.values(c.w.facts).filter((f) => c.h.known[f.id] && HOSTILE.has(f.kind) && offender(f) === a).length}:${k.knowsTrouble ? 1 : 0}`; };
 
 // ---------------------------------------------------------------- choosing
-export function choose(w: World, v: Visit, id: string): { v: Visit; minutes: number; meeting?: Meeting; settle?: Id } { const r = chooseIn(w, v, id); return { ...r, v: notNow(w, r.v) }; }
+export function choose(w: World, v: Visit, id: string): { v: Visit; minutes: number; meeting?: Meeting; settle?: Id } {
+  const from = v.lines.length, r = chooseIn(w, v, id);
+  // he does not say the same thing twice in a visit, whichever part of the conversation it came from: a long line he has already said
+  // is left out, and if that leaves him nothing to say, he says so
+  const prev = new Set(v.lines.slice(0, from).filter((l) => l.who === 'him').map((l) => l.text)), mine = v.lines.slice(from);
+  const kept = mine.filter((l) => !(l.who === 'him' && l.text.length > 30 && prev.has(l.text)));
+  if (kept.length !== mine.length) { v.lines.splice(from); v.lines.push(...kept); if (!kept.some((l) => l.who === 'him')) { const c = ctx(w, v), alr = vsay(w, c.n, c.h, 'already'); v.lines.push(prev.has(alr) ? { who: 'narr', text: 'He has nothing more to say on it.' } : { who: 'him', text: alr }); } }
+  return { ...r, v: notNow(w, r.v) };
+}
 // While a man who came with something is still waiting on an answer, the way out is an answer: "Not now", said, not a silent exit
 // (it puts him off: his request lapses, as it would unanswered, and he knows he was put off). Leaving otherwise is just leaving.
 function notNow(w: World, v: Visit): Visit {
@@ -489,7 +503,7 @@ function chooseIn(w: World, v: Visit, id: string): { v: Visit; minutes: number; 
     case 'who': doWho(c, a1); break;
     case 'answers': doAnswers(c, a1); break;
     case 'tell': doTell(c, a1); break;
-    case 'news': doNews(c); break;
+    case 'news': if (v.mem.points.includes('news')) { says(c, vsay(w, c.n, c.h, 'already')); general(c); minutes = 2; break; } doNews(c); break;
     case 'thank': him(c, plain(c.n.id, 'react.thanks')); general(c); break;
     case 'pass': doPass(c, a1, a2 as 'done' | 'refused'); break;
     case 'hisword': doHisWord(c, a1); break;
@@ -502,7 +516,7 @@ function chooseIn(w: World, v: Visit, id: string): { v: Visit; minutes: number; 
       him(c, plain(c.n.id, a1 === 'lie' ? 'react.credit.claimed' : 'react.credit.notMe', {}, a1 === 'lie' ? 'warm' : 'flat'));
       remember(w, c.n.id, 'credit:' + a2, a1); c.v.topic = undefined; general(c); break;
     }
-    case 'spend': minutes = doSpend(c); break;
+    case 'spend': if (v.mem.points.includes('spend')) { says(c, vsay(w, c.n, c.h, 'already')); general(c); minutes = 2; break; } minutes = doSpend(c); break;
     default: general(c);
   }
   return { v, minutes };
@@ -611,7 +625,7 @@ function doLoan(c: Ctx, amt: number, how?: string) {
   const { w, h, n } = c;
   const mem = new EncounterMemory(2); mem.said = new Set(c.v.mem.points);
   const offered = { ...(how === 'rep' ? { reputation: true } : {}), ...(how === 'rate' ? { rate: 0.08 } : {}), ...(how === 'promise' ? { promise: 'the end of the month' } : {}) };
-  if (how === 'take' && c.v.mem.offered.loan) { const sit = openAsk(w, 'borrow', h, n, { amt: Number(c.v.mem.offered.loan) }); if (sit) door.agree(w, sit, 'loan'); card(c, 'card.agreed.loan', { amt: `$${c.v.mem.offered.loan}`, rate: String(c.v.mem.offered.rate ?? 5) }); remember(w, n.id, 'loan', 'agreed'); return general(c); }
+  if (how === 'take' && c.v.mem.offered.loan) { const sit = openAsk(w, 'borrow', h, n, { amt: Number(c.v.mem.offered.loan) }); if (sit) door.agree(w, sit, 'loan'); says(c, temper(n).agreeable > 0.55 ? '“Good. We understand each other.”' : '“Done. Don’t make me come looking for it.”', settled(n.id, 'agrees', 'you took his figure')); card(c, 'card.agreed.loan', { amt: `$${c.v.mem.offered.loan}`, rate: String(c.v.mem.offered.rate ?? 5) }); remember(w, n.id, 'loan', 'agreed'); return general(c); }
   const r = onLoanRequest(c.pn(), h, amt, mem, offered);
   c.v.mem.points = [...mem.said];
   him(c, r);

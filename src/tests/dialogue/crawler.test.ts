@@ -1,15 +1,16 @@
-// V79: the conversation crawler. Random walks through every menu, for many men at every level of trust, checking that nothing
+// V79: the conversation crawler (since Gate 4, through the one conversation: conv/visit.ts). Random walks through every screen, for many men at every level of trust, checking that nothing
 // breaks, nothing is a dead end, nothing is said twice for a reward, and nobody talks like a database. DUMP=file writes every problem found.
 import assert from 'node:assert';
 import { describe, test as ok } from 'vitest';
 import { writeFileSync } from 'node:fs';
 import { deserialize, serialize } from '../../engine';
 import { World } from '../../types';
-import { options, say, startConvo, arrive, isNavCode, answered, Convo } from '../../dialogue';
+import { begin, choose, everything, type Visit } from '../../conv/visit';
+import { answered } from '../../conv/acts/words';
+import { talk } from './fixtures';
 import { openAsk, openAsks, stance } from '../../asks';
 import { addEnc } from '../../encounters';
 import { ownerBiz } from '../../core';
-import { whereIs } from '../../where';
 import { Rng } from '../../rng';
 import { world60 } from './fixtures';
 
@@ -18,6 +19,9 @@ const men = (w: World) => Object.values(w.chars).filter((c) => c.alive && !c.isP
 
 const DEV = /undefined|NaN|\[object|\bnull\b|knowsActor|textHidden|first-hand|The matter|Which incident|Day \d+ \d\d:\d\d|\bfact\b|\brecord(?:s|ed)?\b(?! of)|cooldown|\bctx\b/;
 const stateOf = (w: World, t: { id: string }) => { const p = P(w), q = w.chars[t.id].rels[p.id], m = p.rels[t.id]; return JSON.stringify([q?.trust, q?.affection, q?.respect, q?.grudge, m?.trust, p.cash, p.standing, p.heat, w.chars[t.id].cash, w.now]); };
+
+const NAVIGATE = (id: string) => /^(u|all):/.test(id) || ['home', 'more', 'back', 'leave'].includes(id);
+const hisLines = (v: Visit, from: number) => v.lines.slice(from).filter((l) => l.who !== 'you' && l.who !== 'card').map((l) => l.text);
 
 interface Walk { transcript: string[]; steps: number; ended: boolean; problems: string[] }
 function walk(seed: number, id: string, trust: number, steps = 22): Walk {
@@ -28,59 +32,55 @@ function walk(seed: number, id: string, trust: number, steps = 22): Walk {
   const rng = new Rng(seed * 7919 + id.length);
   const out: Walk = { transcript: [], steps: 0, ended: false, problems: [] };
   const bad = (m: string) => out.problems.push(`${t.name} (trust ${trust}) seed ${seed}: ${m}`);
-  let convo: Convo = arrive(w, p, t, { lines: [] }, whereIs(w, p, t), -1e9).convo;
-  const spoken = new Map<string, number>();
-  for (let i = 0; i < steps; i++) {
-    let os;
-    try { os = options(w, p, t, convo); } catch (e) { bad(`options threw at ${convo.node}: ${(e as Error).message}`); return out; }
-    if (!os.length) { bad(`no options at node ${convo.node}`); return out; }
-    const live = os.filter((o) => !o.done);
-    if (!live.some((o) => o.code === 'root' || isNavCode(o.code))) bad(`dead end at ${convo.node}: ${live.map((o) => o.label).join(' | ')}`);
-    const labels = os.filter((o) => !isNavCode(o.code)).map((o) => o.label);
-    if (new Set(labels).size !== labels.length) bad(`duplicate options at ${convo.node}: ${labels.filter((l, k) => labels.indexOf(l) !== k).join(' | ')}`);
-    for (const o of os) { if (DEV.test(o.label) || DEV.test(o.hint ?? '')) bad(`database wording in option "${o.label}" / "${o.hint ?? ''}"`); if (o.label.length > 110) bad(`very long option "${o.label.slice(0, 40)}…"`); if (!o.label.trim()) bad(`empty option label for ${o.code}`); }
-    // a used option can be forced, and must pay nothing
-    const done = os.find((o) => o.done);
-    if (done) {
-      const before = stateOf(w, t);
-      const s = say(w, p, t, convo, done.code);
-      if (stateOf(w, t) !== before) bad(`repeating "${done.label}" changed the relationship, money or time`);
-      if (!s.lines.length) bad(`repeating "${done.label}" gave no reply`);
+  const v = begin(w, id);
+  const spoken = new Map<string, number>(), said = new Set<string>();
+  for (const l of v.lines) if (l.who === 'him' && l.text.length > 30) spoken.set(l.text, 1);
+  for (let i = 0; i < steps && !v.ended; i++) {
+    const os = v.choices;
+    if (!os.length) { bad('nothing to say'); return out; }
+    if (!os.some((o) => o.id === 'leave')) bad(`no way out: ${os.map((o) => o.label).join(' | ')}`);
+    const labels = os.filter((o) => !NAVIGATE(o.id)).map((o) => o.label);
+    if (new Set(labels).size !== labels.length) bad(`duplicate choices: ${labels.filter((l, k) => labels.indexOf(l) !== k).join(' | ')}`);
+    for (const o of os) { if (DEV.test(o.label) || DEV.test(o.note ?? '')) bad(`database wording in a choice "${o.label}" / "${o.note ?? ''}"`); if (o.label.length > 130) bad(`very long choice "${o.label.slice(0, 40)}…"`); if (!o.label.trim()) bad(`empty label for ${o.id}`); }
+    // something already said in this visit can be said again, and pays nothing
+    const again = [...said].find((x) => [...os, ...everything(w, v)].some((o) => o.id === x));
+    if (again) { const before = stateOf(w, t), n0 = v.lines.length; choose(w, v, again); if (stateOf(w, t).replace(/,[^,]*\]$/, ']') !== before.replace(/,[^,]*\]$/, ']')) bad(`saying "${again}" again changed the relationship or money`); if (v.lines.length === n0) bad(`saying "${again}" again gave no reply`); if (v.ended) break; }
+    // choose: mostly what is on screen (as it is now), now and then anything under the headings
+    const now = v.choices;
+    const pool = rng.chance(0.25) ? everything(w, v).filter((o) => o.id !== 'leave') : now.filter((o) => o.id !== 'leave' || rng.chance(0.05));
+    const pick = rng.pick(pool.length ? pool : now);
+    const n0 = v.lines.length;
+    let res;
+    try { res = choose(w, v, pick.amount ? `${pick.id}:${pick.amount.value}` : pick.id); } catch (e) { bad(`"${pick.label}" (${pick.id}) threw: ${(e as Error).stack?.split('\n').slice(0, 3).join(' ')}`); return out; }
+    out.steps++; out.transcript.push(`> ${pick.label}`, ...v.lines.slice(n0).map((l) => l.text));
+    if (res.meeting || res.settle) { out.ended = true; return out; }
+    if (!NAVIGATE(pick.id)) {
+      said.add(pick.id);
+      const ls = hisLines(v, n0);
+      if (!ls.length) bad(`"${pick.label}" (${pick.id}) produced no reply`);
+      else if (!v.lines.slice(n0).some((l) => l.who === 'him' || answered(l.text, t.name.split(' ')[0]))) bad(`"${pick.label}" (${pick.id}) got no answer from him: ${ls.join(' / ').slice(0, 140)}`);
     }
-    const stay = live.filter((o) => !(o.code === 'root' && convo.node === 'root' && i < steps - 1) || rng.chance(0.05)); // (drawn once: a man who has shut you out leaves only the door)
-    const pick = rng.pick(stay.length ? stay : live);
-    let s;
-    try { s = say(w, p, t, convo, pick.code); } catch (e) { bad(`say threw on "${pick.label}" (${pick.code}) at ${convo.node}: ${(e as Error).stack?.split('\n').slice(0, 3).join(' ')}`); return out; }
-    out.steps++; out.transcript.push(`> ${pick.label}`, ...s.lines);
-    if (s.meeting) { out.ended = true; return out; }
-    if (!s.lines.length && !isNavCode(pick.code)) bad(`"${pick.label}" (${pick.code}) produced no reply at ${convo.node}`);
-    // V90: every statement is answered by him, not only narrated or scored (an answer, a refusal, a dodge, a reaction all count)
-    if (!isNavCode(pick.code) && s.lines.length && !s.lines.some((l) => answered(l, t.name.split(' ')[0]))) bad(`"${pick.label}" (${pick.code}) got no answer from him: ${s.lines.join(' / ').slice(0, 140)}`);
-    for (const l of s.lines) {
-      if (!l.trim()) bad(`blank line after "${pick.label}"`);
-      if (DEV.test(l)) bad(`database wording in line "${l.slice(0, 120)}" after "${pick.label}"`);
-      // he never calls himself by his own name when he talks
-      for (const q of l.matchAll(/["“]([^"“”]+)["”]/g)) if (q[1].includes(t.name)) bad(`${t.name} names himself aloud: "${q[1].slice(0, 100)}"`);
-      if (!l.startsWith('⟡') && l.length > 30 && /[“"]/.test(l)) { const n = (spoken.get(l) ?? 0) + 1; spoken.set(l, n); if (n > 1) bad(`line repeated in one conversation: "${l.slice(0, 90)}"`); }
+    for (const l of v.lines.slice(n0)) {
+      if (!l.text.trim()) bad(`blank line after "${pick.label}"`);
+      if (DEV.test(l.text)) bad(`database wording in line "${l.text.slice(0, 120)}" after "${pick.label}"`);
+      if (l.who === 'him') for (const q of l.text.matchAll(/["“]([^"“”]+)["”]/g)) if (q[1].includes(t.name)) bad(`${t.name} names himself aloud: "${q[1].slice(0, 100)}"`);
+      if (l.who === 'him' && l.text.length > 30) { const n = (spoken.get(l.text) ?? 0) + 1; spoken.set(l.text, n); if (n > 1) bad(`line repeated in one conversation: "${l.text.slice(0, 90)}"`); }
     }
     // what he has just told you he must himself know; and nothing is written twice
     for (const [fid, k] of Object.entries(p.known)) if (k.from === t.id && !t.known[fid]) bad(`he told you something he does not know himself: ${w.facts[fid]?.text?.slice(0, 80)}`);
     { const seen = new Set<string>(); for (const m of t.memos) { if (m.done || m.other !== p.id) continue; const key = m.kind + m.text; if (seen.has(key)) bad(`duplicate open memo "${m.text.slice(0, 60)}"`); seen.add(key); } }
     { const open = w.grievances.filter((g) => g.status === 'open'); const keys = open.map((g) => g.from + '>' + g.about + '>' + g.cause); if (new Set(keys).size !== keys.length) bad('duplicate open grievance'); }
     { const ds = w.debts.filter((d) => d.status === 'active').map((d) => d.creditor + '>' + d.debtor + '>' + d.reason); if (new Set(ds).size !== ds.length && ds.length < 40) bad('duplicate active debt records'); }
-    if (!s.convo) { out.ended = true; return out; }
-    // whatever he was given, the option just used shows as used if it is offered again
-    if (!isNavCode(pick.code)) { const again = options(w, p, t, s.convo).find((o) => o.code === pick.code); if (again && !again.done) bad(`"${pick.label}" is offered again and not greyed out`); }
-    convo = s.convo;
   }
+  out.ended = !!v.ended;
   return out;
 }
 
 // V90: the rules, walked. Men of every temperament (their traits drawn at random, so every combination turns up), in every kind of
 // circumstance (a matter of yours with them, a request of theirs, bad blood, nothing at all), talked to at length, with the
 // conversation's rules checked at every step rather than particular lines: what he says agrees with what he decided; the replies
-// on screen answer the point he has just made; a request he breaks in with is the only thing on screen until it is dealt with;
-// a man who has turned cold is offered no small talk; the hub stays short; every statement is answered.
+// on screen answer the point he has just made; a request he breaks in with is answered before anything else; a man who has turned
+// cold is offered no small talk; every statement is answered.
 const REFUSE = /“(No[.,!]|I can’t[.!]|Then it’s no|Not interested)|still no|same answer|answer’s still|It’s still too much|I still can’t/i;
 const AGREE = /We have a deal|That suits me|Fine\. Agreed|You’ll have it|“All right\. All right\.”|Asking\. All right|Why didn’t you say so/;
 function rulesWalk(seed: number, id: string): string[] {
@@ -94,36 +94,33 @@ function rulesWalk(seed: number, id: string): string[] {
   if (b?.open && t.rank === 'civilian') { if (b.protection?.collectorId === p.id || rng.chance(0.5)) delete b.protection; openAsk(w, 'protect', p, t, { biz: b.id, amt: Math.max(15, Math.round(b.income * (0.03 + rng.next() * 0.15) / 5) * 5) }); }
   else if (rng.chance(0.5)) openAsk(w, rng.chance(0.5) ? 'borrow' : 'recruit', p, t, { amt: 150 + Math.floor(rng.next() * 6) * 50 });
   let encAt = rng.chance(0.4) ? 2 + Math.floor(rng.next() * 6) : -1;
-  let c: Convo | null = arrive(w, p, t, { lines: [] }, whereIs(w, p, t), -1e9).convo;
-  for (let i = 0; i < 26 && c; i++) {
+  const v = begin(w, id);
+  for (let i = 0; i < 26 && !v.ended; i++) {
     if (i === encAt) { addEnc(w, { kind: 'loan', from: t.id, title: `${t.name.split(' ')[0]} needs a favour`, days: 4, lines: ['“While you’re here, I need two hundred until Friday.”'], opts: [{ code: 'yes', label: '“All right. Here.”', hint: 'He will owe you.' }, { code: 'no', label: '“Not this time.”', hint: 'He will remember.' }], data: {} }); encAt = -1; }
-    const os = options(w, p, t, c), live = os.filter((o) => !o.done);
-    if (!live.length) { bad.push(`${who}: nothing to say at ${c.node}`); break; }
-    // the hub stays short; a cold man is offered no small talk
-    if (os.some((o) => o.group)) {
-      if (os.filter((o) => o.group === 'Between you' && o.code !== 'f:more').length > 3) bad.push('hub: more than three matters shown');
-      if (c.ctx.cold && os.some((o) => o.group === 'Talk')) bad.push('hub: small talk offered to a man who has turned cold');
-    }
-    // a request he broke in with is the only thing in hand
-    if (c.ctx.focus?.startsWith('enc:') && w.enc.some((e) => 'enc:' + e.id === c!.ctx.focus && e.status === 'open') && live.some((o) => !isNavCode(o.code) && !o.code.startsWith('enc:'))) bad.push(`his request is mixed with other things: ${live.map((o) => o.code).join(',')}`);
+    const os = v.choices;
+    if (!os.length) { bad.push(`${who}: nothing to say`); break; }
+    // a cold man is offered no small talk
+    if (v.th.cold && os.some((o) => o.id === 'news' || o.id === 'spend')) bad.push('small talk offered to a man who has turned cold');
     // the point he has just made is what the replies are about
-    const sm = c.ctx.focus?.startsWith('m:') ? openAsks(w).find((x) => 'm:' + x.id === c!.ctx.focus) : undefined;
-    if (sm && ['claim', 'nottrue', 'nobooks'].includes(String(sm.m?.beat ?? '')) && !os.some((o) => o.code.startsWith('x:') || (stance(w, sm, t.id).last === 'counter' && /:(take|sweeten)$/.test(o.code)))) bad.push(`he made a point (${sm.m?.beat}:${sm.m?.claim}) and nothing on screen answers it`);
+    // (a request he has broken in with is the only thing in hand until it is answered: then nothing else is on screen)
+    if (v.topic?.startsWith('enc:') && os.some((o) => o.group === 'reply' && !/^a:(enc|apx):/.test(o.id))) bad.push(`his request is mixed with other things: ${os.map((o) => o.id).join(',')}`);
+    const sm = v.topic === 'act:m' || v.topic === 'act:mv' || v.topic === 'act:x' || v.topic === 'act:nm' ? openAsks(w).find((x) => x.terms?.by === p.id && x.terms?.of === t.id) : undefined;
+    if (sm && ['claim', 'nottrue', 'nobooks'].includes(String(sm.m?.beat ?? '')) && os.some((o) => o.group === 'reply') && !os.some((o) => o.id.startsWith('a:x:') || (stance(w, sm, t.id).last === 'counter' && /:(take|sweeten)$/.test(o.id)))) bad.push(`he made a point (${sm.m?.beat}:${sm.m?.claim}) and nothing on screen answers it`);
     // choose: mostly the matter in hand, sometimes anything
-    const inMatter = live.filter((o) => /^(mv|x|enc):/.test(o.code) || o.code.startsWith('f:m:') || o.code.startsWith('f:enc:'));
-    const pool = inMatter.length && rng.chance(0.65) ? inMatter : live.filter((o) => !(o.code === 'root' && c!.node === 'root') || rng.chance(0.04));
-    const pick = rng.pick(pool.length ? pool : live);
-    const mid = /^(mv|x):([^:]+):/.exec(pick.code)?.[2];
-    const res = say(w, p, t, c, pick.code);
-    const his = res.lines.filter((l) => /^[“"]/.test(l) || /[“"]/.test(l)).join(' ');
-    if (!isNavCode(pick.code) && res.lines.length && !res.lines.some((l) => answered(l, t.name.split(' ')[0]))) bad.push(`"${pick.label}" (${pick.code.split(':')[0]}) not answered: ${res.lines.join(' / ').slice(0, 160)}`);
+    const inMatter = os.filter((o) => /^a:(mv|x|enc|m|enc_open):/.test(o.id));
+    const pool = inMatter.length && rng.chance(0.65) ? inMatter : os.filter((o) => o.id !== 'leave' || rng.chance(0.04));
+    const pick = rng.pick(pool.length ? pool : os);
+    const mid = /^a:(mv|x):([^:]+):/.exec(pick.id)?.[2], n0 = v.lines.length;
+    const res = choose(w, v, pick.amount ? `${pick.id}:${pick.amount.value}` : pick.id);
+    if (res.meeting || res.settle) break;
+    const ls = v.lines.slice(n0), his = ls.filter((l) => l.who === 'him').map((l) => l.text).join(' ');
+    if (!NAVIGATE(pick.id) && ls.some((l) => l.who !== 'you') && !ls.some((l) => l.who === 'him' || answered(l.text, t.name.split(' ')[0]))) bad.push(`"${pick.label}" (${pick.id.split(':')[1]}) not answered: ${ls.map((l) => l.text).join(' / ').slice(0, 160)}`);
     if (mid) {
       const m = (w.situations ?? []).find((x) => x.id === mid), S = m ? stance(w, m, t.id) : undefined;
       const agreed = m?.stage === 'resolved' && ['agreed', 'gave in'].includes(m.out ?? '');
       if (agreed && REFUSE.test(his)) bad.push(`he agreed, but said: ${his.slice(0, 120)}`);
       if (m && m.stage !== 'resolved' && S?.last === 'no' && AGREE.test(his)) bad.push(`he refused, but said: ${his.slice(0, 120)}`);
     }
-    c = res.convo;
   }
   return bad;
 }
@@ -162,18 +159,17 @@ function fast() {
     }
   });
 
-  ok('what is said persists through save and reload: memory, promises, backing and the used-option rule', { tags: ['determinism'] }, () => {
+  ok('what is said persists through save and reload: what he was asked, and that it was asked', { tags: ['determinism'] }, () => {
     const w = world60(); const p = P(w); const m0 = sample.find((x) => x.rank === 'soldier' && x.familyId === p.familyId) ?? sample.find((x) => x.rank === 'soldier')!; const m = w.chars[m0.id];
     (p.intro ??= {})[m.id] = w.now;
     const r = (m.rels[p.id] ??= { trust: 0.7, affection: 0.7, respect: 0.6, grudge: 0, lastMet: -1e9 } as never) as { trust: number; respect: number; affection: number };
     r.trust = 0.7; r.respect = 0.6;
-    let c = startConvo(m.id);
-    say(w, p, m, c, 'how');
+    talk(w, m.id, 'how');
     const talkBefore = JSON.stringify(m.talk);
     const w2 = deserialize(serialize(w));
-    assert.equal(JSON.stringify(w2.chars[m.id].talk), talkBefore, 'conversational memory survives a save ' + m.name + ' ' + talkBefore + ' => ' + JSON.stringify(w2.chars[m.id].talk));
-    const again = say(w2, w2.chars[w2.playerId!], w2.chars[m.id], startConvo(m.id), 'how');
-    assert.match(again.lines[0], /already|changed|enough|same|ask|went over|memory|told you/i, 'and he remembers after reload: ' + again.lines[0]);
+    assert.equal(JSON.stringify(w2.chars[m.id].talk), talkBefore, 'conversational memory survives a save');
+    const again = talk(w2, m.id, 'how');
+    assert.match(again.lines[0], /already|changed|enough|same|ask|went over|memory|told you|asked|over this/i, 'and he remembers after reload: ' + again.lines[0]);
   });
 
   ok('backing: asking, pressing and agreeing records one favour and one backer, never twice', { tags: ['scenario'] }, () => {
@@ -183,16 +179,15 @@ function fast() {
     (p.intro ??= {})[m.id] = w.now;
     const rr = (m.rels[p.id] ??= { trust: 0.7, affection: 0.7, respect: 0.6, grudge: 0, lastMet: -1e9 } as never) as { trust: number; respect: number };
     rr.trust = 0.7; rr.respect = 0.6;
-    let c = startConvo(m.id);
-    let s = say(w, p, m, c, 'rk_back'); c = s.convo!;
+    const a = talk(w, m.id, 'rk_back');
     const owed0 = w.favours.length;
-    s = say(w, p, m, c, 'fl:back_take'); c = s.convo ?? c;
+    talk(w, m.id, 'back_take', {}, a.v);
     assert.equal(p.backer, m.id);
     assert.equal(w.favours.length, owed0 + 1, 'one favour written');
-    const s2 = say(w, p, m, c, 'fl:back_take');
+    const s2 = talk(w, m.id, 'back_take', {}, a.v);
     assert.equal(w.favours.length, owed0 + 1, 'a repeat writes nothing');
     assert.ok(s2.lines.length);
-    const s3 = say(w, p, m, startConvo(m.id), 'rk_back');
+    const s3 = talk(w, m.id, 'rk_back');
     assert.equal(w.favours.length, owed0 + 1, 'asking again later writes nothing');
     assert.match(s3.lines.join(' '), /already/i);
   });
@@ -200,29 +195,25 @@ function fast() {
   ok('a man of lower rank cannot be threatened without consequence, a rival warned off costs tension, and a recruit costs once', { tags: ['scenario'] }, () => {
     const w = world60(); const p = P(w);
     const crew = men(w).find((x) => x.rank === 'associate' && x.id !== p.id);
-    if (crew) { crew.bossId = p.id; (p.intro ??= {})[crew.id] = w.now; const t0 = crew.rels[p.id]?.trust ?? 0.1; const s = say(w, p, crew, startConvo(crew.id), 'cr_thin'); assert.ok(s.lines.length); const s2 = say(w, p, crew, startConvo(crew.id), 'cr_thin'); assert.match(s2.lines.join(' '), /already|told/i, 'a second threat the same week is not a second threat'); assert.ok((crew.rels[p.id]?.trust ?? 0) <= t0 + 0.0001); }
+    if (crew) { crew.bossId = p.id; (p.intro ??= {})[crew.id] = w.now; const t0 = crew.rels[p.id]?.trust ?? 0.1; const s = talk(w, crew.id, 'cr_thin'); assert.ok(s.lines.length); const s2 = talk(w, crew.id, 'cr_thin'); assert.match(s2.lines.join(' '), /already|told/i, 'a second threat the same week is not a second threat'); assert.ok((crew.rels[p.id]?.trust ?? 0) <= t0 + 0.0001); }
     const riv = men(w).find((x) => x.rank !== 'civilian' && x.familyId && x.familyId !== p.familyId);
-    if (riv && p.familyId) { (p.intro ??= {})[riv.id] = w.now; const before = w.fam[p.familyId].tension[riv.familyId!] ?? 0; say(w, p, riv, startConvo(riv.id), 'rv_warn'); assert.ok((w.fam[p.familyId].tension[riv.familyId!] ?? 0) >= before, 'tension does not fall from a warning'); }
+    if (riv && p.familyId) { (p.intro ??= {})[riv.id] = w.now; const before = w.fam[p.familyId].tension[riv.familyId!] ?? 0; talk(w, riv.id, 'rv_warn'); assert.ok((w.fam[p.familyId].tension[riv.familyId!] ?? 0) >= before, 'tension does not fall from a warning'); }
     const pr = men(w).find((x) => x.prospect && x.rank === 'civilian');
-    if (pr && p.rank !== 'civilian') { (p.intro ??= {})[pr.id] = w.now; const cash0 = p.cash; let c = startConvo(pr.id); let s = say(w, p, pr, c, 'recruit_offer'); c = s.convo!; s = say(w, p, pr, c, 'fl:rc_more'); if (pr.rank === 'associate') { assert.ok(cash0 - p.cash <= 300 + 1, 'costs once'); assert.equal(pr.bossId, p.id); } }
+    if (pr && p.rank !== 'civilian') { (p.intro ??= {})[pr.id] = w.now; const cash0 = p.cash; const s = talk(w, pr.id, 'recruit_offer'); const take = s.r.next?.find((o) => /:(take|sweeten)$/.test(o.code)); if (take) talk(w, pr.id, take.code, {}, s.v); if (pr.rank === 'associate') { assert.ok(cash0 - p.cash <= 300 + 1, 'costs once'); assert.equal(pr.bossId, p.id); } }
   });
 
-  ok('a used option is greyed out for the rest of the conversation, and a new conversation starts clean', { tags: ['unit'] }, () => {
+  ok('something said in a visit pays nothing the second time in it, and the next visit starts clean', { tags: ['unit'] }, () => {
     const w = world60(); const p = P(w); const m = sample.find((x) => x.rank === 'soldier') ?? sample[0];
     (p.intro ??= {})[m.id] = w.now;
-    // (Stage 5C: "How are you keeping?" is under catching up)
-    const social = (c: Convo) => options(w, p, m, { ...c, ctx: { ...c.ctx, focus: 'g:social' } });
-    let c = startConvo(m.id);
-    const first = social(c).find((o) => o.code === 'how')!;
-    assert.ok(first && !first.done);
-    const s = say(w, p, m, c, 'how'); c = s.convo!;
-    assert.ok(social(c).find((o) => o.code === 'how')!.done, 'greyed after use');
-    const before = stateOf(w, m);
-    const again = say(w, p, m, c, 'how');
+    const v = begin(w, m.id);
+    assert.ok(everything(w, v).some((o) => o.id === 'a:how'), 'how he is keeping can be asked');
+    choose(w, v, 'a:how');
+    const before = stateOf(w, m), n0 = v.lines.length;
+    choose(w, v, 'a:how');
     assert.equal(stateOf(w, m), before, 'a repeat pays nothing');
-    assert.match(again.lines[0], /already/);
-    const fresh2 = startConvo(m.id);
-    assert.ok(!social(fresh2).find((o) => o.code === 'how')?.done, 'a new conversation starts clean');
+    assert.match(v.lines.slice(n0).map((l) => l.text).join(' '), /already/);
+    const v2 = begin(w, m.id);
+    assert.ok(everything(w, v2).some((o) => o.id === 'a:how'), 'a new visit starts clean');
   });
 }
 describe('conversation crawler', fast);

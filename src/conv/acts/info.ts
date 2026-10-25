@@ -6,10 +6,9 @@
 import { famName, ownerBiz } from '../../core';
 import { mkJob } from '../../jobs';
 import { arch } from '../../voice';
-import { addr } from '../../talk';
+import { addr } from '../subjects/life';
 import { temper } from '../../temper';
-import { sitdownTalk } from '../../flows';
-import { DAY, type Fact } from '../../types';
+import { DAY, type Character, type Fact } from '../../types';
 import * as door from '../doors';
 import { chance, settled, term } from '../decide';
 import type { Act, Ctx, Offer } from '../kit';
@@ -60,6 +59,16 @@ export function troubleHere(c: Ctx): boolean {
   return !!grudgeTarget(w, t) || incidentsOf(w, t).some(({ f }) => TROUBLE.has(f.kind) && !!p.known[f.id] && (f.victim === t.id || f.actor === t.id || f.actor === p.id || f.victim === p.id));
 }
 
+// What he says as a sit-down is set up: what he wants from it, in his own terms (it is only words; the meeting is unchanged), and
+// whether it is the second in three weeks
+function sitdownTalk(c: Ctx, other: Character): string[] {
+  const { w, h: p, n: t } = c, a = arch(t);
+  const lead = a === 'hothead' ? '“I’ll come. Don’t expect me to be calm about it.”' : a === 'frightened' ? '“If it’ll end it, I’ll sit. I don’t want any more of this.”' : a === 'cold' ? '“I’ll sit. I want it said to his face, and I want it made right.”' : '“All right. A sit-down. I’ll say what I have to say, and he’ll say his.”';
+  const prior = (p.cooldown[`sd:${t.id}`] ?? 0) > w.now - 20 * DAY ? ' “And let’s not have another one like the last.”' : '';
+  door.cool(p, `sd:${t.id}`, w.now);
+  return [`${lead}${prior}`, `He expects ${other.name.split(' ')[0]} to be there, and he expects you to be fair.`];
+}
+
 // ---------------------------------------------------------------- asking about an event
 const inc: Act = {
   base: 'inc', pane: 'personal', questions,
@@ -91,7 +100,7 @@ const inc: Act = {
 };
 // which event: the ones the player knows of by what they were about, and anything else as one open question
 const pickIncident: Act = {
-  base: 'pick_incident', pane: 'personal',
+  base: 'pick_incident', pane: 'personal', opens: true,
   offers: (c) => (incidentsOf(c.w, c.n).length && troubleHere(c) ? [{ code: 'pick_incident', label: said(c, 'pick_incident', 'Ask about a recent incident'), kind: 'between' }] : []),
   run: (c) => {
     const x = T(c), { w, p, t } = x, tp = temper(t), hot = tp.volatility + tp.pride > 1.15;
@@ -297,7 +306,7 @@ const sitdown: Act = {
     const x = T(c), { w, p, t } = x, f = fact(c)!, a = w.chars[f.actor!]; ask(c, 'sitdown');
     const have = w.grievances.find((q) => q.status === 'open' && (q.cause === f.id || (q.from === t.id && q.about === a.id)));
     const g = have ?? door.draftGrievance(w, { from: t.id, about: a.id, kind: f.kind === 'poach' ? 'territory' : 'violence', text: `${t.name} says ${a.name} wronged him: ${f.text}`, claim: f.amount ?? 0, valid: true, cause: f.id });
-    for (const l of sitdownTalk(w, p, t, a)) line(x, l);
+    for (const l of sitdownTalk(c, a)) line(x, l);
     const m = door.sitdown(w, p, g, !have);
     if (typeof m === 'string') { c.v.lines.push({ who: 'narr', text: m }); return stay(c, 15); }
     return { minutes: 15, meeting: m };

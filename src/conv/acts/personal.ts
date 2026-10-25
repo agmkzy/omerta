@@ -211,7 +211,7 @@ const members = (c: Ctx) => Object.values(c.w.chars).filter((y) => y.alive && y.
 const about: Act = {
   base: 'about', pane: 'personal',
   repeat: { window: 14, sig: (c, arg) => String(Object.values(c.w.facts).filter((f) => f.actor === arg && c.n.known[f.id] && !c.h.known[f.id]).length) },
-  offers: (c) => (inFamily(c.h, c.n) && c.n.familyId ? members(c).map((y) => offer(c, 'about:' + y.id, `Ask about ${y.name}`)) : []),
+
   run: (c, code) => {
     const x = T(c), { w, p, t } = x, y = w.chars[code.split(':')[1]];
     if (!y) return out(3);
@@ -225,6 +225,16 @@ const about: Act = {
     }
     tweak(x, 0.01);
     return out(20);
+  },
+};
+// which man: he asks the player who, and the men of the family he has views on are what can be asked
+const pickMember: Act = {
+  base: 'pick_member', pane: 'personal', opens: true,
+  offers: (c) => one(inFamily(c.h, c.n) && !!c.n.familyId && members(c).length > 0, offer(c, 'pick_member', 'Ask about one of the others')),
+  run: (c) => {
+    const x = T(c), tp = temper(x.t), hot = tp.volatility + tp.pride > 1.15;
+    line(x, hot ? '“Who? Spit it out.”' : tp.caution > 0.6 ? '“Depends who you mean.”' : '“Who did you have in mind?”');
+    return { minutes: 5, next: members(c).map((y) => ({ code: 'about:' + y.id, label: `What do you make of ${y.name}?`, note: y.rank })) };
   },
 };
 const leaders: Act = {
@@ -392,4 +402,4 @@ const rvTrade: Act = {
 };
 const rvPass: Act = { base: 'rv_pass', pane: 'personal', run: (c) => { line(T(c), '“Suit yourself.” He goes back to his drink.'); return out(5); } };
 
-export const PERSONAL: Act[] = [how, fHurt, fBiz, fHelp, leaveIt, helpGift, helpLoan, welcome, congrats, oldTimes, askWant, fWant, askCrew, about, leaders, askRep, repWho, askHistory, askAround, intro, introVia, rvDrink, rvMood, rvFavour, rvEars, rvTrade, rvPass];
+export const PERSONAL: Act[] = [how, fHurt, fBiz, fHelp, leaveIt, helpGift, helpLoan, welcome, congrats, oldTimes, askWant, fWant, askCrew, pickMember, about, leaders, askRep, repWho, askHistory, askAround, intro, introVia, rvDrink, rvMood, rvFavour, rvEars, rvTrade, rvPass];

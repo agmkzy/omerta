@@ -13,7 +13,7 @@ import { performMove } from '../../jobs';
 import { workShift } from '../../orders';
 import { SKILLS } from '../../people';
 import { hierarchyIssues } from '../../rank';
-import { introduced } from '../../dialogue';
+import { introduced } from '../../acquaint';
 import { promote } from '../../career';
 import { jail } from '../../jobs';
 import { handleDeath } from '../../core';

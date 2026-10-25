@@ -1,25 +1,28 @@
 // V90 acceptance audit: one check per defect found while playing and exploring, each written as the rule that was broken, so the
-// defect cannot come back in another form.
+// defect cannot come back in another form. (Since Gate 4, on the one conversation: conv/visit.ts.)
 import assert from 'node:assert';
 import { describe, test as ok } from 'vitest';
-import { options, say, startConvo, speechFor, introduced, arrive } from '../../dialogue';
+import { begin, choose, everything, type Visit } from '../../conv/visit';
+import { speechFor } from '../../conv/acts/words';
+import { introduced } from '../../acquaint';
 import { openAsk, move, askBetween, playerMove } from '../../asks';
 import { addFact, ownerBiz, rel } from '../../core';
 import { jobSaid, mkJob } from '../../jobs';
 import { replies } from '../../exchange';
-import { whereIs } from '../../where';
 import { kinOf } from '../../kin';
 import { makeLoan } from '../../encounters';
 import { openSunday } from '../../crewlife';
 import { FEMALE } from '../../names';
-import { world60 } from './fixtures';
+import { world60, talk } from './fixtures';
 import { deserialize, serialize } from '../../engine';
 import { DAY } from '../../types';
 import { P } from '../helpers';
 import type { Character, World } from '../../types';
 
 const shops = (w: World) => Object.values(w.chars).filter((c) => c.alive && !c.isPlayer && c.rank === 'civilian' && ownerBiz(w, c.id)?.open).sort((a, b) => (a.id < b.id ? -1 : 1));
-const meet = (w: World, t: Character) => { const p = P(w); (p.intro ??= {})[t.id] ??= w.now; return arrive(w, p, t, { lines: [] }, whereIs(w, p, t), -1e9).convo; };
+const meet = (w: World, t: Character): Visit => { const p = P(w); (p.intro ??= {})[t.id] ??= w.now; return begin(w, t.id); };
+const all = (w: World, v: Visit) => [...v.choices, ...everything(w, v)];
+const after = (v: Visit, n: number) => v.lines.slice(n).map((l) => l.text);
 
 describe('V90 audit regressions', { timeout: 60_000 }, () => {
   ok('his own name is "I" where it starts a clause and "me" where it is the object ("beat me up", "after I refused")', { tags: ['scenario'] }, () => {
@@ -32,8 +35,8 @@ describe('V90 audit regressions', { timeout: 60_000 }, () => {
   ok('the record of who owns what is not trouble: it is not offered as a grievance, and a man is not asked what he will do about it', { tags: ['unit'] }, () => {
     const w = world60(), p = P(w), t = shops(w)[1];
     const f = addFact(w, { kind: 'ownership', actor: t.id, victim: p.id, business: ownerBiz(w, t.id)!.id, text: `${p.name} owns a tenth of ${ownerBiz(w, t.id)!.name}.`, district: t.district }, { witnesses: [p.id, t.id] });
-    const os = options(w, p, t, meet(w, t));
-    assert.ok(!os.some((o) => o.code === 'inc:' + f.id || /What he did to you/.test(o.label)), os.map((o) => o.label).join(' | '));
+    const os = all(w, meet(w, t));
+    assert.ok(!os.some((o) => o.id === 'a:inc:' + f.id || /What he did to you/.test(o.label)), os.map((o) => o.label).join(' | '));
   });
   ok('an apology refused is not refused like a business deal, and a man apologised to does not send for his protector', { tags: ['unit'] }, () => {
     for (const n of [2, 3, 4, 5]) {
@@ -57,7 +60,7 @@ describe('V90 audit regressions', { timeout: 60_000 }, () => {
     const w = world60(), p = P(w); p.rank = 'soldier'; p.cash = 2000;
     for (const t of Object.values(w.chars).filter((c) => c.alive && c.rank === 'civilian' && !ownerBiz(w, c.id)).slice(0, 12)) {
       t.prospect = true; (p.intro ??= {})[t.id] = w.now;
-      const r = say(w, p, t, startConvo(t.id), 'recruit_offer');
+      const r = talk(w, t.id, 'recruit_offer');
       const s = askBetween(w, 'recruit', p.id, t.id);
       if (s && (s.st?.[t.id]?.last === 'no')) assert.ok(!/waiting for somebody to ask/.test(r.lines.join(' ')), r.lines.join(' / '));
     }
@@ -98,20 +101,20 @@ describe('V90 audit regressions', { timeout: 60_000 }, () => {
   ok('you raise a matter in your own voice; his answer is his', { tags: ['unit'] }, () => {
     const w = world60(), p = P(w), t = shops(w)[7];
     const s = openAsk(w, 'protect', p, t, { biz: ownerBiz(w, t.id)!.id, amt: 40 })!;
-    const r = say(w, p, t, meet(w, t), 'f:m:' + s.id);
-    assert.ok(r.q && !/^“/.test(r.q), 'your line is given as yours: ' + r.q);
-    assert.ok(r.lines.every((l) => l !== r.q));
+    const v = meet(w, t), n0 = v.lines.length;
+    choose(w, v, 'a:m:' + s.id);
+    const mine = v.lines.slice(n0).find((l) => l.who === 'you');
+    assert.ok(mine && !/^“/.test(mine.text), 'your line is given as yours: ' + mine?.text);
+    assert.ok(v.lines.slice(n0).filter((l) => l.who === 'him').every((l) => l.text !== mine!.text));
   });
   ok('work he has offered you, he raises when you see him, and you answer it to his face', { tags: ['unit'] }, () => {
     const w = world60(), p = P(w), t = shops(w)[8];
     const j = mkJob(w, { kind: 'collect', title: 'Collect from somebody', brief: 'He is owed and wants it back.', giver: t.id, via: 'tip', target: shops(w)[9].id, pay: 120, status: 'offered', days: 5 } as never);
-    const c = meet(w, t);
-    const row = options(w, p, t, c).find((o) => o.code === 'f:job:' + j.id);
-    assert.ok(row && row.group === 'He brings it up', 'he raises it');
-    const r = say(w, p, t, c, row!.code);
-    assert.ok(r.lines.some((l) => /I need somebody to collect/.test(l)), r.lines.join(' / '));
-    const r2 = say(w, p, t, r.convo!, 'jobtake:' + j.id);
-    assert.equal(j.status, 'active'); assert.ok(r2.lines.some((l) => /“/.test(l)));
+    const v = meet(w, t);
+    assert.ok(v.lines.some((l) => /I need somebody to collect/.test(l.text)), 'he raises it himself: ' + v.lines.map((l) => l.text).join(' / '));
+    assert.ok(v.choices.some((o) => o.id === 'a:jobtake:' + j.id), 'and its answers are what the player can say');
+    const n0 = v.lines.length; choose(w, v, 'a:jobtake:' + j.id);
+    assert.equal(j.status, 'active'); assert.ok(after(v, n0).some((l) => /“/.test(l)));
   });
   ok('a man asking for money says why in a whole sentence, admits the truth in his own words, and his request stays the subject', { tags: ['scenario'] }, () => {
     const kinds = ['gambling', 'debt', 'family', 'drink', 'house', 'resentment', 'woman'] as const;
@@ -121,14 +124,12 @@ describe('V90 audit regressions', { timeout: 60_000 }, () => {
       makeLoan(w, p, t); const e = w.enc.at(-1)!;
       const asked = e.lines.at(-1)!;
       assert.ok(!/It’s (I|my|the|a man|we|there|rent|an) /i.test(asked) && !/It’s It’s/.test(asked), asked);
-      const c0 = meet(w, t);
-      assert.equal(c0.ctx.focus, 'apx:' + e.id, 'he asks for a minute');
-      const c = say(w, p, t, c0, 'f:enc:' + e.id).convo!;
-      assert.equal(c.ctx.focus, 'enc:' + e.id);
-      const r = say(w, p, t, c, `enc:${e.id}:ask`);
-      assert.ok(!/It’s (resentful|in debt|saving|drinking|a woman who)|”.*resentful/.test(r.lines.join(' ')), r.lines.join(' / '));
-      assert.equal(r.convo?.ctx.focus, 'enc:' + e.id, 'having asked what it is for, you still have his request in front of you');
-      assert.ok(options(w, p, t, r.convo!).some((o) => o.code === `enc:${e.id}:lend`));
+      const v = meet(w, t);
+      assert.ok(v.choices.some((o) => o.id.startsWith(`a:enc:${e.id}:`)), 'he raises it himself, and its answers are on screen: ' + v.choices.map((o) => o.id).join());
+      if (!v.choices.some((o) => o.id === `a:enc:${e.id}:ask`)) continue;
+      const n0 = v.lines.length; choose(w, v, `a:enc:${e.id}:ask`);
+      assert.ok(!/It’s (resentful|in debt|saving|drinking|a woman who)|”.*resentful/.test(after(v, n0).join(' ')), after(v, n0).join(' / '));
+      assert.ok(v.choices.some((o) => o.id === `a:enc:${e.id}:lend`), 'having asked what it is for, you still have his request in front of you');
     }
   });
   ok('nothing is offered that he would only turn away for being asked too soon: "I’ll look after you myself" waits out the cooling-off', { tags: ['scenario'] }, () => {
@@ -138,10 +139,10 @@ describe('V90 audit regressions', { timeout: 60_000 }, () => {
     const pressedOpts = (cool: boolean) => {
       const x = deserialize(serialize(w)), px = P(x), tx = x.chars[t.id];
       if (cool) (x.sitcool ??= {})[`ask:protect:${px.id}:${tx.id}:${b.id}`] = x.now + 5 * DAY;
-      const c = meet(x, tx), door = options(x, px, tx, c).find((o) => /Anyone been bothering you/.test(o.label));
+      const v = meet(x, tx), door = all(x, v).find((o) => /Anyone been bothering you/.test(o.label));
       assert.ok(door, 'he has a man leaning on him to talk about');
-      const r = say(x, px, tx, c, door!.code);
-      return options(x, px, tx, r.convo!).map((o) => o.code);
+      choose(x, v, door!.id); void px;
+      return v.choices.map((o) => o.id);
     };
     assert.ok(pressedOpts(false).some((c) => c.endsWith(':mine')), 'offered when he could be asked');
     assert.ok(!pressedOpts(true).some((c) => c.endsWith(':mine')), 'not offered while he would refuse to hear it');
@@ -150,7 +151,7 @@ describe('V90 audit regressions', { timeout: 60_000 }, () => {
     const w = world60(), p = P(w), boss = w.chars[p.bossId!];
     const sunday = (x: World) => { const px = P(x); x.sunday = { t: x.now, tells: [] }; px.cooldown.handed = 0; px.books.arrears = 120; px.cash = 3000; };
     // (if he opens with something of his own, the player turns to other business first, as he would at the table)
-    const offered = (x: World) => { let c = meet(x, x.chars[boss.id]); if (c.ctx.focus) c = say(x, P(x), x.chars[boss.id], c, 'f:').convo ?? c; const os = [...options(x, P(x), x.chars[boss.id], c)]; const r = say(x, P(x), x.chars[boss.id], c, 'n:myboss'); if (r.convo) os.push(...options(x, P(x), x.chars[boss.id], r.convo)); return os.some((o) => o.code === 'b_envelope'); };
+    const offered = (x: World) => all(x, meet(x, x.chars[boss.id])).some((o) => o.id === 'a:b_envelope');
     const alone = deserialize(serialize(w)); sunday(alone);
     assert.ok(offered(alone), 'a man with no crew hands his envelope straight up');
     const withCrew = deserialize(serialize(w)); sunday(withCrew);

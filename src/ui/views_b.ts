@@ -7,7 +7,6 @@ import { bgLabel, bgOf } from '../background';
 import { repLines } from '../crewlife';
 import { careerLines, recommendable, recruitable, rewardOptions, standingTable } from '../career';
 import { factText, famName, fmtTime, money, ownerBiz, shortTime } from '../core';
-import { options as dialogueOptions } from '../dialogue';
 import { GIG_HELP, GIG_LABEL } from '../gigs';
 import { KIND_HELP, activityOf, KIND_LABEL, approaches, canQuestion, crewMoves, jobChecks, schemes, traitWords, ventureOf } from '../jobs';
 import { available, current as meetCurrent } from '../meetings';
@@ -375,8 +374,6 @@ export function helpView(id: Id, lines: string[]): string {
 
 // ------------------------------------------------------------------ talk
 
-// V89: the conversation screen lives in talkview.ts
-export { talkView } from './talkview';
 
 export function peopleView(): string {
   const w = W();

@@ -78,7 +78,7 @@ const bMore: Act = {
 const offered = (c: Ctx) => c.w.jobs.find((j) => j.giver === c.n.id && j.status === 'offered' && (!j.assignee || j.assignee === c.h.id));
 const hasAsk = (c: Ctx) => c.w.enc.some((e) => e.status === 'open' && e.from === c.n.id && e.expires > c.w.now && e.opts.length);
 const jobOffer: Act = {
-  base: 'job', pane: 'business',
+  base: 'job', pane: 'business', opens: true,
   offers: (c) => { const j = offered(c); return j && !hasAsk(c) ? [{ code: 'job:' + j.id, label: `About what he asked: ${j.title}`, says: 'You had something for me?', note: `Pays ${money(j.pay ?? 0)}. He wants an answer.`, kind: 'his' }] : []; },
   offersFor: (c, id) => { const j = c.w.jobs.find((q) => q.id === id && q.status === 'offered'); return j ? [{ code: 'jobtake:' + j.id, label: 'I’ll take care of it', note: `It’s yours. Pays ${money(j.pay ?? 0)}.` }, { code: 'jobpass:' + j.id, label: 'Not this time', note: 'He will think a little less of you for it.' }] : []; },
   run: (c, code) => { const x = T(c), id = code.split(':')[1], j = c.w.jobs.find((q) => q.id === id); if (!j) return out(2); line(x, jobSaid(j)); if (j.brief) line(x, j.brief); return { minutes: 2, next: jobOffer.offersFor!(c, id) }; },
@@ -231,7 +231,7 @@ const rkBackAsk: Act = {
 const flDrop: Act = { base: 'fl_drop', pane: 'business', run: (c) => { c.v.lines.push({ who: 'narr', text: 'You leave it at that.' }); return out(3); } };
 // ---------------------------------------------------------------- a concern about a man, told to a man above him
 const pickConcern: Act = {
-  base: 'pick_concern', pane: 'business',
+  base: 'pick_concern', pane: 'business', opens: true,
   offers: (c) => (inFamily(c.h, c.n) && superior(c) ? [offer(c, 'pick_concern', 'Tell him something about a man')] : []),
   run: (c) => {
     const x = T(c), { w, p, t } = x;

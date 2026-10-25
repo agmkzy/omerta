@@ -100,8 +100,9 @@ export const onRevision: Listener[] = [];
 export function refresh(w: World, c: Character, subject: string, why: string): Belief {
   const m = minds(w), b = belief(w, c, subject);
   const prev = m.held.find((h) => h.who === c.id && h.subject === subject);
-  if (!prev) { m.held.push({ who: c.id, subject, value: b.value, conf: b.conf, uncertain: b.uncertain, t: w.now }); if (b.value) revise(w, c, subject, undefined, b.value, why); return b; }
-  if (prev.value !== b.value) { const from = prev.value; Object.assign(prev, { value: b.value, conf: b.conf, uncertain: b.uncertain, t: w.now }); revise(w, c, subject, from, b.value, why); }
+  // (a field with no value is left out, not set to undefined: a saved and loaded world must go on byte for byte the same)
+  if (!prev) { m.held.push({ who: c.id, subject, ...(b.value !== undefined ? { value: b.value } : {}), conf: b.conf, uncertain: b.uncertain, t: w.now }); if (b.value) revise(w, c, subject, undefined, b.value, why); return b; }
+  if (prev.value !== b.value) { const from = prev.value; if (b.value === undefined) delete prev.value; else prev.value = b.value; Object.assign(prev, { conf: b.conf, uncertain: b.uncertain, t: w.now }); revise(w, c, subject, from, b.value, why); }
   else Object.assign(prev, { conf: b.conf, uncertain: b.uncertain });
   return b;
 }

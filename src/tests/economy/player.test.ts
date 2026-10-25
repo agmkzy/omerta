@@ -9,7 +9,7 @@ import { DAY, WEEK, type World } from '../../types';
 import { S } from '../../ui/state';
 import { wayView } from '../../ui/views_c';
 import { canStart, startOp, lineOf } from '../../rackets';
-import { options, say, startConvo, type Convo, type DOpt } from '../../dialogue';
+import { begin, choose, everything, type Visit } from '../../conv/visit';
 import { bizView } from '../../ui/views_a';
 import { openAsks } from '../../asks';
 import { bizMove, priceOf, setManager } from '../../econ';
@@ -44,16 +44,13 @@ describe('the player in the criminal economy', { tags: ['scenario'] }, () => {
   });
 
   // ------------------------------------------------------------- flows 1-3, 6-8: through the conversation, as the player plays it
-  // (find a line the way the player does: open the conversation and follow the menus, never more than a few steps deep)
-  const find = (w: World, p: Character, t: Character, want: (o: DOpt) => boolean, c: Convo = startConvo(t.id)): { o: DOpt; c: Convo } | undefined => {
-    const seen = new Set<string>(); const q: Convo[] = [c];
-    for (let i = 0; i < 30 && q.length; i++) {
-      const cv = q.shift()!, opts = options(w, p, t, cv);
-      const hit = opts.find(want); if (hit) return { o: hit, c: cv };
-      for (const o of opts) if ((o.nav || o.code.startsWith('f:') || o.code.startsWith('n:')) && !seen.has(o.code)) { seen.add(o.code); const r = say(w, p, t, cv, o.code); if (r.convo) q.push(r.convo); }
-    }
-    return undefined;
-  };
+  // (find a line the way the player does: go and see him, and look under the headings)
+  const find = (w: World, p: Character, t: Character, code: string): Visit | undefined => { const v = begin(w, t.id); return [...v.choices, ...everything(w, v)].some((o) => o.id === 'a:' + code) ? v : undefined; void p; };
+  // say it; what follows is on screen
+  const sayIn = (w: World, v: Visit, code: string) => { const n0 = v.lines.length; choose(w, v, 'a:' + code); return v.lines.slice(n0).map((l) => l.text); };
+  // a figure named in a matter, on another day, as the player would: going back to him and raising it
+  const figure = (w: World, t: Character, sid: string, amt: string) => { const v = begin(w, t.id); if (!v.choices.some((o) => o.id === 'a:nm:' + sid)) choose(w, v, 'a:m:' + sid); return sayIn(w, v, `nm:${sid}:${amt}`); };
+  const fig = (v: Visit, sid: string) => v.choices.find((o) => o.id === 'a:nm:' + sid);
   const shopkeeper = (w: World) => Object.values(w.chars).filter((c) => c.alive && c.rank === 'civilian' && !c.familyId && ownerBiz(w, c.id)?.open && ownerBiz(w, c.id)!.kind !== 'casino').sort((a, b) => (a.id < b.id ? -1 : 1))[0];
   const meet = (w: World, p: Character, t: Character) => { (p.intro ??= {})[t.id] = w.now; rel(t, p.id).trust = 0.4; };
 
@@ -64,21 +61,21 @@ describe('the player in the criminal economy', { tags: ['scenario'] }, () => {
     // 1. the business is on the map: its page sends him to talk to the owner
     assert.match(screen(w, () => bizView(b.id)), new RegExp(`data-a="talk:${t.id}"`));
     // ...and in conversation, the question is there to ask
-    const f = find(w, p, t, (o) => o.code === 'buy_ask');
+    const f = find(w, p, t, 'buy_ask');
     assert.ok(f, 'he can ask whether the owner would sell');
-    let r = say(w, p, t, f!.c, 'buy_ask');
+    sayIn(w, f!, 'buy_ask');
     const sit = openAsks(w).find((x) => x.ak === 'buy' && x.terms?.by === p.id && x.biz === b.id)!;
     assert.ok(sit, 'it is a negotiation between them now');
     // 2. the figure is his to name: a low one is not taken
-    const row = options(w, p, t, r.convo!).find((o) => o.code === 'nm:' + sit.id)!;
-    assert.ok(row?.amount, 'the screen offers a figure to name: ' + options(w, p, t, r.convo!).map((o) => o.code).join(', '));
+    const row = fig(f!, sit.id);
+    assert.ok(row?.amount, 'the screen offers a figure to name: ' + f!.choices.map((o) => o.id).join(', '));
     const full = priceOf(w, b);
-    r = say(w, p, t, r.convo!, `nm:${sit.id}:${Math.round(full * 0.35 / 50) * 50}`);
+    let r = sayIn(w, f!, `nm:${sit.id}:${Math.round(full * 0.35 / 50) * 50}`);
     assert.equal(b.ownerId, t.id, 'a lowball offer does not buy it');
     // 3. a fair one does: the money changes hands and the place is his, on the record
     const cash0 = p.cash, tcash0 = t.cash;
-    for (let i = 0; i < 4 && b.ownerId !== p.id; i++) { w.now += 24 * 60; r = say(w, p, t, r.convo ?? startConvo(t.id), `nm:${sit.id}:${Math.round(full * 1.5 / 50) * 50}`); }
-    assert.equal(b.ownerId, p.id, 'it is his: ' + r.lines.join(' '));
+    for (let i = 0; i < 4 && b.ownerId !== p.id; i++) { w.now += 24 * 60; r = figure(w, t, sit.id, String(Math.round(full * 1.5 / 50) * 50)); }
+    assert.equal(b.ownerId, p.id, 'it is his: ' + r.join(' '));
     assert.ok(p.cash < cash0 && t.cash > tcash0 && cash0 - p.cash === t.cash - tcash0, 'the money went to the man who sold it');
     assert.ok(Object.values(w.facts).some((x) => x.kind === 'ownership' && x.actor === p.id && x.business === b.id), 'on the record');
   });
@@ -87,14 +84,15 @@ describe('the player in the criminal economy', { tags: ['scenario'] }, () => {
     const w = createWorld(7, 'Tony Marino'), p = P(w);
     const t = Object.values(w.chars).filter((c) => c.alive && c.rank === 'civilian' && ownerBiz(w, c.id)?.open && !ownerBiz(w, c.id)!.protection && ownerBiz(w, c.id)!.kind !== 'casino').sort((a, b) => (a.id < b.id ? -1 : 1))[0];
     const b = ownerBiz(w, t.id)!; meet(w, p, t);
-    const f = find(w, p, t, (o) => o.code === 'suggest');
-    assert.ok(f, 'the protection conversation can be opened');
-    let r = say(w, p, t, f!.c, 'suggest');
+    const f = find(w, p, t, 'suggest');
+    // (where the player may put protection to him as the layer's own demand, that is the way: visit.doProtect, Gate 3's own test)
+    if (!f) { const v = begin(w, t.id); assert.ok(everything(w, v).some((o) => o.id === 'protect'), 'the protection conversation can be opened'); return; }
+    sayIn(w, f, 'suggest');
     const sit = openAsks(w).find((x) => x.ak === 'protect' && x.terms?.by === p.id && x.biz === b.id)!;
     assert.ok(sit);
-    const row = options(w, p, t, r.convo ?? startConvo(t.id)).find((o) => o.code === 'nm:' + sit.id);
+    const row = fig(f, sit.id);
     assert.ok(row?.amount, 'a figure of his own');
-    for (let i = 0; i < 5 && b.protection?.collectorId !== p.id; i++) { w.now += 24 * 60; r = say(w, p, t, r.convo ?? startConvo(t.id), `nm:${sit.id}:15`); }
+    for (let i = 0; i < 5 && b.protection?.collectorId !== p.id; i++) { w.now += 24 * 60; figure(w, t, sit.id, '15'); }
     if (b.protection?.collectorId === p.id) assert.equal(b.protection.fee, 15, 'the fee is the one agreed');
     else assert.equal(sit.terms?.amt, 15, 'his figure is what was put to the man');
   });
@@ -105,14 +103,14 @@ describe('the player in the criminal economy', { tags: ['scenario'] }, () => {
     let done = false;
     for (const t of Object.values(w.chars).filter((c) => c.alive && c.rank === 'civilian' && ownerBiz(w, c.id)?.open).sort((a, b) => (a.id < b.id ? -1 : 1)).slice(0, 12)) {
       meet(w, p, t); const b = ownerBiz(w, t.id)!; bizMove(w, b, -b.cash, 'expense'); b.distress = 2; // a man who needs it
-      const f = find(w, p, t, (o) => o.code === 'offer_loan');
+      const f = find(w, p, t, 'offer_loan');
       if (!f) continue;
-      let r = say(w, p, t, f.c, 'offer_loan');
+      sayIn(w, f, 'offer_loan');
       const sit = openAsks(w).find((x) => x.ak === 'lend' && x.terms?.by === p.id && x.terms?.of === t.id);
       if (!sit) continue;
-      const row = options(w, p, t, r.convo ?? startConvo(t.id)).find((o) => o.code === 'nm:' + sit.id);
+      const row = fig(f, sit.id);
       assert.ok(row?.amount?.rate, 'a rate to name, beside the amount');
-      r = say(w, p, t, r.convo ?? startConvo(t.id), `nm:${sit.id}:700:0.04`);
+      sayIn(w, f, `nm:${sit.id}:700:0.04`);
       const d = w.debts.find((x) => x.creditor === p.id && x.debtor === t.id && x.status === 'active');
       if (d) { assert.equal(d.principal, 700); assert.equal(d.weeklyRate, 0.04); done = true; break; }
     }
@@ -123,9 +121,9 @@ describe('the player in the criminal economy', { tags: ['scenario'] }, () => {
     const w = createWorld(7, 'Tony Marino'), p = P(w), t = shopkeeper(w), b = ownerBiz(w, t.id)!;
     p.cash = 50000; t.cash = 0; b.distress = 3; meet(w, p, t);
     const s = openAsks(w).length; void s;
-    let r = say(w, p, t, find(w, p, t, (o) => o.code === 'buy_ask')!.c, 'buy_ask');
+    sayIn(w, find(w, p, t, 'buy_ask')!, 'buy_ask');
     const sit = openAsks(w).find((x) => x.ak === 'buy' && x.terms?.by === p.id)!;
-    for (let i = 0; i < 4 && b.ownerId !== p.id; i++) { w.now += 1440; r = say(w, p, t, r.convo ?? startConvo(t.id), `nm:${sit.id}:${priceOf(w, b) * 2}`); }
+    for (let i = 0; i < 4 && b.ownerId !== p.id; i++) { w.now += 1440; figure(w, t, sit.id, String(priceOf(w, b) * 2)); }
     assert.equal(b.ownerId, p.id);
     const html = screen(w, () => bizView(b.id));
     assert.match(html, /data-a="bmgr:[^"]*\\|hire"/, 'his own place offers him the choice');

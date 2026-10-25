@@ -1,5 +1,4 @@
 // Shared UI state. One world, one current view, a back stack, and the little bits of text that live between actions.
-import type { Convo, DOpt } from '../dialogue';
 import type { Meeting } from '../meetings';
 import type { OrderOpt } from '../orders';
 import type { Action, Id, Kind, World } from '../types';
@@ -34,7 +33,6 @@ export type View =
   | { t: 'books'; id: Id; lines: string[] }
   | { t: 'meeting'; m: Meeting; lines: string[] }
   | { t: 'guests'; picked: Id[] }
-  | { t: 'talk'; convo: Convo; lines: string[]; q?: string; history?: { q?: string; lines: string[] }[]; ended?: boolean }
   | { t: 'talk2'; v: import('../conv/visit').Visit } // (Gate 3: the new conversation screen, behind a switch: ui/talk2.ts)
   | { t: 'people' }
   | { t: 'brief' }
@@ -64,7 +62,6 @@ export const S = {
   notice: '' as string, // a one-off message shown at the top of whatever screen you land on
   chips: [] as { t: string; tone: 'good' | 'bad' | '' }[],
   opts: [] as Action[],
-  dopts: [] as DOpt[],
   planOpts: [] as OrderOpt[],
   lifeSub: 'you' as LifeSub,
   sub: {} as Record<string, string>, // which room of each section is open (family: men/org, business: rackets/money, journal: stories/known)
