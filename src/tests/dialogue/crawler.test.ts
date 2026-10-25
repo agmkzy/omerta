@@ -208,10 +208,11 @@ function fast() {
     const v = begin(w, m.id);
     assert.ok(everything(w, v).some((o) => o.id === 'a:how'), 'how he is keeping can be asked');
     choose(w, v, 'a:how');
-    const before = stateOf(w, m), n0 = v.lines.length;
-    choose(w, v, 'a:how');
+    assert.ok(!everything(w, v).some((o) => o.id === 'a:how'), 'once said, it is not offered again in the visit');
+    // (and put to him anyway, it pays nothing: the rule holds whatever the screen offers)
+    const before = stateOf(w, m), r = talk(w, m.id, 'how', {}, v);
     assert.equal(stateOf(w, m), before, 'a repeat pays nothing');
-    assert.match(v.lines.slice(n0).map((l) => l.text).join(' '), /already/);
+    assert.match(r.lines.join(' '), /already/);
     const v2 = begin(w, m.id);
     assert.ok(everything(w, v2).some((o) => o.id === 'a:how'), 'a new visit starts clean');
   });

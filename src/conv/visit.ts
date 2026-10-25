@@ -357,7 +357,9 @@ export function everything(w: World, v: Visit): Choice[] {
 // is on his mind, what a man in the player's position would put to him first, and the rest
 function actRows(c: Ctx, k: Pane | undefined, kinds: NonNullable<Offer['kind']>[]): Choice[] {
   if (c.v.th.shut) return [];
-  const xs = memo(c, 'acts', () => offersNow(c)).filter((o) => kinds.includes(o.kind ?? 'other') && (!k || o.pane === k) && !(c.h.cash < (o.cost ?? 0)));
+  // (what has been said in this visit is not offered again in it: it would change nothing until the player comes back)
+  const said = new Set(c.v.th.used ?? []);
+  const xs = memo(c, 'acts', () => offersNow(c)).filter((o) => kinds.includes(o.kind ?? 'other') && (!k || o.pane === k) && !(c.h.cash < (o.cost ?? 0)) && !said.has(o.code));
   // (a man who has turned cold on the player is in no mood for small talk or proposals: only what is between them)
   return xs.filter((o) => !c.v.th.cold || o.kind === 'his' || o.kind === 'between').map((o) => ({ id: 'a:' + o.code, label: o.label, says: o.says, note: o.note, group: o.kind === 'his' ? 'reply' : o.kind === 'between' || o.kind === 'mind' ? 'matter' : 'matter', pane: o.pane, ...(o.amount ? { amount: o.amount } : {}) }) as Choice);
 }

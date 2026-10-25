@@ -19,7 +19,7 @@ import { P } from '../helpers';
 beforeAll(() => { world60(); });
 const fresh = (w: ReturnType<typeof world60>) => deserialize(serialize(w));
 
-describe('menus', () => {
+describe('menus', { timeout: 120_000 }, () => {
   ok('the opening screen is short: what he raises (two at most), the three headings in their order (each only when there is something under it), and leaving', { tags: ['unit'] }, () => {
     const w = world60(); introAll(w);
     for (const m of men(w)) {

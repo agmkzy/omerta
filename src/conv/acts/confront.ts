@@ -186,7 +186,9 @@ const rvWarn: Act = {
 };
 const rvEase: Act = { base: 'rv_ease', pane: 'confront', run: (c) => { const x = T(c); door.tension(x.w, x.p, x.t, -0.2, true); tweak(x, 0.02, 0, -0.02); line(x, '“Fine. Fine. Let’s say it was a long day.” The air eases, a little.'); return out(5); } };
 // ---------------------------------------------------------------- what he has come to ask the player (an encounter), and its answers
-const encRows = (c: Ctx, id: string): Offer[] => { const e = asksOf(c.w, c.n).find((q) => q.id === id); return e ? [...e.opts.map((o) => ({ code: `enc:${e.id}:${o.code}`, label: o.label, note: o.hint })), ...(c.v.th.asked.includes('apx:wait:' + id) ? [] : [{ code: 'apx:wait:' + id, label: 'Can it wait?', note: 'He will wait. He will notice he had to.' }]), { code: 'apx:no:' + id, label: 'Not right now.', note: 'He will take it as it sounds.' }] : []; };
+// (what the player cannot pay for is not offered: an envelope, a gift, a sum larger than the money in his pocket)
+const costOf = (label: string) => { const m = /^(Give|Pay|Go, with|Make a call, put up|Take this|Put|Hand|Cover|Lend)\b[^$]*\$([\d,]+)/.exec(label); return m ? Number(m[2].replace(/,/g, '')) : 0; };
+const encRows = (c: Ctx, id: string): Offer[] => { const e = asksOf(c.w, c.n).find((q) => q.id === id); return e ? [...e.opts.filter((o) => costOf(o.label) <= c.h.cash).map((o) => ({ code: `enc:${e.id}:${o.code}`, label: o.label, note: o.hint })), ...(c.v.th.asked.includes('apx:wait:' + id) ? [] : [{ code: 'apx:wait:' + id, label: 'Can it wait?', note: 'He will wait. He will notice he had to.' }]), { code: 'apx:no:' + id, label: 'Not right now.', note: 'He will take it as it sounds.' }] : []; };
 const encOpen: Act = {
   base: 'enc_open', pane: 'business', opens: true,
   offersFor: encRows,
