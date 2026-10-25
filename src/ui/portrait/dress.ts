@@ -394,7 +394,7 @@ export function jewelOf(F: Face, D: Dress, kind: number): string {
   if (D.neckline === 'tie') return s`<path d="M${cx - 1.6} ${ny + 8}H${cx + 1.6}" stroke="${GOLD}" stroke-width=".55"/><path d="M${cx - 1.6} ${ny + 7.8}H${cx}" stroke="#f0d9a0" stroke-width=".2" opacity=".8"/>`;
   const turtle = D.neckline === 'turtle';
   const yb = turtle ? ny + 6.6 : D.neckline === 'crew' ? ny + 3.4 : Math.min(D.vDepth - 1.2, ny + 7.2);
-  const w = turtle ? n0 + 0.4 : n0 - 1;
+  const w = turtle ? n0 + 0.4 : D.neckline === 'crew' ? n0 - 1 : F.nw * 0.8; // in an open collar the chain lies inside the V, under the collar points
   let j = s`<path d="M${cx - w} ${ny - (turtle ? -0.6 : 0.2)}Q${cx} ${yb + 0.6} ${cx + w} ${ny - (turtle ? -0.6 : 0.2)}" stroke="${GOLD}" stroke-width=".55" fill="none"/><path d="M${cx - w + 0.4} ${ny + (turtle ? 0.8 : 0)}Q${cx - w * 0.4} ${yb - 0.4} ${cx + 0.4} ${yb + 0.3}" stroke="#f0d9a0" stroke-width=".2" fill="none" opacity=".8"/>`;
   const py = yb + 0.5;
   if (kind === 2) j += s`<path d="M${cx} ${py}v3M${cx - 0.9} ${py + 0.9}h1.8" stroke="${GOLD}" stroke-width=".55"/>`;
