@@ -75,8 +75,7 @@ export function openingAct(v: string): void {
     case 'last': D().last = rollSurname(Math.random, D().last); return;
     case 'bg': if (bgOf(x)) D().bg = x; return;
     case 'shuffle': S.look = { ...randomLook() }; return;
-    // (the group names are LOOK_GROUPS; ui/state.ts types draft.lg with the three older names, so it is written through a cast)
-    case 'lg': if ((LOOK_GROUPS as string[]).includes(x)) (D() as { lg?: string }).lg = x; return;
+    case 'lg': if ((LOOK_GROUPS as string[]).includes(x)) D().lg = x as LookGroup; return;
     case 'look': {
       const [key, val] = x.split(':');
       if (key === '@rank') { if (PREVIEW_RANKS.includes(val as Rank)) previewRank = val as Rank; return; } // the preview only: how he would dress at a rank
@@ -168,7 +167,7 @@ function namePanel(): string {
 }
 function lookPanel(): string {
   // One group at a time, so two dozen choices never sit on the screen together.
-  const cur = (D() as { lg?: string }).lg ?? '';
+  const cur = D().lg ?? '';
   const g: LookGroup = (LOOK_GROUPS as string[]).includes(cur) ? (cur as LookGroup) : 'Face';
   const eff = resolveLook(previewChar()) as unknown as Record<string, unknown>;
   // (the inline flex-wrap lets the five tabs wrap onto two lines on a phone even before web/css/opening-look.css is loaded)

@@ -129,12 +129,41 @@ Branch `ui-rebuild` from `main` at 7c1810c, the Gate 4 deploy. The audit and the
 | `before-conversation-mobile.jpg` | `conversation-mobile.jpg` |
 | `before-person-desktop.jpg` | `person-desktop.jpg` |
 | `before-money-desktop.jpg` | `money-desktop.jpg` |
-| | `world-mobile.jpg` |
+| | `world-mobile.jpg`, `people-desktop.jpg`, `creation-desktop.jpg` |
 
 ## 3. Testing
-TESTING
+- **`npm run typecheck`:** clean.
+- **`npm run test:all` on the merged branch** (UI rebuild plus portraits): **646 passed, 0 failed** (14 opt-in long runs skipped).
+  - Earlier runs during the work had timeouts while two suites shared the machine: `dialogue/menus`, `situations/information`, and the portrait timing check. Each passed when rerun alone (18/18), and the final run on a quiet machine passed whole.
+- **New interface tests, `src/tests/interface/` (16):**
+  - every action the router handles is offered by some screen;
+  - choices are numbered in order with the way out last, escape their labels, and draw nothing over nothing;
+  - the conversation:
+    - its header holds the man and not his words;
+    - the context box is read from the records and says favours once;
+    - a figure is a numbered group;
+    - a heading names itself;
+    - an ended visit offers only the way on and his page;
+  - one money account, agreed by World and Money;
+  - his page hides his debts with third parties;
+  - an event names its culprit only when the player knows;
+  - *Your word* lists favours and promises and leaves out kept ones;
+  - decision screens are numbered.
+- **Browser:**
+  - **Screen sizes:** 1440×900, 1920×1080, 1024×768, 375×812 and 320×568.
+  - **Screens checked:** the conversation (keys 1–9, focus, the ☰ panel, region stability across turns), World, People, his page, Family (your men, the tree), Business (rackets, money), Journal (stories, your word), *Let time pass*, your page, the Herald, the opening and the creation screen.
+  - **Result:** no sideways scroll at phone widths, and no console errors from the new code.
 
-## 4. Limitations
+## 4. Portraits (merged from branch `portraits`)
+A separate agent reworked the portraits alongside this rebuild:
+- a layered renderer in `src/ui/portrait/` (face, head, hair, beard, hats, dress, extras), with anchor points fitted to each face;
+- about twice the appearance choices at creation, in five groups (Face, Features, Hair, Clothes, Details);
+- civilians dressed for their trade, and rank shown through dress;
+- NPCs from older saves keep their faces, and every new `Look` field is optional.
+
+Its comparison and gallery pages are `docs/portraits/compare.html` and `docs/portraits/gallery.html`, rebuilt with `npx tsx docs/portraits/build.ts`. Its creation-screen CSS is `web/css/opening-look.css`, and `draft.lg` is now typed as its `LookGroup`.
+
+## 5. Limitations
 - **Some section pieces kept their own markup.** These are the family tree, the ways-to-earn cards, the first-week guide, Sunday at the club, the road to the next rank and the Herald. They are restyled on the tokens, but not rebuilt on the components, because each is a one-off layout with no shared component.
 - **The keyboard picks from the first numbered list on a screen.** A story with both a question and *What you can do* shows the second as plain rows for that reason.
 - **The browser checks used a fresh test game** (day 7, two men, no rackets) on `play.localhost`. The test save from Gate 4 was lost when the app restarted. Screens that need a long game (a broken promise, a quarrel, a crew in arrears) are covered by the interface tests and Gate 4's scenarios, not re-played here.
