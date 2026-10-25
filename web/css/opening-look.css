@@ -1,0 +1,11 @@
+/* The creation screen's appearance panel (portraits rework). Additive only: it refines classes already defined for the
+   opening screens (.om-subtabs, .om-chip, .om-chips, .om-swatches) and adds two of its own. Import it from web/main.ts. */
+
+/* five groups (Face, Features, Hair, Clothes, Details): one row on a wide screen, two on a phone */
+.om-subtabs--look { flex-wrap: wrap; row-gap: 6px; }
+.om-subtabs--look .om-chip { flex: 1 1 auto; min-width: 0; padding: 0 10px; letter-spacing: .08em; }
+
+/* "Dressed as": preview his taste at a higher rank */
+.om-chips--rank .om-chip { min-height: 36px; padding: 0 12px; }
+.om-look-note { margin: 8px 0 0; font-size: 12.5px; max-width: 46ch; }
+
