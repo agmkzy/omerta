@@ -9,6 +9,7 @@ import { clamp, peek } from '../core';
 import { temper, viewOf } from '../temper';
 import { say as vsay } from '../voicesheet';
 import { openAsks } from '../asks';
+import { reached } from '../jobs';
 import type { Character, World } from '../types';
 import * as door from './doors';
 import { agoWords, him, lastOf, plain, remember, restate, says, type Act, type Ctx, type Offer, type Out } from './kit';
@@ -180,6 +181,7 @@ export function perform(c: Ctx, code: string, label: string): Done {
   if (act.repeat && v.lines.length > from && !r.skip) (t.talk ??= {})[tkey] = { d: day0, sig: act.repeat.sig(c, arg), n: 1 };
   { const m = t.talk ?? {}, ks = Object.keys(m); if (ks.length > 18) delete m[ks.sort((x, y) => m[x].d - m[y].d)[0]]; }
   if (!act.nav && !act.opens) used.push(key);
+  reached(w); // (what was said may have done what a man's work asked for: an owner agreeing to pay)
   if (r.end || r.meeting || act.nav) return { ...r, minutes: r.minutes ?? 10 };
   return { ...r, minutes: r.minutes ?? 10, ...govern(c, code, from) };
 }

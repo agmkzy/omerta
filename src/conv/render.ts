@@ -46,6 +46,8 @@ const B: Record<string, Entry> = {
   'job.ack.done': { _: ['“Well? {job}. How did it go?”', '“I hear {job} got done. Tell me about it.”'] },
   'job.ack.thanks': { _: ['“{job}. Good work.”', '“You did right by me with {job}.”'], cold: ['“{job}. Fine.”'] },
   'job.ack.failed': { _: ['“{job}. I heard how that went.”', '“About {job}. That was a mess.”'], hothead: ['“{job}? What happened there?”'] },
+  'job.ack.moot': { _: ['“{job}. Forget it, it sorted itself out.”', '“That business, {job}. It doesn’t need doing any more.”'] },
+  'job.ack.declined': { _: ['“You turned down {job}. I gave it to someone else.”'], proud: ['“You said no to {job}. I remember.”'] },
   'job.ack.ignored': { _: ['“I put work your way. You never came.”', '“I had something for you. You didn’t want it, I suppose.”'], proud: ['“I don’t offer twice.”'] },
   'report.job': { _: ['“It’s done. Here’s how it went.”'] },
   // the same question, the same answer, nothing changed: he says so

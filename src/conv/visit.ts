@@ -30,6 +30,7 @@ import { newThread, restate, acquainted, agoWords, card, ctx, first, him, lastOf
 export { acquainted, relationOf, PANES, type Choice, type Pane, type Say, type TalkMemory, type Visit } from './kit';
 import type { Meeting } from '../meetings';
 import { subjectsOf } from './subjects/life';
+import { askedInPerson } from './pursuits';
 import { candourOf, subjectsHeldBy } from './acts/subjects';
 import { pathInfo } from '../path';
 import { readiness } from '../career';
@@ -179,6 +180,7 @@ function doPromise(c: Ctx, type: ObType, rid: Id) {
     type, obligor: h.id, beneficiary: n.id, promisee: n.id, from: w.now, by: w.now + (type === 'result' ? 30 : 10) * DAY, matter: { for: n.id, against: a.id, biz, fact: r.fact }, notify: [n.id], words: 'promise.' + type,
     spec: type === 'action' && cap ? { kind: 'actionDone', act: 'raise', target: cap.id, about: r.about } : type === 'result' ? { kind: 'noHostility', actor: a.id, target: n.id, biz, days: 30 } : { kind: 'effort', acts: ['raise'], about: r.about, floor: 0.15 },
   }, g);
+  askedInPerson(w, n.id, a.id, r); // (his trouble is now in the player's hands: he waits on that, not asks again)
   r.status = 'agreed'; note(r, w.now, `${h.name} promised`);
   remember(w, n.id, 'help:' + r.id, 'promised');
   c.v.topic = undefined;
@@ -202,6 +204,7 @@ function openProgress(c: Ctx, ob: Obligation, req?: Request) {
   // he has seen the trouble stop and asks whether it was the player's doing: the replies answer that question
   if (!since && w.now - ob.from > 7 * DAY && !did) {
     c.v.choices = [{ id: `credit:no:${ob.id}`, label: line(c, 'credit.notMe'), group: 'reply' }, { id: `credit:lie:${ob.id}`, label: line(c, 'credit.claim'), note: 'You had nothing to do with it.', group: 'reply' }, { id: 'more', label: 'Something else…', group: 'more' }, { id: 'leave', label: 'Leave', group: 'leave' }];
+    c.v.waiting = { q: 'whether it was you', choices: c.v.choices.filter((x) => x.group === 'reply') };
     return;
   }
   // (if he has heard how it went, his answer is the whole of it: that he went, and what came of it, in one breath)
@@ -209,6 +212,7 @@ function openProgress(c: Ctx, ob: Obligation, req?: Request) {
   c.v.choices = (did
     ? [{ id: `report:done:${ob.id}${how ? ':' + how : ''}`, label: how ? passLine(c, ob, how) : line(c, 'report.raised', { captainFirst: cap ? first(cap.name) : 'the family' }), group: 'reply' }]
     : [{ id: `report:notyet:${ob.id}`, label: line(c, 'report.notYet'), group: 'reply' }, { id: `report:lie:${ob.id}`, label: line(c, 'report.raised', { captainFirst: cap ? first(cap.name) : 'the family' }), note: `You haven’t been to see ${cap ? first(cap.name) : 'anyone'}.`, group: 'reply' }, { id: `report:cannot:${ob.id}`, label: line(c, 'report.cannot'), group: 'reply' }]) as Choice[];
+  c.v.waiting = { q: 'where it stands', choices: c.v.choices.filter((x) => x.group === 'reply') };
   c.v.choices.push({ id: 'more', label: 'Something else…', group: 'more' }, { id: 'leave', label: 'Leave', group: 'leave' });
 }
 function doReport(c: Ctx, kind: 'done' | 'notyet' | 'lie' | 'cannot', obId: Id, pass?: 'done' | 'refused') {
@@ -340,7 +344,8 @@ function pane(c: Ctx, k: Pane, all = false) {
 // The headings: what he brings up himself first (answered directly, no heading), then Business, Personal, Confront, and leaving
 function home(c: Ctx) {
   c.v.pane = undefined; c.v.more = false; c.v.topic = undefined;
-  const his = actRows(c, undefined, ['his']).slice(0, 2);
+  // (what he asked and is still waiting on comes first, until it is answered: looking at something else does not unask it)
+  const his = [...(c.v.waiting ? [{ id: 'answer', label: `Answer him: ${c.v.waiting.q}`, group: 'reply' as const }] : []), ...actRows(c, undefined, ['his']).slice(0, 2)];
   const heads: Choice[] = PANES.filter((k) => subjects(c, k).length || subjects(c, k, true).length).map((k) => ({ id: 'u:' + k, label: PANE_WORD[k], group: 'intent' }));
   c.v.choices = [...his, ...heads, { id: 'leave', label: 'Leave', group: 'leave' }];
 }
@@ -348,7 +353,7 @@ function home(c: Ctx) {
 function general(c: Ctx) { c.memo.clear(); if (c.v.pane) pane(c, c.v.pane); else home(c); }
 // Everything plausible, under all three headings (spec §8.2: filtered only for plausibility, never for relevance)
 export function everything(w: World, v: Visit): Choice[] {
-  const c = ctx(w, v), out: Choice[] = [];
+  const c = ctx(w, v), out: Choice[] = v.waiting ? [{ id: 'answer', label: `Answer him: ${v.waiting.q}`, group: 'reply' }] : [];
   for (const k of PANES) out.push(...subjects(c, k, true));
   if (!v.th.cold && !v.th.shut) out.push({ id: 'news', label: line(c, 'ask.news'), group: 'social' }, { id: 'spend', label: line(c, 'spend.time.' + partOfDay(w.now)), group: 'social' });
   out.push({ id: 'home', label: 'Never mind', group: 'more' }, { id: 'leave', label: 'Leave', group: 'leave' });
@@ -428,7 +433,8 @@ function jobNews(c: Ctx) {
   const { w, h, n } = c;
   const xs = w.jobs.filter((j) => j.giver === n.id && j.assignee === h.id && ['done', 'failed', 'expired'].includes(j.status) && w.now - j.created < 45 * DAY && !lastOf(w, n.id, 'job:' + j.id));
   for (const j of xs.slice(-2)) {
-    const key = j.status === 'done' ? (j.reported ? 'job.ack.thanks' : 'job.ack.done') : j.status === 'failed' ? 'job.ack.failed' : 'job.ack.ignored';
+    // (work the player took on and that stopped being needed is not work he turned his nose up at: he knows it was taken)
+    const key = j.status === 'done' ? (j.reported ? 'job.ack.thanks' : 'job.ack.done') : j.status === 'failed' ? 'job.ack.failed' : j.accepted ? 'job.ack.moot' : j.status === 'declined' ? 'job.ack.declined' : 'job.ack.ignored';
     him(c, plain(n.id, key, { job: jobPhrase(j.title) }, j.status === 'done' ? 'warm' : 'cold'));
     remember(w, n.id, 'job:' + j.id, j.status);
   }
@@ -483,6 +489,9 @@ function notNow(w: World, v: Visit): Visit {
 }
 function chooseIn(w: World, v: Visit, id: string): { v: Visit; minutes: number; meeting?: Meeting; settle?: Id } {
   const c = ctx(w, v), [kind, a1, a2] = id.split(':');
+  // (back to the question he is waiting on; or the question answered, by any of its answers)
+  if (id === 'answer' && v.waiting) { v.choices = [...v.waiting.choices, { id: 'more', label: 'Something else…', group: 'more' }, { id: 'leave', label: 'Leave', group: 'leave' }]; return { v, minutes: 0 }; }
+  if (v.waiting?.choices.some((x) => x.id === id)) v.waiting = undefined;
   // moving between the headings is not said aloud and takes no time
   if (kind === 'u' || kind === 'all') { if (PANES.includes(a1 as Pane)) pane(c, a1 as Pane, kind === 'all'); return { v, minutes: 0 }; }
   if (id === 'home' || id === 'more') { home(c); return { v, minutes: 0 }; }
@@ -496,6 +505,7 @@ function chooseIn(w: World, v: Visit, id: string): { v: Visit; minutes: number; 
   const spoken = base?.says ?? label;
   if (id === 'leave') {
     v.ended = true;
+    if (v.waiting) { narr(c, 'You leave without answering him.'); door.regard(w, c.n, c.h.id, 'trust', -0.01, `${c.h.name} didn’t answer him`); remember(w, c.n.id, 'unanswered', v.waiting.q); v.waiting = undefined; }
     // (walking out on a refusal is taking it: he said no, and the matter is remembered as refused, as if the player had let it go)
     if (v.topic?.startsWith('intervene:')) { const ob = social(w).obs.find((o) => o.id === v.topic!.slice(10)); if (ob) { remember(w, c.n.id, mkey(ob), 'refused', interveneSig(c, ob)); const rq = social(w).requests.filter((x) => x.by === c.h.id && x.of === c.n.id && x.parent === ob.id && x.status === 'open').at(-1); if (rq) { rq.status = 'refused'; note(rq, w.now, 'he walked out on it'); } } }
     const r = v.approach ? social(w).requests.find((x) => x.id === v.approach) : undefined;
@@ -556,7 +566,7 @@ function openHelpChoices(c: Ctx, r: Request, details = false) {
 }
 function helpRefuse(c: Ctx, rid: Id) {
   const { w, h, n } = c, r = social(w).requests.find((x) => x.id === rid);
-  if (r) { r.status = 'refused'; note(r, w.now, `${h.name} would not help`); }
+  if (r) { if (r.against) askedInPerson(w, n.id, r.against, r); r.status = 'refused'; note(r, w.now, `${h.name} would not help`); }
   door.regard(w, n, h.id, 'trust', -0.03, `${h.name} would not help him`);
   him(c, plain(n.id, 'react.help.refused', {}, 'cold'));
   remember(w, n.id, 'help:' + rid, 'refused');
@@ -865,6 +875,7 @@ function doNews(c: Ctx) {
     him(c, onSeekHelp(pn, a));
     const req = social(w).requests.find((x) => x.by === n.id && x.of === h.id && x.status === 'open') ?? request(w, { by: n.id, of: h.id, wants: 'intervene', about: 'trouble:' + a.id, for: n.id, against: a.id, biz: ownerBiz(w, n.id)?.id, fact: his.fact });
     remember(w, n.id, 'trouble:' + his.id, 'told');
+    askedInPerson(w, n.id, a.id, req);
     c.v.topic = 'help:' + req.id;
     return openHelpChoices(c, req, false);
   }

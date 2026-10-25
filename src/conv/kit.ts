@@ -62,6 +62,7 @@ export interface Visit {
   approach?: Id;           // the request he came to you with, when he came to you
   pane?: Pane;             // the heading the talk is under (Business, Personal, Confront), when it is under one
   th: Thread;              // what this conversation is on
+  waiting?: { q: string; choices: Choice[] }; // a question he put to the player and is still waiting on: it stays his until answered
 }
 // What has passed between the player and a man across visits, as it bears on what is said next (kept small: World.social.talks)
 export interface TalkMemory { visits: number; last: number; topics: { k: string; t: number; out: string; sig?: string }[]; heard: string[] }

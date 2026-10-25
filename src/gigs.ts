@@ -100,11 +100,12 @@ function escortGig(w: World, p: Character): boolean {
   const b = pick(w, shops);
   const o = w.chars[b.ownerId];
   const goods = GOODS[b.kind];
-  const col = w.chars[b.protection!.collectorId];
+  // (the man who wants a man in the cab is the shop's collector, unless that is the player himself: then it is the owner asking)
+  const col0 = w.chars[b.protection!.collectorId], col = col0?.alive && col0.id !== p.id ? col0 : undefined;
   const pay = Math.round(w.rng.int(180, 360) / 10) * 10;
   mkJob(w, {
-    kind: 'gig', title: `Ride shotgun for ${b.name}’s delivery`, giver: col?.alive ? col.id : o.id, via: 'opportunity', assignee: p.id, biz: b.id, pay, days: 4,
-    brief: `${b.name} pays your family, and ${o.name} has a truck of ${goods} coming in on ${when(w, 2)} night. Word is someone from outside has been watching the route. ${col?.alive ? col.name + ' would' : o.name + ' would'} like a man in the cab. It pays ${money(pay)}.`,
+    kind: 'gig', title: `Ride shotgun for ${b.name}’s delivery`, giver: col ? col.id : o.id, via: 'opportunity', assignee: p.id, biz: b.id, pay, days: 4,
+    brief: `${b.name} pays your family, and ${o.name} has a truck of ${goods} coming in on ${when(w, 2)} night. Word is someone from outside has been watching the route. ${col ? col.name + ' would' : o.name + ' would'} like a man in the cab. It pays ${money(pay)}.`,
     extra: { gig: 'escort' },
   });
   return true;

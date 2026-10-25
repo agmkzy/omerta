@@ -187,6 +187,15 @@ function stopTrouble(w: World, p: Pursuit) {
   p.next = w.now + DAY;
 }
 
+// He has put his trouble to a man in person (the player, in conversation) rather than on his own turn: that is the route he is on now,
+// and he waits on that man's answer as he would on any other (an agreement, then the promise that came of it; or a refusal, which
+// rules that man out). Without this he would go on as if he had asked nobody, and come back asking the same man again as if new.
+export function askedInPerson(w: World, who: Id, against: Id, req: Request) {
+  const p = P(w).find((x) => x.who === who && x.kind === 'stopTrouble' && x.status === 'active' && x.against === against);
+  if (!p || p.waitingOn === req.id) return;
+  p.route = 'intercessor'; p.with = req.of; p.waitingOn = req.id; p.waitedFrom = w.now; p.next = w.now + DAY;
+  log(w, p, 'intercessor', req.of, 'pending');
+}
 // A man in the life asked by someone in trouble to take it up: the same decision as the player's captain makes (onIntervention), on
 // his own perception; yes is his promise to raise it with the man over the one causing it.
 export function answerIntervention(w: World, r: Request) {

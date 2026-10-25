@@ -5,7 +5,7 @@ import { addFact, bear, clamp, compat, ease as coreEase, feel, feelAtLeast, feel
 import * as deeds from '../deeds';
 import { share, confide as tellAbout } from '../actions';
 import { handOver as booksHandOver, react as booksReact } from '../books';
-import { bossOffer, declineJob, mkJob, oppFrom, takeJob, tipFrom } from '../jobs';
+import { bossOffer, declineJob, mkJob, oppFrom, reached, takeJob, tipFrom } from '../jobs';
 import { choose as encChoose } from '../encounters';
 import { askAbout as sitAskAbout, helpWith as sitHelpWith } from '../situations';
 import { matterAct as mAct } from '../matters';
@@ -71,6 +71,7 @@ export function agree(w: World, sit: Situation, about: string): Act | undefined 
   const by = sit.terms?.of;
   if (!by) return undefined;
   agreeAsk(w, sit);
+  reached(w); // (an agreement may be what a man's work asked for: it is done the moment it is)
   return record(w, { actor: by, act: 'agree', target: sit.terms?.by, about });
 }
 // pay: money from one man to another (core.transfer: the one door for it)

@@ -109,7 +109,7 @@ describe('V90 audit regressions', { timeout: 60_000 }, () => {
   });
   ok('work he has offered you, he raises when you see him, and you answer it to his face', { tags: ['unit'] }, () => {
     const w = world60(), p = P(w), t = shops(w)[8];
-    const j = mkJob(w, { kind: 'collect', title: 'Collect from somebody', brief: 'He is owed and wants it back.', giver: t.id, via: 'tip', target: shops(w)[9].id, pay: 120, status: 'offered', days: 5 } as never);
+    const j = mkJob(w, { kind: 'collect', title: 'Collect from somebody', brief: 'He is owed and wants it back.', giver: t.id, via: 'tip', assignee: p.id, target: shops(w)[9].id, pay: 120, status: 'offered', days: 5 } as never);
     const v = meet(w, t);
     assert.ok(v.lines.some((l) => /I need somebody to collect/.test(l.text)), 'he raises it himself: ' + v.lines.map((l) => l.text).join(' / '));
     assert.ok(v.choices.some((o) => o.id === 'a:jobtake:' + j.id), 'and its answers are what the player can say');

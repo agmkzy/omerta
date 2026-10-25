@@ -102,6 +102,8 @@ export function standingWord(s: number): string {
 export type NewJob = Omit<Job, 'id' | 'created' | 'expires' | 'status'> & { days?: number; status?: Job['status'] };
 export function mkJob(w: World, j: NewJob): Job {
   const { days, status, ...rest } = j;
+  // (nobody gives work to himself: a job whose giver would be the man doing it is nobody's but his own, and is not a job)
+  if (rest.giver && rest.giver === rest.assignee) rest.giver = null;
   if (rest.kind !== 'summons') {
     const same = w.jobs.find((q) => q.kind === rest.kind && q.target === rest.target && q.biz === rest.biz && (((q.status === 'offered' || q.status === 'active') && rest.via !== 'order' && rest.via !== 'scheme') || q.giver === rest.giver && q.assignee === rest.assignee && ((q.status === 'offered' || q.status === 'active') || (w.now - q.created < 10 * DAY && q.via === rest.via && rest.via !== 'order' && rest.via !== 'scheme'))));
     if (same) return same;
@@ -321,6 +323,7 @@ export function newOffer(w: World) {
 export function takeJob(w: World, j: Job) {
   j.status = 'active';
   j.assignee = w.playerId!;
+  j.accepted = w.now;
   delete j.due;
 }
 export function declineJob(w: World, j: Job) {
@@ -374,9 +377,35 @@ export function assign(w: World, j: Job, memberId: Id, orders: 'quiet' | 'hard')
   for (const q of w.jobs) if (q !== j && q.status === 'offered' && q.kind === j.kind && q.target === j.target && q.biz === j.biz && q.kind !== 'summons') { q.status = 'expired'; q.notes = [...(q.notes ?? []), 'Taken up under another name.']; }
   j.status = 'active';
   j.assignee = memberId;
+  j.accepted = w.now;
   j.orders = orders;
   j.due = w.now + w.rng.int(1, 3) * DAY;
   return null;
+}
+
+// Whether what the work asked for has been done by the man it was given to (or his own men), however he went about it: in
+// conversation, through the job's own screen, or on his own initiative. The job is one record; this is the one test of it.
+//   lean    the shop now pays him (or one of his men)
+//   handle  he has been at the man since it was given: a beating, a threat, damage to his place
+// Other kinds are done through their own screen (a collection, a delivery, a contract), which resolves them there.
+export function objectiveMet(w: World, j: Job): boolean {
+  const who = new Set([j.assignee, ...Object.values(w.chars).filter((c) => c.bossId === j.assignee).map((c) => c.id)]);
+  if (j.kind === 'lean') { const b = j.biz ? w.biz[j.biz] : undefined; return !!b?.protection && who.has(b.protection.collectorId) && (b.protection.since ?? j.created) >= j.created - DAY; }
+  if (j.kind === 'handle' && j.target) return Object.values(w.facts).some((f) => f.t >= j.created && f.actor && who.has(f.actor) && (f.victim === j.target || (!!f.business && w.biz[f.business]?.ownerId === j.target)) && ['beating', 'threat', 'vandalism'].includes(f.kind));
+  return false;
+}
+// Work of the player's that has been done by doing it: finished as if he had done it from the job's own screen (paid, credited, counted
+// and remembered by the man who gave it), with a word on World. Work offered and done before he said yes counts as taken and done.
+export function reached(w: World) {
+  const p = PL(w);
+  if (!p) return;
+  for (const j of w.jobs) {
+    if ((j.status !== 'active' && j.status !== 'offered') || j.assignee !== p.id || !objectiveMet(w, j)) continue;
+    if (j.status === 'offered') takeJob(w, j);
+    const r = finishJob(w, j, true);
+    const g = j.giver ? w.chars[j.giver] : undefined;
+    addFact(w, { kind: 'report', actor: j.giver ?? undefined, victim: p.id, minor: true, text: `${j.title}: done.${g?.alive ? ` ${g.name} will want to hear it from you.` : ''}${r.lines.length ? ' ' + r.lines.join(' ') : ''}`, district: p.district }, { witnesses: [p.id] });
+  }
 }
 
 export function approaches(w: World, j: Job): Approach[] {
@@ -814,6 +843,7 @@ export function staleReason(w: World, j: Job): string | null {
 }
 export function pruneJobs(w: World) {
   const p = PL(w);
+  reached(w); // (what was asked for and has been done is done, not "no longer needed")
   for (const j of w.jobs) {
     if (j.status !== 'offered' && j.status !== 'active') continue;
     const why = staleReason(w, j);

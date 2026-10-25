@@ -5,7 +5,7 @@
 import { askBetween } from '../../asks';
 import { readiness } from '../../career';
 import { clamp, peek } from '../../core';
-import { jobSaid, standingWord } from '../../jobs';
+import { jobSaid, staleReason, standingWord } from '../../jobs';
 import { pathInfo } from '../../path';
 import { PROBLEM_LABEL } from '../../people';
 import { RECRUIT_COST } from '../../orders';
@@ -61,7 +61,7 @@ const work: Act = {
 const bNeed: Act = {
   base: 'b_need', pane: 'business',
   offers: (c) => (isBoss(c) && !asked(c, 'b_need') ? [offer(c, 'b_need', 'Ask what he needs done', 'It could be anything.')] : []),
-  run: (c) => { const x = T(c), { w, t } = x, n0 = w.jobs.length; ask(c, 'b_need'); if (door.bossWork(w) || w.jobs.length > n0) { c.v.lines.push({ who: 'narr', text: `${t.name} thinks a moment.` }); line(x, jobSaid(w.jobs.at(-1)!)); } else line(x, `${t.name} waves a hand. "Nothing now. Don’t look for work. It finds you."`); return out(15); },
+  run: (c) => { const x = T(c), { w, t } = x, n0 = w.jobs.length; ask(c, 'b_need'); const held = inHandFrom(c); if (held) { line(x, `"You’ve still got ${held.title.length <= 48 ? `‘${held.title}’` : 'what I gave you'}. Finish that first."`); return out(5); } if (door.bossWork(w) || w.jobs.length > n0) { c.v.lines.push({ who: 'narr', text: `${t.name} thinks a moment.` }); line(x, jobSaid(w.jobs.at(-1)!)); } else line(x, `${t.name} waves a hand. "Nothing now. Don’t look for work. It finds you."`); return out(15); },
 };
 const bMore: Act = {
   base: 'b_more', pane: 'business',
@@ -75,7 +75,9 @@ const bMore: Act = {
   },
 };
 // work he has put the player's way and is waiting to hear about: raised by him, answered to his face
-const offered = (c: Ctx) => c.w.jobs.find((j) => j.giver === c.n.id && j.status === 'offered' && (!j.assignee || j.assignee === c.h.id));
+const offered = (c: Ctx) => c.w.jobs.find((j) => j.giver === c.n.id && j.status === 'offered' && (!j.assignee || j.assignee === c.h.id) && !staleReason(c.w, j));
+// work of his the player already has in hand: he does not hand out more on top of it, and says so
+const inHandFrom = (c: Ctx) => c.w.jobs.find((j) => j.giver === c.n.id && j.status === 'active' && j.assignee === c.h.id && j.kind !== 'summons');
 const hasAsk = (c: Ctx) => c.w.enc.some((e) => e.status === 'open' && e.from === c.n.id && e.expires > c.w.now && e.opts.length);
 const jobOffer: Act = {
   base: 'job', pane: 'business', opens: true,
@@ -187,7 +189,7 @@ const recommend: Act = {
   run: (c) => {
     const x = T(c), { w, p, t } = x;
     const d = chance(w, t.id, 'puts in a word', 'will not', [term('his trust in you × 0.9', R(x).trust * 0.9)], 0.1, 0.9);
-    if (d.yes) { const boss = w.chars[w.fam[t.familyId!].bossId]; if (boss && boss.id !== t.id) door.regard(w, boss, p.id, 'respect', 0.05); door.memo(w, t, p.id, 'favour', 'He put in a word for you. You owe him one.'); line(x, voice(x, 'recommend_yes'), d); }
+    if (d.yes) { const boss = w.chars[w.fam[t.familyId!].bossId]; if (boss && boss.id !== t.id) door.regard(w, boss, p.id, 'respect', 0.05); door.owe(w, t, p, 1, 'put in a word for you'); line(x, voice(x, 'recommend_yes'), d); }
     else line(x, voice(x, 'recommend_no'), d);
     return out(25);
   },
@@ -218,13 +220,13 @@ const rkBack: Act = {
 };
 const backWhat: Act = { base: 'back_what', pane: 'business', run: (c) => { const x = T(c), r = R(x); line(x, r.trust < 0.5 ? '“Let me see you pay on time, do what you say you’ll do, and not give me a reason to worry. A few weeks of that.”' : '“Do something people notice. Stand up for someone, or come through on a job. Then I’ll have something to say.”'); door.memoOnce(x.w, x.t, x.p.id, 'agreement', r.trust < 0.5 ? 'He wants to see you reliable before he’ll speak for you.' : 'He wants to see you make a name for yourself before he’ll speak for you.'); return out(10); } };
 const backCall: Act = { base: 'back_call', pane: 'business', run: (c) => { const x = T(c), { w, p, t } = x; if (!door.settleFavour(w, p.id, t.id)) { line(x, '“There’s nothing outstanding between us.”'); return out(3); } door.setBacker(p, t); door.memoOnce(w, t, p.id, 'agreement', 'He repaid what he owed you by agreeing to speak for you.'); tweak(x, 0.02, 0, 0.04); line(x, '“Done. We’re square, and I’ll say your name when it matters.”'); return out(15); } };
-const backTake: Act = { base: 'back_take', pane: 'business', run: (c) => { const x = T(c), { w, p, t } = x; door.setBacker(p, t); door.owe(w, t, p, 2, 'agreed to speak for you'); door.memoOnce(w, t, p.id, 'favour', 'He agreed to speak for you. He’ll want something back one day.'); tweak(x, 0.03, 0, 0.03); line(x, '“Done. I’ll say your name when it matters. If you shame me, I’ll say that too.”'); return out(15); } };
+const backTake: Act = { base: 'back_take', pane: 'business', run: (c) => { const x = T(c), { w, p, t } = x; door.setBacker(p, t); door.owe(w, t, p, 2, 'agreed to speak for you'); tweak(x, 0.03, 0, 0.03); line(x, '“Done. I’ll say your name when it matters. If you shame me, I’ll say that too.”'); return out(15); } };
 const backPress: Act = {
   base: 'back_press', pane: 'business',
   run: (c) => {
     const x = T(c), { w, p, t } = x, r = R(x);
     const d = chance(w, t.id, 'does it for less', 'will not haggle over his name', [term('base', 0.2), term('his respect − 0.35, × 0.9', (r.respect - 0.35) * 0.9), term('his trust − 0.5, × 0.4', (r.trust - 0.5) * 0.4), term('your standing / 400', p.standing / 400)], 0.1, 0.8);
-    if (d.yes) { door.setBacker(p, t); door.owe(w, t, p, 1, 'agreed to speak for you, for a smaller debt'); door.memoOnce(w, t, p.id, 'favour', 'He agreed to speak for you, and asked less than he might have.'); tweak(x, 0.02, 0, 0.04); line(x, 'He weighs you up. “You drive a hard bargain for a man asking a favour. All right. A small one.”', d); return out(15); }
+    if (d.yes) { door.setBacker(p, t); door.owe(w, t, p, 1, 'agreed to speak for you, for a smaller debt'); tweak(x, 0.02, 0, 0.04); line(x, 'He weighs you up. “You drive a hard bargain for a man asking a favour. All right. A small one.”', d); return out(15); }
     tweak(x, -0.04, -0.02, -0.03);
     line(x, '“Then we’re done. I don’t haggle over my name.” He is not angry, only closed to it.', d);
     stamp(w, t, 'rk_back_no');

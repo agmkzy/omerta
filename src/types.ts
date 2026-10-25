@@ -416,6 +416,9 @@ export interface Job {
   acked?: boolean; // the player has seen the report
   meeting?: MeetingKind; // for summons
   extra?: Record<string, number | string>;
+  accepted?: number; // when the man it was given to took it on (absent: never taken on, or taken before this was kept)
+  // The lifecycle: offered → active (accepted) → done (its objective met, however it was met) → reported → rewarded (reportJobs);
+  // or declined (turned down, or dropped), expired (never taken up in time, or no longer needed), failed.
   status: 'offered' | 'active' | 'done' | 'failed' | 'declined' | 'expired';
 }
 
