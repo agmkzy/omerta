@@ -1,0 +1,117 @@
+/* The components every screen is built from (src/ui/kit.ts writes their markup). One of each:
+   a page heading, a section heading, rows, a key/value list, numbered choices, a context box, a chip, a meter, three buttons. */
+
+/* ---------------------------------------------------------------- headings */
+.ui-title { font: 500 34px/1.08 var(--f-display); color: var(--c-cream); margin: 0; letter-spacing: .005em; }
+.ui-lede { margin: 6px 0 0; font-size: 13.5px; color: var(--c-muted); }
+/* a section: small gold capitals, a hairline after them, and a quiet note at the end */
+.ui-h { display: flex; align-items: center; gap: var(--s-3); margin: var(--s-6) 0 var(--s-2); font: 600 11px/1.3 var(--f-ui); letter-spacing: .16em; text-transform: uppercase; color: var(--c-gold); }
+.ui-h::after { content: ""; flex: 1; height: 1px; background: var(--c-line); order: 1; }
+.ui-h small { order: 2; font: 500 11px var(--f-ui); letter-spacing: .1em; color: var(--c-muted); white-space: nowrap; }
+.ui-h:first-child { margin-top: 0; }
+/* a label inside a panel (How he sees you, What you know) */
+.ui-label { display: block; font: 600 10.5px/1.3 var(--f-ui); letter-spacing: .16em; text-transform: uppercase; color: var(--c-muted); margin: 0 0 6px; }
+
+/* ---------------------------------------------------------------- rows: most lists are rows, not boxes */
+.ui-rows { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--c-line); }
+.ui-row { display: flex; align-items: center; gap: var(--s-3); width: 100%; padding: 12px 4px; border: 0; border-bottom: 1px solid var(--c-line); background: none; text-align: left; color: inherit; min-height: var(--tap); }
+button.ui-row, a.ui-row { cursor: pointer; transition: background var(--t-fast); text-decoration: none; }
+button.ui-row:hover, a.ui-row:hover { background: rgba(234, 223, 200, .025); }
+.ui-row__face { flex: none; }
+.ui-row__face .avatar.pt { width: 40px; height: 40px; box-shadow: none; }
+.ui-row__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.ui-row__kick { font: 600 10.5px/1.4 var(--f-ui); letter-spacing: .14em; text-transform: uppercase; color: var(--c-dim); }
+.ui-row__title { font: 500 18px/1.25 var(--f-display); color: var(--c-cream); overflow-wrap: anywhere; }
+.ui-row__sub { font-size: 13px; line-height: 1.4; color: var(--c-muted); }
+.ui-row__end { flex: none; text-align: right; font-size: 13.5px; color: var(--c-cream-2); }
+.ui-row__end .fig { font-size: 14px; color: var(--c-cream); }
+.ui-row__end.good, .ui-row__end.good .fig { color: var(--c-good); }
+.ui-row__end.warn, .ui-row__end.warn .fig { color: var(--c-gold-2); }
+.ui-row__end.bad, .ui-row__end.bad .fig { color: var(--c-danger); }
+.ui-row__go { flex: none; color: var(--c-dim); }
+button.ui-row:hover .ui-row__go, a.ui-row:hover .ui-row__go { color: var(--c-gold-2); }
+.ui-mark { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--c-good); margin: 0 4px; }
+.ui-mark.amber { background: var(--c-gold); box-shadow: 0 0 0 3px var(--c-gold-soft); }
+.ui-mark.red { background: var(--c-danger); box-shadow: 0 0 0 3px var(--c-danger-soft); }
+.ui-mark.blue { background: var(--c-info); }
+.ui-mark.dead { background: var(--c-dim); }
+
+/* ---------------------------------------------------------------- key / value */
+.ui-kv { display: grid; grid-template-columns: auto 1fr; gap: 0 var(--s-4); margin: 0; font-size: 13.5px; }
+.ui-kv dt { color: var(--c-muted); padding: 8px 0; border-bottom: 1px solid var(--c-line); }
+.ui-kv dd { margin: 0; padding: 8px 0; border-bottom: 1px solid var(--c-line); text-align: right; color: var(--c-cream); overflow-wrap: anywhere; }
+.ui-kv dt:last-of-type, .ui-kv dd:last-of-type { border-bottom: 0; }
+.ui-kv dd.good { color: var(--c-good); } .ui-kv dd.warn { color: var(--c-gold-2); } .ui-kv dd.bad { color: var(--c-danger); }
+
+/* ---------------------------------------------------------------- choices: numbered, label and hint, one decision at a time
+   Used wherever the player answers something: a conversation, an approach, a meeting, a job. */
+.ui-choices { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; counter-reset: ui-choice; }
+.ui-choice { position: relative; display: grid; grid-template-columns: 34px 1fr auto; align-items: center; column-gap: var(--s-4); width: 100%; min-height: 60px; padding: 11px 16px 11px 14px;
+  border: 1px solid transparent; border-radius: var(--radius); background: transparent; text-align: left; color: var(--c-cream); transition: border-color var(--t-fast), background var(--t-fast), box-shadow var(--t-fast); }
+.ui-choice__n { grid-row: span 2; display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--c-line-2); border-radius: 2px; font: 500 14px/1 var(--f-ui); color: var(--c-cream-2); transition: border-color var(--t-fast), color var(--t-fast); }
+.ui-choice__label { grid-column: 2; font: 500 21px/1.22 var(--f-display); color: var(--c-cream); overflow-wrap: anywhere; }
+.ui-choice__hint { grid-column: 2; margin-top: 2px; font: 400 13.5px/1.4 var(--f-ui); color: var(--c-muted); overflow-wrap: anywhere; }
+.ui-choice__go { grid-column: 3; grid-row: 1 / span 2; color: var(--c-dim); display: none; }
+.ui-choice:hover { background: var(--c-raise); border-color: var(--c-line-2); }
+.ui-choice:hover .ui-choice__n { border-color: var(--c-gold-line); color: var(--c-cream); }
+/* the choice under the keyboard, or the one he is waiting for: a gold edge and a low glow, as in the approved design */
+.ui-choice:focus-visible, .ui-choice.is-lead { outline: none; border-color: var(--c-gold); background: linear-gradient(180deg, rgba(196, 160, 98, .07), rgba(196, 160, 98, .02)); box-shadow: 0 0 0 1px rgba(196, 160, 98, .35), 0 0 22px -6px rgba(196, 160, 98, .35); }
+.ui-choice:focus-visible .ui-choice__n, .ui-choice.is-lead .ui-choice__n { border-color: var(--c-gold); color: var(--c-gold-2); }
+/* the way out: last, quieter, after a rule */
+.ui-choice.is-out { margin-top: var(--s-2); border-top: 1px solid var(--c-line); border-radius: 0; padding-top: 16px; }
+.ui-choice.is-out:hover { border-color: transparent; border-top-color: var(--c-line); }
+.ui-choice.is-out .ui-choice__n { border: 0; color: var(--c-muted); }
+.ui-choice.is-out .ui-choice__label { color: var(--c-cream-2); font-size: 19px; }
+/* a way on to more subjects ("Other business…", "Something else") */
+.ui-choice.is-more .ui-choice__label { font-size: 18.5px; color: var(--c-cream-2); font-style: italic; }
+/* a figure to name before it is said */
+.ui-choice.is-fig { cursor: default; align-items: start; }
+.ui-choice.is-fig:hover { background: var(--c-raise); }
+.ui-figrow { grid-column: 2 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 10px; font-size: 14px; color: var(--c-cream-2); }
+.ui-figrow label { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.ui-figrow input { width: 7.5em; min-height: 40px; padding: 6px 10px; border: 1px solid var(--c-line-2); border-radius: var(--radius); background: var(--c-ground); color: var(--c-cream); font: 400 15px var(--f-fig); }
+.ui-figrow input:focus-visible { border-color: var(--c-gold); outline: none; box-shadow: 0 0 0 1px var(--c-gold); }
+
+/* ---------------------------------------------------------------- the context box: information, never speech */
+.ui-context { display: grid; grid-template-columns: 30px 1fr; gap: var(--s-4); align-items: start; padding: 14px 18px 14px 16px; border: 1px solid var(--c-line-2); border-left: 2px solid var(--c-gold); border-radius: var(--radius); background: rgba(22, 20, 18, .7); font: 400 14px/1.5 var(--f-ui); color: var(--c-cream-2); }
+.ui-context__mark { color: var(--c-gold); padding-top: 1px; }
+.ui-context__body p { margin: 0; }
+.ui-context__body p + p { margin-top: 3px; }
+.ui-context__body b { font-weight: 600; color: var(--c-cream); }
+.ui-context.is-bad { border-left-color: var(--c-danger); }
+.ui-context.is-bad .ui-context__mark { color: var(--c-danger); }
+
+/* ---------------------------------------------------------------- chip, tag, meter */
+.ui-chip { display: inline-block; padding: 2px 7px 1px; border: 1px solid var(--c-line-2); border-radius: 2px; font: 600 10.5px/1.4 var(--f-ui); letter-spacing: .14em; text-transform: uppercase; color: var(--c-cream-2); white-space: nowrap; vertical-align: 1px; }
+.ui-chip.f0 { color: var(--c-f0); border-color: currentColor; } .ui-chip.f1 { color: var(--c-f1); border-color: currentColor; } .ui-chip.f2 { color: var(--c-f2); border-color: currentColor; }
+.ui-chip.f3 { color: var(--c-f3); border-color: currentColor; } .ui-chip.f4 { color: var(--c-f4); border-color: currentColor; }
+.ui-meter { margin: 10px 0; }
+.ui-meter__top { display: flex; justify-content: space-between; gap: var(--s-3); font-size: 13px; }
+.ui-meter__top span { color: var(--c-muted); }
+.ui-meter__top b { font-weight: 500; color: var(--c-cream); }
+.ui-meter__bar { display: block; height: 3px; margin-top: 6px; border-radius: 2px; background: var(--c-line); overflow: hidden; }
+.ui-meter__bar i { display: block; height: 100%; background: var(--c-gold); }
+.ui-meter.is-bad .ui-meter__bar i { background: var(--c-danger); }
+
+/* ---------------------------------------------------------------- buttons: the decisive act, an ordinary one, a quiet one */
+.ui-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--s-2); min-height: var(--tap); padding: 0 18px; border: 1px solid var(--c-line-2); border-radius: var(--radius); background: transparent; color: var(--c-cream);
+  font: 600 12px/1 var(--f-ui); letter-spacing: .14em; text-transform: uppercase; text-decoration: none; transition: border-color var(--t-fast), background var(--t-fast), color var(--t-fast); }
+.ui-btn:hover { border-color: var(--c-gold); }
+.ui-btn--primary { background: var(--c-wine); border-color: var(--c-wine-2); color: #f6eee0; }
+.ui-btn--primary:hover { background: var(--c-wine-2); border-color: #a03a4d; }
+.ui-btn--danger { border-color: rgba(212, 119, 107, .45); color: #e9a99f; }
+.ui-btn--danger:hover { border-color: var(--c-danger); background: var(--c-danger-soft); }
+.ui-btn--quiet { border-color: transparent; padding: 0 10px; color: var(--c-gold-2); letter-spacing: .1em; }
+.ui-btn--quiet:hover { border-color: transparent; color: var(--c-cream); background: var(--c-raise-2); }
+.ui-btn:disabled { opacity: .4; }
+.ui-btn--wide { width: 100%; }
+.ui-acts { display: flex; flex-wrap: wrap; gap: var(--s-2); margin: var(--s-4) 0; }
+.ui-acts .ui-btn { flex: 1 1 auto; }
+@media (min-width: 900px) { .ui-acts .ui-btn { flex: 0 1 auto; } }
+
+/* ---------------------------------------------------------------- the way back */
+.ui-back { display: inline-flex; align-items: center; gap: 6px; min-height: var(--tap); padding: 0 8px 0 0; border: 0; background: none; color: var(--c-cream-2); font: 400 17px var(--f-display); }
+.ui-back:hover { color: var(--c-cream); }
+
+/* ---------------------------------------------------------------- quiet text */
+.ui-quiet { font: italic 400 16.5px/1.5 var(--f-display); color: var(--c-cream-2); margin: var(--s-3) 0; }

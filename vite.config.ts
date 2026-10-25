@@ -19,7 +19,11 @@ function singlePage(): Plugin {
       order: 'post',
       handler(html) {
         const tag = /<script type="module"[^>]*\ssrc="[^"]*"><\/script>\n?/.exec(html);
-        return tag ? html.replace(tag[0], '') + tag[0].trimEnd() + '\n' : html;
+        if (tag) html = html.replace(tag[0], '') + tag[0].trimEnd() + '\n';
+        // The bundled stylesheet (web/css, imported by main.ts) goes after the meta tags for the same reason, just before #app.
+        const css = /<link rel="stylesheet"[^>]*href="[^"]*\.css"[^>]*>\n?/.exec(html);
+        if (css) html = html.replace(css[0], '').replace('<div id="app">', css[0].trimEnd() + '\n<div id="app">');
+        return html;
       },
     },
     // vite-plugin-singlefile only warns about anything it could not inline, so fail the build instead.
