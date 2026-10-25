@@ -122,7 +122,8 @@ const earnA: Act = {
 // (rate, protect, borrow, buy, stake, run, sell, lend: each a matter between them, asks.ts; the old engine opened it the same way)
 const rateAskA: Act = {
   base: 'rate_ask', pane: 'business',
-  offers: (c) => (isBoss(c) && (c.h.cooldown['rate:ask'] ?? 0) <= c.w.now ? [offer(c, 'rate_ask', 'Ask for a smaller share', 'He may say yes. He remembers being asked.')] : []),
+  // (a man who has not yet handed anything up has nothing to have been carrying)
+  offers: (c) => (isBoss(c) && (c.h.cooldown['rate:ask'] ?? 0) <= c.w.now && c.h.books.history.some((h) => h.paid > 0) ? [offer(c, 'rate_ask', 'Ask for a smaller share', 'He may say yes. He remembers being asked.')] : []),
   run: (c) => {
     const x = T(c), { w, p, t } = x;
     if (t.id !== p.bossId) return out(5);
@@ -316,7 +317,8 @@ const sellAsk: Act = {
 };
 const offerLoan: Act = {
   base: 'offer_loan', pane: 'business',
-  offers: (c) => (ownerBiz(c.w, c.n.id) && c.n.rank === 'civilian' && c.h.cash >= 200 && !c.w.debts.some((d) => d.status === 'active' && d.debtor === c.n.id) ? [offer(c, 'offer_loan', 'Offer him a loan', 'You name the amount and the weekly rate. He takes it if he needs it and the terms are fair.')] : []),
+  // (to a man who might need it: his place short of cash or struggling, or his own pockets empty; not to a man the player owes)
+  offers: (c) => { const b = ownerBiz(c.w, c.n.id); return b && c.n.rank === 'civilian' && c.h.cash >= 200 && (b.cash < Math.max(250, b.expense) || b.distress > 0 || c.n.cash < 150) && !c.w.debts.some((d) => d.status === 'active' && (d.debtor === c.n.id || (d.debtor === c.h.id && d.creditor === c.n.id))) ? [offer(c, 'offer_loan', 'Offer him a loan', 'You name the amount and the weekly rate. He takes it if he needs it and the terms are fair.')] : []; },
   run: (c) => {
     const x = T(c), { w, p, t } = x, b = ownerBiz(w, t.id)!;
     const need = Math.max(100, Math.min(p.cash, Math.round(Math.max(500, b.expense * 1.5 - b.cash) / 50) * 50));

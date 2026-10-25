@@ -239,10 +239,10 @@ export function goalsView(): string {
   const row = (x: (typeof all)[number]) => {
     const unit = x.a.key.startsWith('cash') || x.a.key === 'earner' || x.a.key.startsWith('rich') || x.a.key === 'loans2k' ? money : (n: number) => String(Math.round(n));
     // V88: a row you can read at a glance (title, progress); the why, the how and the reward open beneath it.
-    const reward = x.a.reward.cash || x.a.reward.standing ? `<p class="muted"><b>Reward:</b> ${[x.a.reward.cash ? money(x.a.reward.cash) : '', x.a.reward.standing ? 'standing +' + x.a.reward.standing : ''].filter(Boolean).join(', ')}</p>` : '';
+    const reward = '';
     return `<details class="g-goal ${x.a.head ? 'headgoal' : ''}"${x.a.head ? ' open' : ''}><summary><span class="g-goal__t">${esc(x.a.title)}${x.a.head ? ' <i class="tag amber">the big one</i>' : ''}</span><span class="g-goal__n">${unit(Math.min(x.have, x.need))} of ${unit(x.need)}</span><span class="bar"><i style="width:${Math.round(x.pct * 100)}%"></i></span></summary><div class="g-goal__body"><p>${esc(x.a.why)}</p><p class="muted"><b>How:</b> ${esc(x.a.how)}</p>${reward}</div></details>`;
   };
-  let out = back() + `<h2 class="ui-h">Milestones<small>${esc(p.rank)}</small></h2><p class="muted pad">What the family expects at your rank. They change as you rise, and meeting one pays a reward. Tap one to see what it takes.</p>`;
+  let out = back() + `<h2 class="ui-h">Milestones<small>${esc(p.rank)}</small></h2><p class="muted pad">What men at your rank are expected to manage. They change as you rise. Nothing pays for them: what they are worth is in the thing itself. Tap one to see what it takes.</p>`;
   out += now.filter((x) => x.a.head).map(row).join('') + now.filter((x) => !x.a.head).sort((a, b) => b.pct - a.pct).map(row).join('');
   if (done.length) out += `<h2 class="ui-h">Done<small>${done.length}</small></h2><div class="ui-card"><ul class="ui-list">${done.map((x) => `<li><span>${esc(x.a.title)}</span><span class="v good">&#10003;</span></li>`).join('')}</ul></div>`;
   return out;

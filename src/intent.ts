@@ -8,6 +8,7 @@
 // the player reaches him the way any matter does (asks.putToPlayer), and he answers it in the conversation.
 //
 // Each man weighs his intentions once a week, on his own day: nothing here runs everyone every day, and nothing is made up.
+import { imposed } from './imposed';
 import { temper } from './temper';
 import { addFact, bear, feel, learn, ownerBiz, rel } from './core';
 import { askBetween, move, openAsk } from './asks';
@@ -114,6 +115,8 @@ export function intentsOf(w: World, c: Character): Intent[] {
     if (f && m?.alive) out.push({ kind: 'confront', to: m, why: `${m.name} hurt the family's own earnings`, score: 0.5 + tp.pride * 0.2 + tp.volatility * 0.1, act: () => {
       c.cooldown['int:confront'] = w.now + 7 * DAY; c.cooldown['conf:' + f.f.id] = w.now + 60 * DAY;
       const e = addFact(w, { kind: 'discipline', actor: c.id, victim: m.id, cause: f.f.id, text: `${c.name} took ${m.name} to task over what happened: ${f.f.text}`, district: m.district }, { witnesses: [c.id, m.id] });
+      // (to the player, to his face: what he did, why it matters to the man above him, and the chance to answer it)
+      if (m.isPlayer) imposed(w, m, c, { title: `${c.name.split(' ')[0]} took you to task`, said: `${c.name.split(' ')[0]} has you come to him. “${f.f.text.replace(new RegExp(m.name, 'g'), 'You').replace(/^You (\w+)/, (_x, v: string) => 'You ' + v)} That place pays this family. You hurt it, you hurt us. Don’t do it again.”`, why: 'A shop that pays us is ours to look after. A man of mine who smashes it up is taking money out of my pocket and the family’s.', record: `${c.name} took you to task over what happened.` });
       feel(w, c, m.id, 'trust', -0.06, e);
       if (temper(m).pride > 0.6) bear(w, m, c.id, 0.08, e); // a proud man resents being dressed down
       else feel(w, m, c.id, 'respect', 0.02);

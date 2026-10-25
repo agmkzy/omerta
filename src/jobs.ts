@@ -14,6 +14,8 @@ import { askBetween, move as askMove, openAsk } from './asks';
 import { isOpen } from './situ';
 import { gigApproaches, gigTick, gigOffer, gigResolve, gigStale, GIG_HELP, GIG_LABEL } from './gigs';
 import { Action, Character, DAY, Id, Job, World } from './types';
+import { pickedUp } from './inside';
+import { imposed } from './imposed';
 
 export interface Approach {
   code: string;
@@ -113,8 +115,9 @@ export function mkJob(w: World, j: NewJob): Job {
   return job;
 }
 
-export function jail(w: World, c: Character, days: number) {
+export function jail(w: World, c: Character, days: number, why?: string) {
   c.jailedUntil = w.now + days * DAY;
+  if (why) pickedUp(w, c, why);
   recordCareer(w, c, `Arrested; inside ${days} days`);
   c.heat = 0.1;
   const kin = Object.values(w.chars).filter((x) => x.alive && x.familyId && x.familyId === c.familyId).map((x) => x.id);
@@ -706,7 +709,7 @@ export function resolve(w: World, j: Job, code: string): Result {
         bump(doer, cfg.heat * 1.5);
         lines.push('A patrol rolls through at the wrong moment. You drop the job and run.');
         if (code === 'showroom' && rng.chance(0.35)) {
-          jail(w, doer, rng.int(3, 15));
+          jail(w, doer, rng.int(3, 15), 'Caught in the showroom, red-handed. There was no talking your way out of that.');
           lines.push('Not fast enough. You’re arrested.');
           note = `${doer.name} was arrested.`;
         }
@@ -729,7 +732,7 @@ export function resolve(w: World, j: Job, code: string): Result {
         bump(doer, quiet ? 0.15 : 0.3);
         lines.push(quiet ? 'A dog starts barking. You walk away.' : 'The alarm and a neighbour at the same time. You leave empty-handed.');
         if (!quiet && rng.chance(0.35)) {
-          jail(w, doer, rng.int(5, 20));
+          jail(w, doer, rng.int(5, 20), 'The alarm went, a neighbour saw you, and the police were there before you were round the corner.');
           lines.push('The police are quicker than you hoped. You’re arrested.');
           note = `${doer.name} was arrested.`;
         }
@@ -867,13 +870,17 @@ export function daily(w: World) {
         feel(w, g, p.id, 'trust', -0.05);
         // Ignoring the man who runs your end twice in a month is asking for it.
         if (j.kind === 'summons' && w.jobs.filter((q) => q.kind === 'summons' && q.status === 'expired' && w.now - q.expires < 30 * DAY).length >= 2 && p.hurtUntil <= w.now) {
+          // (it is done to him, so he knows it, and why: from the man who did it)
+          const missed = w.jobs.filter((q) => q.kind === 'summons' && q.status === 'expired' && q.giver === g.id && w.now - q.expires < 30 * DAY).length;
           if (temper(g).volatility > 0.5) {
             p.hurtUntil = w.now + 3 * DAY;
             bear(w, p, g.id, 0.3, `${g.name} had him roughed up for not coming when called`);
-            addFact(w, { kind: 'discipline', actor: g.id, victim: p.id, text: `${g.name} had ${p.name} beaten for ignoring him.`, district: p.district }, { witnesses: [] });
+            addFact(w, { kind: 'discipline', actor: g.id, victim: p.id, text: `${g.name} had ${p.name} beaten for ignoring him.`, district: p.district }, { witnesses: [p.id] });
+            imposed(w, p, g, { title: `${g.name.split(' ')[0]} had you roughed up`, said: `Two of ${g.name.split(' ')[0]}’s men catch you outside. When they’re done, one of them says: “He sent for you ${missed > 2 ? `${missed} times` : 'twice'}. You didn’t come.”`, why: 'When I send for a man, he comes. You didn’t, more than once. Now you know what it costs.', record: `${g.name} had you beaten for not coming when he sent for you.` });
           } else {
             p.kickRate = Math.min(0.35, p.kickRate + 0.05);
-            addFact(w, { kind: 'discipline', actor: g.id, victim: p.id, text: `${g.name} raised ${p.name}'s share for ignoring him.`, district: p.district }, { witnesses: [] });
+            addFact(w, { kind: 'discipline', actor: g.id, victim: p.id, text: `${g.name} raised ${p.name}'s share for ignoring him.`, district: p.district }, { witnesses: [p.id] });
+            imposed(w, p, g, { title: `${g.name.split(' ')[0]} raised your share`, said: `Word comes from ${g.name.split(' ')[0]}: from this Sunday you pass up ${Math.round(p.kickRate * 100)} percent. “He sent for you ${missed > 2 ? `${missed} times` : 'twice'}. A man who can’t find the time to come can find the money.”`, why: 'I sent for you and you didn’t come. Twice. A man who has no time for me can pay for the privilege.', record: `${g.name} raised your share to ${Math.round(p.kickRate * 100)} percent for not coming when he sent for you.` });
           }
         }
       } else if (g) feel(w, g, p.id, 'trust', -0.03);

@@ -63,7 +63,7 @@ export function pathInfo(w: World, p: Character): PathInfo | undefined {
     g('chair', 'The chair is taken, not given', gone ? 1 : 0, boss?.alive ? `${boss.name} still holds it` : 'it is empty', 'The only way up is for the man above you to stop being the boss. How that happens is your business.', gone);
     return { to, goals, ready: true, trial: 'passed', retryAt: 0 };
   }
-  g('earn', 'Pass up to the family', p.lifetimeKick / n.kick, `${money(p.lifetimeKick)} of ${money(n.kick)} passed up in total`, 'It all adds up over the whole climb. Declare it straight, hand it over in person, and be generous to the man above you.');
+  g('earn', 'Pass up to the family', p.lifetimeKick / n.kick, `${money(p.lifetimeKick)} of ${money(n.kick)} passed up in total`, 'It all adds up over the whole climb: what you declare and hand over. Declare it straight and hand it over in person. Gifts make friends; they are not earnings.');
   const work = Math.max(rec.done + (rec.led ?? 0), st?.deeds ?? 0); // (an old save's count of the player's deeds carries over)
   g('deeds', 'Get the work done', work / n.work, `${Math.min(work, n.work)} of ${n.work} jobs finished`, 'Take the work you’re given and finish it. What your own men finish on your orders counts too.');
   if (n.hard) {
@@ -106,9 +106,25 @@ export function pathBlockers(w: World, p: Character): string[] {
 }
 
 // ---------------------------------------------------------------- the daily check
+// Who would speak for the player: when that changes, he hears it, with the reason as the man himself would see it (a man stops putting
+// his name to a player who comes up light, breaks his word, or is never seen; he starts again when the player has earned it back).
+function backingTick(w: World, p: Character) {
+  if (p.rank !== 'associate') { delete p.spoke; return; }
+  const s = sponsorOf(w, p);
+  if (s?.id === p.spoke) return;
+  const was = p.spoke ? w.chars[p.spoke] : undefined;
+  if (was?.alive && (!s || s.id !== was.id)) {
+    const broke = Object.values(w.facts).find((f) => f.kind === 'ruling' && f.actor === p.id && /keep his word/.test(f.text) && w.now - f.t < 30 * DAY);
+    const why = p.books.missed > 0 ? 'Your envelopes have come up light, and he has heard about it.' : broke ? `You didn’t keep your word to ${w.chars[broke.victim ?? '']?.name ?? 'a man'}, and he heard about it.` : (rel(was, p.id).lastMet ?? -1e9) < w.now - 21 * DAY ? 'He hasn’t seen you in weeks. A man doesn’t speak for a stranger.' : 'Something has cooled him on you.';
+    addFact(w, { kind: 'report', actor: was.id, victim: p.id, minor: false, text: `${was.name} has stopped speaking for you. ${why}`, district: p.district }, { witnesses: [p.id] });
+  }
+  if (s && s.id !== was?.id) addFact(w, { kind: 'report', actor: s.id, victim: p.id, minor: false, text: `${s.name} will speak for you${was ? ' now' : ''}. A made man’s word is how an associate gets made.`, district: p.district }, { witnesses: [p.id] });
+  if (s) p.spoke = s.id; else delete p.spoke;
+}
 export function pathTick(w: World) {
   const p = w.playerId ? w.chars[w.playerId] : undefined;
   if (!p?.alive || !p.familyId) return;
+  backingTick(w, p);
   const st = pathState(w);
   for (const g of [...(st.guar ?? [])]) {
     if (g.due > w.now) continue;

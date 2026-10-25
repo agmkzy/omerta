@@ -3,7 +3,9 @@
 // each week, what goes out, and what last week came to. Everything here is the player's own books: nothing another man keeps private.
 import { money } from '../core';
 import { envelopeSum, SOURCE_LABEL } from '../books';
-import { owedOf } from '../econ';
+import { owedOf, stakesOf } from '../econ';
+import { LIVING } from '../engine';
+import { DUES_FLOOR } from '../orgs';
 import { OPS, type OpKey } from '../rackets';
 import type { Character, World } from '../types';
 
@@ -40,6 +42,10 @@ export function week(w: World, p: Character): Week {
   const recv = p.books.history.at(-1)?.received ?? 0;
   if (recv > 0) comingIn.push({ label: 'Your men’s envelopes', amt: Math.round(recv), note: 'last Sunday', a: 'sub:family.men' });
   if (p.books.side) comingIn.push({ label: 'Side deal', amt: Math.round(p.books.side), note: 'off the books' });
+  // a share in another man's trade: what it pays out of his till each week (econ.payStake), as things stand
+  const stakes = stakesOf(w, p.id).filter(({ b }) => b.open);
+  if (stakes.length) comingIn.push({ label: 'Your share in a business', amt: stakes.reduce((a, { b, s }) => a + Math.max(0, Math.round(b.income * s.share * 0.8)), 0), note: stakes.map(({ b, s }) => `${Math.round(s.share * 100)}% of ${b.name}`).join(', ') });
+  if (p.wage > 0) comingIn.push({ label: 'Wages', amt: Math.round(p.wage), note: p.job ? 'your day job' : 'a regular wage' });
   // going out: your envelope, and what you are paying back
   const boss = p.bossId ? w.chars[p.bossId] : undefined;
   if (boss?.alive) {
@@ -48,6 +54,10 @@ export function week(w: World, p: Character): Week {
   }
   const owe = w.debts.filter((d) => d.status === 'active' && d.debtor === p.id);
   if (owe.length) goingOut.push({ label: 'Paying back', amt: owe.reduce((a, d) => a + d.weeklyPayment, 0), note: plural(owe.length, 'debt') });
+  // living: rent, food, the barber and the bar, every week (engine.weekly), and the dues a made man pays the family fund (orgs.treasuryWeek)
+  goingOut.push({ label: 'Living', amt: LIVING[p.rank] ?? 100, note: 'rent, food, clothes, a round now and then' });
+  const floor = DUES_FLOOR[p.rank];
+  if (floor && p.cash > floor) { const due = Math.round(Math.min(p.cash - floor, 3000) * 0.03); if (due >= 10) goingOut.push({ label: 'Dues to the family fund', amt: due, note: 'a made man’s share of what the family keeps' }); }
 
   const soFarBy = Object.entries(p.books.gross).filter(([, v]) => v > 0).map(([s, v]) => ({ label: SOURCE_LABEL[s] ?? s, amt: Math.round(v) }));
   const h = p.books.history.at(-1);

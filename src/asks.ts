@@ -578,11 +578,15 @@ export function playerMoves(w: World, p: Character, s: Situation): PlayerMove[] 
   if (!S.last) { add('drop', '“Never mind. Forget I said anything.”', 'Walk away before it starts.'); return out; }
   const better = K.better?.(w, s);
   add('sweeten', better !== undefined ? K.sweeten?.(better) ?? q(`Call it ${money(better)}.`) : '“I can do better.”', K.low ? 'More from you, easier for him.' : 'Less for you, easier for him.', better === undefined ? (K.low ? 'You can’t go higher.' : 'You can’t go lower.') : undefined);
-  add('persuade', s.ak === 'protect' ? '“Think about it. Who looks after you if something happens?”' : s.ak === 'amends' ? '“I was wrong. I want it put right between us.”' : '“Be sensible. This is good for both of us.”', tried(S, 'persuade') >= 2 ? 'He’s heard your arguments.' : 'Reason with him.');
+  add('persuade', s.ak === 'protect' ? '“Think about it. Who looks after you if something happens?”' : s.ak === 'amends' ? '“I was wrong. I want it put right between us.”' : s.ak === 'layoff' || s.ak === 'warn' ? '“He’s got enough trouble. Leave him be.”' : '“Be sensible. This is good for both of us.”', tried(S, 'persuade') >= 2 ? 'He’s heard your arguments.' : 'Reason with him.');
   const lv = leverageOf(w, p, t);
   add('leverage', lv ? q(`I know about ${lv.what}.`) : '“I know things about you.”', lv ? 'Remind him what you know. He won’t thank you for it.' : 'You need something on him first.', lv ? undefined : 'You have nothing on him.');
-  add('pressure', s.ak === 'protect' ? '“It’d be a shame if something happened to the place.”' : s.ak === 'collect' ? '“I’d hate for this to get ugly.”' : '“I’d think hard before saying no to me.”', 'Lean on him. Fear works. So does resentment, later.');
-  if (K.force && tried(S, 'no') >= 1) add('force', s.ak === 'protect' ? 'Send the boys in to wreck the place' : 'Have him taught a lesson', 'Make an example. Loud, and it will be talked about.');
+  // (what the player may do, and has the means to: a man above him in his own family is pressed at the player's own cost, and never
+  // touched; "the boys" are men he actually has)
+  const R = ['civilian', 'associate', 'soldier', 'capo', 'underboss', 'boss'], above = t.familyId === p.familyId && R.indexOf(t.rank) > R.indexOf(p.rank), madeOfOurs = t.familyId === p.familyId && R.indexOf(t.rank) >= 2;
+  const boys = Object.values(w.chars).some((c) => c.alive && c.bossId === p.id && c.jailedUntil <= w.now);
+  add('pressure', s.ak === 'protect' ? '“It’d be a shame if something happened to the place.”' : s.ak === 'collect' ? '“I’d hate for this to get ugly.”' : above ? '“I’m asking you to think about it. Carefully.”' : '“I’d think hard before saying no to me.”', above ? 'He outranks you. He will remember being leaned on by you.' : 'Lean on him. Fear works. So does resentment, later.');
+  if (K.force && tried(S, 'no') >= 1) add('force', s.ak === 'protect' ? (boys ? 'Send the boys in to wreck the place' : 'Wreck the place yourself') : boys ? 'Have him taught a lesson' : 'Teach him a lesson yourself', 'Make an example. Loud, and it will be talked about.', madeOfOurs && p.rank !== 'boss' ? 'He’s a made man of your own family. Nobody lays a hand on him without the boss’s say.' : undefined);
   const boss = p.bossId ? w.chars[p.bossId] : undefined;
   add('senior', boss ? q(`${first(boss)} is behind this, you know.`) : '“There are people behind this.”', 'Bring in your boss’s name. It costs you with him.', !boss || peek(boss, p.id).trust < 0.45 ? 'Nobody above you would put his name to this.' : undefined);
   add('drop', '“Forget it.”', 'Let it go. People notice.');
@@ -826,10 +830,12 @@ ASKS.lend = {
   valid: (w, s) => { const a = asker(w, s); return !!a && a.cash >= (s.terms?.amt ?? 0) && !w.debts.some((d) => d.status === 'active' && d.debtor === s.terms?.of && d.creditor === s.terms?.by); },
   lean: (w, s, a, t) => {
     const b = ownerBiz(w, t.id);
-    const need = b && (b.cash < 250 || b.distress > 0) ? 0.35 : t.cash < 150 ? 0.25 : 0.05;
+    const need = b && (b.cash < 250 || b.distress > 0) ? 0.35 : t.cash < 150 ? 0.25 : 0;
     // Stage 4: the price of the money is part of the offer: dear money puts off a man who doesn't need it, less one who does
     const dear = Math.max(0, lendRate(s, a) - 0.04) * (need >= 0.25 ? 2 : 6);
-    return need + (1 - t.traits.caution) * 0.15 + 0.4 - dear; // (V89 health: was -0.3, which turned nearly every offer down; V88 took about half)
+    // (a man who doesn't need money doesn't borrow it at a vig; and nobody wants to owe the man who has just been leaning on him)
+    const resent = viewOf(w, t, a).resent;
+    return need > 0 ? need + (1 - t.traits.caution) * 0.15 + 0.4 - dear - resent * 0.5 : (1 - t.traits.caution) * 0.1 - 0.15 - dear - resent * 0.5;
   },
   counter: (w, s, a, t) => { const amt = s.terms?.amt ?? 0, b = ownerBiz(w, t.id); return amt >= 1000 && !(b && b.distress > 0) ? { amt: 500, why: 'I don’t need more than that' } : undefined; },
   yes: (w, s, a, t) => {

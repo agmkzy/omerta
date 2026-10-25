@@ -35,11 +35,12 @@ const B: Record<string, Entry> = {
   'advance.worse': { _: ['“You’ve gone backwards since {ago}: {what}.”', '“Worse than {ago}, not better: {what}.”'], cold: ['“You’ve slipped since {ago}. {what}.”'] },
   'advance.ready': { _: ['“You’ve done what was asked. It’s with the people above me now. Be patient, and be seen.”'] },
   'advance.noSeat': { _: ['“You’re ready. There’s no chair. Somebody has to die, retire or go away first. Be ready when it happens.”'] },
-  'advance.gap.earn': { _: ['“The money isn’t there yet: {note}. Nobody puts a name forward short of it.”'] },
-  'advance.gap.deeds': { _: ['“I need to see more work done: {note}. Take what you’re given and finish it.”'] },
+  // (what he still needs to see, said as a man says it: how far off, never the family's own tally)
+  'advance.gap.earn': { _: ['“The money isn’t there yet. {how} Nobody puts a name forward for a man short of it.”'] },
+  'advance.gap.deeds': { _: ['“I need to see more work done. {how} Take what you’re given and finish it.”'] },
   'advance.gap.kills': { _: ['“There’s been no hard work from you. When the family has some, ask for it.”'] },
   'advance.gap.name': { _: ['“People don’t speak of you yet. You’re {standing}. That comes from what you do, and who sees it.”'] },
-  'advance.gap.sponsor': { _: ['“You need made men who’ll stand up for you: {note}.”', '“Who would speak for you? {note}. That’s the part that matters.”'] },
+  'advance.gap.sponsor': { _: ['“You need made men who’ll stand up for you. {how}”', '“Who would speak for you? {how} That’s the part that matters.”'] },
   'advance.gap.trial': { _: ['“Once the rest is done, they’ll set you something to prove.”'] },
   'advance.gap.trialOpen': { _: ['“They’ve put something to you. Do it, and do it well.”'] },
   // work he gave the player, come to an end since they last met (jobs.ts)

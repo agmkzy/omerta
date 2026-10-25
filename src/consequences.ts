@@ -1,3 +1,4 @@
+import { imposed } from './imposed';
 import { huntDue } from './violence';
 // Delayed consequences. Violence and secrets do not resolve when they happen: witnesses come forward,
 // the police take an interest, a client calls in a favour, a false accusation comes apart.
@@ -178,6 +179,16 @@ function disputeStep(w: World, q: import('./types').Pending) {
     say(cross
       ? `${mid.name} and ${counter.name} have spoken. ${x.name} is to leave you alone${comp ? ` and make good ${money(comp)}` : ''}. Neither family wants a war over this, and that’s all it took.`
       : `${mid.name} had a word with ${x.name}. He’ll leave you be${comp ? ` and pays ${money(comp)} to put it right` : ''}. He doesn’t like it, but he’s done it.`);
+    // (when the man told to leave it alone, and to pay, is the player: it was decided over his head, and he is told so, by the man who did it)
+    if (x.isPlayer) {
+      const by = cross ? counter : mid;
+      imposed(w, x, by, {
+        title: `${by.name.split(' ')[0]} settled your trouble with ${p.name.split(' ')[0]}`,
+        said: `“${p.name.split(' ')[0]} came to ${cross ? 'his people' : 'me'} about you. It’s settled: you leave him alone${comp ? `, and the ${money(comp)} I gave him to put it right came out of your end` : ''}. That’s the end of it.”`,
+        why: cross ? 'Two families don’t go to war over one beating. This was the price of not having to.' : `He went to his captain, and his captain came to me. I could stop it here or watch it go further. I stopped it here.`,
+        record: `${by.name} settled ${p.name}’s complaint against you${comp ? `: ${money(comp)} of yours went to ${p.name} to put it right` : ''}. You are to leave him alone.`,
+      });
+    }
   } else if (roll < base + 0.3) {
     bear(w, x, p.id, 0.05, `${p.name} went over his head`);
     say(`${mid.name} raised it with ${cross ? counter.name : x.name} and got a shrug. "Nothing was agreed," he tells you. Whatever ${x.name} wants, he hasn’t been told to stop wanting it.`);

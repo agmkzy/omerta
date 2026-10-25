@@ -69,7 +69,7 @@ const firstName = (c: Character) => c.name.split(' ')[0];
 // What kind of approach it is, in a word or two (never the record's own label).
 const ENC_K: Record<string, string> = {
   threat: 'A threat', ask: 'Wants something', word: 'Wants a word', matter: 'Wants your answer', callin: 'Calling in a favour',
-  squeeze: 'Another family', invite: 'An invitation', kin: 'Family',
+  squeeze: 'Another family', invite: 'An invitation', kin: 'Family', imposed: 'Decided over your head',
 };
 function approach(w: World, e: Enc, story?: Story): Need {
   const c = e.from ? w.chars[e.from] : undefined;
@@ -77,7 +77,7 @@ function approach(w: World, e: Enc, story?: Story): Need {
   const he = !c ? 'They' : isFemale(c) ? 'She' : 'He';
   const wait = e.kind === 'kin' ? '' : `${he}’ll want an answer ${by}.`;
   const dot = e.kind === 'threat' ? 'red' : story ? (story.tone === 'red' ? 'red' : 'amber')
-    : e.kind === 'callin' || e.data?.what === 'sit_turf' || e.kind === 'ask' || e.kind === 'word' || e.kind === 'matter' ? 'amber' : e.kind === 'invite' ? 'blue' : 'green';
+    : e.kind === 'callin' || e.data?.what === 'sit_turf' || e.kind === 'ask' || e.kind === 'word' || e.kind === 'matter' || e.kind === 'imposed' ? 'amber' : e.kind === 'invite' ? 'blue' : 'green';
   return {
     dot, title: e.title, k: e.kind === 'crew' && c?.bossId === w.playerId ? 'One of your men' : ENC_K[e.kind] ?? (c ? 'Wants a word' : 'Word comes'), who: c?.id, when: by.replace(/^by /, ''),
     sub: e.kind === 'threat' ? `This is serious. ${wait}`.trim() : wait || 'It won’t keep for ever.',
@@ -239,6 +239,8 @@ export function todayView(): string {
   // V88: the street first. What happened, what is said, what wants you, where you can go. Where you stand goes to the side.
   const dg = dangerLevel(w);
   if (dg.level > 0 && dg.who) out += context([`<b>Watch your back.</b> ${lk(dg.who.name)} is after you: ${esc(LADDER_WORDS[dg.level])}. It won’t stop by itself.`], true);
+  // out from inside: the account of it, once, before anything else (inside.ts)
+  if (p.inside?.done && !p.inside.seen && p.inside.account?.length) out += `<section class="wd-inside ui-card" aria-label="Inside"><h2>Back on the street</h2>${p.inside.account.map((l, i) => `<p${i ? '' : ' class="lead"'}>${lk(esc(l))}</p>`).join('')}${acts(btn('insideok:', 'Get back to it', 'primary'))}</section>`;
   // what just happened, and what it changed: the consequence first, then the word that reached you while time passed
   if (S.log.length) out += `<section class="wd-just" aria-label="Just now">${S.log.map((l) => `<p>${l}</p>`).join('')}${S.chips.length ? `<p class="wd-fx" aria-label="What changed">${S.chips.map((c) => `<span class="${c.tone}">${esc(c.t)}</span>`).join('')}</p>` : ''}</section>`;
   else if (S.chips.length) out += `<p class="wd-fx" aria-label="What changed">${S.chips.map((c) => `<span class="${c.tone}">${esc(c.t)}</span>`).join('')}</p>`;
@@ -260,8 +262,9 @@ export function todayView(): string {
   out += h('Go and do something') + `<div class="grid g-places">`;
   out += `<button class="tile" data-a="place:club"><span class="t">Social Club</span><span class="s">${esc(clubHint())}</span></button><button class="tile" data-a="places:"><span class="t">Around town</span><span class="s">Barber shop, corner bar</span></button><button class="tile" data-a="people:"><span class="t">Find someone</span><span class="s">Who’s where, right now</span></button>`;
   out += `<button class="tile" data-a="orders:"><span class="t">Give orders</span><span class="s">Put a man to work</span></button>`;
+  const shiftDone = !!p.job && p.job.last === Math.floor(w.now / DAY);
   out += p.job
-    ? `<button class="tile hot" data-a="shift:"><span class="t">Work a shift</span><span class="s">${esc(p.job.kind)} · ${p.job.biz ? esc(w.biz[p.job.biz].name) : esc(w.chars[p.job.boss].name)}</span></button>`
+    ? `<button class="tile${shiftDone ? '' : ' hot'}" data-a="shift:"><span class="t">${shiftDone ? 'Shift done today' : 'Work a shift'}</span><span class="s">${esc(p.job.kind)} · ${p.job.biz ? esc(w.biz[p.job.biz].name) : esc(w.chars[p.job.boss].name)}${shiftDone ? ' · back tomorrow' : ''}</span></button>`
     : `<button class="tile" data-a="dayjob:"><span class="t">Legit work</span><span class="s">A clean job buys cover.</span></button>`;
   if (grudgeHint() && !/^no\b|nobody|nothing/i.test(grudgeHint())) out += `<button class="tile" data-a="grudges:"><span class="t">Settle a score</span><span class="s">${esc(grudgeHint())}</span></button>`;
   out += `<button class="tile" data-a="bj:"><span class="t">Gamble</span><span class="s">Blackjack at the family casinos</span></button>`;

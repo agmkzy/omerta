@@ -163,7 +163,12 @@ export interface Character {
   goods: number; // value of stolen goods on hand
   diedAt?: number;
   informant?: { since: number; evidence: number; agent: string; exposed?: boolean };
+  inside?: Inside; // the player's time inside: opened when he is picked up, closed with its account when he walks out (inside.ts)
+  standingWhy?: { t: number; d: number; kind: string }[]; // the player's recent changes in standing and what each was for (bounded)
+  spoke?: Id; // the made man who would speak for the player when he last looked (path.ts tells him when that changes, and why)
 }
+// A spell inside, as the player lived it: why he was picked up (as far as he could tell), how long, and what he came out to.
+export interface Inside { from: number; until: number; why: string; cash: number; standing: number; kickRate: number; backer?: Id; collects: Id[]; ops: Id[]; done?: boolean; seen?: boolean; account?: string[] }
 
 export interface Business {
   id: Id;
@@ -383,6 +388,8 @@ export interface DayJob {
   since: number;
   noticed: number; // 0..1
   shifts: number;
+  last?: number;  // the day of the last shift worked (a day job is one shift a day, five a week, and a man who stops coming loses it)
+  wk?: { n: number; k: number }; // shifts worked this week: k of week n
 }
 export type MeetingKind = 'crew' | 'accounts' | 'family' | 'sitdown' | 'social' | 'induction';
 

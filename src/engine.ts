@@ -70,15 +70,17 @@ export function advance(w: World, until: number) {
       politicsCoup(w);
       commissionTick(w);
       lifeDaily(w);
-      { const pl = w.playerId ? w.chars[w.playerId] : undefined; if (pl?.alive) christeningDue(w, pl); }
+      { const pl = w.playerId ? w.chars[w.playerId] : undefined; if (pl?.alive) { christeningDue(w, pl); if (pl.jailedUntil <= w.now) dayJobWeek(w, pl); } }
       ambitionTick(w);
       reconcile(w);
       disputeScan(w);
       disputeTick(w);
       schedule(w, w.now + DAY, 'daily');
     } else think(w, ev.who!);
+    insideTick(w); // (the player picked up, or walking out: his time inside is an account, opened and closed here, however it began)
   }
   w.now = Math.max(w.now, until);
+  insideTick(w);
 }
 
 function think(w: World, id: string) {
@@ -92,7 +94,7 @@ function think(w: World, id: string) {
 
 // ------------------------------------------------------------ weekly economy
 
-const LIVING: Record<string, number> = { civilian: 70, associate: 100, soldier: 170, capo: 330, underboss: 520, boss: 900 };
+export const LIVING: Record<string, number> = { civilian: 70, associate: 100, soldier: 170, capo: 330, underboss: 520, boss: 900 };
 
 function weekly(w: World) {
   const rng = w.rng;
@@ -208,6 +210,7 @@ function weekly(w: World) {
     feelingsWeek(w, c);
     if (c.heat > 0.45 && rng.chance(c.heat * 0.5)) {
       c.jailedUntil = w.now + rng.int(5, 40) * DAY;
+      if (c.isPlayer) pickedUp(w, c, heatWhy(w, c)); // (why, said while the heat is still on him)
       c.heat = 0.1;
       c.cash -= Math.min(Math.round(c.cash * 0.15), 500); // lawyers
       const kin = Object.values(w.chars).filter((x) => x.alive && x.familyId && x.familyId === c.familyId).map((x) => x.id);
@@ -223,6 +226,8 @@ export function serialize(w: World): string {
 }
 export { SCHEMA };
 import { ensureClubs } from './clubdata';
+import { heatWhy, insideTick, pickedUp } from './inside';
+import { dayJobWeek } from './orders';
 import { sweep } from './retain';
 import { repairAll } from './rank';
 import { ensureShape } from './world';

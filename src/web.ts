@@ -1,3 +1,4 @@
+import { standingReasons } from './core';
 import { doMove } from './sitmoves';
 import { matterAct } from './matters';
 import { openAsks, playerMove, type AskMove } from './asks';
@@ -42,7 +43,7 @@ import { social } from './conv/social';
 import { gcast } from './conv/scenarioG';
 import * as door from './conv/doors';
 import { goalsView, disputeView, storyView, storyExists } from './ui/views_c';
-import { encView, factView, bizView, attentionCount, personView, todayView } from './ui/views_a';
+import { encView, factView, bizView, attentionCount, needs, personView, todayView } from './ui/views_a';
 import { choose as encChoose } from './encounters';
 import {
   approachView, booksView, crewList, crewView, dayjobView, delegateView, familyTab, grudgesView, settleView, guestsView, helpView, jobView, meetingView,
@@ -183,7 +184,8 @@ function pass(minutes: number, lines: string[], next: View = { t: 'tab', name: '
   S.log = lines.map((l) => lk(l));
   const p = P();
   if (p.alive && p.jailedUntil > w.now) {
-    S.log.push(lk(`You were picked up. You’re inside until ${fmtTime(p.jailedUntil)}.`));
+    // (the time inside passes, and what he comes out to is the account on World: inside.ts)
+    S.log.push(lk(`You were picked up. ${p.inside?.why ?? ''}`.trim()));
     advance(w, p.jailedUntil);
   }
   S.news = collectNews(t0);
@@ -194,7 +196,7 @@ function pass(minutes: number, lines: string[], next: View = { t: 'tab', name: '
   const dh = pn.heat - snap.heat;
   if (Math.abs(dh) >= 0.04) S.chips.push({ t: `Heat ${dh > 0 ? 'up' : 'down'}`, tone: dh > 0 ? 'bad' : 'good' });
   const ds = Math.round(pn.standing - snap.standing);
-  if (ds) S.chips.push({ t: `Standing ${ds > 0 ? '+' : '−'}${Math.abs(ds)}`, tone: ds > 0 ? 'good' : 'bad' });
+  if (ds) { const why = standingReasons(pn, t0).slice(0, 2); S.chips.push({ t: `Standing ${ds > 0 ? '+' : '−'}${Math.abs(ds)}${why.length ? `: ${why.join(', ')}` : ''}`, tone: ds > 0 ? 'good' : 'bad' }); }
   const dk = Object.keys(pn.known).length - snap.known;
   if (dk > 0) S.chips.push({ t: `${dk} new thing${dk > 1 ? 's' : ''} learned`, tone: '' });
   if (pn.rank !== snap.rank) S.chips.push({ t: `Now ${pn.rank}`, tone: 'good' });
@@ -438,19 +440,22 @@ function handle(a: string, v: string) {
     case 'orders': return go({ t: 'orders', who: v });
     case 'wait': return go({ t: 'wait' });
     case 'guideoff': if (w.goals) w.goals.done['g:off'] = w.now; save(); return;
+    case 'insideok': { const pp = P(); if (pp.inside) pp.inside.seen = true; save(); return; }
     case 'waitgo': {
       const o = waitChoices(true)[Number(v)];
       if (!o) return;
       if (!o.event) return doAction({ kind: 'wait', actor: w.playerId!, hours: o.mins / 60, label: 'wait', score: 0 });
       const t0 = w.now;
-      const before = attentionCount();
+      const before = attentionCount(), offers0 = needs().length - before;
       let stopped = false;
       for (let i = 0; i < 48; i++) {
         advance(w, w.now + 30);
         pruneJobs(w);
         if (!P().alive || P().jailedUntil > w.now || attentionCount() > before) { stopped = true; break; }
       }
-      return pass(0, [stopped ? 'Something has come up.' : 'A long day. Nothing stirs.'], undefined, t0);
+      // (what stopped the clock, said as what it was: picked up, something wanting him, or new work on offer; "nothing stirs" only if so)
+      const jailed = P().alive && P().jailedUntil > w.now, more = needs().length - attentionCount() - offers0;
+      return pass(0, [jailed ? '' : stopped ? 'Something wants you. It’s at the top of the list.' : more > 0 ? `A day goes by. ${more === 1 ? 'Something new is on offer' : `${more} new things are on offer`}, under Opportunities.` : 'A long day. Nothing stirs.'].filter(Boolean), undefined, t0);
     }
     case 'cat': {
       const kind = v as Kind;

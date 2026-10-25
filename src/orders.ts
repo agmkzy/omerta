@@ -430,6 +430,17 @@ export function dayJobOptions(w: World, p: Character): DayJobOpt[] {
 export function takeDayJob(w: World, p: Character, o: DayJobOpt) {
   p.job = { kind: o.kind, biz: o.biz, boss: o.boss, since: w.now, noticed: 0, shifts: 0 };
 }
+// A man who has not worked a shift in a week is let go, and told why (the job is a commitment, not a tap to turn on when he likes)
+export function dayJobWeek(w: World, p: Character) {
+  const j = p.job;
+  if (!j) return;
+  const since = Math.floor(w.now / DAY) - (j.last ?? Math.floor(j.since / DAY));
+  if (since < 8) return;
+  const boss = w.chars[j.boss];
+  delete p.job;
+  if (boss?.alive) { const r = (boss.rels[p.id] ??= { trust: 0.3, respect: 0.3, affection: 0.3, grudge: 0, lastMet: w.now }); feelOn(w, r, 'trust', -0.04); }
+  addFact(w, { kind: 'report', actor: boss?.id, victim: p.id, minor: false, text: `${boss?.name ?? 'Your employer'} has let you go: you haven’t been in for a week. “Don’t bother coming back.”`, district: p.district }, { witnesses: [p.id] });
+}
 export const quitDayJob = (p: Character) => {
   delete p.job;
 };
@@ -449,6 +460,10 @@ export function workShift(w: World, p: Character): { minutes: number; lines: str
     delete p.job;
     return { minutes: 0, lines: [`${place.name} has closed its doors. There’s no work there any more.`] };
   }
+  // (a job is a job: one shift a day, five days a week. A man who stops turning up is told not to bother.)
+  const day = Math.floor(w.now / DAY), wk = Math.floor(day / 7);
+  if (j.last === day) return { minutes: 0, lines: [`You’ve done your shift today. ${boss.name.split(' ')[0]} expects you tomorrow, not twice today.`] };
+  if (j.wk?.n === wk && j.wk.k >= 5) return { minutes: 0, lines: ['That’s your five shifts this week. The place doesn’t need you again until the week turns.'] };
   let pay = PAY[j.kind] + (j.kind === 'driver' && boss.rank === 'boss' ? 30 : 0);
   // Union scale comes out of the employer's own till, so a bad week at the place is a short week for you.
   if (j.kind === 'porter' && place) {
@@ -461,6 +476,7 @@ export function workShift(w: World, p: Character): { minutes: number; lines: str
   p.books.gross.odd = (p.books.gross.odd ?? 0) + pay;
   p.weekIncome += pay;
   j.shifts++;
+  j.last = day; j.wk = j.wk?.n === wk ? { n: wk, k: j.wk.k + 1 } : { n: wk, k: 1 };
   const r = (boss.rels[p.id] ??= { trust: 0.3, respect: 0.3, affection: 0.3, grudge: 0, lastMet: w.now });
   const good = w.rng.chance(0.55 + p.traits.caution * 0.2);
   j.noticed = clamp(j.noticed + (good ? 0.07 : 0.02));

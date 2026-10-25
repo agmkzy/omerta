@@ -165,8 +165,20 @@ export function regard(w: World, npc: Character, player: Character, field: 'trus
 // within a week. Losses are not damped: a name is quicker lost than made. Returns the change actually applied.
 // Foundation (Oct 2026): the one door for anyone's standing, player or not. Deeds come here from addFact (DEED); a rise in rank
 // from applyRank; everything else the game rewards or punishes calls it directly, with the kind of thing it was.
+// What a change in the player's standing was for, kept (bounded) so the screen can say so: "Standing −1, a broken promise".
+function noteStanding(w: World, p: Character, d: number, kind: string) {
+  if (!p.isPlayer || Math.abs(d) < 0.05) return;
+  const xs = (p.standingWhy ??= []); xs.push({ t: w.now, d: Math.round(d * 100) / 100, kind }); if (xs.length > 12) xs.splice(0, xs.length - 12);
+}
+const STANDING_WORD: Record<string, string> = { bossjob: 'work for your captain', 'broke word': 'a broken promise', 'ignored summons': 'not coming when sent for', 'refused work': 'turning down work', 'short weeks': 'light envelopes', 'honest weeks': 'honest envelopes', told: 'keeping your word', trial: 'your test', meeting: 'how a sit-down went', lies: 'lies found out', 'let down': 'letting a man down', 'stood up': 'standing up for someone', gift: 'a gift', generous: 'generosity', 'gave way': 'giving way', hard: 'the family’s hard work', handled: 'a matter handled', 'good work': 'good work', botched: 'a job botched', caught: 'being caught', lifestyle: 'how you live', wedding: 'a wedding', married: 'getting married', friend: 'a friend in the right place', favour: 'a favour done', mediated: 'settling a quarrel', 'kept-quiet': 'keeping your mouth shut', informer: 'talk of an informer' };
+/** What the player's standing has turned on since `t0`, in words, most weight first. */
+export function standingReasons(p: Character, t0: number): string[] {
+  const by = new Map<string, number>();
+  for (const x of p.standingWhy ?? []) if (x.t >= t0) { const k = x.kind.startsWith('deed:') ? 'what people heard you did' : STANDING_WORD[x.kind] ?? x.kind.replace(/[-_]/g, ' '); by.set(k, (by.get(k) ?? 0) + x.d); }
+  return [...by.entries()].filter(([, d]) => Math.abs(d) >= 0.3).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).map(([k]) => k);
+}
 export function repute(w: World, p: Character, amount: number, kind: string): number {
-  if (amount <= 0) { const before = p.standing; p.standing = clamp(p.standing + amount, 0, 100); return p.standing - before; }
+  if (amount <= 0) { const before = p.standing; p.standing = clamp(p.standing + amount, 0, 100); noteStanding(w, p, p.standing - before, kind); return p.standing - before; }
   const week = Math.floor(w.now / (7 * 1440));
   const key = `st:${kind}`;
   const seen = p.cooldown[key] ?? 0;
@@ -175,6 +187,7 @@ export function repute(w: World, p: Character, amount: number, kind: string): nu
   const gain = amount * Math.pow(0.6, times) * Math.max(0.2, 1 - Math.max(0, p.standing - 40) / 70);
   const before = p.standing;
   p.standing = clamp(p.standing + gain, 0, 100);
+  noteStanding(w, p, p.standing - before, kind);
   return p.standing - before;
 }
 
@@ -572,6 +585,8 @@ export function handleDeath(w: World, id: Id, o: { cause?: string; favoured?: Id
     if (b.protection?.collectorId === id) delete b.protection;
   }
   for (const x of w.debts) if (x.status === 'active' && (x.debtor === id || x.creditor === id)) x.status = 'void';
+  // (work he was doing ends with him: nobody is left on it, and the man who gave it will hear it was never finished)
+  for (const j of w.jobs) if ((j.status === 'active' || j.status === 'offered') && j.assignee === id) { j.status = 'expired'; j.notes = [...(j.notes ?? []), 'The man on it is dead.']; }
   for (const q of w.disputes ?? []) if ((q.status === 'open' || q.status === 'violated') && (q.a === id || q.b === id)) { q.status = 'dropped'; q.history.push({ t: w.now, text: 'One of the two is gone. There is nobody left to argue with.' }); }
   const subs = Object.values(w.chars).filter((x) => x.alive && x.bossId === id);
   if (d.rank === 'boss' && d.familyId) {

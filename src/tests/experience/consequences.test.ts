@@ -16,7 +16,7 @@ const heardSince = (w: World, t0: number) => Object.entries(P(w).known).filter((
 describe('a decision made over the player’s head is told to him', { tags: ['scenario'] }, () => {
   ok('when a captain settles a quarrel against the player with the player’s money, the player learns what was paid, to whom, and why', () => {
     // (the settlement is the captain's to make; whether it comes off is a roll, so it is tried on fresh copies until it does)
-    for (const seed of [3, 7, 11, 13, 17, 19, 23, 29]) {
+    for (const seed of [3, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61]) {
       const w = worldFor(seed), p = P(w), [victim] = familyMen(w, 'associate').length ? familyMen(w, 'associate') : familyMen(w, 'soldier');
       const mid = w.chars[victim.bossId ?? ''] ?? captain(w);
       p.cash = 2000;

@@ -302,7 +302,8 @@ function subjectsNow(c: Ctx, k: Pane, all: boolean): Choice[] {
     if (shopOf(c) && protectAvailable(c)) { const prev = lastOf(w, n.id, 'protect'); out.push({ id: 'protect', label: line(c, 'demand.protection', { amt: `$${feeOf(c)}` }), note: !prev ? undefined : prev.out === 'counter' ? `He offered less ${agoWords(w.now, prev.t)}.` : prev.out === 'agreed' ? undefined : `He turned you down ${agoWords(w.now, prev.t)}.`, group: 'matter' }); }
     if (all) {
       const ways = actRows(c, k, ['other']);
-      if ((n.rank !== 'civilian' || n.cash >= 600) && !ways.some((x) => x.id.startsWith('a:borrow'))) out.push({ id: 'loan:500', label: line(c, 'ask.loan', { amt: '$500' }), group: 'matter' });
+      // (not from a man who owes the player money himself: the player would be borrowing his own money back at interest)
+      if ((n.rank !== 'civilian' || n.cash >= 600) && !ways.some((x) => x.id.startsWith('a:borrow')) && !w.debts.some((d) => d.status === 'active' && d.creditor === h.id && d.debtor === n.id)) out.push({ id: 'loan:500', label: line(c, 'ask.loan', { amt: '$500' }), group: 'matter' });
       // who a man answers to: the men troubling people the player has promised to help
       for (const id of new Set(social(w).obs.filter((o) => o.obligor === h.id && o.status === 'pending' && o.matter?.against).map((o) => o.matter!.against!))) { const m = w.chars[id]; if (m && m.id !== n.id && m.id !== h.id) out.push({ id: 'answers:' + m.id, label: line(c, 'ask.answersTo', { manFirst: first(m.name) }), group: 'matter' }); }
       out.push(...ways);
@@ -411,6 +412,7 @@ function raiseHis(c: Ctx) {
 // When his money has come up and he is short (the old engine offers a gift or a loan only then: less than $300, or his shop in the
 // red), those are what the player can say next, beside whatever the subject itself allows
 function offerHelp(c: Ctx) {
+  if (c.v.topic?.startsWith('enc:') || c.v.choices.some((x) => /^a:(enc|apx):/.test(x.id))) return; // (his own request in hand: answered on its own)
   const help = actRows(c, undefined, ['between', 'lead', 'other']).filter((x) => /^a:(help_gift|help_loan|offer_loan|cr_cash)\b/.test(x.id) && !c.v.choices.some((y) => y.id === x.id)).slice(0, 2);
   if (!help.length) return;
   const i = c.v.choices.findIndex((x) => x.group === 'more' || x.group === 'leave' || x.group === 'intent');

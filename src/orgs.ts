@@ -82,7 +82,7 @@ export function treasuryMove(w: World, fid: Id, c: Character, amt: number, why: 
 }
 export const treasuryCheck = (f: Family): number => (f.tin ?? 0) - (f.tout ?? 0) - (f.treasury ?? 0);
 
-const DUES_FLOOR: Record<string, number> = { soldier: 1500, capo: 4000, underboss: 8000 };
+export const DUES_FLOOR: Record<string, number> = { soldier: 1500, capo: 4000, underboss: 8000 };
 const SUPPORT: Record<string, number> = { associate: 0, soldier: 120, capo: 200, underboss: 300, boss: 400 };
 export function treasuryWeek(w: World) {
   for (const f of orgList(w)) {

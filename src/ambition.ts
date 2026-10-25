@@ -35,11 +35,11 @@ const bossTrust = (w: World, p: Character) => { const b = p.bossId ? w.chars[p.b
 export const AMBITIONS: Ambition[] = [
   // ---- associate
   { key: 'earner', band: 'associate', title: 'Put $2,500 in your pocket', why: 'Money is the first language. A man with no cash can’t buy a runner, a favour or his way out of trouble.', how: 'Work jobs, collect, and keep what you earn. Don’t spend it on losing hands.', measure: (w, p) => [p.cash, 2500], reward: { standing: 2 } },
-  { key: 'envelope', band: 'associate', title: 'Get a shop paying you every week', why: 'A weekly envelope is proof you can do the job, and it’s money that keeps coming while you sleep.', how: 'Open Rackets, then Protection, and lean on a shop. Pick one that isn’t already someone’s.', measure: (w, p) => [shops(w, p), 1], reward: { cash: 150, standing: 2 } },
+  { key: 'envelope', band: 'associate', title: 'Get a shop paying you every week', why: 'A weekly envelope is proof you can do the job, and it’s money that keeps coming while you sleep.', how: 'Go and see a shop owner and put it to him. Pick a place that isn’t already paying someone.', measure: (w, p) => [shops(w, p), 1], reward: { cash: 150, standing: 2 } },
   { key: 'friends', band: 'associate', title: 'Make five men who’d speak for you', why: 'To be made you need a sponsor, and sponsors only back men that other men speak well of.', how: 'Spend time with the family at the club. Do favours. Don’t take sides in small quarrels.', measure: (w, p) => [friends(w, p), 5], reward: { standing: 3 } },
   { key: 'bosstrust', band: 'associate', title: 'Earn your boss’s trust', why: 'Everything in the family runs through him. Until he trusts you, nothing opens.', how: 'Do what he asks, bring in what you owe, and don’t embarrass him.', measure: (w, p) => [bossTrust(w, p), 60], reward: { standing: 3 } },
-  { key: 'crew6', band: 'associate', title: 'Put six men under you', why: 'A crew means you can be in three places at once. It’s also how the family sees you’re ready to lead.', how: 'Recruit under Family, Your men. Take men who owe you, or who are hungry.', measure: (w, p) => [crew(w, p), 6], reward: { cash: 100, standing: 2 } },
-  { key: 'racket1', band: 'associate', title: 'Run a standing racket', why: 'A racket earns while you’re busy elsewhere. Numbers, vending machines, a front: any of them will do.', how: 'See Rackets, Standing rackets. Set one up and put a runner on it.', measure: (w, p) => [ops(w, p), 1], reward: { cash: 200, standing: 2 } },
+  { key: 'crew6', band: 'associate', title: 'Put six men under you', why: 'A crew means you can be in three places at once. It’s also how the family sees you’re ready to lead.', how: 'Take men on under Family. Take men who owe you, or who are hungry.', measure: (w, p) => [crew(w, p), 6], reward: { cash: 100, standing: 2 } },
+  { key: 'racket1', band: 'associate', title: 'Run a standing racket', why: 'A racket earns while you’re busy elsewhere. Numbers, vending machines, a front: any of them will do.', how: 'Under Business, Rackets: set one up and put a runner on it.', measure: (w, p) => [ops(w, p), 1], reward: { cash: 200, standing: 2 } },
   { key: 'favours3', band: 'associate', title: 'Be owed three favours', why: 'Favours are the real currency. Cash gets spent, and a favour is held in reserve.', how: 'Say yes when men ask for help, and name your price when it’s big.', measure: (w, p) => [owedTo(w, p.id).length, 3], reward: { standing: 2 } },
   { key: 'name', band: 'associate', title: 'Build a name men respect', why: 'Reputation gets you a seat at the table where the real decisions get made.', how: 'Finish jobs cleanly, pay your debts, and keep your word.', measure: (w, p) => [p.standing, 60], reward: { cash: 150 } },
   { key: 'made', band: 'associate', head: true, title: 'Get made', why: 'This is the line. Cross it and you’re a soldier, protected and answerable. The family has to want you and your sponsor has to vouch.', how: 'Follow “The road to being made” card under World: earn, finish jobs, build your name, win a sponsor, pass the trial. Then the family makes room.', measure: (w, p) => [ri(p.rank) >= 2 ? 1 : 0, 1], reward: { cash: 500, standing: 5 } },
@@ -92,10 +92,9 @@ export function ambitionTick(w: World) {
     const quiet = order.indexOf(a.band) < order.indexOf(bandOf(p.rank));
     w.goals.done[a.key] = w.now;
     if (quiet) continue;
-    if (a.reward.cash) p.cash += a.reward.cash;
-    if (a.reward.standing) repute(w, p, a.reward.standing, 'milestone');
-    const bits = [a.reward.cash ? `+${money(a.reward.cash)}` : '', a.reward.standing ? `standing +${a.reward.standing}` : ''].filter(Boolean).join(', ');
-    addFact(w, { kind: 'report', actor: p.id, minor: true, text: `Ambition met: ${a.title}.${bits ? ' (' + bits + ')' : ''}`, district: p.district }, { witnesses: [p.id] });
+    // (a marker of what men at his rank are expected to manage, met: noted for him, and nothing paid for it. What it was worth is in
+    // the thing itself, the shop paying, the men who trust him; money from nowhere, or a name for a goal he never chose, is not)
+    addFact(w, { kind: 'report', actor: p.id, minor: true, text: `${a.title}: done. It is the kind of thing men notice in an associate.`, district: p.district }, { witnesses: [p.id] });
   }
 }
 

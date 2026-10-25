@@ -230,7 +230,7 @@ export function gigResolve(w: World, j: Job, doer: Character, code: string): Res
       if (rng.chance(risk)) {
         bump(doer, hijack ? 0.3 : 0.12);
         lines.push(hijack ? 'The driver doesn’t stop. A second car is behind him that nobody mentioned. You get out of there with a bruised shoulder and nothing in your hands.' : 'A watchman who wasn’t on the list comes round the corner with a flashlight. You walk away like you meant to.');
-        if (hijack && rng.chance(0.3)) { jail(w, doer, rng.int(4, 18)); lines.push('The police are quicker than you hoped. You’re arrested.'); note = `${doer.name} was arrested.`; }
+        if (hijack && rng.chance(0.3)) { jail(w, doer, rng.int(4, 18), 'The police were quicker than you hoped on the truck job.'); lines.push('The police are quicker than you hoped. You’re arrested.'); note = `${doer.name} was arrested.`; }
         return res();
       }
       const take = Math.round((hijack ? value : value * 0.25) * 0.6 / 10) * 10;

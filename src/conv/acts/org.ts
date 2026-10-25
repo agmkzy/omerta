@@ -65,7 +65,8 @@ const bNeed: Act = {
 };
 const bMore: Act = {
   base: 'b_more', pane: 'business',
-  offers: (c) => (isBoss(c) && !asked(c, 'b_more') && c.h.rank !== 'boss' ? [offer(c, 'b_more', 'Ask for a bigger piece', 'More ground and more risk.')] : []),
+  // (a man asks for more once he has shown what he does with what he has: work finished, or money passed up)
+  offers: (c) => (isBoss(c) && !asked(c, 'b_more') && c.h.rank !== 'boss' && ((c.h.career?.done ?? 0) >= 1 || c.h.lifetimeKick > 0) ? [offer(c, 'b_more', 'Ask for a bigger piece', 'More ground and more risk.')] : []),
   run: (c) => {
     const x = T(c), { w, p, t } = x, rd = readiness(w, p); ask(c, 'b_more');
     const d = chance(w, t.id, 'gives you more', 'says you are not ready', [term('base', 0.15), term('his trust in you × 0.5', R(x).trust * 0.5), term('your standing / 250', p.standing / 250), term('what you have passed up, × 0.15', (rd?.earn ?? 0) * 0.15)], 0.1, 0.85);
@@ -112,9 +113,11 @@ const report: Act = {
   run: (c) => { const x = T(c), n = door.reportJobs(x.w, x.p, x.t); c.v.lines.push({ who: 'narr', text: `You walk ${x.t.name} through what you did. He seems satisfied. (standing +${n})` }); return out(20); },
 };
 const activeOrders = (c: Ctx) => c.w.jobs.filter((q) => q.status === 'active' && q.giver === c.n.id && q.assignee === c.h.id && (q.via === 'boss' || q.via === 'tip')).slice(0, 2);
+// the work, said to the man who gave it: "he wants Vito dealt with", never his own name back at him ("Frankie wants Vito dealt with")
+const workTo = (c: Ctx, j: Job) => { const g = j.giver ? c.w.chars[j.giver] : undefined, m = g ? new RegExp(`^${g.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} (wants|says) `).exec(j.title) : null; return m ? { verb: m[1] === 'says' ? 'say' : 'want', rest: j.title.slice(m[0].length) } : undefined; };
 const challenge: Act = {
   base: 'challenge', pane: 'confront',
-  offers: (c) => (orders(c) ? activeOrders(c).map((j) => offer(c, 'challenge:' + j.id, `Ask why: "${j.title}"`, 'Is it what he says it is?')) : []),
+  offers: (c) => (orders(c) ? activeOrders(c).map((j) => { const k = workTo(c, j); return offer(c, 'challenge:' + j.id, k ? `Ask why you ${k.verb} ${k.rest}` : `Ask why: "${j.title}"`, 'Is it what he says it is?'); }) : []),
   conduct: (c) => { if (rk(c.n) > rk(c.h)) door.conduct(c.h, 'defied'); },
   run: (c, code) => {
     const x = T(c), { w, t } = x, j = w.jobs.find((q) => q.id === code.split(':')[1]) as Job, cause = j?.cause ? w.facts[j.cause] : undefined;
@@ -130,7 +133,7 @@ const challenge: Act = {
 };
 const refuse: Act = {
   base: 'refuse', pane: 'confront',
-  offers: (c) => (orders(c) ? activeOrders(c).map((j) => offer(c, 'refuse:' + j.id, `Refuse: "${j.title}"`, 'He won’t like it.')) : []),
+  offers: (c) => (orders(c) ? activeOrders(c).map((j) => { const k = workTo(c, j); return offer(c, 'refuse:' + j.id, k ? 'Tell him you won’t do it' : `Refuse: "${j.title}"`, k ? `${k.rest.charAt(0).toUpperCase() + k.rest.slice(1)}. He won’t like it.` : 'He won’t like it.'); }) : []),
   conduct: (c) => { if (rk(c.n) > rk(c.h)) door.conduct(c.h, 'defied'); },
   run: (c, code) => { const x = T(c), j = x.w.jobs.find((q) => q.id === code.split(':')[1]) as Job; door.refuseJob(x.w, x.p, j); tweak(x, -0.1, -0.04, -0.06); line(x, `${x.t.name} doesn’t argue. That’s worse. "Noted."`); return out(15); },
 };
@@ -154,6 +157,14 @@ const bStand: Act = {
 // What a man who can speak to it says when asked about moving up: from the road the family actually holds him to (path.ts), the gaps
 // that matter most first, and against what he said the last time: what has come on since, or that nothing has (Gate 3's doAdvance)
 const GOAL_RANK: Record<string, number> = { earn: 0, sponsor: 1, deeds: 2, kills: 3, name: 4, trial: 5 };
+// how far off he is on one part of the road, as a captain would say it: no figures, no tally, only what it amounts to
+function howFar(g: { key: string; frac: number }, h: Character, w: World): string {
+  const f = g.frac, sp = g.key === 'sponsor';
+  if (g.key === 'earn') return f < 0.1 ? 'You’ve hardly passed anything up.' : f < 0.4 ? 'You’ve started passing money up. It’s a start, not more.' : f < 0.75 ? 'You’re passing up a fair amount. Not enough yet.' : 'You’re close on the money.';
+  if (g.key === 'deeds') return f < 0.01 ? 'I haven’t seen you finish anything for me.' : f < 0.5 ? 'You’ve done a job or so. Not enough to talk about.' : 'You’re getting there with the work.';
+  if (sp) { const s = h.backer && w.chars[h.backer]?.alive ? w.chars[h.backer] : undefined; return f < 0.34 ? (s ? `${s.name.split(' ')[0]}’s word on its own isn’t enough.` : 'Right now nobody would.') : f < 0.99 ? 'A man or two would. It wants more than that.' : 'You’ve the men. Now one of them has to put your name forward.'; }
+  return '';
+}
 const GOAL_WORD: Record<string, string> = { earn: 'the money you pass up', deeds: 'the work', kills: 'the hard work', name: 'what people say of you', sponsor: 'the men who would back you', trial: 'your proof' };
 const promo: Act = {
   base: 'promo', pane: 'business',
@@ -176,7 +187,7 @@ const promo: Act = {
     else if (prev && (better.length || nameUp)) him(c, plain(n.id, 'advance.better', { ago: agoWords(w.now, prev.t), what: better.length ? GOAL_WORD[better[0].key] ?? 'the work' : `people call you ${word} now` }, 'warm'));
     else him(c, plain(n.id, 'advance.open', { standing: word }, 'flat'));
     if (!gaps.length) him(c, plain(n.id, rd?.openSeat ? 'advance.ready' : 'advance.noSeat'));
-    for (const g of gaps.slice(0, 2)) him(c, plain(n.id, 'advance.gap.' + (g.key === 'trial' && g.note.startsWith('waiting') ? 'trialOpen' : g.key), { note: g.note, standing: word, label: g.label }, 'flat'));
+    for (const g of gaps.slice(0, 2)) him(c, plain(n.id, 'advance.gap.' + (g.key === 'trial' && g.note.startsWith('waiting') ? 'trialOpen' : g.key), { how: howFar(g, h, w), standing: word, label: g.label }, 'flat'));
     remember(w, n.id, 'advance', 'asked', sig);
     return out(15);
   },
@@ -240,21 +251,37 @@ const rkBackAsk: Act = {
 };
 const flDrop: Act = { base: 'fl_drop', pane: 'business', run: (c) => { c.v.lines.push({ who: 'narr', text: 'You leave it at that.' }); return out(3); } };
 // ---------------------------------------------------------------- a concern about a man, told to a man above him
+// What the player actually has on a man, if anything: money he has seen go missing, or something the man did that the player knows he
+// did, against the family or what it looks after. A grudge of his own is an opinion, not something to tell (it is offered, and heard as
+// such). Only men he has something on are named: telling tales with nothing in them is not a way to win a captain's trust.
+function onHim(c: Ctx, y: Character): { what: string; evidence: boolean } | undefined {
+  const { w, h: p } = c, fl = p.books.flags[y.id];
+  if (fl?.amt) return { what: `You have noticed ${money(Math.round(fl.amt))} missing.`, evidence: true };
+  const f = Object.values(w.facts).filter((f) => f.actor === y.id && p.known[f.id]?.knowsActor && ['beating', 'vandalism', 'robbery', 'theft', 'burglary', 'poach', 'scam'].includes(f.kind) && w.now - f.t < 45 * DAY && (w.chars[f.victim ?? '']?.familyId === p.familyId || (!!f.business && w.biz[f.business]?.protection?.familyId === p.familyId))).sort((a, b) => b.t - a.t)[0];
+  if (f) return { what: `You know what he did: ${f.text.replace(/\.$/, '')}.`, evidence: true };
+  if ((p.rels[y.id]?.grudge ?? 0) >= 0.3) return { what: 'You have no time for him. It is your word against his.', evidence: false };
+  return undefined;
+}
+const concernMen = (c: Ctx) => Object.values(c.w.chars).filter((y) => y.alive && y.id !== c.n.id && y.id !== c.h.id && y.familyId === c.n.familyId && y.rank !== 'boss' && !!onHim(c, y)).sort((a, b) => Number(!!onHim(c, b)?.evidence) - Number(!!onHim(c, a)?.evidence) || (a.id < b.id ? -1 : 1)).slice(0, 5);
 const pickConcern: Act = {
   base: 'pick_concern', pane: 'business', opens: true,
-  offers: (c) => (inFamily(c.h, c.n) && superior(c) ? [offer(c, 'pick_concern', 'Tell him something about a man')] : []),
+  offers: (c) => (inFamily(c.h, c.n) && superior(c) && concernMen(c).length ? [offer(c, 'pick_concern', 'Tell him something about a man')] : []),
   run: (c) => {
-    const x = T(c), { w, p, t } = x;
+    const x = T(c);
     line(x, R(x).trust < 0.35 ? '“About who? Careful how you say it.”' : '“Go on. About who?”');
-    const mem = Object.values(w.chars).filter((y) => y.alive && y.id !== t.id && y.id !== p.id && y.familyId === t.familyId && y.rank !== 'boss').sort((a, b) => (p.books.flags[b.id]?.amt ?? 0) - (p.books.flags[a.id]?.amt ?? 0) || (p.rels[b.id]?.grudge ?? 0) - (p.rels[a.id]?.grudge ?? 0)).slice(0, 5);
-    return { minutes: 5, next: mem.map((y) => ({ code: 'concern:' + y.id, label: `About ${y.name}`, note: p.books.flags[y.id]?.amt ? `You have noticed ${money(Math.round(p.books.flags[y.id].amt))} missing.` : undefined })) };
+    return { minutes: 5, next: concernMen(c).map((y) => ({ code: 'concern:' + y.id, label: `About ${y.name}`, note: onHim(c, y)?.what })) };
   },
 };
 const concern: Act = {
   base: 'concern', pane: 'business',
   run: (c, code) => {
-    const x = T(c), { w, p, t } = x, y = w.chars[code.split(':')[1]], fl = p.books.flags[y.id];
+    const x = T(c), { w, p, t } = x, y = w.chars[code.split(':')[1]], fl = p.books.flags[y.id], has = onHim(c, y);
     if (!isSuperior(w, y, t) && y.bossId !== t.id && t.rank === 'associate') { line(x, `${t.name} shrugs. "I’m the wrong man to tell."`); return out(15); }
+    // (nothing but his own opinion: heard, and weighed as that, and a man who carries tales about men he simply dislikes is noted)
+    if (!has?.evidence) { line(x, pick(w, t, { cold: ['“That’s what you think of him. Bring me something I can use.”'], proud: ['“I don’t deal in what one man thinks of another.”'], _: ['“So you don’t like him. That isn’t news, and it isn’t a reason.”', '“Come back when you have more than a feeling.”'] })); tweak(x, 0, 0, -0.01); return out(15); }
+    // (told once is told: the same thing about the same man again, within a fortnight, is a man repeating himself)
+    if (recent(w, t, 'concern:' + y.id, 14)) { line(x, `“You told me about ${first(y)}. I heard you the first time.”`); return out(5); }
+    stamp(w, t, 'concern:' + y.id);
     if (y.bossId === t.id && fl?.amt) door.reportSkimming(w, t, y, { amt: fl.amt, n: Math.max(2, fl.n), last: w.now });
     line(x, voice(x, 'concern_ok', { X: first(y) }));
     // (whether word gets back to the man: three times in ten, as it always has)

@@ -22,12 +22,11 @@ export function spend(w: World, c: Character, amt: number, note: string): number
   post(w, { from: c.id, to: 'world', amt: x, flow: 'spend', note });
   return x;
 }
-// money handed up to a man above, over and above what is owed: it counts towards what the player has passed up (path.ts)
+// money handed to a man above as a gift, over and above what is owed: it is a gift to him, and he feels it (the caller's regard), but it
+// is not money passed up to the family (path.ts counts the envelopes, kick-ups and what is handed over in person: earned, not bought)
 // (posted as a gift, not as the week's kick-up: it is over and above what is owed, and the week's account must not count it as handed up)
 export function tribute(w: World, p: Character, boss: Character, amt: number, why: string): number {
-  const x = transfer(w, p, boss, amt, 'gift', why);
-  p.lifetimeKick += x;
-  return x;
+  return transfer(w, p, boss, amt, 'gift', why);
 }
 
 // ---------------------------------------------------------------- what is on record between two men

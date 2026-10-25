@@ -167,16 +167,19 @@ function debtTalk(x: X): Subject | undefined {
   };
 }
 const canPay = (t: Character, d: Debt) => Math.min(Math.max(0, Math.floor(t.cash)), d.balance);
+// whether anything is owed yet: a payment missed, one due within the day, or the loan already being paid down
+const dueNow = (w: World, d: Debt) => d.missed > 0 || d.nextDue - w.now <= DAY || (d.paid ?? 0) > 0;
 function owedMenu(x: X, d: Debt, key: string): Choice[] {
   const { w, t } = x;
   const asked = (c: string) => lastSaid(t, key + ':' + c) === String(Math.floor(w.now / DAY));
   return [
     ...(!asked('manage') ? [ch(key, 'manage', '“How much can you manage?”', 'He tells you, or he doesn’t.')] : []),
-    ...(canPay(t, d) > 0 ? [ch(key, 'now', '“Pay what you can now.”', 'Cash today, and the rest on the book.')] : []),
+    // (money lent is not called back before anything is due: a loan is its terms, and he has them)
+    ...(canPay(t, d) > 0 && dueNow(w, d) ? [ch(key, 'now', '“Pay what you can now.”', 'Cash today, and the rest on the book.')] : []),
     ...(!asked('week') ? [ch(key, 'week', '“I’ll give you another week.”', 'The next payment moves on a week. He owes you for it.')] : []),
     ...(d.weeklyPayment >= 30 && !asked('ease') ? [ch(key, 'ease', '“Let’s make the payments easier.”', `Half: ${money(Math.max(25, Math.round(d.weeklyPayment / 2 / 5) * 5))} a week. It takes longer.`)] : []),
     ...(!asked('forgive') ? [ch(key, 'forgive', '“Take a quarter off. Call it a favour.”', 'Goodwill, or weakness. Depends who’s watching.')] : []),
-    ...(!asked('lean') ? [ch(key, 'lean', '“Pay up, or there’ll be trouble.”', 'Fear works, if he has it to give. So does resentment, later.', true)] : []),
+    ...(!asked('lean') && dueNow(w, d) ? [ch(key, 'lean', '“Pay up, or there’ll be trouble.”', 'Fear works, if he has it to give. So does resentment, later.', true)] : []),
     ...(!asked('others') ? [ch(key, 'others', '“Who else do you owe?”', 'A man who owes everybody pays nobody.')] : []),
     end(key),
   ];
