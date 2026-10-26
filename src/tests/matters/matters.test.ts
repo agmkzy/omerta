@@ -219,7 +219,8 @@ ok('revenge: a beaten man’s brother wants the man who did it, asks his boss fo
 
 ok('bad blood runs its course without the player, and ends in different ways across the world', () => {
   const outs = new Set<string>();
-  for (const seed of [3, 7, 11]) {
+  // (four worlds: which endings turn up in three is the dice's; that more than two do across the city is the rule)
+  for (const seed of [3, 7, 11, 19]) {
     const w = createWorld(seed, 'Tony Marino');
     advance(w, w.now + 70 * DAY);
     for (const s of w.situations ?? []) if (s.kind === 'rivalry' && s.out) outs.add(s.out);

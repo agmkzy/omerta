@@ -50,5 +50,11 @@ export function reach(w: World, actor: Character, against: Character): { can: bo
 // conversation offers the pitch to their owners, the guide points at them. A shop in his crew's ground that pays nobody, its owner a
 // civilian, alive and open for business. (A shop paying a family, his own or another, is not a pitch: it is a matter between families.)
 export function leanable(w: World, p: Character) {
-  return Object.values(w.biz).filter((b) => b.open && b.kind !== 'casino' && b.protection?.collectorId !== p.id && !w.chars[b.ownerId]?.isPlayer && w.chars[b.ownerId]?.alive && w.chars[b.ownerId].rank === 'civilian' && may(w, p, 'protect', w.chars[b.ownerId]) && !b.protection).sort((a, b) => b.income - a.income || (a.id < b.id ? -1 : 1));
+  const ground = crewGround(w, p);
+  return Object.values(w.biz).filter((b) => canLean(w, p, b, ground)).sort((a, b) => b.income - a.income || (a.id < b.id ? -1 : 1));
+}
+// one place, by the same rule (the list above is every place that passes it)
+export function canLean(w: World, p: Character, b: World['biz'][string], ground = crewGround(w, p)): boolean {
+  const o = w.chars[b.ownerId];
+  return b.open && b.kind !== 'casino' && !b.protection && !!o?.alive && !o.isPlayer && o.rank === 'civilian' && rankOf(p) >= 1 && ground.has(b.district);
 }

@@ -21,7 +21,7 @@ import { addFavour } from '../encounters';
 import { bear } from '../core';
 import { note, social, type Request } from './social';
 import { agreement, captaincyOf, promise, request } from './tick';
-import { captainOf, chairFor, leanable, may, superiors } from './authority';
+import { canLean, captainOf, chairFor, may, superiors } from './authority';
 import { belief, judge, say } from './minds';
 import { onConfrontation, onProgressAsked } from './respond';
 import { compat } from '../core';
@@ -456,7 +456,7 @@ const unreported = (c: Ctx) => c.w.jobs.some((j) => j.giver === c.n.id && j.assi
 
 const shopOf = (c: Ctx) => { const b = ownerBiz(c.w, c.n.id); return b?.open && c.n.rank === 'civilian' ? b : undefined; };
 const feeOf = (c: Ctx) => { const b = shopOf(c)!; return Math.max(15, Math.round((b.income * 0.08) / 5) * 5); };
-const protectAvailable = (c: Ctx) => { const b = shopOf(c); return !!b && memo(c, 'leanable', () => leanable(c.w, c.h)).some((x) => x.id === b.id); }; // (the one list: authority.leanable)
+const protectAvailable = (c: Ctx) => { const b = shopOf(c); return !!b && canLean(c.w, c.h, b); }; // (the one rule: authority.leanable / canLean)
 protectOwnedBy(protectAvailable);
 function interveneChoice(c: Ctx, ob: Obligation, again: boolean): Choice {
   const forC = c.w.chars[ob.matter?.for ?? ''], a = c.w.chars[ob.matter?.against ?? ''];
