@@ -3,7 +3,7 @@
 // Everything here is read from records the game already keeps (favours, completed jobs, the sponsor ledger, facts he knows the
 // actor of, your rank and standing). A memory is only spoken when that record exists, and it is spoken at most once a day per man
 // and not in every conversation, so it stays an occasional remark and not a summary of the relationship.
-import { hash } from './voice';
+import { arch, hash } from './voice';
 import { say, rk, surname } from './voicesheet';
 import { ledgerOf } from './powers2';
 import type { Character, Fact, World } from './types';
@@ -15,7 +15,7 @@ const HARM = new Set(['beating', 'vandalism', 'robbery', 'burglary', 'theft', 's
 const mine = (s: string) => s.replace(/\bhis\b/g, 'my').replace(/\bhim\b/g, 'me').replace(/\bhe\b/g, 'I').replace(/\bhe’s\b/g, 'I’m');
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-export interface Memory { kind: 'broken' | 'harm' | 'favour' | 'owe' | 'sponsor' | 'made' | 'origin' | 'job' | 'rank' | 'name'; line: string }
+export interface Memory { kind: 'broken' | 'harm' | 'favour' | 'owe' | 'sponsor' | 'made' | 'origin' | 'job' | 'rank' | 'name' | 'news'; line: string }
 
 // The one thing he might bring up today, if there is anything. Never invents: each branch needs its own record.
 export function recall(w: World, p: Character, t: Character): Memory | undefined {
@@ -27,6 +27,24 @@ export function recall(w: World, p: Character, t: Character): Memory | undefined
   // Each kind of memory comes up at most once a fortnight with the same man: a callback, not a refrain.
   const cool = (k: string) => (p.cooldown[`recallk:${t.id}:${k}`] ?? -1) >= day;
   const out = (kind: Memory['kind'], line: string): Memory => { p.cooldown[`recall:${t.id}`] = day; p.cooldown[`recallk:${t.id}:${kind}`] = day + 14; return { kind, line }; };
+
+  // 0. what has just happened to him, that this man has heard: a man of his own family says something about it the next time they
+  // meet (the world noticing him: made, out from inside, beaten, taken down a peg, a shop on his book hit). Once for each thing.
+  const hit = (f: Fact) => !!f.business && w.biz[f.business]?.protection?.collectorId === p.id && ['robbery', 'vandalism', 'burglary'].includes(f.kind);
+  const news = t.familyId && t.familyId === p.familyId ? Object.values(w.facts).filter((f: Fact) => w.now - f.t < 7 * DAY && w.now >= f.t && t.known[f.id] && f.actor !== t.id
+    && ((f.victim === p.id && ['beating', 'robbery', 'vandalism', 'discipline'].includes(f.kind)) || (f.actor === p.id && f.kind === 'report' && /is out after/.test(f.text))
+      || (f.kind === 'promotion' && f.text.startsWith(`${p.name} was made`)) || hit(f))).sort((a, b) => b.t - a.t)[0] : undefined;
+  if (news && !cool('news:' + news.id)) {
+    const A = arch(t), hot = A === 'hothead', warm = A === 'jovial' || A === 'earnest';
+    const shop = hit(news) ? w.biz[news.business!].name : undefined;
+    const line = news.kind === 'promotion' ? (warm ? '“There he is. A made man. I always said it.”' : hot ? '“So they made you. Don’t let it go to your head.”' : '“I heard. Congratulations. It means something, what they gave you.”')
+      : /is out after/.test(news.text) ? (warm ? '“You’re out! Sit down, sit down. How was it?”' : A === 'cold' ? '“You’re out. Good. You said nothing, I hope.”' : '“Welcome back. Inside is no place for a man with business to see to.”')
+      : news.kind === 'discipline' ? (hot ? '“I heard you got taken down a peg. Happens to everybody once.”' : '“I heard about you and the man upstairs. Keep your head down a while.”')
+      : shop ? (hot ? `“I heard about ${shop}. On your book, too. You’re going to let that stand?”` : `“I heard about ${shop}. A place that pays you, hit like that. People are watching what you do.”`)
+      : hot ? '“I heard what they did to you. Tell me who, and we’ll see.”' : warm ? '“I heard what happened. You all right? You look all right.”' : '“I heard about what happened to you. It won’t have gone unnoticed.”';
+    p.cooldown[`recallk:${t.id}:news:${news.id}`] = day + 60;
+    return out('news', line);
+  }
 
   // 1. something you did to him that he knows you did
   const harm = Object.values(w.facts).filter((f: Fact) => f.actor === p.id && f.victim === t.id && HARM.has(f.kind) && t.known[f.id]?.knowsActor && w.now - f.t < 120 * DAY).sort((a, b) => b.t - a.t)[0];

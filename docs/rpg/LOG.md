@@ -30,3 +30,25 @@ RPG"). Each entry says what was found, what was changed, how it was checked, and
 
 **Measured:** the climber was made on day 61, 100 and 129 (seeds 11, 3, 7) by cultivating three made men and doing the work offered;
 before, it stayed an associate.
+
+## Stage B1: loyalty tested
+- A captain of the player's own family who holds something against the player's captain comes to him, once he is worth having
+  (standing 38, two jobs done), and asks him to tell him how things go in his crew. Three answers: take the money (a favour and a
+  friend higher up; weeks later his captain may find out, and if he does, trust, standing and backing go), say he is his captain's man
+  (respected, resented a little), or take it to his captain (trusted more; the other man may learn who told).
+- Tested in src/tests/experience/loyalty.test.ts over four worlds.
+
+## Validation and deploy of A and B1 (6d327d4, live)
+- A tip about a mark that the player passes over no longer costs the shopkeeper's trust; a favour asked and let lapse still does.
+  (Found through the Ferrara chain test: a world where Nate tipped Henry about a flush customer ended with Nate trusting him less
+  for a promise kept.)
+- The new skim/hard-message outcomes are the player's choices only; NPC errands keep the old outcomes (pacing tests).
+- The wedding invitation is for tonight's reception, so the answer and the evening agree.
+- Tests that depended on one man or one world doing a particular thing now sample several (debtors asking the player; men going
+  to somebody for help).
+- Suites run in three chunks: all pass (the "innocent man" scenario, which times out under load, passes alone). Live hash matches
+  the build; a save from the previous version loads on the live site with no errors.
+
+## Stage B2: the world notices the player
+- A man of his own family who has heard what just happened to him (made, out from inside, beaten, disciplined, a shop on his book
+  hit) says so the next time they talk, in his own voice, once. A man who hasn't heard says nothing (memory.ts recall, step 0).

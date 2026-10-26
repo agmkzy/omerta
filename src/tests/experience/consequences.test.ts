@@ -6,6 +6,7 @@ import { describe, test as ok } from 'vitest';
 import { advance } from '../../engine';
 import { addFact } from '../../core';
 import { daily, mkJob } from '../../jobs';
+import { recall } from '../../memory';
 import { DAY, type World } from '../../types';
 import { P } from '../helpers';
 import { captain, days, familyMen, worldFor } from './play';
@@ -60,3 +61,15 @@ describe('a month inside is an account, not a jump', { tags: ['scenario'] }, () 
   });
 });
 void days;
+
+describe('the world notices what happens to the player', { tags: ['scenario'] }, () => {
+  ok('a man of his family who has heard he was beaten says so the next time they talk, once, and a man who has not heard says nothing', () => {
+    const w = worldFor(3), p = P(w), [a, b] = familyMen(w, 'soldier'), cap = captain(w);
+    const f = addFact(w, { kind: 'beating', actor: cap.id, victim: p.id, text: `Somebody beat ${p.name}.`, district: p.district }, { witnesses: [a.id] });
+    assert.ok(f && a.known[f.id] && !b.known[f.id]);
+    assert.equal(recall(w, p, a)?.kind, 'news');
+    w.now += DAY;
+    assert.notEqual(recall(w, p, a)?.kind, 'news', 'it is said once');
+    assert.notEqual(recall(w, p, b)?.kind, 'news', 'he never heard it');
+  });
+});
