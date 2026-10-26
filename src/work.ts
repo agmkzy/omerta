@@ -61,7 +61,7 @@ export function needsOf(w: World, g: Character): Need[] {
     const t = w.chars[f.actor];
     if (!t?.alive || t.isPlayer || (t.familyId && t.familyId === g.familyId) || w.jobs.some((j) => j.cause === f.id)) continue;
     const n = { kind: 'handle' as const, target: t.id };
-    if (open(w, n)) out.push({ ...n, cause: f.id, title: `${g.name} wants ${t.name} dealt with`, brief: `"${f.text}" ${g.name} won't let that stand.`, pay: 0, why: f.text, weight: 0.35 });
+    if (open(w, n)) out.push({ ...n, cause: f.id, title: g.isPlayer ? `Deal with ${t.name}` : `${g.name} wants ${t.name} dealt with`, brief: g.isPlayer ? `"${f.text}" You won't let that stand.` : `"${f.text}" ${g.name} won't let that stand.`, pay: 0, why: f.text, weight: 0.35 });
   }
   // his crew's ground: a shop there paying nobody (the other purpose behind an approach, beside a man's own book)
   if (['capo', 'underboss', 'boss'].includes(g.rank) || g.isPlayer && g.rank !== 'associate') {

@@ -164,7 +164,8 @@ export function needs(): Need[] {
   // you is not work to report)
   const told = new Map<string, string[]>();
   for (const j of w.jobs.filter((x) => x.status === 'done' && !x.reported && x.kind !== 'summons' && x.assignee === p.id && x.giver && x.giver !== p.id && w.chars[x.giver]?.alive && w.now - x.created < 30 * DAY)) told.set(j.giver!, [...(told.get(j.giver!) ?? []), j.title]);
-  for (const [gid, titles] of told) { const g = w.chars[gid]; out.push({ dot: 'amber', k: 'Done', title: `Tell ${g.name} how it went`, sub: titles.join(' · '), a: `talk:${g.id}`, who: g.id }); }
+  const above = new Set<string>(); for (let c = p.bossId ? w.chars[p.bossId] : undefined, i = 0; c && i < 5; c = c.bossId ? w.chars[c.bossId] : undefined, i++) above.add(c.id);
+  for (const [gid, titles] of told) { const g = w.chars[gid]; out.push({ dot: above.has(gid) ? 'amber' : 'blue', k: 'Done', title: `Tell ${g.name} how it went`, sub: titles.join(' · '), a: `talk:${g.id}`, who: g.id }); }
   for (const j of w.jobs.filter((x) => x.rep && !x.acked && playerSide(w, x) && (x.status === 'done' || x.status === 'failed')).slice(-3).reverse())
     out.push({ dot: 'blue', k: 'Reporting back', title: `${w.chars[j.rep!.by].name} reports back`, sub: j.title, a: `report:${j.id}`, who: j.rep!.by });
   for (const b of Object.values(w.biz).filter((x) => x.open && x.protection && lateOf(x) > 0 && (x.protection.collectorId === p.id || w.chars[x.protection.collectorId]?.bossId === p.id)))
@@ -256,7 +257,7 @@ export function wantsHere(ids: Set<string>): string {
 }
 export function justNow(at?: string): string {
   if (at && S.logAt !== at) return '';
-  const fx = S.chips.length ? `<p class="wd-fx" aria-label="What changed">${S.chips.map((c) => `<span class="${c.tone}">${esc(c.t)}</span>`).join('')}</p>` : '';
+  const fx = S.chips.length ? `<p class="wd-fx" aria-label="What changed">${S.chips.map((c) => (c.a ? `<button class="${c.tone}" data-a="${esc(c.a)}" title="Where it came from">${esc(c.t)} ›</button>` : `<span class="${c.tone}">${esc(c.t)}</span>`)).join('')}</p>` : '';
   if (S.log.length) return `<section class="wd-just" aria-label="Just now">${S.log.map((l) => `<p>${l}</p>`).join('')}${fx}</section>`;
   return fx;
 }

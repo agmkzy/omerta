@@ -59,7 +59,7 @@ export const S = {
   news: [] as string[],
   routine: 0,
   notice: '' as string, // a one-off message shown at the top of whatever screen you land on
-  chips: [] as { t: string; tone: 'good' | 'bad' | '' }[],
+  chips: [] as { t: string; tone: 'good' | 'bad' | ''; a?: string }[], // a: where to see the why of it (the money: the week, in Business)
   opts: [] as Action[],
   planOpts: [] as OrderOpt[],
   last: {} as Record<string, { view: View; stack: View[] }>, // where you were in each section, so going back to it picks up there

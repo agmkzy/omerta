@@ -135,10 +135,17 @@ export function ordersView(whoId: Id): string {
   const c = w.chars[whoId];
   S.planOpts = orderMenu(w, p);
   let out = back() + `<header class="pp-head">${avatar(c)}<div class="pp-id">${title(`Orders for ${c.name.split(' ')[0]}`, esc(skillLine(c)))}</div></header>`;
+  // (the work itself first, named: the best of each kind, as orders a man gives; everything else folded under its kind)
   const groups = ['Money', 'Cars', 'Burglary', 'Scams', 'Watch', 'Other'];
-  for (const g of groups) {
-    const list = S.planOpts.map((o, i) => [o, i] as const).filter(([o]) => o.group === g);
-    if (list.length) out += banner('o:' + g, 'wrench', 'g', g, `${list.length}`, choices(list.map(([o, i]) => ({ a: `plan:${i}|${c.id}`, label: o.label, hint: o.hint })), g));
+  const all = S.planOpts.map((o, i) => [o, i] as const);
+  const top = groups.map((g) => all.find(([o]) => o.group === g)).filter((x): x is (typeof all)[number] => !!x);
+  if (!top.length) return out + quiet('There’s nothing to send him on right now.');
+  out += h('Send him to') + choices(top.map(([o, i]) => ({ a: `plan:${i}|${c.id}`, label: o.label, hint: `${o.group === 'Other' ? '' : o.group + ' · '}${o.hint}` })), 'Send him to');
+  const rest = all.filter((x) => !top.includes(x));
+  if (rest.length) {
+    let more = '';
+    for (const g of groups) { const list = rest.filter(([o]) => o.group === g); if (list.length) more += h(g, String(list.length)) + rows(list.map(([o, i]): Row => ({ title: esc(o.label), sub: esc(o.hint ?? ''), a: `plan:${i}|${c.id}` }))); }
+    out += `<details class="pp-more"><summary>Everything else he could do (${rest.length})</summary>${more}</details>`;
   }
   return out;
 }

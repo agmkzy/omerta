@@ -216,7 +216,7 @@ function pass(minutes: number, lines: string[], next: View = { t: 'tab', name: '
   const dc = Math.round(pn.cash - snap.cash);
   // (a week's living goes out every week: when the money moved by about that and nothing else, the chip says so)
   const weeks = Math.floor(w.now / (7 * DAY)) - Math.floor(t0 / (7 * DAY)), living = weeks * Math.max(0, (LIVING[pn.rank] ?? 100) - pn.wage);
-  if (dc) S.chips.push({ t: `${dc > 0 ? '+' : '−'}${money(Math.abs(dc))}${weeks && dc === -living ? ': a week’s living' : weeks && living ? ` (after ${money(living)} living)` : ''}`, tone: dc > 0 ? 'good' : 'bad' });
+  if (dc) S.chips.push({ t: `${dc > 0 ? '+' : '−'}${money(Math.abs(dc))}${weeks && dc === -living ? ': a week’s living' : weeks && living ? ` (after ${money(living)} living)` : ''}`, tone: dc > 0 ? 'good' : 'bad', a: 'sub:business.week' });
   const dh = pn.heat - snap.heat;
   if (Math.abs(dh) >= 0.04) S.chips.push({ t: `Heat ${dh > 0 ? 'up' : 'down'}`, tone: dh > 0 ? 'bad' : 'good' });
   const ds = Math.round(pn.standing - snap.standing);
@@ -614,7 +614,9 @@ function handle(a: string, v: string) {
         const s = statement(w, c);
         if (s.light || c.books.missed > 1 || S.sundayRes[sKey(c.id)]) continue;
         const r = rel(c, p.id); feelOn(w, r, 'trust', 0.02);
-        S.sundayRes[sKey(c.id)] = [`You take ${c.name.split(' ')[0]}’s envelope and nod. ${c.name.split(' ')[0]} relaxes.`];
+        // (each man as he hands it over, not the same nod three times; the hour and the man pick the moment)
+        const f_ = c.name.split(' ')[0], took = [`You take ${f_}’s envelope and nod. ${f_} relaxes.`, `${f_} slides it across. You put it in your jacket without counting it, which is its own kind of compliment.`, `You weigh ${f_}’s envelope in your hand and nod. He’s already reaching for his coffee.`, `${f_} puts it down and waits. “Good,” you say. That’s all he needed.`, `You count it once, quickly. ${f_} watches you count and looks pleased when you stop.`];
+        S.sundayRes[sKey(c.id)] = [took[(c.id.length + Math.floor(w.now / DAY) + crewOf(w, P()).indexOf(c)) % took.length]];
       }
       save(); return;
     }
