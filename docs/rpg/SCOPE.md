@@ -11,6 +11,10 @@ glance. It folds in the October roadmap (V90 places, V91 The Living Ecosystem, V
    before all of them, one score before a score engine, one district before seven).
 4. **Player enjoyment is a release criterion:** working, passing tests and making the simulation busier is not enough. A slice that
    isn't enjoyable is reworked or cut, not widened.
+5. **Keep the game playable:** stable increments, tested and deployed; no months-long rebuild.
+6. **Keep testing actual gameplay:** long playthroughs every stage expose repetition, shallow decisions and broken progression.
+7. **Keep systems interconnected:** every new mechanic influences existing characters, relationships, opportunities or
+   consequences.
 
 ## Phase 0: Finish and harden
 - Pending fixes live; a long live playthrough.

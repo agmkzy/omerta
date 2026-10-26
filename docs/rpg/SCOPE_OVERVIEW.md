@@ -36,6 +36,13 @@ everyone does?* A state variable changing is not integration. A downstream syste
    simulation busier. It is finished when playing it is enjoyable: it creates a decision the player cares about, an outcome worth
    retelling, or a moment he would seek out again. A slice that isn't enjoyable is reworked or cut, not widened. (How this is
    judged: see "Release criteria" under *Throughout*.)
+5. **Keep the game playable.** Develop, test and deploy stable increments; never disappear into a months-long rebuild. Every
+   stage ends with a working, deployed game.
+6. **Keep testing actual gameplay.** A technically complete feature isn't necessarily an enjoyable one. Long-running playthroughs
+   (the climber over 150+ days, browser playthroughs over weeks of game time) are run every stage to expose repetition, shallow
+   decisions and broken progression.
+7. **Keep systems interconnected.** Every new mechanic must influence existing characters, relationships, opportunities or
+   consequences. A mechanic nothing else reads is not added.
 
 ## Where the game stands (26 October 2026)
 
