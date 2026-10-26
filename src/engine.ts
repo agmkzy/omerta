@@ -208,8 +208,10 @@ function weekly(w: World) {
   for (const c of Object.values(w.chars)) {
     if (!c.alive) continue;
     feelingsWeek(w, c);
-    if (c.heat > 0.45 && rng.chance(c.heat * 0.5)) {
-      c.jailedUntil = w.now + rng.int(5, 40) * DAY;
+    // (the player's arrest odds rise from nothing at the line, and his time inside scales with how hot he was, a week to a month;
+    // a stopgap until the police are a faction with cases of their own, docs/rpg/SCOPE.md 1.8. Everyone else as before.)
+    if (c.heat > 0.45 && rng.chance(c.isPlayer ? Math.min(0.85, (c.heat - 0.45) * 1.2) : c.heat * 0.5)) {
+      c.jailedUntil = w.now + (c.isPlayer ? Math.round(5 + Math.min(1, (c.heat - 0.45) / 0.6) * 25 + rng.int(-2, 2)) : rng.int(5, 40)) * DAY;
       if (c.isPlayer) pickedUp(w, c, heatWhy(w, c)); // (why, said while the heat is still on him)
       c.heat = 0.1;
       c.cash -= Math.min(Math.round(c.cash * 0.15), 500); // lawyers

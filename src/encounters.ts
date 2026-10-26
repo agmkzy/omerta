@@ -3,6 +3,7 @@ import { answerCourting, courter, makeCourting } from './loyalty';
 import { answerDeal, dealer, makeDeal } from './crossdeal';
 import { authorityChoose, quarrel } from './authority';
 import { bookChoose } from './book';
+import { makeScore, scoreChoose, scoreTip } from './score';
 import { answerAsk, answerWord, callFavour, putToPlayer } from './asks';
 import { answerMatter } from './matters';
 // People come to you. Each approach is a small scene in the man's own voice, with choices that carry weight:
@@ -408,7 +409,9 @@ function shopHelp(w: World, p: Character): Cand[] {
 const courting = (w: World, p: Character): Cand[] => { const c = courter(w, p); return c ? [{ weight: 0.6, key: 'courting', make: () => makeCourting(w, p, c.x, c.cap) }] : []; };
 // (a man of another family with a job to split: crossdeal.ts)
 const crossdeal = (w: World, p: Character): Cand[] => { const d = dealer(w, p); return d ? [{ weight: 0.5, key: 'crossdeal', make: () => makeDeal(w, p, d.x, d.cap, d.b) }] : []; };
-const GENERATORS = [favourAsk, mediate, shopBegs, tipSale, callIn, witnessTell, shopHelp, courting, crossdeal]; // (Stage 5: a man in trouble, or behind with a creditor, comes for his own reasons: intent.ts)
+// (a truck worth taking, from a man with a reason to tell him: score.ts)
+const scoreGen = (w: World, p: Character): Cand[] => { const t = scoreTip(w, p); return t ? [{ weight: 0.45, key: 'score', make: () => makeScore(w, p, t.giver, t.src) }] : []; };
+const GENERATORS = [favourAsk, mediate, shopBegs, tipSale, callIn, witnessTell, shopHelp, courting, crossdeal, scoreGen]; // (Stage 5: a man in trouble, or behind with a creditor, comes for his own reasons: intent.ts)
 
 // ------------------------------------------------------------ the tick
 
@@ -519,6 +522,7 @@ export function choose(w: World, p: Character, e: Enc, code: string): { lines: s
   if (e.kind === 'word') return answerWord(w, p, e, code); // V89: a superior's word about trouble
   if (e.kind === 'matter') return answerMatter(w, p, e, code); // V89: someone in a matter wants the player's answer
   if (e.kind === 'imposed') return answerImposed(w, p, e, code);
+  if (e.kind === 'score') return scoreChoose(w, p, e, code); // a truck, played: score.ts
   if (['bigbet', 'cantpay', 'rivalbook', 'pad'].includes(e.kind)) return bookChoose(w, p, e, code); // the book: book.ts
   if (e.kind === 'cometo' || e.kind === 'quarrel' || e.kind === 'answer') return authorityChoose(w, p, e, code); // his crew and what he answers for: authority.ts
   if (e.kind === 'crossdeal') return answerDeal(w, p, e, code); // a man of another family with a job to split: crossdeal.ts

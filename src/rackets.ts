@@ -206,7 +206,7 @@ export function enterpriseWeek(w: World) {
       op.until = w.now + w.rng.int(2, 4) * DAY * 7;
       const fine = w.rng.int(150, 450);
       owner.cash = Math.max(0, owner.cash - fine);
-      if (w.rng.chance(runner ? 0.6 : 0.4)) { doer.jailedUntil = w.now + w.rng.int(7, 21) * DAY; doer.heat = clamp(doer.heat + 0.4, 0, 1.5); }
+      if (w.rng.chance(runner ? 0.6 : doer.isPlayer ? 0.2 : 0.4)) { doer.jailedUntil = w.now + w.rng.int(7, 21) * DAY; doer.heat = clamp(doer.heat + 0.4, 0, 1.5); }
       addFact(w, { kind: 'raid', actor: doer.id, text: `Police raided the ${d.label.toLowerCase()} in ${op.district}${doer.jailedUntil > w.now ? ` and took ${doer.name}` : ''}. It costs ${owner.name} ${money(fine)} and some weeks.`, amount: fine, district: op.district }, { witnesses: [owner.id] });
       op.last = 0; op.bad = (op.bad ?? 0) + 1;
       continue;

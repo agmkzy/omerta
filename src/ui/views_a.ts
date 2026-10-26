@@ -70,7 +70,7 @@ const firstName = (c: Character) => c.name.split(' ')[0];
 // What kind of approach it is, in a word or two (never the record's own label).
 const ENC_K: Record<string, string> = {
   threat: 'A threat', ask: 'Wants something', word: 'Wants a word', matter: 'Wants your answer', callin: 'Calling in a favour',
-  squeeze: 'Another family', invite: 'An invitation', kin: 'Family', imposed: 'Decided over your head', courting: 'A quiet word', crossdeal: 'Another family', cometo: 'Your crew', quarrel: 'Your crew', answer: 'Answer for your man', bigbet: 'Your book', cantpay: 'Your book', rivalbook: 'Your book', pad: 'Your book',
+  squeeze: 'Another family', invite: 'An invitation', kin: 'Family', imposed: 'Decided over your head', courting: 'A quiet word', crossdeal: 'Another family', cometo: 'Your crew', quarrel: 'Your crew', answer: 'Answer for your man', score: 'A truck', bigbet: 'Your book', cantpay: 'Your book', rivalbook: 'Your book', pad: 'Your book',
 };
 function approach(w: World, e: Enc, story?: Story): Need {
   const c = e.from ? w.chars[e.from] : undefined;

@@ -9,6 +9,7 @@ import { begin, choose, everything } from '../../conv/visit';
 import { approaches, resolve, takeJob } from '../../jobs';
 import { pathInfo } from '../../path';
 import { startOp } from '../../rackets';
+import { perform } from '../../actions';
 import { leanable } from '../../conv/authority';
 import { DAY, type Character } from '../../types';
 import { choose as encChoose } from '../../encounters';
@@ -43,6 +44,8 @@ for (let d = 0; d < days && p.alive; d++) {
   // his own work, done his own way; but when the heat on him shows (the bar at the top of the screen), the quietest way there is, and
   // no work but his captain's until it cools (unless RECKLESS is set: the old bot, which did everything)
   const hot = !process.env.RECKLESS && p.heat > 0.35;
+  // (and when it is high, he lies low for the day, as the screen offers: 'Heat is on you. Let it fade.')
+  if (!process.env.RECKLESS && p.heat > 0.45) { for (let i = 0; i < 2; i++) perform(w, { kind: 'work', actor: p.id, hours: 4, label: 'lay low', score: 0 }); }
   const quiet = (as: { code: string; hint: string }[]) => as.find((a) => !/heat|risk|loud|smash|police/i.test(a.hint)) ?? as[0];
   for (const j of w.jobs.filter((q) => q.status === 'active' && q.assignee === p.id && q.kind !== 'summons')) { const as = approaches(w, j), a = hot ? quiet(as) : as[1] ?? as[0]; if (a) resolve(w, j, a.code); }
   // take up a tip or an opportunity on offer, now and then
@@ -51,6 +54,14 @@ for (let d = 0; d < days && p.alive; d++) {
   // (a man climbing stays loyal: a rival captain's money is taken to his own captain, another family's job is asked about first, a quarrel
   // is heard out, a man's wrong is made right; LOYAL=0 for the old bot, which took the first answer to everything)
   const LOYAL: Record<string, string[]> = process.env.LOYAL === '0' ? {} : { courting: ['tell'], crossdeal: ['cap'], quarrel: ['hear', 'a'], answer: ['side', 'pay'], cometo: ['take', 'ok'], bigbet: ['half', 'take'], pad: ['pay'], rivalbook: ['absorb', 'live'], cantpay: ['cap', 'weeks'] };
+  // a truck: prepared properly (cased, whose, the fence, one man), taken the safest way open, walked away from if it goes sideways
+  for (const e of w.enc.filter((x) => x.kind === 'score' && x.status === 'open')) {
+    for (let i = 0; i < 12 && e.status === 'open'; i++) {
+      const has = (c: string) => e.opts.some((o) => o.code === c), man = e.opts.find((o) => o.code.startsWith('man:'));
+      const c = ['plan', 'case', 'whose', 'fence', 'driver'].find(has) ?? (man && !String(e.data?.men ?? '') ? man.code : undefined) ?? ['go', 'giveup', 'diner', 'road', 'abort'].find(has) ?? 'pass';
+      encChoose(w, p, e, c);
+    }
+  }
   for (const e of w.enc.filter((x) => x.status === 'open' && x.opts.length)) {
     for (const code of LOYAL[e.kind] ?? []) if (e.status === 'open' && e.opts.some((o) => o.code === code)) encChoose(w, p, e, code);
     if (e.status !== 'open') continue;

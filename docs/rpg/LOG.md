@@ -155,3 +155,29 @@ One racket made into a business with decisions, for the player's own bookmaking 
 - The captain who gives a new made man his first man also tells him to get something of his own: a book, a few loans.
 - **Measured** (climber, 240 days, the book started after being made): about $5,000 over 25 weeks, four to six decisions a season,
   the precinct paid. The first runs showed every big bet at the $1,200 cap, mostly from the same rich gambler; now varied.
+
+## Phase 1.5: a truck, played (score.ts); 1.8 jail stopgap
+**The truck.** A tip from a man with a reason (one who owes the player, with a cousin who drives; or one of his own men), for
+Thursday night: a named load bound for a real place in the city. Preparation as he chooses:
+- case the route (two hours; opens the diner; shows whether somebody minds the truck);
+- talk to the driver (a debtor's cousin usually gives it up for 15%; a stranger may not, and may tell);
+- find out whose load it is (nobody's, our own family's client, or another family's);
+- set it up with a fence first (40 cents on the dollar, paid Friday);
+- bring up to two of his men (good at it or not; steady or a hothead).
+
+Going waits for Thursday night. The moment offers only the ways preparation opened, each with odds told as he'd judge them: the
+diner, the road (needs a man; the driver sees faces), the driver handing it over (needs him in on it), or the depot (half as much
+again). Sometimes a patrol car turns into the street: abort, push, or let his steadiest man handle it (a hothead beats a cop: heat,
+and every cop in the city looking). After: the fence's money or goods in a garage, his men's ends and the driver's, a debtor's
+balance worked down for the tip, a theft on record with its doers hidden, the store's protector told, a description given to the
+police after a road job. Played through in the browser; tested (money conserved; preparation opens ways in).
+
+**Jail, a stopgap for the player until the police are a faction (SCOPE 1.8).**
+- Weekly heat arrests rise from nothing at the line ((heat − 0.45) × 1.2, so 18% at 0.6, instead of 30%).
+- Time inside scales with how hot he was (about a week to a month, instead of a random 5–40 days).
+- A raid on a book he runs himself takes him less often.
+- A federal sweep after an informant is exposed no longer counts the player twice: he had been on the list of names (45–150 days)
+  as well as under his own rule (14–45). It had cost one run 122 days.
+- The climber now lies low when the heat shows.
+- **Measured** (240 days, three worlds): made on day 44, 79 and 89; jailed 0, 2 and 4 times (before: 4 to 9 times, 48 to 76 days
+  inside); books earning $3,000–6,500; crews of 2–3; five trucks a season.
