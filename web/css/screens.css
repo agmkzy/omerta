@@ -468,3 +468,10 @@ a.story { font-size: .85em; white-space: nowrap; color: var(--c-gold-2); }
   .timebar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: visible; }
   .timebar button { border-radius: var(--radius); padding: 8px 12px; }
 }
+/* A man's page: how he sees you in a sentence; the rest of what you could do folded under More. */
+.pp-how { margin: 0 0 var(--s-2); font: italic 400 18px/1.4 var(--f-display); color: var(--c-cream-2); }
+.pp-more { margin: var(--s-2) 0 var(--s-3); }
+.pp-more > summary { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; cursor: pointer; list-style: none; font: 600 11px var(--f-ui); letter-spacing: .14em; text-transform: uppercase; color: var(--c-muted); }
+.pp-more > summary::-webkit-details-marker { display: none; }
+.pp-more > summary::after { content: "›"; font-size: 14px; transition: transform var(--t-fast); }
+.pp-more[open] > summary::after { transform: rotate(90deg); }

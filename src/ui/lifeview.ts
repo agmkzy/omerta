@@ -26,7 +26,7 @@ import { deepStorage, saveBox, storageNote } from '../savestore';
 import { avatar, skillBars, traitTags } from './common';
 import { esc, lk, P, pl, S, W, youify } from './links';
 import { toSide } from './layout';
-import { acts, btn, choices, h, kv, note, quiet, rows, rows as kitRows, type KV, type Pick, type Row } from './kit';
+import { acts, btn, choices, h, kv, note, quiet, rows, title, type KV, type Pick, type Row } from './kit';
 import { between } from './between';
 import { week } from './money';
 import { queueView } from './family';
@@ -77,6 +77,7 @@ export function youRoom(): string {
   out += `<div class="ui-card"><h2>The man you’ve shown them</h2>${characterWords(p).map((x) => `<p>${esc(x)}</p>`).join('')}<p class="muted">Each man sees you through what he has seen and heard himself.</p></div>`;
   if (p.familyId) out += queueView();
   out += ambitionCard();
+  out += h('Home') + loveBlock(w, p);
 
   // what you are known for: the four reputations, said once; skills beside them
   const sc = specScores(w, p);
@@ -87,8 +88,7 @@ export function youRoom(): string {
     : quiet('Nothing yet. A name is made by what you do: earn, run something, talk a man round, or put one down, and people start to say it of you.');
   out += `<details class="lf-fold"><summary>What you’re good at</summary>${skillBars(p)}</details>`;
   { const pc = powersCard(); if (pc) out += `<details class="lf-fold"><summary>What your rank lets you do</summary>${pc}</details>`; }
-  out += `<div class="lf-links"><button class="ui-btn ui-btn--quiet" data-a="goals:">Milestones &rsaquo;</button><button class="ui-btn ui-btn--quiet" data-a="dayjob:">${p.job ? `Your job: ${esc(p.job.kind)} &rsaquo;` : 'Find legitimate work &rsaquo;'}</button></div>`;
-  out += savesFold();
+  // (milestones, honest work and the saves live in More)
 
   // beside it: how the street sees you, who is around you, and what you have going
   let side = `<div class="lf-side">${sect('What they say about you')}${repLines(w, p).map((l) => `<p class="say">${esc(l)}</p>`).join('')}</div>`;
@@ -126,9 +126,9 @@ function standing(w: World, p: Character): string {
 
 const snapList = (): { day: number; key: string; label: string }[] => saveBox()?.snaps ?? [];
 // The game itself: saving, backups, going back a day, starting over. Kept out of the way, at the foot of the page.
-function savesFold(): string {
-  const open = !!S.open['saves'] || S.confirmReset;
-  let out = `<div class="lf-saves"><button class="lf-saves__t" data-a="tog:saves" aria-expanded="${open}">Saves and backups <span>${open ? '&lsaquo;' : '&rsaquo;'}</span></button>`;
+export function savesFold(always = false): string {
+  const open = always || !!S.open['saves'] || S.confirmReset;
+  let out = always ? '<div class="lf-saves">' : `<div class="lf-saves"><button class="lf-saves__t" data-a="tog:saves" aria-expanded="${open}">Saves and backups <span>${open ? '&lsaquo;' : '&rsaquo;'}</span></button>`;
   if (!open) return out + `</div>`;
   out += choices([
     { a: 'save:', label: 'Save now', hint: S.save ? (S.save.ok ? `Last saved ${S.saveGood || fmtTime(W().now)}. This game takes ${(S.save.bytes / 1e6).toFixed(2)} MB; with ${S.save.snapshots} earlier-day snapshot${S.save.snapshots === 1 ? '' : 's'}, ${(S.save.used / 1e6).toFixed(2)} MB${deepStorage() ? ' in all, kept in this browser' : ' of roughly 5 MB this browser allows'}.` : 'NOT saved: ' + (S.save.error ?? '')) : 'The game saves itself after every action, in this browser only.' },
@@ -145,49 +145,68 @@ function savesFold(): string {
 // =================================================================== People
 export function peopleRoom(): string {
   const w = W(), p = P();
-  let out = homeSection(w, p);
-
-  // everyone else you know
-  const fam = S.worldFilter;
-  const fil = (id: string, label: string) => `<button class="ui-pill is-small ${fam === id ? 'on' : ''}" data-a="pf:${id}">${label}</button>`;
-  // (the people at home are above; they are not contacts)
   const home = new Set([...(w.life?.kin ?? []).map((k) => k.id), ...(w.life?.partner && w.life.partner.stage !== 'split' ? [w.life.partner.id] : [])]);
   const known = Object.entries(p.rels).map(([id, r]) => [w.chars[id], r] as const).filter(([x]) => x && x.alive && x.id !== p.id && !home.has(x.id));
-  const rows = known.filter(([x]) => fam === 'all' || (fam === 'pin' ? !!p.notes?.[x.id]?.pin : fam === 'none' ? !x.familyId : x.familyId === fam))
+  if (!known.length && !home.size) return title('Everyone') + quiet('You don’t know anybody yet. Go to the club, sit at the bar, get a shave. Faces become names.');
+  const fam = S.worldFilter;
+  let out = '';
+  const placed = new Set<string>();
+  // (a man is described only when there is something to say)
+  const feel = (x: Character) => { const r = x.rels[p.id], mine = p.rels[x.id]; return (mine?.grudge ?? 0) >= 0.3 ? 'you haven’t forgiven him' : (r?.grudge ?? 0) >= 0.3 ? 'holds it against you' : (r?.trust ?? 0) > 0.6 ? 'close' : (r?.trust ?? 0) > 0.35 ? 'friendly' : ''; };
+  const what = (x: Character) => x.rank === 'civilian' ? (ownerBiz(w, x.id)?.name ?? x.district) : `${x.rank === 'capo' ? 'captain' : x.rank}${x.familyId && x.familyId !== p.familyId ? ', ' + w.fam[x.familyId].name : ''}`;
+  const man = (x: Character, sub?: string): Row => { placed.add(x.id); const f = feel(x); return { face: avatar(x), title: esc(x.name), sub: esc(sub ?? what(x)), end: esc(f), tone: /forgiven|against/.test(f) ? 'bad' : '', a: `ent:${x.id}` }; };
+  if (fam === 'all') {
+    // who you answer to, up the line
+    const up: Row[] = [];
+    for (let c = p.bossId ? w.chars[p.bossId] : undefined, i = 0; c && i < 3; c = c.bossId ? w.chars[c.bossId] : undefined, i++) if (c.alive) up.push(man(c, i === 0 ? `${what(c)} · you answer to him` : what(c)));
+    if (up.length) out += h('Above you') + rows(up);
+    // your men, in a line each
+    const crew = crewList();
+    if (crew.length) out += h('Your men', String(crew.length)) + rows(crew.map((c) => man(c, c.problem?.revealed ? `${what(c)} · something is wrong` : what(c))));
+    // money and favours, either way, one row a man
+    const ties = new Map<string, { you: number; them: number; money: number; owe: number }>();
+    const tie = (id: string) => { if (!ties.has(id)) ties.set(id, { you: 0, them: 0, money: 0, owe: 0 }); return ties.get(id)!; };
+    for (const f of owedTo(w, p.id)) tie(f.to).them++;
+    for (const f of owing(w, p.id)) tie(f.from).you++;
+    for (const d of w.debts.filter((d) => d.status === 'active')) { if (d.creditor === p.id) tie(d.debtor).money += d.balance; else if (d.debtor === p.id) tie(d.creditor).owe += d.balance; }
+    const n = (k: number, one: string) => (k === 1 ? `a ${one}` : `${['', '', 'two', 'three', 'four', 'five', 'six'][k] ?? k} ${one}s`);
+    const owed = [...ties].filter(([id]) => w.chars[id]?.alive && !placed.has(id)).sort((a, b) => (b[1].money + b[1].owe) - (a[1].money + a[1].owe) || (b[1].them + b[1].you) - (a[1].them + a[1].you))
+      .map(([id, t]) => man(w.chars[id], [t.money ? `owes you ${money(t.money)}` : '', t.owe ? `you owe him ${money(t.owe)}` : '', t.them ? `owes you ${n(t.them, 'favour')}` : '', t.you ? `you owe him ${n(t.you, 'favour')}` : ''].filter(Boolean).join(' · ')));
+    if (owed.length) out += h('Owed, either way', String(owed.length)) + rows(owed.slice(0, S.open['pp:owed'] ? 40 : 5)) + (owed.length > 5 ? acts(btn('tog:pp:owed', S.open['pp:owed'] ? 'Fewer' : `${owed.length - 5} more`, 'quiet')) : '');
+    // bad blood, either way
+    const sore = known.filter(([x, r]) => !placed.has(x.id) && ((x.rels[p.id]?.grudge ?? 0) >= 0.3 || r.grudge >= 0.3)).map(([x]) => man(x));
+    if (sore.length) out += h('Bad blood', String(sore.length)) + rows(sore.slice(0, 5));
+    // home
+    const L = w.life;
+    if (L) {
+      const pr = L.partner && L.partner.stage !== 'split' ? L.partner : undefined;
+      const hm: Row[] = [];
+      if (pr && w.chars[pr.id]) hm.push({ face: avatar(w.chars[pr.id]), title: esc(w.chars[pr.id].name), sub: esc(stageWord[pr.stage]), end: esc(warmthWord(pr.warmth)), a: `ent:${pr.id}` });
+      for (const k of L.kin.filter((k) => w.chars[k.id]?.alive)) hm.push({ face: avatar(w.chars[k.id]), title: esc(w.chars[k.id].name), sub: esc(kinWord(k).replace('Your ', '')), end: k.sick ? 'unwell' : esc(warmthWord(k.warmth)), tone: k.sick ? 'warn' : '', a: `ent:${k.id}` });
+      if (hm.length) out += h('At home') + rows(hm);
+    }
+  }
+  // everyone else, by family, with the closest first
+  const fil = (id: string, label: string) => `<button class="ui-pill is-small ${fam === id ? 'on' : ''}" data-a="pf:${id}">${label}</button>`;
+  const rest = known.filter(([x]) => (fam === 'all' ? !placed.has(x.id) : fam === 'pin' ? !!p.notes?.[x.id]?.pin : fam === 'none' ? !x.familyId : x.familyId === fam))
     .sort((a, b) => Number(!!p.notes?.[b[0].id]?.pin) - Number(!!p.notes?.[a[0].id]?.pin) || b[1].trust - a[1].trust);
-  const lim = S.open['lfall'] ? 120 : 30;
-  out += sect('The people you know', known.length ? String(known.length) : '');
-  if (!known.length) return out + quiet('You don’t know anybody yet. Go to the club, sit at the bar, get a shave. Faces become names.') + peopleSide(w, p);
-  out += `<div class="ui-pills lf-filter">${fil('all', 'Everyone')}${Object.values(w.fam).map((f) => fil(f.id, esc(f.name))).join('')}${fil('none', 'Not in the life')}${fil('pin', '&#9733; Pinned')}</div>`;
-  // each man: his face, what he is, how he stands with you, and the first thing between you (ui/between.ts, as on his page)
-  out += rows.length ? kitRows(rows.slice(0, lim).map(([x, r]): Row => {
-    const n = p.notes?.[x.id];
-    const what = x.rank === 'civilian' ? (ownerBiz(w, x.id)?.name ?? x.district) : `${x.rank === 'capo' ? 'captain' : x.rank}${x.familyId ? ', ' + w.fam[x.familyId].name : ''}`;
-    const feel = r.grudge >= 0.3 ? grudgeWord(r.grudge) : r.trust > 0.6 ? 'close' : r.trust > 0.35 ? 'friendly' : 'a face you know';
-    const tie = between(w, p, x).find((t) => t.kind !== 'rank' && t.kind !== 'word');
-    return { face: avatar(x), title: `${n?.pin ? '★ ' : ''}${esc(x.name)}`, sub: `${esc(what)}${n?.tags.length ? ' · ' + esc(n.tags.join(', ')) : ''}${tie ? ` · <span class="pp-tie">${tie.text.replace(/<[^>]+>/g, '')}</span>` : ''}`, end: esc(feel), tone: r.grudge >= 0.3 ? 'bad' : '', a: `ent:${x.id}` };
-  })) + (rows.length > lim ? acts(btn('tog:lfall', `Show all ${rows.length}`, 'quiet')) : '')
+  const lim = S.open['lfall'] ? 150 : 12;
+  out += h(fam === 'all' ? 'Everyone else' : 'Who you know', String(rest.length));
+  out += `<div class="ui-pills lf-filter">${fil('all', 'All')}${Object.values(w.fam).map((f) => fil(f.id, esc(f.name))).join('')}${fil('none', 'Not in the life')}${fil('pin', '&#9733; Pinned')}</div>`;
+  out += rest.length ? rows(rest.slice(0, lim).map(([x]) => { const r = man(x); if (p.notes?.[x.id]?.pin) r.title = '★ ' + r.title; return r; })) + (rest.length > lim ? acts(btn('tog:lfall', `Show all ${rest.length}`, 'quiet')) : '')
     : quiet(fam === 'pin' ? 'Nobody pinned. Open a man’s page and pin him, and he stays at the top of this list.' : 'Nobody you know fits.');
-  return out + peopleSide(w, p);
+  return out;
 }
 
-// The people at home: whoever you are seeing, your blood, your children. Romance is one of these relationships, not a room of its own.
-function homeSection(w: World, p: Character): string {
+// Home and love: whoever you are seeing (an evening, where it goes), or, with nobody, the girls you might ask. Lives in Your life.
+export function loveBlock(w: World, p: Character): string {
   const L = w.life;
   if (!L) return '';
   const pr = L.partner && L.partner.stage !== 'split' ? L.partner : undefined;
-  const kin = L.kin.filter((k) => w.chars[k.id]?.alive);
-  let out = sect('At home');
-  const home: Row[] = [];
-  if (pr) home.push({ face: avatar(w.chars[pr.id]), title: esc(w.chars[pr.id].name), sub: esc(stageWord[pr.stage]), end: esc(warmthWord(pr.warmth)), a: `ent:${pr.id}` });
-  for (const k of kin) home.push({ face: avatar(w.chars[k.id]), title: esc(w.chars[k.id].name), sub: esc(kinWord(k).replace('Your ', '')), end: k.sick ? 'unwell' : esc(warmthWord(k.warmth)), tone: k.sick ? 'warn' : '', a: `ent:${k.id}` });
-  out += home.length ? rows(home) : quiet('Nobody’s waiting up for you.');
-  if (pr) return out + partnerBlock(w, p, pr);
-
-  // nobody yet: an invitation, and the girls you might ask, when you want to see them
+  if (pr) return partnerBlock(w, p, pr);
   const pool = datingPool(w, p).list.filter((x) => w.chars[x.id]?.alive);
   const open = !!S.open['dating'];
-  out += `<div class="lf-invite"><p>${L.ex && w.chars[L.ex] ? `${esc(w.chars[L.ex].name)} is the one you let go. ` : ''}A man should have someone to go home to. Ask a girl out and it costs you an evening and a little money; the better your name and your manner, the better your odds. A no stays a no for a while.</p>`;
+  let out = `<div class="lf-invite"><p>${L.ex && w.chars[L.ex] ? `${esc(w.chars[L.ex].name)} is the one you let go. ` : ''}A man should have someone to go home to. Ask a girl out and it costs you an evening and a little money; the better your name and your manner, the better your odds. A no stays a no for a while.</p>`;
   out += pool.length ? `<button class="mini" data-a="tog:dating" aria-expanded="${open}">${open ? 'Not now' : `Who you might ask (${pool.length})`}</button>` : `<p class="muted">Nobody you’ve met this week. Give it time.</p>`;
   if (open && pool.length) out += choices(pool.map((x) => { const g = w.chars[x.id]; return { a: `askout:${g.id}`, label: g.name, hint: `${x.job}, ${g.district}. You see her ${x.where}. Ask her out ($20).` }; }), 'Who you might ask');
   return out + `</div>`;
@@ -206,16 +225,6 @@ function partnerBlock(w: World, p: Character, pr: NonNullable<NonNullable<World[
   if (pr.stage !== 'married') next.push({ a: 'breakoff:', label: 'End it', hint: 'It is kinder done properly.', kind: 'danger' });
   out += h('Where this goes') + choices(next, 'Where this goes');
   return out + `</div>`;
-}
-
-function peopleSide(w: World, p: Character): string {
-  let side = `<div class="lf-side">${sect('Find someone')}<p class="muted">Who is where, right now, and how far.</p><button class="ui-btn" data-a="people:">Who’s where</button></div>`;
-  const pins = Object.entries(p.notes ?? {}).filter(([id, n]) => n.pin && w.chars[id]?.alive).map(([id]) => w.chars[id]);
-  side += `<div class="lf-side">${sect('Pinned')}${pins.length ? `<ul class="ui-list">${pins.slice(0, 10).map((c) => `<li><span>${pl(c)}</span><span class="v"><button class="mini" data-a="talk:${c.id}">Talk</button></span></li>`).join('')}</ul>` : quiet('Pin a man from his page and he stays close at hand, here and at the top of your list.')}</div>`;
-  const sore = Object.entries(p.rels).filter(([id, r]) => r.grudge >= 0.3 && w.chars[id]?.alive).sort((a, b) => b[1].grudge - a[1].grudge).slice(0, 4);
-  if (sore.length) side += `<div class="lf-side">${sect('Men you haven’t forgiven')}<ul class="ui-list">${sore.map(([id, r]) => `<li><span>${pl(w.chars[id])}</span><span class="v warn">${esc(grudgeWord(r.grudge))}</span></li>`).join('')}</ul><button class="ui-btn ui-btn--quiet" data-a="grudges:">Settle a score &rsaquo;</button></div>`;
-  toSide(side);
-  return '';
 }
 
 // =================================================================== Business

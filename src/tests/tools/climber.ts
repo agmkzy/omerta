@@ -107,4 +107,6 @@ for (let d = 0; d < days && p.alive; d++) {
   if (process.env.DBG5) for (const j of w.jobs) if (j.status === 'expired' && j.assignee === p.id && j.via === 'boss' && !seenJ.has('x' + j.id)) { seenJ.add('x' + j.id); log.push(`  expired (day ${d}): ${j.kind} ${j.title} from ${w.chars[j.giver ?? '']?.name} (${w.chars[j.giver ?? '']?.rank})`); }
 }
 console.log(log.join('\n'));
+// (SAVE=path: leave the world as a save file, to look at the screens of a man this far along)
+if (process.env.SAVE) (await import('node:fs')).writeFileSync(process.env.SAVE, (await import('../../engine')).serialize(w));
 void ({} as Character);

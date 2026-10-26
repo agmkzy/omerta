@@ -421,7 +421,7 @@ function handle(a: string, v: string) {
       if (r === 'known') S.sub.journal = 'known';
       return tab(r === 'you' ? 'life' : r === 'people' ? 'people' : r === 'business' ? 'business' : 'journal');
     }
-    case 'sub': { const [sec, room] = v.split('.'); S.sub[sec] = room; if (S.view.t !== 'tab' || S.view.name !== sec) tab(sec as Tab); return; }
+    case 'sub': { const [sec, room] = v.split('.'); if (S.view.t !== 'tab' || S.view.name !== sec) { tab(sec as Tab); S.view = { t: 'tab', name: sec as Tab }; S.stack = []; } S.sub[sec] = room; return; }
     case 'pf': S.worldFilter = v; return;
     case 'place': return go({ t: 'place', id: v });
     // (waiting at a place for a man who comes in: the time until he does passes, and then he is there to talk to)

@@ -20,6 +20,7 @@ export const takeSide = () => sideParts.splice(0, sideParts.length).join('');
 
 // ------------------------------------------------------------------ navigation
 const IC: Partial<Record<Tab, string>> = {
+  more: '<circle cx="5.5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18.5" cy="12" r="1.4"/>',
   street: '<path d="M3.5 9 5 4h14l1.5 5"/><path d="M3.5 9a2.1 2.1 0 0 0 4.25 0 2.1 2.1 0 0 0 4.25 0 2.1 2.1 0 0 0 4.25 0 2.1 2.1 0 0 0 4.25 0"/><path d="M5 11.5V20h14v-8.5M10 20v-5h4v5"/>',
   today: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.2 2"/>',
   people: '<circle cx="9" cy="8.5" r="3.2"/><path d="M3 20c0-3.6 2.7-6 6-6s6 2.4 6 6"/><circle cx="17" cy="9.5" r="2.4"/><path d="M16.5 14.2c2.8 0 4.5 2 4.5 5"/>',
@@ -28,7 +29,7 @@ const IC: Partial<Record<Tab, string>> = {
   story: '<path d="M4 4.5h12.5a2 2 0 0 1 2 2V19a1.5 1.5 0 0 0 3 0V9h-3M4 4.5V18a2 2 0 0 0 2 2h14.5"/><path d="M8 9h7M8 12.5h7M8 16h4"/>',
   life: '<circle cx="12" cy="8" r="4"/><path d="M4.5 21c.6-4.4 3.6-7 7.5-7s6.9 2.6 7.5 7"/>',
 };
-const LABEL: Partial<Record<Tab, string>> = { street: 'Street', people: 'People', today: 'Today', business: 'Business', story: 'Story' };
+const LABEL: Partial<Record<Tab, string>> = { street: 'Street', people: 'People', today: 'Today', business: 'Business', story: 'Story', more: 'More' };
 // The world you deal with on the left of Today, the life you're building on the right.
 const SECTIONS: Tab[] = ['street', 'people', 'today', 'business', 'story'];
 const icon = (t: Tab, size = 22) => `<svg class="ti" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[t]}</svg>`;
@@ -37,12 +38,13 @@ const icon = (t: Tab, size = 22) => `<svg class="ti" viewBox="0 0 24 24" width="
 // place is the Street; a man, a conversation, your men and the family are People; a racket is Business; a story, the Herald and
 // your own road are Story; what has reached you today is Today.
 const HOME: Record<View['t'], Tab> = {
-  tab: 'today', menu: 'today', wait: 'today', job: 'today', approach: 'today', delegate: 'today', sendorder: 'today', report: 'today', dayjob: 'today', enc: 'today',
+  tab: 'today', menu: 'today', wait: 'today', job: 'today', approach: 'today', delegate: 'today', sendorder: 'today', report: 'today', enc: 'today',
   place: 'street', places: 'street', bj: 'street',
-  person: 'people', talk2: 'people', people: 'people', grudges: 'people', settle: 'people',
+  person: 'people', talk2: 'people', settle: 'people',
   manage: 'people', comm: 'people', tree: 'people', plan: 'people', orders: 'people', recruit: 'people', books: 'people', meeting: 'people', guests: 'people', sunday: 'people', help: 'people',
   biz: 'business', way: 'business', opstart: 'business', op: 'business', hijack: 'business',
-  fact: 'story', dispute: 'story', story: 'story', brief: 'story', goals: 'story',
+  fact: 'story', dispute: 'story', story: 'story',
+  brief: 'more', goals: 'more', grudges: 'more', people: 'more', dayjob: 'more',
 };
 export const sectionOf = (v: View): Tab => (v.t === 'tab' ? LEGACY[v.name]?.[0] ?? v.name : HOME[v.t]);
 export const section = (): Tab => sectionOf(S.view);
@@ -73,6 +75,7 @@ export function topBar(): string {
     <button class="g-top__me" data-a="tab:life" aria-label="Your page">${avatar(p)}</button>
     <div class="g-top__main"><b class="g-cash">${money(p.cash)}</b><span class="g-when">${esc(short(W().now))}</span></div>
     <div class="g-top__heat ${h.hot ? 'hot' : ''}" title="Police attention"><span>${esc(p.district)}</span><i style="--h:${Math.round(h.v * 100)}%"></i><span>${h.word}</span></div>
+    <button class="g-top__more${section() === 'more' ? ' on' : ''}" data-a="tab:more" aria-label="More">${icon('more', 22)}</button>
   </header>`;
 }
 
@@ -96,7 +99,7 @@ export function rail(): string {
       <div class="g-heat ${h.hot ? 'hot' : ''}"><span>Heat</span><b>${h.word}</b><i style="--h:${Math.round(h.v * 100)}%"></i></div>
       <dl class="g-words"><dt>Reputation</dt><dd>${esc(standingWord(p.standing))}</dd><dt>Influence</dt><dd>${esc(influenceWord(influence(w, p)))}</dd></dl>
     </div>
-    <nav class="g-nav" aria-label="Sections">${nav}</nav>
+    <nav class="g-nav" aria-label="Sections">${nav}<button class="g-nav__item g-nav__more ${cur === 'more' ? 'on' : ''}" data-a="tab:more" aria-current="${cur === 'more' ? 'page' : 'false'}">${icon('more', 20)}<span>More</span></button></nav>
     <button class="g-save" data-a="save:">Save${S.saveGood ? `<small>Last saved ${esc(S.saveGood)}</small>` : ''}</button>
   </aside>`;
 }

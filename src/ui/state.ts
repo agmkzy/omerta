@@ -8,7 +8,7 @@ import type { Move, SchemeOpt } from '../jobs';
 // The five destinations (owner, 26 October): Street and People (the world you deal with) either side of Today (the present), then
 // Business and Story (the life you're building). family, journal, life, rackets, crew and stories are older names: links and saved
 // back-stacks that use them land in the section and room that now hold them.
-export type Tab = 'street' | 'people' | 'today' | 'business' | 'story' | 'family' | 'journal' | 'life' | 'rackets' | 'crew' | 'stories';
+export type Tab = 'street' | 'people' | 'today' | 'business' | 'story' | 'more' | 'family' | 'journal' | 'life' | 'rackets' | 'crew' | 'stories';
 
 export type View =
   | { t: 'tab'; name: Tab }

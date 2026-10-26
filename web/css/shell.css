@@ -96,3 +96,8 @@ body.g-scene .tabs { display: none; }
 .dot { position: absolute; top: 9px; right: calc(50% - 20px); width: 8px; height: 8px; border-radius: 50%; background: var(--c-danger); box-shadow: 0 0 0 2px var(--c-ground); }
 .tabs button.centre .dot { top: -4px; right: calc(50% - 22px); }
 .g-nav__item .dot { position: static; margin-left: auto; }
+/* More: the far right of the top bar on a phone (the five tabs stay even, Today in the middle); below the five in the rail. */
+.g-top { grid-template-columns: auto minmax(0, 1fr) auto auto; }
+.g-top__more { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; margin-right: -8px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--c-cream-2); }
+.g-top__more.on { color: var(--c-gold-2); background: var(--c-raise-2); }
+.g-nav__more { margin-top: var(--s-3); font-size: 15px; color: var(--c-muted); }

@@ -172,7 +172,9 @@ export function needs(): Need[] {
 function needRow(n: Need): Row {
   const w = W(), c = n.who ? w.chars[n.who] : undefined;
   const plain = (x: string) => lk(x).replace(/<a [^>]*>(.*?)<\/a>/g, '$1');
-  return { face: c ? avatar(c) : undefined, mark: c ? undefined : n.dot === 'blue' ? 'blue' : n.dot, kick: c ? `${c.name}${n.k ? ' · ' + n.k : ''}` : n.k ?? '', title: plain(n.title), sub: plain(n.sub), tone: n.dot === 'red' ? 'bad' : '', a: n.a };
+  // (a label that the title already says is left off: "A quarrel" over "A quarrel: Sammy and Gino")
+  const k = n.k && !plain(n.title).toLowerCase().startsWith(n.k.toLowerCase()) ? n.k : '';
+  return { face: c ? avatar(c) : undefined, mark: c ? undefined : n.dot === 'blue' ? 'blue' : n.dot, kick: c ? `${c.name}${k ? ' · ' + k : ''}` : k, title: plain(n.title), sub: plain(n.sub), tone: n.dot === 'red' ? 'bad' : '', a: n.a };
 }
 
 // A quiet line or two of what has reached him lately: his version of it, and where he had it from.
@@ -383,19 +385,19 @@ export function personView(id: Id): string {
     if (c.familyId) more.push(btn(`tree:${c.familyId}`, 'Their family', 'quiet'));
     if (kn) { const nt = noteOf(p, c.id); more.push(btn(`npin:${c.id}`, nt?.pin ? '★ Pinned' : '☆ Pin', 'quiet')); }
     if (!k && !partner) more.push(btn(`settle:${c.id}`, 'Take action against him', 'danger'));
-    out += acts(...more);
+    // (the rest folds away: his business, his family, a pin, and taking action against him)
+    if (more.length) out += `<details class="pp-more"><summary>More</summary>${acts(...more)}</details>`;
   }
   if (isMe) out += acts(btn('tab:life', 'Your life'));
   // ---- what is between you, as the conversation shows it (ui/between.ts), and what shows on him
   if (kn && !isMe) {
     const ties = between(w, p, c);
     const shows = personTexture(w, p, c);
-    if (ties.length || shows.length) out += h('Between you') + rows([...ties.map((t): Row => ({ title: t.text, mark: t.tone === 'good' ? 'green' : t.tone === 'bad' ? 'red' : t.tone === 'warn' ? 'amber' : 'blue' })), ...shows.map((t): Row => ({ title: esc(t), mark: 'blue' }))]);
-    const wd = relWords(c, p), f = viewOf(w, c, p).fear;
-    out += h('How he sees you') + `<p class="ui-quiet">${esc(relationOf(w, p, c).words)}</p>`
-      + meter('Trust', wd.trust, r?.trust ?? 0) + meter('Respect', wd.respect, r?.respect ?? 0)
-      + meter('Fear', f >= 0.55 ? 'Afraid of you' : f >= 0.3 ? 'Wary of you' : f >= 0.12 ? 'A little' : 'None', f >= 0.12 ? f : 0, true)
-      + meter('Grudge', wd.grudge, r && r.grudge >= 0.25 ? r.grudge : 0, true);
+    // how he sees you, in words (no meters: a man is not a set of numbers), then what is between you
+    const f = viewOf(w, c, p).fear, He_ = isFemale(c) ? 'She' : 'He';
+    const how = [relationOf(w, p, c).words, f >= 0.55 ? `${He_}’s afraid of you.` : f >= 0.3 ? `${He_}’s wary of you.` : ''].filter(Boolean).join(' ');
+    out += h('Between you') + `<p class="pp-how">${esc(how)}</p>` + rows([...ties.map((t): Row => ({ title: t.text, mark: t.tone === 'good' ? 'green' : t.tone === 'bad' ? 'red' : t.tone === 'warn' ? 'amber' : 'blue' })), ...shows.map((t): Row => ({ title: esc(t), mark: 'blue' }))]);
+    void r;
   }
   if (kn && c.bossId === p.id && !isMe) {
     const ins = p.insight?.[c.id] ?? [];
@@ -417,16 +419,16 @@ export function personView(id: Id): string {
     if (c.rank !== 'civilian' && c.bossId === p.id) fits.push(['Skills', esc(skillLine(c))], ['Passes up', `${Math.round(effectiveRate(w, c) * 100)}%`]);
     side += h('Where he fits') + kv(fits);
   }
-  if (!isMe && kn) {
-    const told = Object.entries(p.known).filter(([, x]) => x.from === c.id).sort((x, y) => y[1].t - x[1].t).slice(0, 6).filter(([fid]) => w.facts[fid]);
-    const lately = Object.entries(c.talk ?? {}).filter(([, m]) => Math.floor(w.now / 1440) - m.d <= 7).length;
-    if (told.length || lately) side += h('What he has told you') + rows(told.map(([fid, x]): Row => ({ title: esc(factText(w.facts[fid], x.knowsActor)), sub: esc(shortTime(x.t)), a: `fact:${fid}` }))) + (lately ? `<p class="ui-note">You have talked over ${lately} ${lately === 1 ? 'thing' : 'things'} with him this week.</p>` : '');
-    const nt = noteOf(p, c.id);
-    side += h('Your notes') + `<div class="pp-notes">${TAGS.map((t, i) => `<button class="pp-tag${nt?.tags.includes(t) ? ' is-on' : ''}" data-a="ntag:${c.id}|${i}" aria-pressed="${!!nt?.tags.includes(t)}">${esc(t)}</button>`).join('')}</div>`;
-  }
+  // what you know of him, and what he has told you: the latest few of each, in the page itself
   if (kn) {
-    const facts = Object.entries(p.known).filter(([fid]) => w.facts[fid] && (w.facts[fid].actor === c.id || w.facts[fid].victim === c.id) && (!w.facts[fid].minor || w.facts[fid].kind === 'trouble')).sort((a2, b2) => w.facts[b2[0]].t - w.facts[a2[0]].t).slice(0, 6);
-    side += h('What you know') + (facts.length ? rows(facts.map(([fid, x]): Row => ({ title: lk(factText(w.facts[fid], x.knowsActor)).replace(/<a [^>]*>(.*?)<\/a>/g, '$1'), sub: esc(shortTime(w.facts[fid].t)), a: `fact:${fid}` }))) : quiet('Nothing worth repeating.'));
+    const facts = Object.entries(p.known).filter(([fid]) => w.facts[fid] && (w.facts[fid].actor === c.id || w.facts[fid].victim === c.id) && (!w.facts[fid].minor || w.facts[fid].kind === 'trouble')).sort((a2, b2) => w.facts[b2[0]].t - w.facts[a2[0]].t).slice(0, 4);
+    if (facts.length) out += h(isMe ? 'What’s known' : `What you know of ${isFemale(c) ? 'her' : 'him'}`) + rows(facts.map(([fid, x]): Row => ({ title: lk(factText(w.facts[fid], x.knowsActor)).replace(/<a [^>]*>(.*?)<\/a>/g, '$1'), sub: esc(shortTime(w.facts[fid].t)), a: `fact:${fid}` })));
+  }
+  if (!isMe && kn) {
+    const told = Object.entries(p.known).filter(([, x]) => x.from === c.id).sort((x, y) => y[1].t - x[1].t).slice(0, 4).filter(([fid]) => w.facts[fid]);
+    if (told.length) out += h(`${He} told you`) + rows(told.map(([fid, x]): Row => ({ title: esc(factText(w.facts[fid], x.knowsActor)), sub: esc(shortTime(x.t)), a: `fact:${fid}` })));
+    const nt = noteOf(p, c.id);
+    out += `<details class="pp-more"><summary>Your notes${nt?.tags.length ? `: ${esc(nt.tags.join(', '))}` : ''}</summary><div class="pp-notes">${TAGS.map((t, i) => `<button class="pp-tag${nt?.tags.includes(t) ? ' is-on' : ''}" data-a="ntag:${c.id}|${i}" aria-pressed="${!!nt?.tags.includes(t)}">${esc(t)}</button>`).join('')}</div></details>`;
   }
   toSide(side);
   return out;

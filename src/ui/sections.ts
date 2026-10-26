@@ -8,16 +8,17 @@ import { todayView } from './views_a';
 import { crewList, crewView, familyTab, placesView } from './views_b';
 import { racketsView } from './views_c';
 import { storiesTab } from './stories';
-import { businessRoom, knownRoom, peopleRoom, youRoom } from './lifeview';
+import { businessRoom, peopleRoom, youRoom } from './lifeview';
 import { P, S } from './links';
 import { wordRoom } from './word';
+import { moreView } from './more';
 import type { Tab } from './state';
 
 type Room = [id: string, label: string, view: () => string];
 const ROOMS: Partial<Record<Tab, Room[]>> = {
   people: [['men', 'Your men', crewView], ['org', 'The family', familyTab], ['all', 'Everyone', peopleRoom]],
   business: [['rackets', 'Rackets', racketsView], ['money', 'Money', businessRoom]],
-  story: [['stories', 'Stories', storiesTab], ['life', 'Your life', youRoom], ['word', 'Your word', wordRoom], ['known', 'What you know', knownRoom]],
+  story: [['stories', 'Stories', storiesTab], ['life', 'Your life', youRoom], ['word', 'Your word', wordRoom]],
 };
 // Where an older name lands: the section, and the room in it (none: the section's own first room).
 export const LEGACY: Partial<Record<Tab, [Tab, string | undefined]>> = {
@@ -28,6 +29,7 @@ export const LEGACY: Partial<Record<Tab, [Tab, string | undefined]>> = {
 export function openSection(name: Tab): Tab {
   const l = LEGACY[name];
   if (l) { if (l[1]) S.sub[l[0]] = l[1]; return l[0]; }
+  if (name === 'more') S.sub.more = 'menu'; // (More always opens on its menu)
   return name;
 }
 
@@ -47,6 +49,7 @@ export function sectionView(raw: Tab): string {
   if (raw !== name && LEGACY[raw]![1]) S.sub[name] = LEGACY[raw]![1]!;
   if (name === 'today') return todayView();
   if (name === 'street') return placesView(true);
+  if (name === 'more') return moreView();
   const rs = roomsOf(name), cur = roomIn(name)!;
   const nav = `<nav class="lf-nav" aria-label="${name}">${rs.map(([id, label]) => `<button class="${cur[0] === id ? 'on' : ''}" data-a="sub:${name}.${id}" aria-current="${cur[0] === id ? 'page' : 'false'}">${label}</button>`).join('')}</nav>`;
   return nav + cur[2]();
