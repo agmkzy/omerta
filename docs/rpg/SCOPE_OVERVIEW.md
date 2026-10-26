@@ -23,6 +23,20 @@ everyone does?* A state variable changing is not integration. A downstream syste
 4. Authored choices with simulated consequences.
 5. A different story every playthrough.
 
+## How we work (owner's direction, 26 October 2026)
+
+1. **The soldier's experience comes first.** A meaningful crew and authority system is delivered before weeks are spent widening
+   locations or criminal activity. Breadth waits until the made man's life is worth living.
+2. **Conversational depth is a permanent workstream,** not a phase that ends. NPC reasoning (why he says what he says), initiative
+   (what he raises and seeks out unprompted) and dialogue that develops over a relationship are explicit objectives in every phase.
+3. **Major systems are built as vertical slices.** One convincing example, end to end, before breadth: one police investigation
+   before a police faction; one compelling racket before every racket; one score before a score engine for everything; one district
+   of real places before seven. Breadth only follows a slice that works.
+4. **Player enjoyment is a release criterion.** A feature is not finished because it works, passes its tests and makes the
+   simulation busier. It is finished when playing it is enjoyable: it creates a decision the player cares about, an outcome worth
+   retelling, or a moment he would seek out again. A slice that isn't enjoyable is reworked or cut, not widened. (How this is
+   judged: see "Release criteria" under *Throughout*.)
+
 ## Where the game stands (26 October 2026)
 
 **Live and working:**
@@ -79,104 +93,111 @@ under a stated size; the V85 list is closed; the suite passes in one command, un
 
 ---
 
-## Phase 1: The mid-game holds up
+## Phase 1: The made man's life
 
-**Purpose:** make hours five to fifty as good as the first hour. This phase does the most for how the game feels.
+**Purpose:** make hours five to fifty as good as the first hour, starting with what it is to be a soldier with men under him.
+Each part is a vertical slice that must be enjoyable before anything is widened.
 
 ### 1.1 Simpler time controls (S)
 - The bar becomes **Morning**, **Evening**, **Sunday**, **Next week**.
   - Morning and Evening always mean the next one, and say so ("Evening · tomorrow").
   - Sunday shows its date and the envelope.
   - **Next week** stops early when someone comes to the player or something serious reaches him (replacing "Next event").
-- Anything set for an hour (a summons, a meeting, "after 10") carries its own **Go at 10:00** on its card (replacing "An hour").
+- Anything set for an hour (a summons, a meeting, "after 10") carries its own **Go at 10:00** on its card.
 - Afternoon and "two days" go. The time engine is unchanged.
-- **Done when:** every timed thing (summons, meetings, shop hours, night gigs, the induction) can be reached from the four buttons or
-  its own card, and the browser playthrough never needs a finer step.
+- Small and independent, so it goes first. It makes every later playtest quicker.
 
-### 1.2 Locations overhaul (L; was V90: places, family HQs and fronts)
-- **Real places in real districts.** Each of the seven districts gets its own places with hours and regulars: each family's club
-  (its headquarters), bars, barbers, a diner, the docks, the church, card games and after-hours clubs, and the track. The three
-  generic rooms go.
-- **Businesses as places.** Every business can be seen, listed by district, and walked into. It shows who owns it, who it pays,
-  and how it's doing, as far as the player knows (knowledge rules apply). **Fronts:** legitimate businesses used for cover and
-  laundering.
-- **Routines with reasons.** Where a man is follows his life: shop or work by day, his family's club in the evening, the bar if he
-  drinks, the track if he gambles, church on Sunday, home late.
-  - Full routines for men in the life and shop owners.
-  - A simple one for civilians the player has met.
-  - Unknown civilians are anonymous regulars.
-  - Routines are a pure function of the man and the clock: deterministic, stable between looks, no new saved state.
-- **Being there is the action.** Arriving shows who is in and what is going on, and offers what can be done there: talk, wait for
-  someone, listen in, lean on the owner, case it. Approaches happen at a place.
-- **Territory you can feel.** Each district shows whose ground it is. Another family's ground means being seen and noticed.
-- **A list by district,** phone-friendly. A drawn map comes later (Phase 6).
-- **Builds on:** places.ts, where.ts, clubdata.ts, the business records, travel times, districts.
-- **Risk:** where everyone is changes, so who meets whom changes, and many test expectations will move. Do it in two steps: places
-  and routines alongside the old rooms, then retire the old rooms.
-- **Done when:** a player can find any man by knowing his habits; every business is visitable; approaches name where they happen;
-  the long-run scorecard is no worse than baseline.
+### 1.2 Crew and authority: the soldier's season (L, the centrepiece)
+A made man has men, and his word means something to them. This is delivered, playtested and enjoyed before 1.4 onwards.
+- **Getting a crew.**
+  - Associates come to him to be taken on, for their own reasons: ambition, money, a debt, a cousin's word.
+  - His captain hands him a man or a shop.
+  - He can recruit, and turn men away.
+  - Every man has a history the player can learn.
+- **Running them.**
+  - He gives them work (orders.ts): pickups, collections, a message, a watch. Each man does it his own way (behaviour by
+    temperament: clean, skim, bungle, overdo it).
+  - He is paid their envelopes, and decides what to pass up.
+- **Authority, felt both ways.**
+  - His men bring him their quarrels, debts, troubles and requests; he settles them, and how he settles them is remembered.
+  - He answers upstairs for what they do: a man who beats the wrong shopkeeper is his problem with his captain.
+  - Discipline: warn, fine, cut his share, have him roughed up, put him out. Each has consequences for loyalty and for what the
+    crew thinks of him.
+- **Loyalty that moves.**
+  - Men grow loyal or resentful from how they're treated and paid.
+  - A man may be courted by another crew, skim, talk to the police (later), or go over his head.
+  - The best of them want to be made, and need him to put them forward.
+- **Conversation is the medium.** Most of this happens in talk with his men, in their voices, with reasons. It is not a management
+  screen. A small crew page shows only what he knows: who, what they earn him, what's wrong.
+- **Builds on:** orders.ts (behaviour, workShift), crewlife.ts, career.ts and path.ts (sponsoring and proposing), recruitment in
+  conv/acts, books.ts (envelopes), loyalty.ts, imposed.ts.
+- **Done when:**
+  - the climber, once made, has a crew within a season;
+  - in a browser playthrough, a made man's weeks are visibly different from an associate's: men come to him, he decides, it
+    matters;
+  - at least three crew stories happen unprompted in 60 days (a skimmer caught, a quarrel settled, a man courted away);
+  - a playtester enjoys running the crew and can retell what happened with one of his men.
 
-### 1.3 Scores you play (L)
-- One engine for criminal jobs as a short played sequence:
-  1. **The tip,** with a source that matters (an insider, or a setup).
-  2. **Preparation,** optional and each step costing time or money: case it, get an insider, choose who comes, arrange the buyer,
-     find out whose it is.
-  3. **The moment:** three or four ways in, odds told as the player would judge them ("He'll fold", "It could go wrong"), opened
-     or closed by preparation.
-  4. **Something sideways, sometimes:** a patrol car, a hero, a partner who freezes. Abort, push or improvise.
-  5. **After:** the fence, the split, what witnesses tell the police, the owner's protectors, the captain's end.
-- **Scores:** truck hijack, warehouse, card-game stick-up, fixed race, insurance arson, bank messenger, plus today's burglary and
-  scams moved onto the engine.
-- **Builds on:** jobs.ts (approaches, resolve), gigs.ts, orders.ts, the ledger, facts and witnesses, heat, regard, fences and goods,
-  crossdeal.ts.
-- **Done when:** each score has at least three meaningfully different ways to play it; preparation changes the odds the player
-  sees; every outcome leaves records the world reads later (a witness, a grudge, heat, money); a playtester can describe two
-  different runs of the same score.
-
-### 1.4 Rackets as businesses you run (L)
-- Each racket gets staff, weekly decisions, problems, competitors and police attention:
-  - **The book:** lay off or hold big bets; a winner you can't pay.
-  - **Loans:** how hard to collect; whom to trust.
-  - **Numbers:** a runner skimming; a big hit.
-  - **Fencing:** what to take, and from whom.
-  - **Protection:** who pays, who won't, who another family is courting.
-- A screen for the player's businesses and rackets: what each earns, who works it, what's wrong, what needs a decision this week.
-- **Builds on:** rackets.ts, econ.ts, books.ts, debts, protection, crew records.
-- **Done when:** a soldier's week has at least one racket decision with consequences; problems arise from causes (a man's vice, a
-  competitor, the police) rather than dice; money still balances in every audit.
-
-### 1.5 Gambling, in period (M)
-- **The track:**
-  - Aqueduct and Belmont, and Yonkers Raceway's harness racing;
-  - fixed races as a score, with jockeys and drivers leaned on and bookies laying off;
-  - gamblers found on Saturday.
-- **Underground casinos:** card games, after-hours clubs and a floating dice game, extending blackjack.ts and the gambling clubs.
-- **The family's Las Vegas interest** (the skim) as a background asset, heard about and later touched.
-- No dog track: greyhound racing was not legal in New York in 1970.
-
-### 1.6 A soldier's season and the road to captain (L)
-- Associates ask to run with a made man; his captain hands him a shop or a man; crew management that matters (their earnings,
-  loyalty, trouble).
-- The road to captain measured with the climber, as the road to soldier was. Vacancies, rivals for the seat, and the boss's choice.
+### 1.3 The road to captain (M)
+- Measured with the climber, as the road to soldier was: vacancies, rivals for the seat, the boss's choice, and the crew's
+  record as the case for him.
 - Captains pass down their own needs instead of "nothing now" (work.ts needsOf, extended upward).
-- **Done when:** the climber, once made, gains a crew and a racket within a season, and reaches captain in a believable span in
-  most worlds; a made man's weeks differ from an associate's.
+
+### 1.4 One compelling racket (M; the vertical slice before 1.6)
+- **One racket first: the book** (bookmaking). The player runs it with his crew:
+  - taking bets through his men and their spots;
+  - laying off or holding a big bet;
+  - a winner he can't pay;
+  - a runner skimming;
+  - a rival book on his ground;
+  - the cop who wants his envelope (a stopgap until Phase 3).
+- **Weekly decisions with consequences,** problems from causes (a man's vice, a competitor, a lucky streak) rather than dice. The
+  money balances in every audit.
+- **Builds on:** rackets.ts, econ.ts, books.ts, the bookie hustle and its talk lines.
+- **Done when:** a playtester wants to check on his book each week, and money, men and danger all flow through it.
+  Then and only then: loans, numbers, fencing and protection on the same pattern (1.6).
+
+### 1.5 One score you play (M; the vertical slice before 1.6)
+- **One score first: the truck hijack,** played as a short sequence:
+  1. **The tip,** whose source matters.
+  2. **Preparation,** optional: case the route, get the driver in on it, choose who comes (his own crew from 1.2), arrange the
+     fence, find out whose load it is.
+  3. **The moment:** three or four ways in, odds told as the player would judge them, opened or closed by preparation.
+  4. **Something sideways, sometimes:** abort, push or improvise.
+  5. **After:** the fence, the split with his men, witnesses, the owner's protectors, the captain's end.
+- **Builds on:** jobs.ts, gigs.ts, the ledger, facts and witnesses, heat, goods and fences.
+- **Done when:** two playthroughs of the same hijack play out differently because of choices; a playtester describes it as a
+  moment, not a menu. Then the engine is widened (1.6).
+
+### 1.6 Breadth, once the slices are good (L)
+- **More scores** on the proven engine: warehouse, card-game stick-up, fixed race, insurance arson, bank messenger; burglary and
+  scams moved onto it.
+- **More rackets** on the proven pattern: loans, numbers, fencing, protection.
+- **Gambling in period:**
+  - the track (Aqueduct, Belmont, Yonkers Raceway's harness racing, fixed races);
+  - underground card and dice games;
+  - the family's Las Vegas skim as a background asset;
+  - no dog track (greyhound racing was not legal in New York in 1970).
+- **Locations overhaul (was V90), as a slice first:**
+  - one district (Little Italy) built properly: real places with hours and regulars, every business visitable, routines with
+    reasons, being there as the action, approaches at a place, whose ground it is;
+  - then the other six, once it plays well;
+  - routines are a pure function of the man and the clock (no new saved state); a list by district, not a map;
+  - risk: who meets whom changes, so do it alongside the old rooms before retiring them.
 
 ### 1.7 Who the player is, and when it ends (M)
-- **Backgrounds** that change how play starts and how men treat him (character creation exists; carry it through).
-- **A reputation for what kind of man he is** (fair, cruel, greedy, loyal), separate from standing, read by NPC decisions.
-- **His own dreams,** as NPCs have theirs.
-- **Death and long sentences:** a clear end and an account of the life, before Phase 4's full endings.
+- **Backgrounds** that change how play starts and how men treat him.
+- **A reputation for what kind of man he is** (fair, cruel, greedy, loyal), read by his crew above all.
+- **His own dreams.**
+- **Death and long sentences:** a clear end and an account of the life.
 
 ### 1.8 Stopgaps and tuning (S–M)
-- **Jail balance** until the police faction replaces heat-meter arrests: arrest odds, sentence lengths, how clearly heat is shown.
+- **Jail balance** until the police replace heat-meter arrests.
 - **Variety:** more kinds of tip and gig, fewer repeats.
-- **Pacing:** agree the target rhythm of quiet and busy weeks, then tune across many worlds rather than one.
+- **Pacing:** agree the target rhythm, then tune across many worlds.
 
-**Phase 1 overall:** XL. Order: time controls → locations → scores and rackets together → gambling → the soldier's season →
-identity → tuning.
-
----
+**Phase 1 overall:** XL. Order: time controls → crew and authority (playtested to enjoyment) → road to captain → one racket and one
+score (each playtested) → breadth → identity → tuning.
 
 ## Phase 2: Make the stories visible (M–L)
 
@@ -216,19 +237,27 @@ identity → tuning.
   splitting.
 - Men who adapt their tactics.
 
-### 3.3 The police faction (XL)
-- **Ranks:** Commissioner, Chief of Detectives, precinct captains per district, lieutenants, detectives and patrolmen. Each a full
-  character.
-- **Policing:** persistent investigations, surveillance of places, charges, trials and sentences. This replaces heat-meter arrests
-  and retires the Phase 1 stopgap.
-- **Corruption:**
-  - the pad, paid through the ledger;
-  - grass-eaters vs meat-eaters;
-  - what bribes buy;
-  - honest cops building cases;
-  - a Knapp-style commission (1970: Serpico).
-- **The chief's press briefing** after a major killing: only what the police know, and with consequences.
-- **Informants** from arrest pressure. Nobody automatically knows who talked; the player can be approached.
+### 3.3 The police: one investigation first, then the faction (L, then XL)
+- **The slice: one convincing investigation.**
+  - A detective with a temperament takes one serious crime the player or his crew committed.
+  - He works it from what can actually be known: witnesses, a car seen, a man with a grudge, a pawned watch.
+  - He leans on the weakest man for an informant, and visits the player.
+  - It ends in an arrest, a trial, a deal, or a case that goes cold, each with consequences.
+  - The player can fight it: alibis, a lawyer, a witness persuaded, a bribe that may backfire.
+  - **Done when:** a playtester feels hunted, makes choices about it, and can retell the case.
+- **Then the faction,** on the slice's proven pattern:
+  - **Ranks:** Commissioner, Chief of Detectives, precinct captains per district, lieutenants, detectives and patrolmen. Each a full
+    character.
+  - **Policing:** persistent investigations, surveillance of places, charges, trials and sentences. This replaces heat-meter arrests
+    and retires the Phase 1 stopgap.
+  - **Corruption:**
+    - the pad, paid through the ledger;
+    - grass-eaters vs meat-eaters;
+    - what bribes buy;
+    - honest cops building cases;
+    - a Knapp-style commission (1970: Serpico).
+  - **The chief's press briefing** after a major killing: only what the police know, and with consequences.
+  - **Informants** from arrest pressure. Nobody automatically knows who talked; the player can be approached.
 
 ### 3.4 The Feds and RICO (L)
 - The FBI as its own institution (the Organized Crime Control Act, October 1970):
@@ -280,7 +309,8 @@ without the player".
 
 **Purpose:** give money somewhere to go and risk something to lose.
 
-- **Prison as a playable episode (XL):**
+- **Prison as a playable episode (XL; slice first: one stretch inside, a few weeks with a cellmate, a guard, a visitor and a
+  crew outside that may hold or fall apart, before the full population and economy):**
   - a real population, its own hierarchy and economy, guards as characters;
   - outside goes on without you, and you know only what visitors tell you;
   - detectives with offers; sentences that change; prison bonds that follow you out;
@@ -331,6 +361,41 @@ The made-man ceremony is the model.
 
 ---
 
+## Permanent workstream: conversational depth
+
+Not a phase: an objective in every phase, reviewed at every release.
+- **NPC reasoning.**
+  - Every answer has a reason the man could give, grounded in what he knows, wants and fears.
+  - Counteroffers say why.
+  - Refusals name what would change his mind.
+- **Initiative.**
+  - Men raise things unprompted: news that bears on the player, a favour they need, a worry, a proposal, a warning.
+  - They seek the player out for their own reasons, and say what they came for.
+- **Developing dialogue.**
+  - What men say changes with the relationship and history: from guarded to open, from formal to familiar, from friendly to cold.
+  - Old events are remembered in their words.
+  - No line twice; no question answered before it is asked.
+- **Every new system speaks.** Crew, rackets, scores, police, feuds and family life each arrive with their talk: what men say about
+  them, ask about them, and bring to the player.
+- **How it is checked:**
+  - the walker and repetition checks extended to each system;
+  - a conversation playtest at every release, read as a player reads it, with the jarring lines fixed before shipping.
+
+## Release criteria
+
+A stage ships when:
+1. **It works:** the full suite passes, the build is clean, and saves are compatible.
+2. **It integrates:** what it changes is read by another system that behaves differently. A variable changing is not integration.
+3. **It is enjoyable.** A browser playtest of the stage, written up, answers yes to at least one, with an example from play:
+   - did it create a decision the player cared about?
+   - an outcome worth retelling?
+   - a moment he would seek out again?
+   
+   It also answers no to: did it add a chore, a dead stretch, or a screen to click through?
+4. **The scorecard is no worse,** and improved where the stage aims to improve it.
+
+A stage that works but isn't enjoyable is reworked or cut, not widened. Your verdict on playing it is the final gate.
+
 ## Throughout: how we know it got better
 
 - **The scorecard.** Each phase is accepted against your five questions, measured with the long-run harness
@@ -350,21 +415,24 @@ The made-man ceremony is the model.
 
 ## Suggested order and dependencies
 
-| Order | Phase | Depends on | Size |
+| Order | Stage | Depends on | Size |
 |---|---|---|---|
 | 1 | 0: Finish and harden | — | M |
 | 2 | 1.1 Time controls | 0 | S |
-| 3 | 1.2 Locations | 1.1 | L |
-| 4 | 1.3 Scores and 1.4 Rackets | 1.2 (places to case and run) | L + L |
-| 5 | 1.5–1.8 Gambling, soldier's season, identity, tuning | 1.3–1.4 | L |
-| 6 | 2: Stories visible | 1 | M–L |
-| 7 | 3.1–3.2 Feuds, authority, violence | 1, 2 | L + L |
-| 8 | 3.3–3.4 Police faction, Feds | 3.1–3.2 | XL + L |
-| 9 | 3.5–3.8 Rackets, politics, underworld, neighbourhood | 3.3 | L–XL |
-| 10 | 3b: Playing at the top | 3 | XL |
-| 11 | 4: A Life | 3 | XL+ |
-| 12 | 5: Big moments | 3, 4 as they land | L |
+| 3 | **1.2 Crew and authority** (playtested to enjoyment) | 1.1 | L |
+| 4 | 1.3 Road to captain | 1.2 | M |
+| 5 | 1.4 One racket (the book) · 1.5 One score (truck hijack) | 1.2 | M + M |
+| 6 | 1.6 Breadth: scores, rackets, gambling, locations (one district, then all) | 1.4, 1.5 enjoyed | L |
+| 7 | 1.7–1.8 Identity, stopgaps, tuning | 1 | M |
+| 8 | 2: Stories visible | 1 | M–L |
+| 9 | 3.1–3.2 Feuds, authority, violence | 1, 2 | L + L |
+| 10 | 3.3 One investigation, then the police faction; 3.4 the Feds | 3.1–3.2 | L → XL |
+| 11 | 3.5–3.8 Rackets, politics, underworld, neighbourhood | 3.3 | L–XL |
+| 12 | 3b: Playing at the top | 3 | XL |
+| 13 | 4: A Life (playable prison as its own slice first) | 3 | XL+ |
+| 14 | 5: Big moments | 3, 4 as they land | L |
+| — | Conversational depth | every stage | permanent |
 | — | 6: Presentation | alongside | M each |
 
-Phases 0–2 make the existing game good past hour five. Phase 3 makes the world self-sustaining. Phases 3b and 4 make it a life.
-Phase 5 makes it memorable.
+Phases 0–2 make the existing game good past hour five, with the made man's crew at its heart. Phase 3 makes the world
+self-sustaining. Phases 3b and 4 make it a life. Phase 5 makes it memorable.
