@@ -130,7 +130,8 @@ export const line = (c: Ctx, key: string, slots: Record<string, string> = {}) =>
 // He says something the decision has already settled, in words from the world's shared voice (voicesheet) or the old pools: the
 // decision is kept with the line, for the developer view, as with every line he says
 export function says(c: Ctx, text: string, d?: Decision) {
-  const t = speechFor(c.w, c.h, c.n, text).replace(/"([^"]*)"/g, '“$1”').replace(new RegExp(`^(${c.n.name}|${first(c.n.name)}): (?=“)`), '');
+  // (in front of him, a line is not attributed by his full name, as if read from a record: "…,” says Louie Costa." is "…,” he says.")
+  const t = speechFor(c.w, c.h, c.n, text).replace(new RegExp(`([,.!?]?["”]) says ${c.n.name}([.,])`, 'g'), '$1 he says$2').replace(new RegExp(`says ${c.n.name}\\.`, 'g'), 'he says.').replace(/"([^"]*)"/g, '“$1”').replace(new RegExp(`^(${c.n.name}|${first(c.n.name)}): (?=“)`), '');
   c.v.mem.said.push(t);
   const m = memOf(c.w, c.n.id); m.heard.push(t); if (m.heard.length > 12) m.heard.shift();
   c.v.lines.push({ who: /^“/.test(t) || new RegExp(`^(He|His|${first(c.n.name)}|${c.n.name})\\b[^“]{0,80}“`).test(t) ? 'him' : 'narr', text: t.replace(new RegExp(`^${c.n.name} `), 'He '), trace: d ? traceOf(d) : undefined });

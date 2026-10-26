@@ -260,18 +260,19 @@ export function ownerBiz(w: World, id: Id): Business | undefined {
 export const famName = (w: World, c: Character) => (c.familyId ? w.fam[c.familyId].name : 'independent');
 // The same event, told the way people actually tell it. The variant is fixed by the fact, so a story never changes between looks.
 const h32 = (x: string) => { let h = 2166136261; for (let i = 0; i < x.length; i++) h = Math.imul(h ^ x.charCodeAt(i), 16777619); return h >>> 0; };
+// (a capture never crosses a colon, a full stop or a semicolon: a fact that quotes another is told as itself, not garbled into it)
 const TELL: [RegExp, string[]][] = [
-  [/^(.+) dropped (\$[\d,]+) at (.+)\.$/, ['$1 left $2 on the table at $3 and called it an evening.', '$1 went home from $3 $2 lighter and swearing he was due.', '$3 had a good night. $1 had a very bad one: $2.']],
-  [/^(.+) lent (.+) (\$[\d,]+)\.$/, ['$1 put $3 in $2’s hand. It will come back with interest, one way or another.', '$2 walked out of $1’s place with $3 and a debt that never sleeps.']],
-  [/^(.+) now collects (\$[\d,]+) a week from (.+)\.$/, ['$3 now pays $1 $2 a week for the comfort of being left alone.', '$1 has $3 on the books: $2 a week, starting now.']],
-  [/^(.+) told (.+) to get out of (.+)\.$/, ['$1 sent $2 packing from $3. No envelope, no discussion.', '$2 asked $1 for a weekly payment at $3 and was shown the door.', '$1 refused to pay protection and ran $2 out of $3.']],
-  [/^(.+) robbed (.+) of (\$[\d,]+)\.$/, ['$1 cleaned out $2: $3, gone in a night.', '$2 opened up to find $3 missing. $1 left a cold till and a hot rumour.']],
-  [/^(.+) beat up (.+)\.$/, ['$1 put $2 in the dirt. It wasn’t a conversation.', '$2 got a lesson from $1, delivered with fists.']],
-  [/^(.+) missed a (\$[\d,]+) payment to (.+)\.$/, ['$1 let a $2 payment to $3 slide. That kind of thing gets noticed.', '$3 is still waiting on $2 from $1. Patience is wearing thin.']],
-  [/^(.+) is late with the (\$[\d,]+) he owes (.+) for (.+)\.$/, ['$1 is late with $2 to $3 for $4. The envelope isn’t going to fill itself.', '$4’s envelope is light. $1 owes $3 $2 and hasn’t come up with it.']],
-  [/^(.+) cleared his debt to (.+)\.$/, ['$1 squared up with $2. Not many do it voluntarily.', '$2 got paid in full by $1. A rarity.']],
-  [/^(.+) was arrested\.$/, ['The law picked up $1. His friends have started saying he’s a good man.', '$1 is in a cell tonight, and every friend he has is thinking about what he knows.']],
-  [/^(.+) came up (\$[\d,]+) short on what he owes (.+)\.$/, ['$1 came up $2 short with $3. The kind of mistake that’s remembered.', '$3 counted it twice. $1 was $2 light.']],
+  [/^([^:;.]+) dropped (\$[\d,]+) at ([^:;.]+)\.$/, ['$1 left $2 on the table at $3 and called it an evening.', '$1 went home from $3 $2 lighter and swearing he was due.', '$3 had a good night. $1 had a very bad one: $2.']],
+  [/^([^:;.]+) lent ([^:;.]+) (\$[\d,]+)\.$/, ['$1 put $3 in $2’s hand. It will come back with interest, one way or another.', '$2 walked out of $1’s place with $3 and a debt that never sleeps.']],
+  [/^([^:;.]+) now collects (\$[\d,]+) a week from ([^:;.]+)\.$/, ['$3 now pays $1 $2 a week for the comfort of being left alone.', '$1 has $3 on the books: $2 a week, starting now.']],
+  [/^([^:;.]+) told ([^:;.]+) to get out of ([^:;.]+)\.$/, ['$1 sent $2 packing from $3. No envelope, no discussion.', '$2 asked $1 for a weekly payment at $3 and was shown the door.', '$1 refused to pay protection and ran $2 out of $3.']],
+  [/^([^:;.]+) robbed ([^:;.]+) of (\$[\d,]+)\.$/, ['$1 cleaned out $2: $3, gone in a night.', '$2 opened up to find $3 missing. $1 left a cold till and a hot rumour.']],
+  [/^([^:;.]+) beat up ([^:;.]+)\.$/, ['$1 put $2 in the dirt. It wasn’t a conversation.', '$2 got a lesson from $1, delivered with fists.']],
+  [/^([^:;.]+) missed a (\$[\d,]+) payment to ([^:;.]+)\.$/, ['$1 let a $2 payment to $3 slide. That kind of thing gets noticed.', '$3 is still waiting on $2 from $1. Patience is wearing thin.']],
+  [/^([^:;.]+) is late with the (\$[\d,]+) he owes ([^:;.]+) for ([^:;.]+)\.$/, ['$1 is late with $2 to $3 for $4. The envelope isn’t going to fill itself.', '$4’s envelope is light. $1 owes $3 $2 and hasn’t come up with it.']],
+  [/^([^:;.]+) cleared his debt to ([^:;.]+)\.$/, ['$1 squared up with $2. Not many do it voluntarily.', '$2 got paid in full by $1. A rarity.']],
+  [/^([^:;.]+) was arrested\.$/, ['The law picked up $1. Everyone who knows $1 is wondering what gets said in that room.', '$1 spent tonight in a cell, and some people are thinking hard about what $1 knows.']],
+  [/^([^:;.]+) came up (\$[\d,]+) short on what he owes ([^:;.]+)\.$/, ['$1 came up $2 short with $3. The kind of mistake that’s remembered.', '$3 counted it twice. $1 was $2 light.']],
 ];
 export function flavour(f: Fact, text: string): string {
   if (text !== f.text) return text;

@@ -1,4 +1,5 @@
 // Every name is a door. Any person, business, family or incident that appears in text opens its own sheet.
+import { youVerb } from '../conv/acts/words';
 import { fmtTime, money, ownerBiz } from '../core';
 import type { Character, Id, World } from '../types';
 import { P, S, W } from './state';
@@ -33,7 +34,10 @@ export function youify(text: string): string {
   if (!p || !text.includes(p.name)) return text;
   const n = p.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   let t = text.replace(new RegExp(`${n}[’']s`, 'g'), 'your').replace(new RegExp(n, 'g'), 'you');
-  t = t.replace(/\b(you) (was|has|is|owes|wants|needs|gets|goes|says|asks|beats|lends|robs|pays)\b/g, (_m, y, v) => `${y} ${({ was: 'were', has: 'have', is: 'are' } as Record<string, string>)[v] ?? v.replace(/s$/, '')}`);
+  // (the verb agrees with "you" wherever "you" begins what is said or a clause of it: "you now collect", "you were"; and a phrasal verb
+  // keeps its object inside it: "picked you up", not "picked up you")
+  t = t.replace(/(^|[.!?;:,—]\s+|["“]\s*|\b(?:and|but|then|so|when|because|that|while|after|before) )(you) ((?:now |just |also |still |never |only |no longer )?)([A-Za-z’']+)/g, (_m, a, y, adv, v) => `${a}${y} ${adv}${/^(?:the|a|an|to|and|in|on|at|of|with|for|from|by|as)$/i.test(v) ? v : youVerb(v)}`);
+  t = t.replace(/\b(picked|beat|roughed|sent|took|set|let) (up|down|in|out|off) you\b/g, (_m, v, prt) => `${v} you ${prt}`);
   return t.replace(/(^|[.!?:]\s+|["“]\s*)(you|your)\b/g, (_m, a, y) => a + y[0].toUpperCase() + y.slice(1));
 }
 export function lk(text: string): string {

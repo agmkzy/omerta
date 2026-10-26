@@ -1,4 +1,5 @@
 // Rackets and ways to earn: what is running, what you could start, and exactly what is on offer right now.
+import { leanable } from '../conv/authority';
 import { avatar } from './common';
 import { acts, btn, choices, h, quiet, rows, type Pick, type Row } from './kit';
 import { week, weekLine } from './money';
@@ -62,7 +63,7 @@ function statusOf(w: World, way: Way, b: ReturnType<typeof bucket>): Status {
     }
     case 'protection': {
       const sh = protectedShops(w);
-      const tgt = b.lean.length;
+      const tgt = leanable(w, p).length;
       if (sh.length) return { running: sh.length, badge: 'Running', tone: 'run', line: `${sh.length} shop${sh.length > 1 ? 's' : ''} paying · ${money(sh.reduce((a, x) => a + x.protection!.fee, 0))} a week${tgt ? ` · ${tgt} more you could lean on` : ''}` };
       return tgt ? { running: 0, badge: 'Ready', tone: 'ok', line: `${tgt} shop${tgt > 1 ? 's' : ''} you could lean on.` } : { running: 0, badge: 'Nothing now', tone: 'lock', line: 'No shop worth leaning on right now.' };
     }
@@ -177,7 +178,9 @@ export function wayView(id: string, lines: string[] = []): string {
       const sh = protectedShops(w);
       if (sh.length) out += `<h2 class="ui-h">Shops paying you<small>${money(sh.reduce((a, x) => a + x.protection!.fee, 0))} a week</small></h2><div class="ui-card"><ul class="ui-list">${sh.map((x) => `<li><span>${bl(x.id)} <small class="muted">${lk(w.chars[x.ownerId].name)}</small></span><span class="v ${lateOf(x) ? 'warn' : ''}">${lateOf(x) ? 'late · ' : ''}${money(x.protection!.fee)}/wk · ${money(x.protection!.total ?? 0)} so far</span></li>`).join('')}</ul></div>`;
       if (b.shake.length) out += `<h2 class="ui-h">Late payers<small>${b.shake.length}</small></h2>` + optList(b.shake, '');
-      out += `<h2 class="ui-h">Shops you could lean on<small>${b.lean.length}</small></h2>` + optList(b.lean, 'Nothing worth leaning on right now. Shops that already pay your family are off the table, and so are casinos.');
+      // (the same list the conversation offers the pitch to: authority.leanable; each leads to the owner, to put it to him in person)
+      const can = leanable(w, p);
+      out += `<h2 class="ui-h">Shops you could lean on<small>${can.length}</small></h2>` + (can.length ? choices(can.slice(0, 8).map((x) => { const o = w.chars[x.ownerId], fresh = x.lastApproach !== undefined && w.now - x.lastApproach < 7 * DAY; return { a: `talk:${o.id}|g:business`, label: `${x.name}, ${o.name}`, hint: `${x.district}. Nobody looks after it.${fresh ? ' Someone has been in about it this week.' : ''} Go and put it to him.` }; }), way.name) : quiet(esc('Nothing in your crew’s ground is paying nobody. Shops that already pay a family are off the table unless there’s a reason, and so are casinos.'))) + (b.lean.some((x) => /pays /.test(x.o.label)) ? `<h2 class="ui-h">Other families’ shops<small>with a reason</small></h2>` + optList(b.lean.filter((x) => /pays /.test(x.o.label)), '') : '');
       break;
     }
     case 'loans': {

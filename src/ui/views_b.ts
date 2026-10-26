@@ -1,3 +1,4 @@
+import { knowsProtection } from '../acquaint';
 import { sundayDue } from './sunday';
 import { acts, btn, choices, context, h, kv, meter, note, quiet, rows, title, type KV, type Pick, type Row } from './kit';
 import type { Character, World } from '../types';
@@ -442,7 +443,7 @@ export function familyTab(): string {
   ]);
   let side = orgCard(fid);
   const shops = Object.values(w.biz).filter((b) => b.open).sort((a, b) => Number(b.district === p.district) - Number(a.district === p.district) || a.district.localeCompare(b.district)).slice(0, S.open['shops'] ? 60 : 8);
-  side += h('Shops and places', String(Object.keys(w.biz).length)) + rows(shops.map((b): Row => ({ title: esc(b.name), sub: esc(b.district), end: b.protection ? esc(w.fam[b.protection.familyId].name) : 'unprotected', a: `biz:${b.id}` }))) + (S.open['shops'] ? '' : acts(btn('tog:shops', 'Show all', 'quiet')));
+  side += h('Shops and places', String(Object.keys(w.biz).length)) + rows(shops.map((b): Row => ({ title: esc(b.name), sub: esc(b.district), end: !knowsProtection(w, p, b) ? '' : b.protection ? esc(w.fam[b.protection.familyId].name) : 'unprotected', a: `biz:${b.id}` }))) + (S.open['shops'] ? '' : acts(btn('tog:shops', 'Show all', 'quiet')));
   toSide(side);
   return out;
 }

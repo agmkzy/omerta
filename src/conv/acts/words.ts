@@ -63,7 +63,7 @@ function selfVerb(v: string): string {
 }
 // (the man he is talking to is "you": "Lawrence was light" said to Lawrence is "you were light")
 const YOU_VERB: Record<string, string> = { is: 'are', was: 'were', has: 'have', does: 'do', 'doesn’t': 'don’t', 'isn’t': 'aren’t', 'wasn’t': 'weren’t', 'hasn’t': 'haven’t', had: 'had' };
-const youVerb = (v: string) => YOU_VERB[v.toLowerCase()] ?? (v.length > 3 && v.endsWith('s') && !v.endsWith('ss') ? v.slice(0, -1) : v);
+export const youVerb = (v: string) => YOU_VERB[v.toLowerCase()] ?? (v.length > 3 && v.endsWith('s') && !v.endsWith('ss') ? v.slice(0, -1) : v);
 function toYou(w: World, p: Character, s: string): string {
   const f = p.name.split(' ')[0], solo = !Object.values(w.chars).some((c) => c.id !== p.id && c.alive && c.name.split(' ')[0] === f);
   for (const n of [rx(p.name), ...(solo ? [rx(f)] : [])]) {

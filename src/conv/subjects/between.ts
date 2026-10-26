@@ -184,10 +184,17 @@ function owedMenu(x: X, d: Debt, key: string): Choice[] {
     end(key),
   ];
 }
+// (a debtor answers as the man he is, and as he stands with the player: a friend who borrowed is embarrassed, a man who resents him is
+// short with him, a frightened one over-explains; behind or not, and whether he has it on him, decide what he can say)
 function owedOpen(x: X, d: Debt, key: string): Beat {
-  const { w, t } = x, can = canPay(t, d);
-  const behind = d.missed ? `I know. I’m ${d.missed} payment${d.missed > 1 ? 's' : ''} behind.` : 'I’m paying, aren’t I?';
-  const line = can >= d.weeklyPayment ? by(t, { proud: `${money(d.balance)} left. ${behind} You’ll get it.`, _: `${money(d.balance)}, last I counted. ${behind}` }) : by(t, { frightened: `${behind} I haven’t got it. Not right now.`, hothead: `${behind} You think I’ve got it hidden somewhere?`, _: `${behind} Things are tight.` });
+  const { w, p, t } = x, can = canPay(t, d), r = peek(t, p.id), friend = r.trust >= 0.45 || r.affection >= 0.45, sore = r.grudge >= 0.2 || (r.fear ?? 0) >= 0.3;
+  const n = d.missed, bal = money(d.balance), wk = money(d.weeklyPayment);
+  const behind = n ? by(t, { proud: `I know what I owe. ${n > 1 ? `${n} weeks` : 'A week'} behind, and I don’t like it any more than you.`, frightened: `I know, I know. ${n > 1 ? `${n} weeks` : 'One week'}. I was going to come and see you.`, hothead: `${n > 1 ? `${n} weeks` : 'One week'} behind. You don’t need to tell me.`, cold: `${n > 1 ? `${n} payments` : 'One payment'} behind. I know.`, jovial: `${n > 1 ? `${n} weeks` : 'A week'} behind, I know. Don’t look at me like that.`, _: `I know. I’m ${n} payment${n > 1 ? 's' : ''} behind.` })
+    : friend ? by(t, { proud: 'Every week, on the nail. I said I would.', jovial: `Every week, like a church collection. ${wk}, regular.`, _: `${wk} a week, every week. I haven’t missed.` })
+    : sore ? by(t, { hothead: 'You’re getting it, aren’t you? Every week.', bitter: 'You get your money. Isn’t that enough?', frightened: 'I’ve paid every week. Every week.', _: 'I’m paying, aren’t I?' })
+    : by(t, { cold: 'You’re being paid.', schemer: 'Regular as clockwork. You can’t say otherwise.', _: 'I’m paying, aren’t I?' });
+  const line = can >= d.weeklyPayment ? (friend ? `${bal} left. ${behind}` : by(t, { proud: `${bal} left. ${behind} You’ll get it.`, cold: `${bal}. ${behind}`, _: `${bal}, last I counted. ${behind}` }))
+    : by(t, { frightened: `${behind} I haven’t got it. Not right now.`, hothead: `${behind} You think I’ve got it hidden somewhere?`, proud: `${behind} It isn’t there this week. It will be.`, bitter: `${behind} Look around you. Where would I get it?`, _: `${behind} Things are tight.` });
   return { lines: [q(t, line)], choices: owedMenu(x, d, key) };
   void w;
 }
@@ -214,7 +221,7 @@ function owedTurn(x: X, d: Debt, key: string, code: string): Beat {
       door.hardWith(w, p, t, 'threats');
       if (can >= d.weeklyPayment && (tp.courage < 0.6 || r.fear && r.fear > 0.3)) { door.payDebt(w, d, Math.min(can, d.weeklyPayment * 2)); door.regard(w, t, p.id, 'fear', 0.08); door.grudge(w, t, p.id, 0.04, `${p.name} threatened him over money`); return again([`He finds the money quickly.`, q(t, 'There. There. No need for that.')]); }
       door.grudge(w, t, p.id, 0.08, `${p.name} threatened him over money`);
-      return again([q(t, can ? 'Threaten me all you like. It won’t make it come faster.' : 'There’s nothing to take. Do what you have to.')]);
+      return again([q(t, can ? by(t, { hothead: 'Threaten me? Go ahead. It won’t make it come faster.', proud: 'You can stop that. I pay what I owe, when I have it.', cold: 'That won’t make it come faster.', _: 'Threaten me all you like. It won’t make it come faster.' }) : by(t, { frightened: 'Please. I haven’t got it. I swear to you I haven’t.', proud: 'There’s nothing to take. I won’t beg you.', bitter: 'Take what? Look around. Do what you have to.', jovial: 'You want my coat? It’s about all I’ve got this week.', _: 'There’s nothing to take. Do what you have to.' }))]);
     }
     case 'others': {
       const mine = w.debts.filter((z) => z.status === 'active' && z.debtor === t.id && z.id !== d.id);

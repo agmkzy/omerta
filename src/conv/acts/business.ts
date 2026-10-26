@@ -26,6 +26,13 @@ import { incidentsOf, told } from './words';
 import { said } from './personal';
 import { ACTS } from '.';
 
+// "About …" a matter, as a man would say it: a title that is a command ("Leave Teddy alone") becomes the matter of it, never "About leave
+// Teddy alone"; a name keeps its capital
+const aboutLabel = (title: string) => {
+  const m = /^(Leave|Keep|Stay|Pay|Back|Stop|Get) (.+)$/.exec(title);
+  if (m) return `About ${({ Leave: 'leaving', Keep: 'keeping', Stay: 'staying', Pay: 'paying', Back: 'backing', Stop: 'stopping', Get: 'getting' } as Record<string, string>)[m[1]]} ${m[2]}`;
+  return `About ${title.replace(/^(His|Her|The|What|Your|Protection|Trouble|Bad|Money|Loan|Debt|Stake|Arrangement|A)\b/, (q) => q.toLowerCase())}`;
+};
 const money = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
 const offer = (c: Ctx, code: string, label: string, note?: string, kind?: Offer['kind']): Offer => ({ code, label: said(c, code, label), note, kind });
 const isBoss = (c: Ctx) => c.n.id === c.h.bossId;
@@ -507,7 +514,7 @@ const envelope: Act = {
 };
 const extra = (big: boolean): Act => ({
   base: big ? 'b_extra2' : 'b_extra', pane: 'business',
-  offers: (c) => (isBoss(c) && asked(c, 'b_envelope') && !asked(c, big ? 'b_extra2' : 'b_extra') && c.h.cash >= (big ? 1000 : 250) ? [offer(c, big ? 'b_extra2' : 'b_extra', big ? 'Add $1,000 for him personally' : 'Add $250 for him personally', big ? 'A real gesture. He’ll owe you one.' : 'Over and above what’s owed. It counts.')] : []),
+  offers: (c) => (isBoss(c) && asked(c, 'b_envelope') && !asked(c, big ? 'b_extra2' : 'b_extra') && c.h.cash >= (big ? 1000 : 250) ? [offer(c, big ? 'b_extra2' : 'b_extra', big ? 'Add $1,000 for him personally' : 'Add $250 for him personally', big ? 'A real gesture. He’ll owe you one. It is a gift to him, not money passed up.' : 'Over and above what’s owed. A gift to him: he’ll feel it, the family won’t count it.')] : []),
   run: (c) => {
     const x = T(c), { w, p, t } = x, amt = big ? 1000 : 250; ask(c, big ? 'b_extra2' : 'b_extra');
     if (p.cash < amt) { c.v.lines.push({ who: 'narr', text: 'You’re short.' }); return out(5); }
@@ -567,7 +574,7 @@ export function matterRows(c: Ctx, sid: Id): Offer[] {
 const matterA: Act = {
   base: 'm', pane: 'business', opens: true,
   offersFor: matterRows,
-  offers: (c) => mine(c).slice(0, 3).map((s) => ({ code: 'm:' + s.id, label: `About ${mTitle(c.w, s).replace(/^(His|Her|The|What|Your|Protection|Trouble|Bad|Money|Loan|Debt|Stake|Arrangement|A)\b/, (q) => q.toLowerCase())}`, says: matterOpen(c.w, s, s.st?.[c.n.id]?.last).replace(/^“|”$/g, ''), note: matterWhere(s, c.n), kind: 'between' as const, pane: (s.ak === 'amends' ? 'confront' : 'business') as never })),
+  offers: (c) => mine(c).slice(0, 3).map((s) => ({ code: 'm:' + s.id, label: aboutLabel(mTitle(c.w, s)), says: matterOpen(c.w, s, s.st?.[c.n.id]?.last).replace(/^“|”$/g, ''), note: matterWhere(s, c.n), kind: 'between' as const, pane: (s.ak === 'amends' ? 'confront' : 'business') as never })),
   run: (c, code) => {
     const x = T(c), { w, t } = x, sid = code.split(':')[1], s = openAsks(w).find((q) => q.id === sid);
     if (!s) return out(2);
@@ -608,7 +615,7 @@ const favcall: Act = {
 // ---------------------------------------------------------------- a matter he is in that the player knows of (matters.ts), and his trouble
 const mtOpen: Act = {
   base: 'mt_open', pane: 'personal', opens: true,
-  offers: (c) => { const seen = new Set<string>(), out0: Offer[] = []; for (const { s } of topicsWith(c.w, c.h, c.n)) if (!seen.has(s.id)) { seen.add(s.id); out0.push({ code: 'mt_open:' + s.id, label: `About ${(matterTitle(c.w, s) ?? s.cause).replace(/^(His|Her|The|What|Your|Protection|Trouble|Bad|Money|Loan|Debt|Stake|Arrangement|A)\b/, (q) => q.toLowerCase())}`, says: `This business with ${(matterTitle(c.w, s) ?? s.cause).replace(/^./, (m) => m.toLowerCase())}…`, note: 'Something you both know about.', kind: 'between' }); } return out0; },
+  offers: (c) => { const seen = new Set<string>(), out0: Offer[] = []; for (const { s } of topicsWith(c.w, c.h, c.n)) if (!seen.has(s.id)) { seen.add(s.id); out0.push({ code: 'mt_open:' + s.id, label: aboutLabel(matterTitle(c.w, s) ?? s.cause), says: `This business with ${(matterTitle(c.w, s) ?? s.cause).replace(/^./, (m) => m.toLowerCase())}…`, note: 'Something you both know about.', kind: 'between' }); } return out0; },
   offersFor: (c, sid) => topicsWith(c.w, c.h, c.n).filter((q) => q.s.id === sid).map(({ s, o }) => ({ code: `mt:${s.id}:${o.code}`, label: o.label, note: o.hint })),
   run: (c, code) => {
     const x = T(c), sid = code.split(':')[1], pickL = (xs: string[]) => xs[(x.t.id.charCodeAt(x.t.id.length - 1) + (x.w.now / 1440 | 0)) % xs.length];

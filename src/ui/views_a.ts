@@ -1,4 +1,5 @@
 import { fallingDue } from '../commitments';
+import { knowsProtection } from '../acquaint';
 import { enterpriseLine, lineOf } from '../rackets';
 import { personTexture } from '../sitmoves';
 import { viewOf } from '../temper';
@@ -214,7 +215,7 @@ function guideCard(): string {
     ? [said ? `Go back to ${them.name}` : `Wait for ${them.name}’s answer`,
       said ? `${said === 'counter' ? 'He named his own price.' : said === 'stall' ? 'He asked for time.' : said === 'no' ? 'He said no.' : said === 'help' ? 'He went to someone about it.' : 'He gave you an answer.'} That isn’t the end of it. The story says where it stands and what you can try: better terms, an argument, pressure, or time.` : 'He will answer in his own time. The story keeps where it stands.',
       prot, `story:sit:${open.id}`, 'Open the story']
-    : [prot ? 'Offer a shopkeeper protection, and press it' : 'Offer a shopkeeper protection', 'Rackets, under “Shops you could lean on”: pick a shop and put it to the owner. If he says no, it isn’t over: you can come back to it with better terms, an argument, or time.', prot, 'tab:rackets', 'Find a shop'];
+    : [prot ? 'Offer a shopkeeper protection, and press it' : 'Offer a shopkeeper protection', 'Under Business, Rackets, “Shops you could lean on”: pick a shop and put it to the owner. If he says no, it isn’t over: you can come back to it with better terms, an argument, or time.', prot, 'tab:rackets', 'Find a shop'];
   const steps: [string, string, boolean, string, string][] = [
     ['Show your face to ' + (boss?.name ?? 'your boss'), 'He is the man you answer to. Respect starts with turning up.', !!g['g:boss'], boss ? `talk:${boss.id}` : '', 'Go and find him'],
     ['Ask a man what’s on his mind', `Every man has his own worries. In a conversation, choose Personal: ask what’s new, or take him for a drink, and let him talk about himself.${peer && peer !== boss ? ` ${peer.name} is in the same crew as you.` : ''}`, tk, peer ? `talk:${peer.id}` : 'people:', peer ? `Talk to ${firstName(peer)}` : 'Find someone'],
@@ -432,7 +433,9 @@ export function bizView(id: Id): string {
     !prot || prot.familyId !== p.familyId ? btn(`plan:lean|${b.id}`, 'Lean on it') : btn(`plan:burgle|${b.id}`, 'Other ideas'));
   if (prot && lateOf(b) > 0 && prot.collectorId === p.id) out += context([`${esc(o.name)} is behind by <b>${esc(money(owedOf(b)))}</b>. You can send a man to shake him, or go yourself.`], true) + acts(btn(`shake:${b.id}`, 'Shake him myself', 'danger'), btn('orders:', 'Send a man'));
   const who: KV[] = [['Owner', o.id === p.id ? 'you' : pl(o)]];
-  if (prot) who.push(['Protected by', `${prot.collectorId === p.id ? 'you' : pl(w.chars[prot.collectorId])} · ${fl(prot.familyId)}`], ['Pays', prot.fee > 0 ? `<span class="fig">${esc(money(prot.fee))}</span> a week` : 'run by the family']);
+  // (who looks after it is known on his own streets, or where he has been or heard; not across the whole city: acquaint.knowsProtection)
+  if (!knowsProtection(w, p, b)) who.push(['Protection', 'you don’t know who looks after it, if anyone']);
+  else if (prot) who.push(['Protected by', `${prot.collectorId === p.id ? 'you' : pl(w.chars[prot.collectorId])} · ${fl(prot.familyId)}`], ['Pays', prot.collectorId === p.id || prot.familyId === p.familyId ? (prot.fee > 0 ? `<span class="fig">${esc(money(prot.fee))}</span> a week` : 'run by the family') : 'that’s their business']);
   else who.push(['Protection', 'nobody yet', 'warn']);
   { const m = b.managerId ? w.chars[b.managerId] : undefined; if (m?.alive) who.push(['Runs it', pl(m)]); }
   for (const s of b.stakes ?? []) if (s.holder === p.id || known(w, w.chars[s.holder])) who.push([s.holder === p.id ? 'Your share' : 'Also has a share', s.holder === p.id ? Math.round(s.share * 100) + '%' : pl(w.chars[s.holder]) + ' · ' + Math.round(s.share * 100) + '%']);
@@ -491,8 +494,12 @@ export function treeView(famId: Id): string {
   const under = all.find((c) => c.rank === 'underboss');
   const capos = all.filter((c) => c.rank === 'capo');
   let out = title('The families') + `<div class="ui-seg" role="group" aria-label="Which family">${Object.values(w.fam).map((f) => `<button class="ui-seg__b${f.id === fam.id ? ' is-on' : ''}" data-a="tree:${f.id}" aria-pressed="${f.id === fam.id}">${esc(f.name)}</button>`).join('')}</div>`;
-  const tens = Object.values(w.fam).filter((o) => o.id !== fam.id).map((o) => `${esc(o.name)}: ${tensionWord(fam.id, o.id)}`).join(' &middot; ');
-  out += note(`${esc(fam.districts.join(', '))} · ${all.length} men${fam.id === p.familyId ? ' · <b>yours</b>' : ''}<br>${tens}`);
+  // (another family is seen from outside: its boss and underboss are known to everyone in the life, its captains and men only as far as
+  // the player has met them or heard of them; how it stands with families other than his own is not his to know)
+  const theirs = fam.id !== p.familyId, seen = (c: Character) => !theirs || c.rank === 'boss' || c.rank === 'underboss' || known(w, c);
+  const tens = Object.values(w.fam).filter((o) => o.id !== fam.id && (!theirs || o.id === p.familyId)).map((o) => `${esc(o.name)}: ${tensionWord(fam.id, o.id)}`).join(' &middot; ');
+  const hidden = all.filter((c) => !seen(c)).length;
+  out += note(`${esc(fam.districts.join(', '))} · ${theirs ? `${all.length - hidden} men you know of${hidden ? `, and more you don’t` : ''}` : `${all.length} men · <b>yours</b>`}<br>${tens}`);
   out += `<div class="tree">`;
   if (boss?.alive) out += node(boss, 'top');
   else out += `<div class="node top open"><div class="nn"><span>No boss</span><small>the family is without a head</small></div></div>`;
@@ -500,11 +507,11 @@ export function treeView(famId: Id): string {
   if (under) out += node(under, 'top');
   else out += `<div class="node top open"><div class="nn"><span>No underboss</span><small>vacant</small></div></div>`;
   out += `<div class="vline"></div></div>`;
-  const kidsOf = (id: Id) => all.filter((c) => c.bossId === id).sort((a, b) => ['soldier', 'associate'].indexOf(a.rank) - ['soldier', 'associate'].indexOf(b.rank) || b.lifetimeKick - a.lifetimeKick);
+  const kidsOf = (id: Id) => all.filter((c) => c.bossId === id && seen(c)).sort((a, b) => ['soldier', 'associate'].indexOf(a.rank) - ['soldier', 'associate'].indexOf(b.rank) || b.lifetimeKick - a.lifetimeKick);
   const openS = Math.max(0, capOf(w, fam.id, 'soldier') - seats(w, fam.id, 'soldier'));
   const openC = Math.max(0, capOf(w, fam.id, 'capo') - seats(w, fam.id, 'capo'));
   const q = queueOf(w, fam.id);
-  const qx = (c: Character) => { const k = q.findIndex((r) => r.c.id === c.id); return k < 0 ? '' : ` &middot; <b>${k === 0 ? 'next in line' : '#' + (k + 1) + ' in line'}</b>`; };
+  const qx = (c: Character) => { if (theirs) return ''; const k = q.findIndex((r) => r.c.id === c.id); return k < 0 ? '' : ` &middot; <b>${k === 0 ? 'next in line' : '#' + (k + 1) + ' in line'}</b>`; };
   out += `<div class="crews">`;
   capos.forEach((cp, i) => {
     const kids = kidsOf(cp.id);
@@ -513,7 +520,8 @@ export function treeView(famId: Id): string {
     const dflt = fam.id === p.familyId ? below(p) || cp.id === p.id : i === 0;
     const key = (dflt ? 'crewx:' : 'crew:') + cp.id;
     const open = dflt ? !S.open[key] : !!S.open[key];
-    out += `<div class="crew ${open ? 'open' : ''}"><button class="hd" data-a="tog:${key}" aria-expanded="${open}"><span>The ${esc(cp.name.split(' ').slice(1).join(' ') || cp.name)} Crew</span><span>${all.filter(below).length} under him ${chevron}</span></button>${node(cp, 'top').replace('node top', 'node')}`;
+    if (!seen(cp)) { out += `<div class="crew"><div class="hd"><span>A crew you don’t know</span><span></span></div><div class="node faded"><span class="dot"></span><div class="nn"><span>A captain</span><small>you don’t know him</small></div></div></div>`; return; }
+    out += `<div class="crew ${open ? 'open' : ''}"><button class="hd" data-a="tog:${key}" aria-expanded="${open}"><span>The ${esc(cp.name.split(' ').slice(1).join(' ') || cp.name)} Crew</span><span>${theirs ? '' : `${all.filter(below).length} under him `}${chevron}</span></button>${node(cp, 'top').replace('node top', 'node')}`;
     if (!open) { out += `</div>`; return; }
     const soldiers = kids.filter((k) => k.rank !== 'associate');
     const direct = kids.filter((k) => k.rank === 'associate');
@@ -522,10 +530,10 @@ export function treeView(famId: Id): string {
       for (const a of kidsOf(s.id)) { out += node(a, 'sub2', qx(a)); for (const r of kidsOf(a.id)) out += node(r, 'sub3'); }
     }
     if (direct.length) out += `<div class="org-lab">Reporting straight to ${esc(cp.name.split(' ')[0])}</div>` + direct.map((a) => node(a, 'sub', qx(a)) + kidsOf(a.id).map((r) => node(r, 'sub2')).join('')).join('');
-    if (i < openS) out += openNode('soldier');
+    if (i < openS && !theirs) out += openNode('soldier');
     out += `</div>`;
   });
-  if (openC) for (let i = 0; i < openC; i++) out += `<div class="crew"><div class="hd"><span>Open</span><span></span></div>${openNode('capo')}</div>`;
+  if (openC && !theirs) for (let i = 0; i < openC; i++) out += `<div class="crew"><div class="hd"><span>Open</span><span></span></div>${openNode('capo')}</div>`;
   out += `</div>`;
   if (fam.id === p.familyId && p.rank === 'associate' && !capos.some((cp) => kidsOf(cp.id).some((k) => k.id === p.id))) out += `<p class="muted">You answer to ${p.bossId ? pl(w.chars[p.bossId]) : 'nobody'}.</p>`;
   void vacancy;

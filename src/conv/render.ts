@@ -29,7 +29,7 @@ const B: Record<string, Entry> = {
   // where the player stands (conv/visit.ts doAdvance: the family's actual road, path.ts), said against what was said last time
   'advance.notMe': { _: ['“I’m hardly the man to ask. I don’t decide that.”'], jovial: ['“Me? Ask somebody who sits at the table.”'] },
   'advance.top': { _: ['“There’s only one chair above you. Think carefully about what you’re asking.”'] },
-  'advance.open': { _: ['“You’re not there. Right now people call you {standing}.”', '“Not yet. {standing}, that’s what I hear.”'], jovial: ['“Ambitious! Good. Right now people call you {standing}.”'], proud: ['“So does every man here. Right now I’d call you {standing}.”'] },
+  'advance.open': { _: ['“You’re not there. Right now people call you {standing}.”', '“Not yet. People call you {standing}, from what I hear.”'], jovial: ['“Ambitious! Good. Right now people call you {standing}.”'], proud: ['“So does every man here. Right now I’d call you {standing}.”'] },
   'advance.same': { _: ['“Same as when you asked me {ago}. Nothing’s moved.”', '“You asked me {ago}. The answer hasn’t changed.”'], cold: ['“{ago}, you asked. Same answer.”'] },
   'advance.better': { _: ['“You’ve come on since {ago}: {what}, for one.”', '“Better than {ago}. I’ve noticed {what}.”'] },
   'advance.worse': { _: ['“You’ve gone backwards since {ago}: {what}.”', '“Worse than {ago}, not better: {what}.”'], cold: ['“You’ve slipped since {ago}. {what}.”'] },

@@ -1,3 +1,4 @@
+import { arch } from './voice';
 import { skimNoticed } from './situ';
 import { temper, viewOf } from './temper';
 import { move as askMove, rateAsk } from './asks';
@@ -93,7 +94,11 @@ export function handOver(w: World, p: Character, boss: Character, amt: number): 
   feelOn(w, r, 'trust', 0.02 + (owedBefore > 0 ? 0.03 : 0));
   feelOn(w, r, 'respect', 0.01);
   if (owedBefore > 0) p.books.arrears = Math.max(0, owedBefore - amt);
-  return [`You put an envelope on the table. ${boss.name} doesn’t count it in front of you. He weighs it in his hand. "${owedBefore > 0 ? 'That’s what I wanted to see.' : 'Good. That’s how it’s done.'}"`, `${money(amt)} handed up. Last week is settled.`];
+  // (each man takes it his own way: how he handles money in front of another man, and what he says, are his)
+  const a = arch(boss), late = owedBefore > 0;
+  const take = ({ cold: `${boss.name} takes it without looking at it and puts it away.`, proud: `${boss.name} lets it sit on the table a moment before he picks it up.`, jovial: `${boss.name} slaps it against his palm and grins.`, schemer: `${boss.name} thumbs the edge of it, counting without seeming to.`, hothead: `${boss.name} takes it and shoves it in his jacket.`, bitter: `${boss.name} weighs it in his hand like he expected it lighter.`, frightened: `${boss.name} takes it quickly and glances at the door.`, earnest: `${boss.name} takes it and nods his thanks.` } as Record<string, string>)[a] ?? `${boss.name} doesn’t count it in front of you. He weighs it in his hand.`;
+  const said = late ? ({ cold: '“About time.”', proud: '“That’s what I wanted to see. Don’t make me wait again.”', jovial: '“There it is! I was starting to worry about you.”', hothead: '“Late. Don’t let it happen again.”', bitter: '“Late, but here. I’ll take it.”' } as Record<string, string>)[a] ?? '“That’s what I wanted to see.”' : ({ cold: '“Good.”', proud: '“Good. That’s how it’s done.”', jovial: '“Like clockwork. I like that in a man.”', schemer: '“In person. People notice that. So do I.”', hothead: '“Good. Some of them I have to chase.”', earnest: '“Thank you. Truly.”' } as Record<string, string>)[a] ?? '“Good. That’s how it’s done.”';
+  return [`You put an envelope on the table. ${take} ${said}`, `${money(amt)} handed up. Last week is settled.`];
 }
 
 // ---------------------------------------------------------------- weekly

@@ -45,3 +45,10 @@ export function reach(w: World, actor: Character, against: Character): { can: bo
   if (may(w, actor, 'order', against)) return { can: true };
   return { can: false, via: chairFor(w, against)?.id };
 }
+
+// The shops the player could put protection to, the one list every screen reads (the coherence repair, phase 10): Rackets lists them,
+// conversation offers the pitch to their owners, the guide points at them. A shop in his crew's ground that pays nobody, its owner a
+// civilian, alive and open for business. (A shop paying a family, his own or another, is not a pitch: it is a matter between families.)
+export function leanable(w: World, p: Character) {
+  return Object.values(w.biz).filter((b) => b.open && b.kind !== 'casino' && b.protection?.collectorId !== p.id && !w.chars[b.ownerId]?.isPlayer && w.chars[b.ownerId]?.alive && w.chars[b.ownerId].rank === 'civilian' && may(w, p, 'protect', w.chars[b.ownerId]) && !b.protection).sort((a, b) => b.income - a.income || (a.id < b.id ? -1 : 1));
+}

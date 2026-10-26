@@ -357,7 +357,7 @@ function handle(a: string, v: string) {
     draftDone();
     const p = P();
     const bs = S.w.chars[p.bossId!];
-    S.log = [esc(`New York, March 1970. You’re ${p.name}, an associate of the ${famName(S.w, p)} family. You’re not made, and you’re nobody’s friend yet.`), ...startingLines(S.w, p).map(esc), esc(`${bs.name} is the man you answer to. Go and find him at his usual place, and let him see your face. Then make yourself useful.`), 'Needs you, on this page, says what wants doing. Rackets says how to earn. Everything else is people.'];
+    S.log = [esc(`New York, March 1970. You’re ${p.name}, an associate of the ${famName(S.w, p)} family. You’re not made, and you’re nobody’s friend yet.`), ...startingLines(S.w, p).map(esc), esc(`${bs.name} is the man you answer to. Go and find him at his usual place, and let him see your face. Then make yourself useful.`), 'Needs you, on this page, says what wants doing. Business says how you earn, and what you could. Everything else is people.'];
     S.news = [];
     S.stack = [];
     S.view = { t: 'tab', name: 'today' };

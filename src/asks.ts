@@ -847,6 +847,8 @@ ASKS.lend = {
     d.cause = f.id;
     return `${t.name} takes the ${money(amt)}. ${money(d.weeklyPayment)} a week, ${Math.round(rate * 100)} percent on top. He shakes on it and holds ${a.isPlayer ? 'your' : 'his'} hand a second too long.`;
   },
+  // (what the lender says to his face: "if you need it")
+  askLabel: (w, s) => `“${money(s.terms?.amt ?? 0)}, if you need it. ${Math.round((s.terms?.rate ?? 0.05) * 100)} percent a week.”`,
   phrase: {
     ask: (w, s) => `${money(s.terms?.amt ?? 0)}, if he needs it. ${Math.round((s.terms?.rate ?? 0.05) * 100)} percent a week.`,
     yes: 'He takes it.', no: '“Thanks. I’d rather not owe anybody.”', counter: '“{amt} would do it. {why}.”', stall: '“Let me think about it.”',

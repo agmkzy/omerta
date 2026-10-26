@@ -136,7 +136,9 @@ export function personTexture(w: World, p: Character, c: Character): string[] {
   for (const s of w.situations ?? []) {
     if (!isOpen(s) || !s.kind || !s.key || !isParty(s, c.id) || c.id === p.id || !visibleTo(w, p, s)) continue;
     if (['dispute', 'crew', 'turf', 'org', 'money', 'ambition'].includes(s.kind)) continue;
-    out.push(`${first(c)} has something on his mind: ${titleOf(w, s).toLowerCase()}.`);
+    // (the title as it is: lowercasing it lowercased the names in it, "louie valenti wants sorrento's billiard hall")
+    const tt = titleOf(w, s), lead = /^(A|An|The|What|His|Who|Where|How) /.test(tt) ? tt.charAt(0).toLowerCase() + tt.slice(1) : tt;
+    out.push(`${first(c)} has something on his mind: ${lead.replace(/\.$/, '')}.`);
   }
   return out.slice(0, 2);
 }

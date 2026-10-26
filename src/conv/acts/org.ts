@@ -83,7 +83,7 @@ const hasAsk = (c: Ctx) => c.w.enc.some((e) => e.status === 'open' && e.from ===
 const jobOffer: Act = {
   base: 'job', pane: 'business', opens: true,
   // (once he has put it to the player in this visit, coming back to it is "about that work", not asking whether he has any)
-  offers: (c) => { const j = offered(c); return j && !hasAsk(c) ? [{ code: 'job:' + j.id, label: `About what he asked: ${j.title}`, says: c.v.th.raised.includes('job:' + j.id) ? 'About that work you mentioned.' : 'You had something for me?', note: `${j.pay ? `Pays ${money(j.pay)}. ` : ''}He wants an answer.`, kind: 'his' }] : []; },
+  offers: (c) => { const j = offered(c); return j && !hasAsk(c) ? [{ code: 'job:' + j.id, label: (() => { const k = workTo(c, j); return k ? `About the work he wants done: ${k.rest}` : `About what he asked: ${j.title}`; })(), says: c.v.th.raised.includes('job:' + j.id) ? 'About that work you mentioned.' : 'You had something for me?', note: `${j.pay ? `Pays ${money(j.pay)}. ` : ''}He wants an answer.`, kind: 'his' }] : []; },
   offersFor: (c, id) => { const j = c.w.jobs.find((q) => q.id === id && q.status === 'offered'); return j ? [{ code: 'jobtake:' + j.id, label: 'I’ll take care of it', note: `It’s yours. Pays ${money(j.pay ?? 0)}.` }, { code: 'jobpass:' + j.id, label: 'Not this time', note: 'He will think a little less of you for it.' }] : []; },
   run: (c, code) => {
     const x = T(c), id = code.split(':')[1], j = c.w.jobs.find((q) => q.id === id);
@@ -221,7 +221,26 @@ const rkBack: Act = {
       return out(15, [{ code: 'back_call', label: '“You owe me one. I’m calling it in.”', note: 'He speaks for you and the debt is cleared. You can only spend it once.' }, ...(trustOk && respectOk ? [{ code: 'back_take', label: '“Keep it. I’ll owe you one instead.”', note: 'He speaks for you. You owe him, and he still owes you.' }] : []), drop]);
     }
     if (!trustOk || !respectOk) {
-      line(x, !trustOk ? pick(w, t, { cold: ['“I don’t put my name on men I haven’t watched. I haven’t watched you.”'], proud: ['“My name is worth something. I don’t spend it on a man I barely know.”'], frightened: ['“If it goes wrong, it goes wrong on me. I can’t. Not yet.”'], _: ['“I don’t know you well enough to put my name on you. Come back when I do.”'] }) : pick(w, t, { cold: ['“I like you fine. But nobody I’d say your name to would take it seriously yet.”'], _: ['“It isn’t that I don’t trust you. It’s that you haven’t been seen doing much yet.”', '“People don’t know what you’re worth. Make them know, then ask me.”'] }), settled(t.id, 'not yet', !trustOk ? `he does not trust you enough (${r.trust.toFixed(2)} < 0.5)` : `you have not earned his respect (${r.respect.toFixed(2)} < 0.35)`));
+      // (each man refuses as himself: what his name is worth to him, how he puts things, and how well he knows the player)
+      const met = (r.known ?? 0) >= 0.4;
+      line(x, !trustOk ? pick(w, t, {
+        cold: ['“I don’t put my name on men I haven’t watched. I haven’t watched you.”', '“No. I don’t know what you’d do with it.”'],
+        proud: ['“My name is worth something. I don’t spend it on a man I barely know.”', '“Men have earned less than my name and asked for it. No.”'],
+        frightened: ['“If it goes wrong, it goes wrong on me. I can’t. Not yet.”'],
+        hothead: [met ? '“I’ve seen you around. Seeing isn’t trusting. No.”' : '“Who are you to ask me that? Earn it first.”'],
+        jovial: [met ? '“Ha. Buy me a few more drinks first, my friend. Then we’ll see.”' : '“You don’t waste time, do you? Let me get to know you first.”'],
+        schemer: ['“And what would it do for me, if you turned out wrong? Let’s wait and see what you turn out to be.”'],
+        bitter: ['“Men asked me that before. Some of them I regret. Not yet.”'],
+        earnest: ['“I’d want to be sure of you before I say your name to anyone. I’m not sure yet. I’m sorry.”'],
+        _: [met ? '“I know you a little. Not enough to put my name on you. Give it time.”' : '“I don’t know you well enough to put my name on you. Come back when I do.”'],
+      }) : pick(w, t, {
+        cold: ['“I like you fine. But nobody I’d say your name to would take it seriously yet.”'],
+        proud: ['“You’re all right. But nobody’s heard of you. My name next to yours would look like charity.”'],
+        hothead: ['“Do something people talk about. Then come and ask.”'],
+        jovial: ['“You’re a good kid. Nobody upstairs knows it yet, that’s the trouble.”'],
+        schemer: ['“Trust isn’t the problem. Nobody owes you anything yet. Make them owe you.”'],
+        _: ['“It isn’t that I don’t trust you. It’s that you haven’t been seen doing much yet.”', '“People don’t know what you’re worth. Make them know, then ask me.”'],
+      }), settled(t.id, 'not yet', !trustOk ? `he does not trust you enough (${r.trust.toFixed(2)} < 0.5)` : `you have not earned his respect (${r.respect.toFixed(2)} < 0.35)`));
       stamp(w, t, 'rk_back_no');
       return out(15, [{ code: 'back_what', label: '“What would you need to see from me?”' }, drop]);
     }
@@ -229,7 +248,9 @@ const rkBack: Act = {
     return out(20, [{ code: 'back_take', label: '“All right. I’ll owe you one.”', note: 'He speaks for you. You owe him a favour, and he can call it in.' }, { code: 'back_press', label: '“I’d rather not owe anybody.”', note: 'He may do it for less. He may not like being haggled with.' }, drop]);
   },
 };
-const backWhat: Act = { base: 'back_what', pane: 'business', run: (c) => { const x = T(c), r = R(x); line(x, r.trust < 0.5 ? '“Let me see you pay on time, do what you say you’ll do, and not give me a reason to worry. A few weeks of that.”' : '“Do something people notice. Stand up for someone, or come through on a job. Then I’ll have something to say.”'); door.memoOnce(x.w, x.t, x.p.id, 'agreement', r.trust < 0.5 ? 'He wants to see you reliable before he’ll speak for you.' : 'He wants to see you make a name for yourself before he’ll speak for you.'); return out(10); } };
+// (what he would need to see, said as things the player can actually do and he will actually notice: his envelope handed over in
+// person on Sunday, work done for him or his captain, his word kept. The agreement it leaves says the same, so Your word shows it.)
+const backWhat: Act = { base: 'back_what', pane: 'business', run: (c) => { const x = T(c), r = R(x); line(x, r.trust < 0.5 ? pick(x.w, x.t, { cold: ['“Your envelope, in person, every Sunday. Work finished when you say it will be. Do that and I’ll notice.”'], jovial: ['“Bring your envelope in yourself on Sundays, finish what you’re given, don’t make a liar of yourself. I’ll be watching, friend.”'], _: ['“Hand your envelope over in person, Sunday after Sunday. Finish the work you’re given. Keep your word to people. I’ll hear about it either way.”'] }) : pick(x.w, x.t, { _: ['“Do something people notice. Finish a job for the family, or stand up for one of ours. Then I’ll have something to say.”'] })); door.memoOnce(x.w, x.t, x.p.id, 'agreement', r.trust < 0.5 ? 'He wants to see your envelope in person on Sundays, your work finished and your word kept, before he’ll speak for you.' : 'He wants to see you finish a job for the family, or stand up for one of ours, before he’ll speak for you.'); return out(10); } };
 const backCall: Act = { base: 'back_call', pane: 'business', run: (c) => { const x = T(c), { w, p, t } = x; if (!door.settleFavour(w, p.id, t.id)) { line(x, '“There’s nothing outstanding between us.”'); return out(3); } door.setBacker(p, t); door.memoOnce(w, t, p.id, 'agreement', 'He repaid what he owed you by agreeing to speak for you.'); tweak(x, 0.02, 0, 0.04); line(x, '“Done. We’re square, and I’ll say your name when it matters.”'); return out(15); } };
 const backTake: Act = { base: 'back_take', pane: 'business', run: (c) => { const x = T(c), { w, p, t } = x; door.setBacker(p, t); door.owe(w, t, p, 2, 'agreed to speak for you'); tweak(x, 0.03, 0, 0.03); line(x, '“Done. I’ll say your name when it matters. If you shame me, I’ll say that too.”'); return out(15); } };
 const backPress: Act = {

@@ -163,7 +163,8 @@ function makeCover(w: World, p: Character, c: Character, deed: Fact) {
 function makeRelease(w: World, p: Character, c: Character, jailed: Character) {
   addEnc(w, {
     kind: 'favour_ask', from: c.id, about: jailed.id, title: `${first(c)} asks about ${first(jailed)}`,
-    lines: [`${c.name} sits down across from you without being asked.`, `"${jailed.name} is inside. I know you know a lawyer, and a clerk who knows a judge. I won’t forget it."`],
+    // (what he says the player can do is what he has reason to think: a man the player has got out before, or only that he's in the life)
+    lines: [`${c.name} sits down across from you without being asked.`, `"${jailed.name} is inside. ${w.favours.some((f) => f.from === p.id && /^getting .* out$/.test(f.what)) ? 'You got a man out before. You know who to call.' : by(c, 'rel' + jailed.id, { proud: ['I wouldn’t ask if I knew where else to go. You’re in the life; you know people who know people.'], frightened: ['I don’t know who to talk to. You must know somebody. Anybody.'], cold: ['A lawyer and the right clerk. You can find them. I can’t.'], _: ['You’re in the life. You’ll know a lawyer, or a man who knows one.', 'Somebody has to know the right clerk. I’m hoping it’s you.'] })} I won’t forget it."`],
     opts: [
       { code: 'do', label: 'Make a call, put up $300', hint: 'A man who gets out remembers who got him out.' },
       { code: 'no', label: 'It’s not your business' },
@@ -910,9 +911,9 @@ function invite(w: World, p: Character, ev: LifeEvent, yes: boolean) {
   const host = w.chars[ev.host];
   const dead = ev.about ? w.chars[ev.about] : undefined;
   const lead = ev.kind === 'funeral'
-    ? `"${dead?.name ?? 'He'} is being buried ${ev.place}. It would mean something if you were there."`
+    ? `"${dead?.name ?? 'He'} is being buried from ${ev.place}. It would mean something if you were there."`
     : by(host, 'inv' + ev.id, {
-        jovial: [`"My ${ev.kind === 'wedding' ? 'daughter is getting married' : 'grandson is being christened'} ${ev.place}, and I want everyone I like in the room. You’re on that list."`],
+        jovial: [`"My ${ev.kind === 'wedding' ? 'daughter is getting married' : 'grandson is being christened'} at ${ev.place}, and I want everyone I like in the room. You’re on that list."`],
         proud: [`"My family is holding a ${ev.kind} at ${ev.place}. I expect to see you."`],
         _: [`"There’s a ${ev.kind} at ${ev.place}. Come. Bring something."`],
       });

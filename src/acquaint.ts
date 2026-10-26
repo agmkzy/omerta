@@ -22,3 +22,15 @@ export function introducers(w: World, p: Character, t: Character): Character[] {
   const cand = [p.bossId, p.backer, p.sponsor].filter(Boolean).map((id) => w.chars[id!]).filter((c) => c?.alive && c.id !== t.id);
   return cand.filter((c) => c.bossId === t.id || t.bossId === c.id || (c.familyId && c.familyId === t.familyId) || (c.rels[t.id] && c.rels[t.id].lastMet > -1e8) || (c.familyId && t.rank === 'civilian' && w.fam[c.familyId]?.districts.includes(t.district))).slice(0, 2);
 }
+
+// Whether the player knows who looks after a place (the coherence repair, phase 9): on his own streets (his family's districts) a man
+// in the life knows whose envelope a shop is; elsewhere he knows only what he has seen or been told: a place he collects from, has been
+// into, has put terms to, or has heard about (a fact about its protection that has reached him). A shop on the far side of the city is
+// not on his map until something puts it there.
+export function knowsProtection(w: World, p: Character, b: { id: string; district: string; ownerId: string; protection?: { collectorId: string } }): boolean {
+  if (b.protection?.collectorId === p.id) return true;
+  if (p.familyId && w.fam[p.familyId]?.districts.includes(b.district)) return true;
+  const o = w.chars[b.ownerId];
+  if (o && (p.intro?.[o.id] != null || introduced(w, p, o))) return true;
+  return Object.keys(p.known).some((id) => { const f = w.facts[id]; return !!f && f.business === b.id && ['protection_started', 'protection_refused', 'poach', 'shake'].includes(f.kind); });
+}
