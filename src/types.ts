@@ -558,7 +558,7 @@ export interface World {
   threats: Record<Id, Threat>;
   events: LifeEvent[];
   sunday?: { t: number; tells: { who: Id; text: string; learn?: string }[]; seen?: boolean }; // what the crew brought in on Sunday
-  papers?: { t: number; lead: string; items: { head: string; body?: string }[]; filler: string[] }[]; // the Monday paper, newest last
+  papers?: { t: number; lead: string; items: { head: string; body?: string; section?: 'city' | 'business' | 'society' }[]; filler: string[] }[]; // the Monday paper, newest last (section: older papers have none, and read as the city's)
   snaps?: { t: number; cash: number; standing: number; heat: number; rank: string; kids: number }[]; // one per week, for the briefing
   ops: Op[];
   promo?: PromoCase;

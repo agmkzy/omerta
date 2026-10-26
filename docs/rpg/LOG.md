@@ -281,3 +281,19 @@ Looked at the Herald and the Stories page as a player in the playthrough save:
   for him about money. Two kinds of story are new:
   - **a shop that pays you**, when something has happened there since it started paying, or its owner is behind;
   - **what you owe your captain**, when the envelope is in arrears, needing the player once the captain has sent for him.
+- **The Herald, the city's paper** (owner's direction: the whole game's news, not only the player's; footers grounded in the real
+  news of those days):
+  - **The city's news, whoever made it:** murders, shots fired, assaults, hold-ups, smashed storefronts, burglaries and hijacked
+    trucks, arrests (a made man is "a member of a crime family"; "his lawyer calls him a businessman"), police raids naming the
+    racket (numbers bank, bookmaking parlour, stolen-car ring, pier racket, trucking company...), federal sweeps.
+  - **A war the city can see** when two families are at open feud.
+  - **A business page:** shops changing hands and closing, and at most one "hard times" piece, never the same one within three
+    issues.
+  - **A society page:** weddings, christenings, funerals.
+  - **Ranking:** by severity, then by what touches the reader (his shops, his street, his family's men, men he knows). A week's
+    repeats are one story with a plural body.
+  - **What stays unprinted:** what a paper couldn't know (who ordered it, who collects, what a table decided).
+  - **The footer ("Also in the news")** is the real news of the same week: from the Village townhouse explosion and the eclipse
+    (March 1970), the postal strike, Apollo 13, Earth Day, Serpico, Kent State, the hard-hat riot and the Knicks' title, the Unity
+    Day rally, the Tombs riots, the first Marathon and the Organized Crime Control Act, into 1971 (the police strike, Colombo shot,
+    Attica) and 1972 (The Godfather, Joey Gallo). The city's small news fills a quiet week. Tested (experience/herald).

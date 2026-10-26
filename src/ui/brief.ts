@@ -68,7 +68,10 @@ export function briefView(): string {
 const HEAD_DAY = (t: number) => fmtTime(t + DAY).replace(/,\s*\d\d:\d\d$/, '');
 function herald(paper: NonNullable<ReturnType<typeof W>['papers']>[number], at: number, n: number): string {
   const nav = n > 1 ? `<nav class="herald__issues" aria-label="Editions"><button class="mini" data-a="paper:${at - 1}" ${at === 0 ? 'disabled' : ''}>&lsaquo; Earlier edition</button><span>${at === n - 1 ? 'This week' : `${n - 1 - at} week${n - 1 - at > 1 ? 's' : ''} ago`}</span><button class="mini" data-a="paper:${at + 1}" ${at === n - 1 ? 'disabled' : ''}>Later edition &rsaquo;</button></nav>` : '';
-  const items = paper.items.map((i, k) => `<section class="herald__item${k === 0 ? ' first' : ''}"><h3>${esc(i.head)}</h3>${i.body ? `<p>${esc(i.body)}</p>` : ''}</section>`).join('');
+  // (the city's news in columns, then the business page and the society page under their own heads)
+  const sec = (k: 'city' | 'business' | 'society') => paper.items.filter((i) => (i.section ?? 'city') === k);
+  const block = (xs: typeof paper.items, first: boolean) => xs.map((i, k) => `<section class="herald__item${first && k === 0 ? ' first' : ''}"><h3>${esc(i.head)}</h3>${i.body ? `<p>${esc(i.body)}</p>` : ''}</section>`).join('');
+  const items = block(sec('city'), true) + (sec('business').length ? `<section class="herald__item"><h4>Business</h4></section>${block(sec('business'), false)}` : '') + (sec('society').length ? `<section class="herald__item"><h4>Society</h4></section>${block(sec('society'), false)}` : '');
   return `${nav}<article class="herald">
     <header class="herald__mast">
       <div class="herald__ears"><span>Late City<br>Edition</span><span>Five<br>Cents</span></div>
@@ -77,7 +80,7 @@ function herald(paper: NonNullable<ReturnType<typeof W>['papers']>[number], at: 
     </header>
     <h2 class="herald__lead">${esc(paper.lead)}</h2>
     ${items ? `<div class="herald__cols">${items}</div>` : '<p class="herald__quiet">Nothing else the police would put their name to.</p>'}
-    <aside class="herald__also"><h4>Also in today’s paper</h4>${paper.filler.map((x) => `<p>${esc(x)}</p>`).join('')}</aside>
+    <aside class="herald__also"><h4>Also in the news</h4>${paper.filler.map((x) => `<p>${esc(x)}</p>`).join('')}</aside>
     <p class="herald__note">The paper only prints what it can prove. It doesn’t know who did what, and it won’t say who it suspects.</p>
   </article>`;
 }
