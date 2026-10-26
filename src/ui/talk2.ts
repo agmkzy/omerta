@@ -6,6 +6,7 @@
 import type { Visit } from '../conv/visit';
 import type { Choice } from '../conv/kit';
 import { approaches } from '../conv/approach';
+import { everything } from '../conv/visit';
 import { ownerBiz } from '../core';
 import { avatar } from './common';
 import { between, knownOf } from './between';
@@ -55,19 +56,73 @@ function figure(c: Choice): string {
     + `<button class="ui-btn" data-a="t2amt:${esc(c.id)}">Put it to him</button>`;
 }
 
-// What you can say now, in the order a man would weigh it: his answer or his request first, then the subjects in hand, then the
-// headings, then a way on to more, and last the way out.
-function picks(v: Visit): Pick[] {
-  const rank = (c: Choice) => (c.group === 'reply' ? 0 : c.group === 'matter' ? 1 : c.group === 'social' ? 2 : c.group === 'intent' ? 3 : c.group === 'more' ? 4 : 5);
-  const lead = v.choices.find((c) => c.group === 'reply' || c.group === 'matter');
-  return [...v.choices].sort((a, b) => rank(a) - rank(b)).map((c) => ({
-    a: 't2:' + c.id,
-    label: c.label,
-    hint: c.note ?? (c.group === 'intent' ? HEAD_HINT[c.id.slice(2)] : undefined),
-    kind: c.group === 'leave' ? 'out' : c.group === 'more' ? 'more' : c === lead && v.approach ? 'lead' : '',
-    fig: c.amount ? figure(c) : undefined,
-  }));
+// ---------------------------------------------------------------- subjects (the redesign, owner 26 October)
+// The conversation is presented as a few clearly organised subjects rather than a list of everything that could be said. Nothing here
+// changes what can be said: every option is the engine's (visit.everything), browsed by subject, with what is already between the two
+// men first. Options that are ways into the same thing are one entry ("Ask for work"), opening to the particular ones when there are
+// several ("A debt" shows the debts). Presentation only: choosing any of them is the engine's own choice, as before.
+type Subj = 'work' | 'family' | 'people' | 'personal' | 'settle';
+const SUBJ: { k: Subj; name: string; hint: string }[] = [
+  { k: 'work', name: 'Work & money', hint: 'Jobs, loans, his business, deals' },
+  { k: 'family', name: 'Family business', hint: 'Your standing, the family, its men' },
+  { k: 'people', name: 'People & rumours', hint: 'What he makes of men, what he’s heard' },
+  { k: 'personal', name: 'Personal', hint: 'The man himself' },
+  { k: 'settle', name: 'Settle something', hint: 'What needs having out' },
+];
+// what each interaction is, by its code: the subject it belongs under, and the entry it shares with others like it
+const codeOf = (id: string) => { const x = id.split(':'); return x[0] === 'a' ? (x[1] === 'tk' ? 'tk:' + (x[2] ?? '') : x[1]) : x[0]; };
+const BETWEEN = /^(answer|report|job|jobtake|jobpass|m|memo|sit|b_envelope|b_env_wait|mt_open|enc_open|enc|apx|pass|intervene|hisword|tk:debt|tk:job|tk:trouble|tk:pressed)$/;
+const SUBJECT_OF: Record<string, Subj> = {};
+const put = (k: Subj, xs: string) => { for (const x of xs.split(' ')) SUBJECT_OF[x] = k; };
+put('work', 'work b_need b_more rate_ask b_tribute borrow loan favcall offer_loan buy_ask stake_ask sell_ask run_ask partner_chop partner_fence op biz_none sh_how sh_ears sh_back sh_time sh_why sh_lean suggest terms_cut terms_raise deal d_time d_half d_favour d_forgive d_pay d_all d_ask d_remind cr_cash cr_duties assign_low assign_hustle recruit_offer protect tk:shop tk:racket');
+put('family', 'promo recommend rk_back rk_back_ask b_stand earn tk:earn leaders mediate pick_concern concern ask_rep ask_crew answers rv_mood');
+put('people', 'tk:op tk:ev tk:tell tk:hurting think pick_member suspect pick_incident tell who news rv_ears ask_around about inc');
+put('personal', 'how old_times spend rv_drink congrats welcome ask_want ask_history help_gift help_loan cr_ask sit_ask intro intro_via rv_favour tk:kin');
+put('settle', 'demand confront amends word_make accuse rv_warn cr_drop cr_thin cr_look challenge refuse');
+// the entries several options share: one row (the fitting wording, when only one may be said), or the choice of them when there are more
+const ENTRY: { key: string; name: string; codes: string[]; one?: boolean }[] = [
+  { key: 'work', name: 'Ask for work', codes: ['b_more', 'b_need', 'work'], one: true },
+  { key: 'standing', name: 'Your standing', codes: ['earn', 'tk:earn', 'b_stand', 'ask_rep', 'promo', 'recommend', 'rk_back', 'rk_back_ask'] },
+  { key: 'money', name: 'Money between you', codes: ['borrow', 'loan', 'offer_loan', 'help_loan', 'favcall', 'b_tribute', 'rate_ask'] },
+  { key: 'debt', name: 'A debt', codes: ['d_time', 'd_half', 'd_favour', 'd_forgive', 'd_pay', 'd_all', 'd_ask', 'd_remind'] },
+  { key: 'shop', name: 'His business', codes: ['sh_how', 'sh_ears', 'op', 'biz_none', 'tk:shop', 'tk:racket'] },
+  { key: 'protect', name: 'Protection', codes: ['protect', 'suggest', 'terms_cut', 'terms_raise', 'sh_back', 'sh_time', 'sh_why', 'sh_lean'] },
+  { key: 'deal', name: 'A deal', codes: ['buy_ask', 'stake_ask', 'sell_ask', 'partner_chop', 'partner_fence', 'run_ask', 'deal'] },
+  { key: 'crew', name: 'His work for you', codes: ['assign_low', 'assign_hustle', 'cr_cash', 'cr_duties'] },
+  { key: 'someone', name: 'Ask about someone', codes: ['tk:op', 'think', 'pick_member', 'suspect'] },
+  { key: 'happened', name: 'What happened', codes: ['tk:ev', 'pick_incident', 'tell', 'who', 'tk:tell'] },
+  { key: 'word', name: 'The word around', codes: ['news', 'rv_ears', 'tk:hurting', 'ask_around'] },
+  { key: 'time', name: 'Pass the time', codes: ['how', 'old_times', 'spend', 'rv_drink'] },
+];
+const entryOf = (code: string) => ENTRY.find((e) => e.codes.includes(code));
+const subjOf = (c: Choice): Subj => SUBJECT_OF[codeOf(c.id)] ?? (c.pane === 'business' ? 'work' : c.pane === 'confront' ? 'settle' : 'personal');
+const isMatter = (c: Choice) => BETWEEN.test(codeOf(c.id));
+// a choice as a numbered pick, with its figure when it takes one
+const pickOf = (c: Choice, lead = false): Pick => ({ a: 't2:' + c.id, label: c.label, hint: c.note, kind: lead ? 'lead' : '', fig: c.amount ? figure(c) : undefined });
+// What can be said, sorted out: his question and its answers (the exchange in hand), what is between you, and the subjects
+function sorted(w: ReturnType<typeof W>, v: Visit) {
+  const now = v.choices.filter((c) => c.group === 'reply');
+  const all = [...v.choices, ...everything(w, v)].filter((c, i, xs) => xs.findIndex((y) => y.id === c.id) === i && !/^(u|all):|^(home|more|back|leave)$/.test(c.id) && !now.some((y) => y.id === c.id));
+  const by = new Map<Subj, Choice[]>(SUBJ.map((s) => [s.k, []]));
+  for (const c of all.filter((x) => !isMatter(x))) by.get(subjOf(c))!.push(c);
+  return { now, matters: all.filter(isMatter), by };
 }
+// One subject's options: an entry several share opens to them; one alone is said as itself
+function subjectPicks(xs: Choice[]): string {
+  const done = new Set<string>(), rows: Pick[] = [];
+  for (const c of xs) {
+    if (done.has(c.id)) continue;
+    const e = entryOf(codeOf(c.id));
+    const mates = e ? xs.filter((y) => entryOf(codeOf(y.id)) === e) : [c];
+    mates.forEach((y) => done.add(y.id));
+    if (mates.length === 1 || e?.one) { rows.push(pickOf(e?.one ? [...mates].sort((a, b) => e.codes.indexOf(codeOf(a.id)) - e.codes.indexOf(codeOf(b.id)))[0] : mates[0])); continue; }
+    const open = !!S.open['cxg:' + e!.key];
+    rows.push({ a: 'tog:cxg:' + e!.key, label: open ? e!.name : `${e!.name} (${mates.length})`, hint: open ? undefined : mates.slice(0, 2).map((y) => y.label.replace(/^“|”$/g, '')).join(' · ') + (mates.length > 2 ? ' …' : ''), kind: 'more' });
+    if (open) rows.push(...mates.map((y) => ({ ...pickOf(y), kind: 'sub' as const })));
+  }
+  return choices(rows, 'What you say');
+}
+void HEAD_HINT;
 
 export function talk2View(v: Visit): string {
   const w = W(), p = P(), t = w.chars[v.npc];
@@ -103,12 +158,27 @@ export function talk2View(v: Visit): string {
   out += `<div class="cx-now" aria-live="polite">${cur.said || '<p class="cx-narr">He waits for you to speak.</p>'}</div>`;
   if (cur.fx.length) out += `<p class="cx-fx" aria-label="What changed">${cur.fx.join(' · ')}</p>`;
   out += `</div>`;
-  // ---- what you can say
-  out += `<div class="cx-act">${context(shown)}`;
-  if (v.ended) out += choices([{ a: 'back:', label: 'Go on', hint: 'Back to where you were.' }, { a: `ent:${t.id}`, label: `${t.name.split(' ')[0]}’s page`, hint: 'Everything you know of him, and what is between you.' }], 'Where now');
-  else {
-    if (v.pane && !v.choices.some((c) => c.group === 'reply')) out += `<p class="cx-under">${esc(v.pane[0].toUpperCase() + v.pane.slice(1))}</p>`;
-    out += choices(picks(v));
+  // ---- what you can say: the exchange in hand, or the subject you have opened, or what is between you; beside it, the subjects
+  const sx = v.ended ? undefined : sorted(w, v);
+  const subj = S.cxSubject as Subj | undefined;
+  const leaveLabel = v.choices.find((c) => c.id === 'leave')?.label ?? 'Leave';
+  out += `<div class="cx-act">`;
+  if (v.ended || !sx) out += choices([{ a: 'back:', label: 'Go on', hint: 'Back to where you were.' }, { a: `ent:${t.id}`, label: `${t.name.split(' ')[0]}’s page`, hint: 'Everything you know of him, and what is between you.' }], 'Where now');
+  else if (sx.now.length && !subj) out += `<p class="cx-under">${v.waiting ? 'He’s waiting on you' : 'Your answer'}</p>` + choices([...sx.now.map((c, i) => pickOf(c, i === 0 && !!v.approach)), { a: 't2:leave', label: leaveLabel, kind: 'out' }], 'Your answer');
+  else if (subj) {
+    const xs = sx.by.get(subj)!;
+    out += `<p class="cx-under"><button class="cx-subback" data-a="cxs:" aria-label="Back to what’s between you">‹</button>${esc(SUBJ.find((x) => x.k === subj)!.name)}</p>` + (xs.length ? subjectPicks(xs) : `<p class="ui-quiet">Nothing to say on that, with him, now.</p>`);
+  } else if (sx.matters.length) out += `<p class="cx-under">Between you</p>` + choices(sx.matters.slice(0, 5).map((c) => pickOf(c)), 'Between you');
+  else out += `<p class="cx-under">What’s on your mind?</p><p class="cx-pick cx-only-wide">Pick a subject beside the conversation.</p><div class="cx-phone-subjs">${choices(SUBJ.filter((x) => sx.by.get(x.k)!.length).map((x) => ({ a: 'cxs:' + x.k, label: x.name, hint: x.hint })), 'Subjects')}</div>`;
+  if (sx && (sx.now.length || subj || sx.matters.length)) out += `<button class="cx-subjbtn" data-a="tog:cxsubj" aria-expanded="${!!S.open.cxsubj}"><span>Subjects</span><b>${sx.matters.length ? `${sx.matters.length} between you` : ''}</b></button>`;
+  out += `</div>`;
+  // ---- the subjects: what is between you first, then the five subjects; a panel beside on a desktop, a drawer on a phone
+  if (sx) {
+    let side = `<h2 class="cx-sh">Between you</h2>${shown.length ? `<div class="cx-ctx">${shown.map((x) => `<p>${x}</p>`).join('')}</div>` : ''}`;
+    side += sx.matters.length ? `<ul class="cx-subjs">${sx.matters.map((c) => `<li><button data-a="t2:${esc(c.id)}"><b>${esc(c.label.replace(/^“|”$/g, ''))}</b>${c.note ? `<small>${esc(c.note)}</small>` : ''}</button></li>`).join('')}</ul>` : (shown.length ? '' : `<p class="cx-none">Nothing unfinished.</p>`);
+    side += `<h2 class="cx-sh">Subjects</h2><ul class="cx-subjs">${SUBJ.map((x) => { const n = sx.by.get(x.k)!.length; return `<li><button class="${subj === x.k ? 'on' : ''}" data-a="cxs:${x.k}"${n ? '' : ' disabled'}><b>${x.name}</b><small>${n ? x.hint : 'Nothing with him now'}</small></button></li>`; }).join('')}</ul>`;
+    side += `<button class="cx-leave2" data-a="t2:leave">${leaveLabel === 'Not now' ? 'Not now' : 'Leave conversation'}</button>`;
+    out += `<aside class="cx-side${S.open.cxsubj ? ' is-open' : ''}" aria-label="Subjects">${side}</aside>`;
   }
   if (dbg) out += `<p class="cx-dbgnote">Developer view on.</p>`;
   out += `</div></section>`;

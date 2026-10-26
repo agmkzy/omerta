@@ -127,3 +127,43 @@
   body.g-talk .cx-read { max-height: none; min-height: 0; margin: var(--s-5) 0 var(--s-3); padding: var(--s-3) var(--s-4) var(--s-3) var(--s-5); border: 1px solid var(--c-line); border-left: 2px solid var(--c-gold-line); border-radius: var(--radius); background: rgba(22, 20, 18, .45); overscroll-behavior: contain; }
   body.g-talk .cx-act { min-height: 0; overflow-y: auto; padding: var(--s-2) var(--s-2) var(--s-5) 0; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--c-line-2) transparent; }
 }
+
+/* ------------------------------------------------------------------ subjects (the redesign, owner 26 October)
+   Desktop: the man across the top; the dialogue and your responses on the left; beside them the subjects (what is between you
+   first), each scrolling on its own. Phone: the responses under the dialogue, and a Subjects drawer over them. */
+.cx-side { display: none; }
+.cx-sh { margin: var(--s-4) 0 var(--s-2); font: 600 10.5px/1.3 var(--f-ui); letter-spacing: .16em; text-transform: uppercase; color: var(--c-gold); }
+.cx-sh:first-child { margin-top: 0; }
+.cx-ctx p { margin: 0 0 6px; font: 400 13.5px/1.45 var(--f-ui); color: var(--c-cream-2); }
+.cx-none { margin: 0; font: italic 400 15px var(--f-display); color: var(--c-muted); }
+.cx-subjs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.cx-subjs button { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 10px 12px; border: 1px solid var(--c-line-2); border-radius: var(--radius); background: var(--c-raise); color: var(--c-cream); text-align: left; cursor: pointer; transition: border-color var(--t-fast), background var(--t-fast); }
+.cx-subjs button:hover:not(:disabled) { border-color: var(--c-gold-line); background: var(--c-raise-2); }
+.cx-subjs button.on { border-color: var(--c-gold); background: var(--c-raise-3); }
+.cx-subjs button:disabled { opacity: .45; cursor: default; }
+.cx-subjs b { font: 500 17px/1.2 var(--f-display); }
+.cx-subjs small { font: 400 12px/1.35 var(--f-ui); color: var(--c-muted); }
+.cx-leave2 { width: 100%; margin-top: var(--s-4); min-height: 44px; border: 1px solid var(--c-line); border-radius: var(--radius); background: none; color: var(--c-cream-2); font: 500 13px var(--f-ui); letter-spacing: .06em; cursor: pointer; }
+.cx-leave2:hover { color: var(--c-cream); border-color: var(--c-line-2); }
+.cx-subback { margin-right: 8px; padding: 0 6px; border: 0; background: none; color: var(--c-gold-2); font-size: 16px; cursor: pointer; }
+.cx-pick { margin: var(--s-2) 0; font: italic 400 17px var(--f-display); color: var(--c-cream-2); }
+.cx-act .ui-choice.is-sub { margin-left: 26px; }
+.cx-act .ui-choice.is-more .ui-choice__label { color: var(--c-gold-2); }
+.cx-subjbtn { display: none; }
+.cx-only-wide { display: none; }
+
+@media (min-width: 900px) {
+  body.g-talk .cx { grid-template-columns: minmax(0, 1fr) 300px; column-gap: var(--s-6); grid-template-areas: "head head" "read side" "act side"; }
+  body.g-talk .cx-head { grid-area: head; }
+  body.g-talk .cx-read { grid-area: read; }
+  body.g-talk .cx-act { grid-area: act; }
+  .cx-side { grid-area: side; display: block; min-height: 0; overflow-y: auto; margin: var(--s-5) 0 var(--s-3); padding: 0 var(--s-1) var(--s-4) 0; scrollbar-width: thin; scrollbar-color: var(--c-line-2) transparent; }
+  .cx-only-wide { display: inline; } .cx-only-phone { display: none; }
+}
+@media (max-width: 899px) {
+  .cx-subjbtn { display: flex; align-items: center; justify-content: space-between; flex: none; margin: var(--s-2) var(--s-1) 0; min-height: 46px; padding: 0 14px; border: 1px solid var(--c-gold-line); border-radius: var(--radius); background: var(--c-raise-2); color: var(--c-gold-2); font: 600 12px var(--f-ui); letter-spacing: .12em; text-transform: uppercase; cursor: pointer; }
+  .cx-subjbtn b { font: 500 12px var(--f-ui); letter-spacing: 0; text-transform: none; color: var(--c-cream-2); }
+  .cx-side.is-open { display: block; position: absolute; left: 0; right: 0; bottom: 0; z-index: 6; max-height: 72%; overflow-y: auto; padding: var(--s-4) var(--s-4) calc(var(--s-4) + env(safe-area-inset-bottom, 0px)); background: #12100e; border-top: 1px solid var(--c-gold-line); border-radius: 16px 16px 0 0; box-shadow: 0 -18px 40px rgba(0, 0, 0, .7); }
+  .cx-only-phone { display: inline; }
+}
+@media (min-width: 900px) { .cx-phone-subjs { display: none; } }

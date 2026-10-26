@@ -22,9 +22,9 @@ describe('the conversation screen', () => {
     const html = draw(w, () => talk2View(v));
     const ns = [...html.matchAll(/data-n="(\d+)"/g)].map((m) => Number(m[1]));
     assert.deepEqual(ns, ns.map((_, i) => i + 1), 'numbered in order: ' + ns.join());
-    assert.ok(ns.length >= 2, 'the headings are choices');
-    const out = html.indexOf('data-out="1"');
-    assert.ok(out > html.lastIndexOf('data-n="'), 'leave comes last');
+    assert.ok(ns.length >= 2, 'the subjects are choices');
+    // (the way out is the last thing on the screen: under the subjects, beside the conversation)
+    assert.ok(html.lastIndexOf('data-a="t2:leave"') > html.lastIndexOf('data-n="'), 'leave comes last');
     assert.ok(html.includes('data-a="t2:leave"'));
   });
 
@@ -40,12 +40,12 @@ describe('the conversation screen', () => {
   ok('the context box says what stands between you, from the records, and nothing when there is nothing', { tags: ['scenario'] }, () => {
     const w = newWorld(7), p = P(w), t = soldier(w);
     const bare = draw(w, () => talk2View(meet(w, t)));
-    assert.ok(!bare.includes('class="ui-context'), 'no box over nothing');
+    assert.ok(!bare.includes('class="cx-ctx'), 'no box over nothing');
     const d = createDebt(w, p.id, t.id, 600, 0.05, 'a private loan');
     addFavour(w, p.id, t.id, 3, 'what you did for his brother');
     addFavour(w, p.id, t.id, 1, 'a word in the right ear');
     const html = draw(w, () => talk2View(meet(w, t)));
-    const box = html.slice(html.indexOf('class="ui-context'), html.indexOf('</div></div>', html.indexOf('class="ui-context')));
+    const box = html.slice(html.indexOf('class="cx-ctx'), html.indexOf('</div>', html.indexOf('class="cx-ctx')));
     assert.ok(box.includes('$600') && box.includes(`at $${d.weeklyPayment} a week`), 'the money: ' + box);
     assert.ok(/owes you two favours, the largest a big one/.test(box), 'the favours, said once: ' + box);
     // the same facts read the same way on his page (both read ui/between.ts)
@@ -60,13 +60,18 @@ describe('the conversation screen', () => {
     assert.ok(html.includes('data-n="1"'), 'reached by 1');
   });
 
-  ok('a heading reads as what it is for, and under it the heading is named above the subjects', { tags: ['scenario'] }, () => {
+  ok('a subject reads as what it is for, and opened, it is named above what can be said under it', { tags: ['scenario'] }, () => {
     const w = newWorld(7), t = soldier(w), v = meet(w, t);
+    S.cxSubject = undefined;
     const home = draw(w, () => talk2View(v));
-    assert.ok(home.includes('Work, money, the family’s affairs.'), 'Business, said plainly');
-    choose(w, v, 'u:business');
+    assert.ok(home.includes('Work &amp; money') || home.includes('Work & money'), 'the subjects, by name');
+    assert.ok(home.includes('Jobs, loans, his business, deals'), 'Work & money, said plainly');
+    S.cxSubject = 'work';
     const under = draw(w, () => talk2View(v));
-    assert.ok(under.includes('<p class="cx-under">Business</p>'));
+    assert.ok(under.includes('Work &amp; money</p>') || under.includes('Work & money</p>'), 'named above its options');
+    assert.ok(/data-a="t2:a:/.test(under.slice(under.indexOf('class="cx-act"'), under.indexOf('class="cx-side'))), 'and what can be said under it, chosen as the engine’s own choices');
+    S.cxSubject = undefined;
+    void choose;
   });
 
   ok('an ended conversation offers a way on and his page, nothing else', { tags: ['unit'] }, () => {

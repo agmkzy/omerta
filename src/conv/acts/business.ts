@@ -267,7 +267,7 @@ let PROTECT_OWN: (c: Ctx) => boolean = () => false;
 export const protectOwnedBy = (f: (c: Ctx) => boolean) => { PROTECT_OWN = f; };
 const borrow: Act = {
   base: 'borrow', pane: 'business',
-  offers: (c) => (c.n.rank !== 'civilian' && c.n.cash >= 1500 && (c.n.rels[c.h.id]?.trust ?? 0) >= 0.4 ? [offer(c, 'borrow', 'Ask to borrow money', 'You name the figure. He decides what he can spare, and on what terms.')] : []),
+  offers: (c) => (c.n.rank !== 'civilian' && !door.wontBorrowFrom(c.h, c.n) && c.n.cash >= 1500 && (c.n.rels[c.h.id]?.trust ?? 0) >= 0.4 ? [offer(c, 'borrow', 'Ask to borrow money', 'You name the figure. He decides what he can spare, and on what terms.')] : []),
   run: (c) => {
     const x = T(c), { w, p, t } = x;
     if (w.debts.some((d) => d.status === 'active' && d.creditor === t.id && d.debtor === p.id)) { line(x, voice(x, 'loan_first')); return out(10); }

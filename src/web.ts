@@ -162,7 +162,7 @@ function collectNews(since: number): string[] {
 // -------------------------------------------------------------- navigation
 const same = (a: View, b: View) => a.t === b.t && JSON.stringify(a, (k, v) => (k === 'm' || k === 'convo' ? undefined : v)) === JSON.stringify(b, (k, v) => (k === 'm' || k === 'convo' ? undefined : v));
 function go(v: View) {
-  if (v.t === 'talk2' && S.view.t !== 'talk2') S.talkFrom = S.view;
+  if (v.t === 'talk2' && S.view.t !== 'talk2') { S.talkFrom = S.view; S.cxSubject = undefined; S.cxLast = undefined; }
   if (!same(S.view, v)) S.stack.push(S.view);
   if (S.stack.length > 30) S.stack.shift();
   S.view = v;
@@ -225,7 +225,7 @@ function pass(minutes: number, lines: string[], next: View = { t: 'tab', name: '
   if (dk > 0) S.chips.push({ t: `${dk} new thing${dk > 1 ? 's' : ''} learned`, tone: '' });
   if (pn.rank !== snap.rank) S.chips.push({ t: `Now ${pn.rank}`, tone: 'good' });
   S.stack = [];
-  if (next.t === 'talk2' && S.view.t !== 'talk2') S.talkFrom = S.view;
+  if (next.t === 'talk2' && S.view.t !== 'talk2') { S.talkFrom = S.view; S.cxSubject = undefined; S.cxLast = undefined; }
   S.view = next;
   save();
 }
@@ -503,14 +503,20 @@ function handle(a: string, v: string) {
     case 'opt': return doAction(S.opts[Number(v)]);
     case 'talk': return talkTo(args[0] ?? v, args[1]);
     // (Gate 3: the new conversation's choices; who has come looking for you; the switch)
+    // a subject opened in the conversation: presentation only, nothing said, no time passes
+    case 'cxs': S.cxSubject = v || undefined; S.cxLast = undefined; S.open.cxsubj = false; return;
     case 't2': {
       if (S.view.t !== 'talk2') return;
+      S.open.cxsubj = false;
       const r = chooseVisit(w, S.view.v, v);
       // (what he agreed to sit down over happens there: the meeting screen, as from the old conversation)
       if (r.meeting) { advance(w, w.now + r.minutes); S.view = { t: 'meeting', m: r.meeting, lines: r.v.lines.slice(-3).map((l) => l.text) }; save(); return; }
       // (settled another way: the existing "take action against him" screen)
       if (r.settle && w.chars[r.settle]?.alive) return pass(r.minutes, [], { t: 'settle', id: r.settle, lines: [] });
       // (leaving: away at once, back to where you were; his name is there to tap if you want to look into him)
+      // (his answer in hand is shown next; otherwise the subject the player was in stays open)
+      if (r.v.choices.some((c) => c.group === 'reply')) { if (S.cxSubject) S.cxLast = S.cxSubject; S.cxSubject = undefined; }
+      else if (!S.cxSubject && S.cxLast) { S.cxSubject = S.cxLast; S.cxLast = undefined; }
       if (v === 'leave' && r.v.ended) { const from = S.talkFrom ?? { t: 'tab', name: 'today' } as View; S.talkFrom = undefined; return pass(r.minutes, [], from); }
       return pass(r.minutes, [], { t: 'talk2', v: r.v });
     }

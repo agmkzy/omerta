@@ -102,3 +102,18 @@ Each step is tested, played in the browser, and deployed before the next:
 5. **Story:** road, life, word.
 6. **Street:** cards, then the illustrated picker.
 7. **A visual pass** across all of it.
+
+## The conversation, by subject (owner's brief, 26 October)
+Presentation only; the engine is unchanged, and every option it offers is still there.
+- **What is between you comes first:** his question and its answers when he has asked one; otherwise what is unfinished between
+  you two (a report owed, the envelope, a matter, a debt, his trouble, his word, a job in hand).
+- **Five subjects:** Work & money, Family business, People & rumours, Personal, Settle something.
+- **Options that lead into the same thing are one entry:**
+  - "Ask for work": the wording that fits the man;
+  - "Your standing", "Money between you", "A debt", "His business", "Protection", "A deal", "His work for you", "Ask about
+    someone", "What happened", "The word around", "Pass the time": these open to their particular options.
+- **Desktop:** the man across the top; the dialogue and your responses on the left; the subjects beside them, each part scrolling on
+  its own.
+- **Phone:** the subjects in place when nothing is pending, and a Subjects drawer otherwise.
+- When an exchange is over, the subject it began from is open again. Leave takes you straight back to where you were.
+- The player is no longer offered a loan from his own men.

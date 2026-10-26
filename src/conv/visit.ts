@@ -7,7 +7,7 @@
 // a promise of yours he is waiting on, something he believes you did, news of something he did for you), or a greeting that fits what
 // you are to each other. Then two to four things worth saying now, "Something else…" for anything else plausible, and leaving. What he
 // says next answers what you said; follow-ups answer his reply, not a menu. Nothing technical is shown: commitments are in the words.
-import { money, ownerBiz, peek } from '../core';
+import { money, ownerBiz, peek, wontBorrowFrom } from '../core';
 import { crewGround } from '../econ';
 import { askBetween, openAsk, openAsks } from '../asks';
 import { whereIs } from '../where';
@@ -309,7 +309,7 @@ function subjectsNow(c: Ctx, k: Pane, all: boolean): Choice[] {
     if (all) {
       const ways = actRows(c, k, ['other']);
       // (not from a man who owes the player money himself: the player would be borrowing his own money back at interest)
-      if ((n.rank !== 'civilian' || n.cash >= 600) && !ways.some((x) => x.id.startsWith('a:borrow')) && !w.debts.some((d) => d.status === 'active' && d.creditor === h.id && d.debtor === n.id)) out.push({ id: 'loan:500', label: line(c, 'ask.loan', { amt: '$500' }), group: 'matter' });
+      if ((n.rank !== 'civilian' || n.cash >= 600) && !wontBorrowFrom(h, n) && !ways.some((x) => x.id.startsWith('a:borrow')) && !w.debts.some((d) => d.status === 'active' && d.creditor === h.id && d.debtor === n.id)) out.push({ id: 'loan:500', label: line(c, 'ask.loan', { amt: '$500' }), group: 'matter' });
       // who a man answers to: the men troubling people the player has promised to help
       for (const id of new Set(social(w).obs.filter((o) => o.obligor === h.id && o.status === 'pending' && o.matter?.against).map((o) => o.matter!.against!))) { const m = w.chars[id]; if (m && m.id !== n.id && m.id !== h.id) out.push({ id: 'answers:' + m.id, label: line(c, 'ask.answersTo', { manFirst: first(m.name) }), group: 'matter' }); }
       out.push(...ways);

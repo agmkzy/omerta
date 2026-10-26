@@ -44,7 +44,7 @@ export interface Pick {
   a: string;
   label: string;          // plain
   hint?: string;          // plain
-  kind?: '' | 'out' | 'more' | 'lead' | 'danger';
+  kind?: '' | 'out' | 'more' | 'lead' | 'danger' | 'sub';
   fig?: string;           // html: the inputs for a figure, and the button that puts it
   off?: boolean;          // shown, with its reason in the hint, but not open now
   sel?: boolean;          // picked (a list you choose several from: guests, a crew)
