@@ -249,7 +249,7 @@ const HUSTLE_TALK: Record<string, { name: string; good: string; bad: string }> =
   fence: { name: 'what he moves', good: 'Things come in, things go out. People always want a bargain.', bad: 'Nobody’s buying. I’ve got a back room full of television sets.' },
   vending: { name: 'the machines', good: 'Cigarettes, jukeboxes. Pennies, but pennies add up.', bad: 'Somebody keeps putting their machines in my places.' },
   shakedown: { name: 'his collections', good: 'People pay. People are sensible.', bad: 'Shopkeepers have got brave lately. Somebody’s been telling them they can say no.' },
-  odd: { name: 'what he’s doing', good: 'A bit of this, a bit of that. It pays the rent.', bad: 'Odd jobs, and fewer of them.' },
+  odd: { name: 'what he’s doing', good: 'A truck that needs unloading here, a card game that needs a man on the door there. None of it’s much. All of it adds up to the rent.', bad: 'Odd jobs, and fewer of them. A man can’t live on favours.' },
 };
 function racket(x: X): Subject | undefined {
   const { w, p, t } = x, h = lineOf(w, t);

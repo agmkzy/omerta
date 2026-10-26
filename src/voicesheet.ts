@@ -607,7 +607,7 @@ const BANK: Record<string, E[]> = {
     E1('cold', `“Nothing you need to worry about,” says {N}.`), E1('cold', `{N} looks at you. “Why?”`),
     E1('hothead', `“Nothing you need to worry about,” says {N}. “Go worry about your own.”`), E1('hothead', `“Mind your business,” says {N}, not loudly.`),
     E1('jovial', `“Ah, you know,” says {N}, and changes the subject to the weather.`), E1('jovial', `{N} laughs it off and tops up his glass instead of answering.`),
-    E1('proud', `“Nothing that concerns you,” says {N}.`), E1('proud', `“That’s not a matter I discuss,” says {N}.`),
+    E1('proud', `“Nothing that concerns you,” says {N}.`), E1('proud', `“Nothing worth repeating,” says {N}, and that’s the end of it.`),
     E1('schemer', `“Nothing worth your time,” says {N}, with a smile.`), E1('schemer', `{N} answers with a question about you instead.`),
     E1('bitter', `“Why, you writing a book?” says {N}.`), E1('bitter', `“Nothing you’d want to know about, friend,” says {N}.`),
     E1('earnest', `{N} looks sorry. “Nothing I can talk about.”`), E1('earnest', `“I don’t really know you well enough for that,” says {N}, apologetically.`),

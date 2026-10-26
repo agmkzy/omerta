@@ -290,7 +290,7 @@ const B: Record<string, Entry> = {
   'cutOff.argument': { _: ['“We’re done with this, {youFirst}. Bring me something, or let it go.”'], proud: ['“Enough. You’ve made your case. The answer’s the same.”'] },
 
   // ---------------------------------------------------------------- a loan (a situation the worked examples never covered)
-  'ask.loan': { _: ['“I need {amt}. I’ll pay the usual.”'] },
+  'ask.loan': { _: ['“Could you lend me {amt}? I’ll pay interest, whatever’s fair.”'] },
   'argue.reputation': { _: ['“I’m good for it. Ask anyone.”'] },
   'sweeten.rate': { _: ['“Make it {rate} percent a week, then.”'] },
   'promise.repay': { _: ['“You’ll have it back by {when}. My word.”'] },

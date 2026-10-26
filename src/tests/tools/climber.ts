@@ -75,7 +75,7 @@ for (let d = 0; d < days && p.alive; d++) {
     if (process.env.DBG) log.push(`   hold=${w.path?.hold} wait=${w.path?.seatWait} promo=${JSON.stringify(w.promo ?? null)?.slice(0,160)} induct=${p.cooldown.induct} summons=${w.jobs.filter((j) => j.kind === 'summons').map((j) => j.meeting + ':' + j.status).join(',')} encs=${w.enc.filter((e) => e.status === 'open').map((e) => e.kind + ':' + (e.data?.stage ?? '')).join(',')}`);
     if (process.env.DBG3) log.push(...reached());
     if (process.env.DBG4) { log.push('  standing: ' + [...why].sort((a, b) => a[1] - b[1]).map(([k, v]) => `${k} ${v.toFixed(1)}`).join(', ')); why.clear(); }
-    log.push(`week ${wk}: ${p.rank} $${Math.round(p.cash)} standing ${Math.round(p.standing)} | ${pi ? pi.goals.map((g) => `${g.key} ${Math.round(g.frac * 100)}%`).join(', ') : 'top'} | shops ${Object.values(w.biz).filter((b) => b.protection?.collectorId === p.id).length} | done ${p.career?.done ?? 0}`);
+    log.push(`week ${wk}: ${p.rank} $${Math.round(p.cash)} standing ${Math.round(p.standing)} | ${pi ? pi.goals.map((g) => `${g.key} ${Math.round(g.frac * 100)}%`).join(', ') : 'top'} | shops ${Object.values(w.biz).filter((b) => b.protection?.collectorId === p.id).length} | done ${p.career?.done ?? 0} | crew ${Object.values(w.chars).filter((c) => c.alive && c.bossId === p.id).length}`);
   }
   if (p.rank !== 'associate' && made < 0) { made = d; log.push(`MADE on day ${d}`); }
   advance(w, day0 + DAY);
