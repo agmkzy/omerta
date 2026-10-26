@@ -269,7 +269,7 @@ export function settleOne(w: World, c: Character) {
   if (c.problem && (missedNow || skim > 0)) c.books.history[c.books.history.length - 1].why = c.problem.kind;
 
   if (missedNow) {
-    const f = addFact(w, { kind: 'shortfall', actor: c.id, victim: boss.id, amount: owed - pay, minor: b.missed < 2, text: refuse ? `${c.name} refused to pass up his share to ${boss.name}.` : stall ? `${c.name} held back what he owed ${boss.name}.` : `${c.name} came up ${money(owed - pay)} short on what he owes ${boss.name}.`, district: c.district }, { witnesses: [] });
+    const f = addFact(w, { kind: 'shortfall', actor: c.id, victim: boss.id, amount: owed - pay, minor: b.missed < 2, text: refuse ? `${c.name} refused to pass up his share to ${boss.name}.` : stall ? `${c.name} held back what he owed ${boss.name}.` : `${c.name} came up ${money(owed - pay)} short with ${boss.name}.`, district: c.district }, { witnesses: [] });
     // A boss does not punish a man whose trade has visibly collapsed, or who is laid up, the way he punishes one whose trade is fine.
     // He is also slower to lose patience with a man he trusts.
     feel(w, boss, c.id, 'trust', -((understood ? 0.005 : 0.03)));

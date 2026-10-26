@@ -94,7 +94,7 @@ function storyK(w: World, p: Character, s: Story): string {
     if (sit?.kind === 'ask') return sit.terms?.by === p.id ? 'Your move' : 'Put to you';
     return s.origin ?? 'A matter';
   }
-  return { debt: 'Money owed', threat: 'Coming after you', hunt: 'Coming after you', turf: 'Your ground', dispute: 'A quarrel', crew: 'One of your men', seat: 'Your future' }[s.kind];
+  return { debt: 'Money owed', threat: 'Coming after you', hunt: 'Coming after you', turf: 'Your ground', dispute: 'A quarrel', crew: 'One of your men', seat: 'Your future', shop: 'Your shop', envelope: 'Your envelope' }[s.kind];
 }
 
 export function needs(): Need[] {

@@ -21,11 +21,12 @@ function item(w: World, f: Fact): { head: string; body?: string } | undefined {
   const vn = v && v.rank === 'civilian' ? v.name : v ? v.name : 'A man';
   switch (f.kind) {
     case 'murder': return { head: `${vn} found dead in ${dist(f)}`, body: pick(['Police are treating the death as suspicious.', 'Neighbours report hearing nothing.', 'Detectives decline to comment on possible motives.', 'Friends say he “had no enemies”, which the police find hard to believe.'], f.id) };
-    case 'beating': return { head: `${v?.rank === 'civilian' ? vn : 'Man'} hospitalised after assault in ${dist(f)}`, body: 'Police ask anyone with information to come forward.' };
+    case 'beating': return { head: `${v?.rank === 'civilian' ? vn : 'Man'} hospitalised after assault in ${dist(f)}`, body: pick(['Police ask anyone with information to come forward.', 'Witnesses describe two men who left in a hurry.', 'Doctors say he will recover. He told police he fell.'], f.id) };
     case 'vandalism': return b ? { head: `${b.name} hit by vandals`, body: 'The owner told reporters he had “no idea” who was responsible.' } : undefined;
     case 'robbery': case 'burglary': case 'theft': return { head: `${b ? b.name : 'Shop'} robbed in ${dist(f)}`, body: 'The thieves escaped in a stolen car.' };
     case 'arrest': return { head: `${f.actor && a ? a.name : 'Man'} arrested in ${dist(f)}`, body: 'Police say further charges may follow.' };
-    case 'raid': return { head: `Police raid gambling operation in ${dist(f)}`, body: 'Several men were taken in for questioning.' };
+    // (what was raided, from the record: "the numbers bank", "the car-stealing outfit"; and whether anyone was held)
+    case 'raid': { const what = /raided the (.+?) in /.exec(f.text)?.[1]; return { head: `Police raid ${what ? ({ 'numbers bank': 'numbers bank', bookmaking: 'bookmaking parlour', 'car-stealing outfit': 'stolen-car ring', 'fencing operation': 'fencing operation' } as Record<string, string>)[what] ?? what : 'gambling operation'} in ${dist(f)}`, body: / and took /.test(f.text) ? 'One man was held. Police say others are known to them.' : pick(['Several men were taken in for questioning and released.', 'Nobody was charged. Police say the investigation continues.'], f.id) }; }
     case 'business_failed': return b ? { head: `${b.name} closes its doors`, body: 'The owner cited “a difficult year”.' } : undefined;
     case 'protection_started': return undefined;
     case 'scam': return { head: `Residents of ${dist(f)} warned of confidence trick` };
@@ -43,7 +44,12 @@ export function makePaper(w: World): Paper {
   items.sort((a, b) => rank(b.f.kind) - rank(a.f.kind) || b.f.t - a.f.t);
   const era = ERA[Math.floor(w.now / (365 * DAY)) + 1970] ?? GENERIC;
   const filler = [pick(era, 'e' + w.now), pick(GENERIC, 'g' + w.now), pick(GENERIC, 'h' + w.now + 3)].filter((x, i, a) => a.indexOf(x) === i);
-  const picks = items.slice(0, 5).map((x) => x.i);
+  // (the same story twice in a week is one story: "Two men hospitalised after assaults in Bensonhurst")
+  const byHead = new Map<string, { head: string; body?: string; n: number }>();
+  for (const x of items) { const k = x.i.head; const e = byHead.get(k); if (e) e.n++; else byHead.set(k, { ...x.i, n: 1 }); }
+  const NUM = ['', '', 'Two', 'Three', 'Four', 'Five'];
+  const merged = [...byHead.values()].map((x) => x.n < 2 ? { head: x.head, body: x.body } : { head: /^Man hospitalised after assault/.test(x.head) ? x.head.replace(/^Man hospitalised after assault/, `${NUM[Math.min(5, x.n)]} men hospitalised after assaults`) : /^Police raid /.test(x.head) ? x.head.replace(/^Police raid (.+?) in /, (_m, k: string) => `Police raid ${NUM[Math.min(5, x.n)].toLowerCase()} ${k.replace(/ring$|parlour$|operation$|bank$/, (e) => e + 's')} in `) : `${x.head}, ${NUM[Math.min(5, x.n)].toLowerCase()} times this week`, body: x.body });
+  const picks = merged.slice(0, 5);
   const lead = picks.length ? picks[0].head : pick(['Quiet week in the five boroughs', 'City goes about its business', 'Calm in the neighbourhoods, say police'], 'l' + w.now);
   const paper: Paper = { t: w.now, lead, items: picks.slice(picks.length ? 1 : 0), filler };
   void famName; void ownerBiz;

@@ -10,7 +10,8 @@ import { factText, fmtTime, money } from '../core';
 import { versionOf, youText } from '../rumour';
 import { dangerLevel, LADDER_WORDS } from '../danger';
 import { matterKind, matterOpts, matterStage, matterTitle, ORIGIN } from '../matters';
-import { PROBLEM_LABEL } from '../people';
+import { PROBLEM_LABEL, lateOf } from '../people';
+import { owedOf } from '../econ';
 import { isParty, movesFor } from '../sitmoves';
 import { isOpen, titleOf } from '../situ';
 import { DAY, Character, Enc, Fact, Id, Knowledge, Situation, World } from '../types';
@@ -26,7 +27,7 @@ export interface Entry { t: number; text: string; learned?: number; k?: Knowledg
 export interface Act { a: string; label: string; hint: string; off?: string; big?: boolean }
 export interface Story {
   key: string;
-  kind: 'dispute' | 'seat' | 'debt' | 'crew' | 'threat' | 'hunt' | 'turf' | 'matter';
+  kind: 'dispute' | 'seat' | 'debt' | 'crew' | 'threat' | 'hunt' | 'turf' | 'matter' | 'shop' | 'envelope';
   title: string;
   stage: string; // where it stands, in words
   tone: Tone;
@@ -207,6 +208,44 @@ function debtStories(w: World, p: Character): Story[] {
     });
   }
   return out;
+}
+
+// A shop that pays the player, when something has happened there or its owner is behind: the robbery, the late weeks, what was said.
+function shopStories(w: World, p: Character): Story[] {
+  const out: Story[] = [];
+  for (const b of Object.values(w.biz)) {
+    if (!b.open || b.protection?.collectorId !== p.id) continue;
+    const o = w.chars[b.ownerId];
+    // (only what has happened since it started paying him: the haggling before is another story, and over)
+    const facts = known(w, p, (f) => f.business === b.id && f.t >= (b.protection!.since ?? 0) && w.now - f.t < 45 * DAY && ['robbery', 'burglary', 'vandalism', 'theft', 'poach', 'protection_refused', 'trouble', 'shortfall'].includes(f.kind));
+    const late = lateOf(b) > 0;
+    if (!facts.length && !late) continue;
+    const tl = facts.map((f) => entry(p, f)), hit = facts.find((f) => ['robbery', 'burglary', 'vandalism', 'theft'].includes(f.kind));
+    const stage = late ? `${o ? first(o) : 'He'} is behind: ${money(owedOf(b))} owed` : hit ? `${hit.kind === 'vandalism' ? 'Smashed up' : 'Robbed'}, ${ago(w.now, hit.t)}` : 'Something going on';
+    out.push({
+      key: 'shop:' + b.id, kind: 'shop', title: b.name, origin: 'A shop that pays you', stage, tone: late || hit ? 'amber' : '', group: 'in',
+      last: tl[0]?.learned ?? w.now - DAY, lastText: tl[0]?.text ?? `${o ? o.name : 'The owner'} hasn’t paid this week.`, timeline: tl,
+      blurb: `${b.name} pays you ${money(b.protection!.fee)} a week.`,
+      people: [...(o ? [{ id: o.id, role: 'the owner' }] : []), ...(hit?.actor && p.known[hit.id]?.knowsActor && w.chars[hit.actor] ? [{ id: hit.actor, role: 'who did it' }] : [])],
+      terms: [['Pays', `${money(b.protection!.fee)} a week`] as [string, string], ...(late ? [['Owed', money(owedOf(b))] as [string, string]] : [])],
+      actions: o ? [{ a: `talk:${o.id}`, label: `See ${first(o)}`, hint: late ? 'Collect, give him time, or lean on him.' : 'Hear it from him. A man who pays you expects you to do something.' }] : [],
+    });
+  }
+  return out;
+}
+// What the player owes his captain on his envelope, when he is behind: it grows, and his captain notices.
+function envelopeStory(w: World, p: Character): Story[] {
+  const cap = p.bossId ? w.chars[p.bossId] : undefined, owed = Math.round(p.books.arrears);
+  if (!cap?.alive || owed < 20) return [];
+  const facts = known(w, p, (f) => f.kind === 'shortfall' && f.actor === p.id && w.now - f.t < 60 * DAY);
+  const tl = facts.map((f) => entry(p, f)), sent = w.jobs.some((j) => j.kind === 'summons' && j.status === 'offered' && j.giver === cap.id && j.meeting === 'accounts');
+  return [{
+    key: 'envelope:' + p.id, kind: 'envelope', title: `What you owe ${first(cap)}`, origin: 'Your envelope', stage: sent ? `${first(cap)} has sent for you about it` : `${money(owed)} behind`,
+    tone: sent ? 'red' : 'amber', group: sent ? 'now' : 'in', last: tl[0]?.learned ?? w.now - DAY, lastText: tl[0]?.text ?? `You are ${money(owed)} behind on what you pass up.`, timeline: tl,
+    blurb: `Your share goes to ${cap.name} every Sunday. You are ${money(owed)} behind.`, why: 'It’s money you owe the man you answer to.',
+    people: [{ id: cap.id, role: 'the man you answer to' }], terms: [['Behind by', money(owed)]],
+    actions: [{ a: `talk:${cap.id}`, label: `Go and see ${first(cap)}`, hint: 'Hand it over, or explain. He would rather you came before he has to send for you.' }],
+  }];
 }
 
 function crewStories(w: World, p: Character): Story[] {
@@ -457,7 +496,7 @@ function seatStory(w: World, p: Character, k: string): Story {
 export function storiesOf(w: World): Story[] {
   const p = w.chars[w.playerId!];
   const byStory = knownByStory(w, p);
-  const out: Story[] = [...huntStories(w, p), ...threatStories(w, p), ...turfStories(w, p), ...disputeStories(w, p), ...crewStories(w, p), ...debtStories(w, p), ...matterStories(w, p, byStory)];
+  const out: Story[] = [...huntStories(w, p), ...threatStories(w, p), ...turfStories(w, p), ...disputeStories(w, p), ...crewStories(w, p), ...shopStories(w, p), ...envelopeStory(w, p), ...debtStories(w, p), ...matterStories(w, p, byStory)];
   for (const k of seatStoryKeys(w, p)) out.push(seatStory(w, p, k));
   // what you did about each one goes on its record, and until the other side answers the story says it is waiting
   for (const s of out) {
@@ -472,7 +511,7 @@ export function storiesOf(w: World): Story[] {
     const theirs = s.timeline.some((x) => x.t > mine.t && !x.mine);
     if (!theirs && w.now - mine.t < 21 * DAY && s.kind !== 'seat' && s.group !== 'now') { s.stage = `You acted ${ago(w.now, mine.t)}. Waiting on the other side`; if (s.tone === 'amber') s.tone = 'blue'; }
   }
-  const WHY: Record<Story['kind'], string> = { dispute: 'It’s a quarrel you or your men are in.', seat: 'You asked for it, and it decides your future.', debt: 'Money is owed between you and him.', crew: 'He’s one of your men.', threat: 'He wants you gone.', hunt: 'They’re looking for you.', turf: 'A shop that pays you is being taken.', matter: 'You’ve heard about it.' };
+  const WHY: Record<Story['kind'], string> = { dispute: 'It’s a quarrel you or your men are in.', seat: 'You asked for it, and it decides your future.', debt: 'Money is owed between you and him.', crew: 'He’s one of your men.', threat: 'He wants you gone.', hunt: 'They’re looking for you.', turf: 'A shop that pays you is being taken.', matter: 'You’ve heard about it.', shop: 'It’s a shop that pays you.', envelope: 'It’s what you owe the man you answer to.' };
   for (const s of out) { s.last = Math.min(s.last, w.now); s.why ??= WHY[s.kind]; s.group ??= s.tone === 'red' ? 'now' : 'in'; if (s.pending) s.group = 'now'; }
   const rank = (s: Story) => (s.closed ? 3 : s.group === 'now' ? 0 : s.group === 'in' ? 1 : 2);
   return out.sort((a, b) => rank(a) - rank(b) || b.last - a.last);

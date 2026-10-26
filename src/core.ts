@@ -280,7 +280,7 @@ const TELL: [RegExp, string[]][] = [
   [/^([^:;.]+) is late with the (\$[\d,]+) he owes ([^:;.]+) for ([^:;.]+)\.$/, ['$1 is late with $2 to $3 for $4. The envelope isn’t going to fill itself.', '$4’s envelope is light. $1 owes $3 $2 and hasn’t come up with it.']],
   [/^([^:;.]+) cleared his debt to ([^:;.]+)\.$/, ['$1 squared up with $2. Not many do it voluntarily.', '$2 got paid in full by $1. A rarity.']],
   [/^([^:;.]+) was arrested\.$/, ['The law picked up $1. Everyone who knows $1 is wondering what gets said in that room.', '$1 spent tonight in a cell, and some people are thinking hard about what $1 knows.']],
-  [/^([^:;.]+) came up (\$[\d,]+) short on what he owes ([^:;.]+)\.$/, ['$1 came up $2 short with $3. The kind of mistake that’s remembered.', '$3 counted it twice. $1 was $2 light.']],
+  [/^([^:;.]+) came up (\$[\d,]+) short (?:on what he owes|with) ([^:;.]+)\.$/, ['$1 came up $2 short with $3. The kind of mistake that’s remembered.', '$3 counted it twice. $1 was $2 light.']],
 ];
 export function flavour(f: Fact, text: string): string {
   if (text !== f.text) return text;

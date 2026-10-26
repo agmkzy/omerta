@@ -265,3 +265,19 @@ family), the negotiation with its owner, a rival family's job, the club on Sunda
     row);
   - a man asking the player to help get somebody out of jail asks about one of his own (his man, a friend, his blood), not
     whichever man in the city happened to be inside (it had come weekly, about strangers).
+
+## Phase 2 begins: the stories visible
+Looked at the Herald and the Stories page as a player in the playthrough save:
+- **The Herald** repeated itself: a lead headline that was also the first story, two identical "Man hospitalised after assault in
+  Bensonhurst", every raid "a gambling operation", every body the same sentence. Now:
+  - a week's identical stories are one story ("Two men hospitalised after assaults in Bensonhurst", "Police raid two
+    stolen-car rings in The Bronx");
+  - raids say what was raided, from the record (numbers bank, bookmaking parlour, stolen-car ring, fencing operation), and whether
+    a man was held;
+  - bodies vary.
+- **The shortfall record** read "You came up $32 short on what he owes Nicky Sorrento" when told to the player. It is now "came up
+  $32 short with", which reads right either way (old saves' wording still displays).
+- **Stories** said "Nothing is unfolding" while the player's tavern had been robbed, its owner was behind, and his captain had sent
+  for him about money. Two kinds of story are new:
+  - **a shop that pays you**, when something has happened there since it started paying, or its owner is behind;
+  - **what you owe your captain**, when the envelope is in arrears, needing the player once the captain has sent for him.
