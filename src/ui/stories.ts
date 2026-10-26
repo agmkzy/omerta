@@ -589,7 +589,15 @@ export function storiesTab(): string {
 
 // ------------------------------------------------------------------ one story
 function timeline(w: World, s: Story): string {
-  const tl = s.timeline.slice().reverse(); // in order, as it happened
+  // in order, as it happened; a thing said twice is said once ("word is that…" heard again, or "answered" the same day as what he did)
+  const tl0 = s.timeline.slice().reverse(), tl: Entry[] = [];
+  for (const e of tl0) {
+    const plain = e.text.replace(/<[^>]+>/g, '');
+    if (tl.some((x) => x.text.replace(/<[^>]+>/g, '') === plain)) continue;
+    const ans = /^(.+?) answered (.+?)\.?$/.exec(plain);
+    if (ans && tl.some((x) => Math.floor(x.t / 1440) === Math.floor(e.t / 1440) && x.text.includes(ans[1]) && x.text.includes(ans[2]))) continue;
+    tl.push(e);
+  }
   if (!tl.length) return `<p class="st-quiet">Nothing has reached you yet beyond what is above.</p>`;
   const seen = before[s.key] ?? 0;
   const one = (e: Entry) => `<li class="st-k${e.learned && e.learned > seen && seen ? ' st-k--new' : ''}"><span class="st-k__when">${esc(fmtDay(e.t))}</span><p class="st-k__text">${lk(e.text)}</p>${e.k ? `<span class="st-k__src">${sourceOf(w, e)}</span>` : ''}</li>`;

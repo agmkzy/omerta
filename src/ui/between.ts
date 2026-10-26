@@ -11,7 +11,7 @@ import { DAY } from '../types';
 import { esc } from './links';
 import { byWhenWord } from './when';
 
-export interface Tie { text: string; tone: '' | 'good' | 'warn' | 'bad'; kind: 'money' | 'favour' | 'place' | 'rank' | 'waiting' | 'word' }
+export interface Tie { text: string; tone: '' | 'good' | 'warn' | 'bad'; kind: 'money' | 'favour' | 'place' | 'rank' | 'waiting' | 'word' | 'blood' }
 
 const fig = (n: number) => `<b class="fig">${esc(money(n))}</b>`;
 const NUM = ['no', 'one', 'two', 'three', 'four', 'five', 'six'];
@@ -29,6 +29,9 @@ export function between(w: World, p: Character, c: Character): Tie[] {
   // who answers to whom, when it is the two of you
   if (c.bossId === p.id) out.push({ kind: 'rank', tone: '', text: `${He} is one of your men.` });
   else if (p.bossId === c.id) out.push({ kind: 'rank', tone: '', text: `You answer to ${him}.` });
+  // bad blood, either way (as the People list says it)
+  if ((p.rels[c.id]?.grudge ?? 0) >= 0.3) out.push({ kind: 'blood', tone: 'bad', text: `You haven’t forgiven ${him}.` });
+  if ((c.rels[p.id]?.grudge ?? 0) >= 0.3) out.push({ kind: 'blood', tone: 'bad', text: `${He} holds something against you.` });
   // money, either way
   for (const d of w.debts.filter((x) => x.status === 'active' && ((x.creditor === p.id && x.debtor === c.id) || (x.debtor === p.id && x.creditor === c.id)))) {
     const mine = d.creditor === p.id;

@@ -135,7 +135,7 @@ export function talk2View(v: Visit): string {
   const chip = `<span class="ui-chip ${t.rank === 'civilian' ? '' : famClass(t.familyId)}">${esc(RANK(t.rank))}</span>`;
   // what stands between you: information, not speech (ui/between.ts), most pressing first
   const ties = between(w, p, t);
-  const order = { waiting: 0, money: 1, place: 2, favour: 3, rank: 4, word: 5 } as const;
+  const order = { waiting: 0, blood: 1, money: 2, place: 3, favour: 4, rank: 5, word: 6 } as const;
   const shown = ties.sort((a, c) => order[a.kind] - order[c.kind]).slice(0, 3).map((x) => x.text);
   if (v.approach && !ties.some((x) => x.kind === 'waiting') && approaches(w).some((a) => a.id === v.approach)) shown.unshift(`${esc(t.name.split(' ')[0])} came to you about this.`);
   // (on a short phone screen the context box moves in here, behind the ☰, so the choices keep their room)
