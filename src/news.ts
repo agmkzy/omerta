@@ -110,7 +110,20 @@ export function makePaper(w: World): Paper {
     if (i) raw.push({ ...i, key: f.id, weight: (SEVERITY[f.kind] ?? 1) + near(f) });
   }
   // (a war the city can see: two families whose men keep turning up hurt, as the paper would put it)
-  for (const fa of Object.values(w.fam)) for (const [fb, t] of Object.entries(fa.tension)) if (fa.id < fb && t >= 6 && w.fam[fb]) raw.push({ head: `Police fear open war between the ${fa.name} and ${w.fam[fb].name} crime families`, body: 'Detectives link a string of beatings and smashed storefronts to the feud.', section: 'city', weight: 8, key: 'war:' + fa.id + fb });
+  // (a family feuding with several at once is one story, not one a pair)
+  const wars: [string, string][] = [];
+  for (const fa of Object.values(w.fam)) for (const [fb, t] of Object.entries(fa.tension)) if (fa.id < fb && t >= 6 && w.fam[fb]) wars.push([fa.id, fb]);
+  const fronts = new Map<string, string[]>();
+  for (const [a, b] of wars) { fronts.set(a, [...(fronts.get(a) ?? []), b]); fronts.set(b, [...(fronts.get(b) ?? []), a]); }
+  const told = new Set<string>();
+  for (const [f, xs] of [...fronts].filter(([, xs]) => xs.length >= 2).sort((a, b) => b[1].length - a[1].length)) {
+    const left = xs.filter((x) => !told.has([f, x].sort().join()));
+    if (left.length < 2) continue;
+    for (const x of left) told.add([f, x].sort().join());
+    const names = left.map((x) => w.fam[x].name), list = names.length === 2 ? names.join(' and ') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+    raw.push({ head: `Police fear the ${w.fam[f].name} crime family is at war on ${['', '', 'two', 'three', 'four'][Math.min(4, left.length)]} fronts`, body: `Detectives link beatings and smashed storefronts to feuds with the ${list} families.`, section: 'city', weight: 9, key: 'wars:' + f });
+  }
+  for (const [a, b] of wars) if (!told.has([a, b].sort().join())) raw.push({ head: `Police fear open war between the ${w.fam[a].name} and ${w.fam[b].name} crime families`, body: 'Detectives link a string of beatings and smashed storefronts to the feud.', section: 'city', weight: 8, key: 'war:' + a + b });
   // (the same story twice in a week is one story: "Two men hospitalised after assaults in Bensonhurst")
   const byHead = new Map<string, Item & { n: number }>();
   for (const x of raw) { const e = byHead.get(x.head); if (e) { e.n++; e.weight = Math.max(e.weight, x.weight) + 1.5; } else byHead.set(x.head, { ...x, n: 1 }); }
@@ -118,6 +131,17 @@ export function makePaper(w: World): Paper {
   const merged = [...byHead.values()].map((x) => x.n < 2 ? x : /^Man hospitalised after assault/.test(x.head) ? { ...x, head: x.head.replace(/^Man hospitalised after assault/, `${NUM[Math.min(6, x.n)]} men hospitalised after assaults`), body: 'None of them will say who did it. Police say they know the pattern.' }
     : /^Police raid /.test(x.head) ? { ...x, head: x.head.replace(/^Police raid (.+?) in /, (_m, k: string) => `Police raid ${NUM[Math.min(6, x.n)].toLowerCase()} ${plural(k)} in `), body: 'Several men were taken in; most were out by morning.' }
     : /^Hard times at /.test(x.head) ? x : { ...x, head: `${x.head}, ${NUM[Math.min(6, x.n)].toLowerCase()} times this week` });
+  // (the same kind of raid in several neighbourhoods is one story: "Police raid stolen-car rings in Little Italy and Red Hook")
+  for (let i = 0; i < merged.length; i++) {
+    const m = /^Police raid (?:(?:two|three|four|five|six) )?(.+?) in (.+)$/.exec(merged[i].head);
+    if (!m) continue;
+    const kindOf = (h: string) => /^Police raid (?:(?:two|three|four|five|six) )?(.+?) in (.+)$/.exec(h);
+    const same = merged.map((x, k) => ({ x, k, m: kindOf(x.head) })).filter((y) => y.k !== i && y.m && plural(y.m[1].replace(/s$/, '')) === plural(m[1].replace(/s$/, '')));
+    if (!same.length) continue;
+    const places = [m[2], ...same.map((y) => y.m![2])];
+    merged[i] = { ...merged[i], head: `Police raid ${plural(m[1].replace(/s$/, ''))} in ${places.slice(0, -1).join(', ')} and ${places.at(-1)}`, body: 'Several men were taken in; most were out by morning.', weight: Math.max(merged[i].weight, ...same.map((y) => y.x.weight)) + 1 };
+    for (const y of same.sort((a, b) => b.k - a.k)) merged.splice(y.k, 1);
+  }
   // (a paper doesn't run the same business story week after week: what it ran in the last three issues is old news)
   const ran = new Set((w.papers ?? []).slice(-3).flatMap((q) => [q.lead, ...q.items.map((i) => i.head)]));
   const fresh = merged.filter((x) => !(x.section !== 'city' && ran.has(x.head)));

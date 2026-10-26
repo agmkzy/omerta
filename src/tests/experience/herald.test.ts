@@ -27,4 +27,13 @@ describe('the Herald', { tags: ['scenario'] }, () => {
     assert.ok(facts.some((f) => f.actor !== p.id && f.victim !== p.id), 'the week had other men’s news');
     assert.ok(paper.filler.length >= 1);
   });
+  ok('a family feuding with three others is one story, not three', () => {
+    const w = worldFor(3);
+    const [a, ...rest] = Object.values(w.fam);
+    for (const f of Object.values(w.fam)) f.tension = {};
+    for (const b of rest.slice(0, 3)) { a.tension[b.id] = 7; b.tension[a.id] = 7; }
+    const paper = makePaper(w), heads = [paper.lead, ...paper.items.map((i) => i.head)];
+    assert.equal(heads.filter((h) => /open war between/.test(h)).length, 0, heads.join(' | '));
+    assert.equal(heads.filter((h) => new RegExp(`${a.name} crime family is at war on three fronts`).test(h)).length, 1, heads.join(' | '));
+  });
 });
