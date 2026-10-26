@@ -5,6 +5,8 @@ import { describe, test as ok } from 'vitest';
 import { advance } from '../../engine';
 import { rel } from '../../core';
 import { answerCourting, courter, makeCourting } from '../../loyalty';
+import { answerDeal, dealer, makeDeal } from '../../crossdeal';
+import { resolve } from '../../jobs';
 import { DAY } from '../../types';
 import { P } from '../helpers';
 import { captain, familyMen, worldFor } from './play';
@@ -43,5 +45,44 @@ describe('a rival captain courts the player', { tags: ['scenario'] }, () => {
       if (w.enc.some((e) => e.kind === 'imposed' && e.from === cap.id && /knows/.test(e.title))) { caught = true; assert.ok(rel(cap, p.id).trust < 0.2); break; }
     }
     assert.ok(caught, 'it never came out in four worlds');
+  });
+});
+
+describe('a man of another family puts a job to the player', { tags: ['scenario'] }, () => {
+  const deal = (seed: number) => {
+    const w = worldFor(seed), p = P(w); p.standing = 40;
+    const d = dealer(w, p);
+    if (!d) return undefined;
+    makeDeal(w, p, d.x, d.cap, d.b);
+    return { w, p, ...d, e: w.enc.find((q) => q.kind === 'crossdeal')! };
+  };
+  ok('he comes from another family, with a place neither family looks after', () => {
+    const got = [3, 7, 11, 13].map(deal).filter(Boolean);
+    assert.ok(got.length, 'nobody in four worlds');
+    for (const g of got) {
+      assert.notEqual(g!.x.familyId, g!.p.familyId);
+      assert.ok(![g!.p.familyId, g!.x.familyId].includes(g!.b.protection?.familyId ?? null));
+    }
+  });
+  ok('taking it to his captain is remembered by his captain either way', () => {
+    const g = [3, 7, 11, 13].map(deal).find(Boolean)!;
+    const t0 = rel(g.cap, g.p.id).trust;
+    answerDeal(g.w, g.p, g.e, 'cap');
+    assert.ok(rel(g.cap, g.p.id).trust > t0);
+  });
+  ok('done quietly, it is the world’s own burglary, and it can come out weeks later, told by his captain himself', () => {
+    let caught = false;
+    for (const seed of [3, 7, 11, 13, 17, 19, 23]) {
+      const g = deal(seed);
+      if (!g) continue;
+      answerDeal(g.w, g.p, g.e, 'quiet');
+      const j = g.w.jobs.find((q) => q.kind === 'burgle' && q.assignee === g.p.id && q.giver === g.x.id && q.status === 'active');
+      assert.ok(j, 'the job is in his work');
+      resolve(g.w, j!, 'quiet');
+      if (j!.status !== 'done') continue;
+      advance(g.w, g.w.now + 36 * DAY);
+      if (g.w.enc.some((e) => e.kind === 'imposed' && e.from === g.cap.id && /heard about/.test(e.title))) { caught = true; break; }
+    }
+    assert.ok(caught, 'it never came out');
   });
 });

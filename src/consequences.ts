@@ -1,5 +1,6 @@
 import { imposed } from './imposed';
 import { loyaltyDue } from './loyalty';
+import { dealDue } from './crossdeal';
 import { huntDue } from './violence';
 // Delayed consequences. Violence and secrets do not resolve when they happen: witnesses come forward,
 // the police take an interest, a client calls in a favour, a false accusation comes apart.
@@ -60,6 +61,10 @@ export function pendingTick(w: World) {
       }
       case 'loyalty': {
         loyaltyDue(w, q); // (the player sold his captain's business: whether it comes out now)
+        break;
+      }
+      case 'crossdeal': {
+        dealDue(w, q); // (a job done with another family behind his captain's back: whether it comes out now)
         break;
       }
       case 'reveal': {

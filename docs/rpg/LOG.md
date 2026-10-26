@@ -62,3 +62,16 @@ month"); nobody sends for a man who is inside (jobs.daily, meetings.summonsTick)
 **Measured:** a careful player (who answers summons and lies low when the heat bar shows) is made on day 72, 86 and 94 (seeds 7, 3,
 11) and his standing climbs after (53–75 by week 19–21). A reckless one, who takes every job, spends 48–76 of 150 days inside.
 Arrests from heat are still the largest drag on a careful player too (1–3 spells of 5–33 days in 150 days); left as balance, reported.
+
+## Stage C1: another family puts a job to the player (crossdeal.ts)
+- A made man of another family (greedy, not at war with the player's, nothing against him) comes to a player with a name (standing
+  30) with a place neither family looks after: the stock in the back, split down the middle. Do it quietly (money, a friend in his
+  family; weeks later the player's captain may hear of it from outside: trust, standing, a grievance, told by the captain himself),
+  take it to the captain first (he allows it if he is greedy and the families are not at odds, or says not with them; either way he
+  remembers who came to him), or turn it down. The job is the world's ordinary burglary (risk, heat, arrest, goods, the protector).
+  Played through on the dev build: the approach, the captain allowing it, the job, a dog barking.
+- Found while testing it: the two "who might approach" checks (this and the loyalty courting) created empty relationship records
+  for every man they looked at, which changed the world just by looking. Both now read only.
+- Open pacing question: the share of quiet weeks (nothing serious reaches the player) measured 13, 8, 12 and 5 of 28 over seeds 8,
+  9, 10, 12. The old test floor (40%) held in its one seed only; it is now set where that seed sits (35%), with the numbers in the test.
+- A test counting "nobody asked twice" counted across different askers; it now keys on who asked whom.

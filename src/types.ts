@@ -460,7 +460,7 @@ export interface Memo {
 export interface Pending {
   id: Id;
   due: number;
-  kind: 'reveal' | 'heat' | 'blackmail' | 'truth' | 'dispute' | 'seat' | 'intent' | 'plan' | 'hunt' | 'loyalty';
+  kind: 'reveal' | 'heat' | 'blackmail' | 'truth' | 'dispute' | 'seat' | 'intent' | 'plan' | 'hunt' | 'loyalty' | 'crossdeal';
   fact?: Id;
   a?: Id;
   b?: Id;

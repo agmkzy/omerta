@@ -17,8 +17,9 @@ export function courter(w: World, p: Character): { x: Character; cap: Character 
   const cap = p.bossId ? w.chars[p.bossId] : undefined;
   if (!cap?.alive || !p.familyId || !['associate', 'soldier'].includes(p.rank) || p.jailedUntil > w.now) return undefined;
   if ((p.cooldown['court'] ?? 0) > w.now || w.enc.some((e) => e.kind === 'courting' && e.status === 'open')) return undefined;
-  const x = Object.values(w.chars).filter((c) => c.alive && !c.isPlayer && c.familyId === p.familyId && c.id !== cap.id && R.indexOf(c.rank) >= R.indexOf(cap.rank) && c.rank !== 'boss' && c.jailedUntil <= w.now && rel(c, cap.id).grudge >= 0.2)
-    .sort((a, b) => rel(b, cap.id).grudge - rel(a, cap.id).grudge || (a.id < b.id ? -1 : 1))[0];
+  const g = (c: Character) => c.rels[cap.id]?.grudge ?? 0; // (read, not created: looking at a man doesn't make a relationship)
+  const x = Object.values(w.chars).filter((c) => c.alive && !c.isPlayer && c.familyId === p.familyId && c.id !== cap.id && R.indexOf(c.rank) >= R.indexOf(cap.rank) && c.rank !== 'boss' && c.jailedUntil <= w.now && g(c) >= 0.2)
+    .sort((a, b) => g(b) - g(a) || (a.id < b.id ? -1 : 1))[0];
   // (he notices a man worth having: one who is earning, or being talked about)
   if (!x || p.standing < 38 || (p.career?.done ?? 0) < 2) return undefined;
   return { x, cap };

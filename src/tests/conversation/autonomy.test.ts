@@ -69,7 +69,9 @@ describe('pursuits, not automatic fulfilment (priority 2)', () => {
     const t = G.stranger.o.text();
     assert.match(t, /starts a pursuit: make .* leave him alone/);
     assert.match(t, /changes his plan: .* because he now believes .* answers to/);
-    const asks = [...t.matchAll(/asks (\w+ \w+) to take up his trouble/g)].map((m) => m[1]);
+    // (by who asked whom: two shopkeepers may each go to the same man once)
+    const asks = [...t.matchAll(/: (\w+ \w+) asks (\w+ \w+) to take up his trouble/g)].map((m) => `${m[1]} → ${m[2]}`);
+    assert.ok(asks.length, 'somebody was asked');
     assert.equal(new Set(asks).size, asks.length, `nobody asked twice: ${asks.join(', ')}`);
   });
   ok('relationships change what people initiate: the shopkeeper comes to Henry only if he knows him', { tags: ['scenario'] }, () => {

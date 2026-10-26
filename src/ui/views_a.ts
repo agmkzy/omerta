@@ -70,7 +70,7 @@ const firstName = (c: Character) => c.name.split(' ')[0];
 // What kind of approach it is, in a word or two (never the record's own label).
 const ENC_K: Record<string, string> = {
   threat: 'A threat', ask: 'Wants something', word: 'Wants a word', matter: 'Wants your answer', callin: 'Calling in a favour',
-  squeeze: 'Another family', invite: 'An invitation', kin: 'Family', imposed: 'Decided over your head', courting: 'A quiet word',
+  squeeze: 'Another family', invite: 'An invitation', kin: 'Family', imposed: 'Decided over your head', courting: 'A quiet word', crossdeal: 'Another family',
 };
 function approach(w: World, e: Enc, story?: Story): Need {
   const c = e.from ? w.chars[e.from] : undefined;
@@ -78,7 +78,7 @@ function approach(w: World, e: Enc, story?: Story): Need {
   const he = !c ? 'They' : isFemale(c) ? 'She' : 'He';
   const wait = e.kind === 'kin' ? '' : `${he}’ll want an answer ${by}.`;
   const dot = e.kind === 'threat' ? 'red' : story ? (story.tone === 'red' ? 'red' : 'amber')
-    : e.kind === 'callin' || e.data?.what === 'sit_turf' || e.kind === 'ask' || e.kind === 'word' || e.kind === 'matter' || e.kind === 'imposed' || e.kind === 'courting' ? 'amber' : e.kind === 'invite' ? 'blue' : 'green';
+    : e.kind === 'callin' || e.data?.what === 'sit_turf' || e.kind === 'ask' || e.kind === 'word' || e.kind === 'matter' || e.kind === 'imposed' || e.kind === 'courting' || e.kind === 'crossdeal' ? 'amber' : e.kind === 'invite' ? 'blue' : 'green';
   return {
     dot, title: e.title, k: e.kind === 'crew' && c?.bossId === w.playerId ? 'One of your men' : ENC_K[e.kind] ?? (c ? 'Wants a word' : 'Word comes'), who: c?.id, when: by.replace(/^by /, ''),
     sub: e.kind === 'threat' ? `This is serious. ${wait}`.trim() : wait || 'It won’t keep for ever.',
