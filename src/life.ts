@@ -58,14 +58,17 @@ export function lifeDaily(w: World) {
   const pr = L.partner;
   if (pr && pr.stage !== 'split') {
     if (w.now - pr.lastSeen > 6 * DAY) pr.warmth = clamp(pr.warmth - 0.012);
-    if (pr.warmth < 0.3 && !w.enc.some((e) => e.status === 'open' && e.kind === 'partner') && w.rng.chance(0.2)) partnerTrouble(w, p, pr);
+    // (she says it once in a while, not every week it stays cold: three weeks between)
+    if (pr.warmth < 0.3 && (p.cooldown['partnerTrouble'] ?? 0) <= w.now && !w.enc.some((e) => e.status === 'open' && e.kind === 'partner') && w.rng.chance(0.2)) { p.cooldown['partnerTrouble'] = w.now + 21 * DAY; partnerTrouble(w, p, pr); }
     if (pr.due && w.now >= pr.due) birth(w, p, pr);
     if (pr.stage === 'steady' && pr.dates >= 14 && pr.warmth > 0.75 && !w.enc.some((e) => e.status === 'open' && e.kind === 'partner') && w.rng.chance(0.3)) proposal(w, p, pr);
   } else if (!pr || pr.stage === 'split') {
     if (w.now > 25 * DAY && w.now - (L.ex ? w.chars[L.ex]?.diedAt ?? 0 : 0) > 0 && w.rng.chance(0.025) && !w.enc.some((e) => e.status === 'open' && e.kind === 'meet')) introduce(w, p);
   }
   // Sunday
-  if (w.now - L.lastSunday >= 14 * DAY && !w.enc.some((e) => e.status === 'open' && e.kind === 'kin')) {
+  // (every three weeks or so, and she leaves it longer when he didn't come last time)
+  const skipped = w.enc.some((e) => e.kind === 'kin' && e.title === 'Sunday dinner' && e.status === 'lapsed' && e.t === L.lastSunday);
+  if (w.now - L.lastSunday >= (skipped ? 28 : 21) * DAY && !w.enc.some((e) => e.status === 'open' && e.kind === 'kin')) {
     L.lastSunday = w.now;
     const k = L.kin[0];
     if (k && w.chars[k.id]?.alive) sunday(w, p, k);
@@ -111,7 +114,7 @@ function partnerTrouble(w: World, p: Character, pr: Partner) {
   const g = w.chars[pr.id];
   const lead = pick([
     `"I’m not asking you to give up whatever it’s you do. I’m asking you to turn up. Is that so much?"`,
-    `"You called to say you were coming and then you didn’t come. Again. I made dinner, Tony. I always make dinner."`,
+    `"You called to say you were coming and then you didn’t come. Again. I made dinner, ${p.name.split(' ')[0]}. I always make dinner."`,
     `"My mother asks me what you do. I say I don’t know. She says that’s the problem."`,
     `"I don’t know who you’re on the nights you’re not with me, and I’m starting to think I should be afraid of the answer."`,
   ], g.id + w.now);

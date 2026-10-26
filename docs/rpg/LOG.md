@@ -306,3 +306,16 @@ Looked at the Herald and the Stories page as a player in the playthrough save:
   paying a quarrel off is a deal, and generosity; making two men shake hands is a deal; selling out his captain or doing another
   family's job behind his back is a lie; a book that stalls a winner breaks his word. How other men see him already comes from what
   they have seen and heard him do (viewOf: violence they know of makes him dangerous; a broken word lowers trust).
+
+## The UI audit, wireframes, and repetition in the long run
+- **UI audit** (docs/rpg/UI_AUDIT.md, .docx) and **wireframes** of the proposed six sections (Today, the Street, Your crew, Money,
+  People, the Record; an artifact) for the owner's review before visual work.
+- **Today: one card per matter.** When the captain has sent for the player about the money, the summons is the card and says what
+  is owed; the envelope row and the envelope story step aside (they had been three rows for one matter).
+- **Repetition over 240 days** (climber, two worlds), counting what reached the player:
+  - "X wants a word put in" came 20–23 times, roughly every 11 days. Now each man asks at most every two months, and the player is
+    asked about anything of the kind at most every ten days.
+  - "Sunday dinner" came 17 times (every fortnight, fixed). Now every three weeks, four if he didn't come last time.
+  - "X has had enough" (the player's girl) could come again within days while things stayed cold. Now three weeks between.
+- **A hardcoded name:** "I made dinner, Tony" and "Tony, my friend" used that name whatever the player was called. Now his own
+  first name.

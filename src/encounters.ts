@@ -91,7 +91,7 @@ export function makeLoan(w: World, p: Character, c: Character, need?: number) {
     earnest: [`I hate asking. I really do.`, `I’m sorry to bother you with this.`],
     hothead: [`Look, I’m short and I’m not going to dress it up.`, `I need money. There. I said it.`],
     cold: [`I need ${money(amt)}. I’ll pay it back.`, `I’m asking once.`],
-    jovial: [`Tony, my friend, you’re going to laugh at me, but I need a favour.`, `I wouldn’t trouble a man like you, but you have a good heart.`],
+    jovial: [`${p.name.split(' ')[0]}, my friend, you’re going to laugh at me, but I need a favour.`, `I wouldn’t trouble a man like you, but you have a good heart.`],
     frightened: [`I don’t know who else to ask. Please don’t say anything to anyone.`, `I’m in trouble. A little trouble. Not the bad kind. Yet.`],
   });
   addEnc(w, {
@@ -117,7 +117,8 @@ function favourAsk(w: World, p: Character): Cand[] {
   const jailed = Object.values(w.chars).filter((x) => x.alive && x.jailedUntil > w.now && !x.isPlayer);
   for (const c of pool.slice(0, 3)) {
     const boss = c.bossId ? w.chars[c.bossId] : undefined;
-    if (boss && boss.id !== p.id && p.rank !== 'associate') out.push({ weight: 1, key: 'word', make: () => makeWord(w, p, c, boss) });
+    // (a man asks for a word put in once in a while, not every time he sees the player: two months between)
+    if (boss && boss.id !== p.id && p.rank !== 'associate' && (c.cooldown['askword'] ?? 0) <= w.now) out.push({ weight: 1, key: 'word', make: () => { c.cooldown['askword'] = w.now + 60 * DAY; makeWord(w, p, c, boss); } });
     const deed = Object.values(w.facts).filter((f) => f.actor === c.id && !f.minor && ['beating', 'robbery', 'theft', 'burglary', 'vandalism', 'scam', 'poach'].includes(f.kind) && w.now - f.t < 12 * DAY && !f.victim?.startsWith?.('zz')).sort((a, b) => b.t - a.t)[0];
     if (deed) out.push({ weight: 0.7, key: 'alibi', make: () => makeCover(w, p, c, deed) });
     // (the man inside is one of his: his own man, a friend, or his blood; nobody asks about a stranger)
@@ -462,7 +463,7 @@ export function encounterTick(w: World) {
   let x = w.rng.next() * total;
   for (const c of cands) {
     x -= c.weight;
-    if (x <= 0) { const before = w.enc.length; c.make(); if (w.enc.slice(before).some((n) => n.kind === 'favour_ask')) p.cooldown.favask = w.now + 6 * DAY; return; }
+    if (x <= 0) { const before = w.enc.length; c.make(); if (w.enc.slice(before).some((n) => n.kind === 'favour_ask')) p.cooldown.favask = w.now + 10 * DAY; return; }
   }
 }
 
