@@ -9,7 +9,7 @@ import { crewOf } from './crewlife';
 import { clubOf } from './clubdata';
 import { addFact, bearOn, clamp, factText, famName, feelOn, fmtTime, money, rel } from './core';
 import { advance, deserialize, serialize } from './engine';
-import { pruneJobs, approaches, assign, declineJob, dropJob, performMove, resolve, startScheme, takeJob, askAroundJob, haggleJob, investigateJob, pressJob, questionJob } from './jobs';
+import { pruneJobs, approaches, assign, summonsAt, declineJob, dropJob, performMove, resolve, startScheme, takeJob, askAroundJob, haggleJob, investigateJob, pressJob, questionJob } from './jobs';
 import { recommend, recruit, reward } from './career';
 import { chairAct, raise, setRank, usePower } from './path';
 import { manageView, commView } from './ui/pathview';
@@ -445,20 +445,23 @@ function handle(a: string, v: string) {
     case 'guideoff': if (w.goals) w.goals.done['g:off'] = w.now; save(); return;
     case 'insideok': { const pp = P(); if (pp.inside) pp.inside.seen = true; save(); return; }
     case 'waitgo': {
+      // (how long the clock ran before it stopped, as a man would say it)
+      const agoSpan = (m: number) => (m < 120 ? 'An hour or so' : m < DAY ? 'A few hours' : m < 2 * DAY ? 'A day' : `${['', '', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven'][Math.floor(m / DAY)]} days`);
       const o = waitChoices(true)[Number(v)];
       if (!o) return;
       if (!o.event) return doAction({ kind: 'wait', actor: w.playerId!, hours: o.mins / 60, label: 'wait', score: 0 });
       const t0 = w.now;
       const before = attentionCount(), offers0 = needs().length - before;
       let stopped = false;
-      for (let i = 0; i < 48; i++) {
+      // (up to a week, half an hour at a time, stopping the moment anything comes for him)
+      for (let i = 0; i < o.mins / 30; i++) {
         advance(w, w.now + 30);
         pruneJobs(w);
         if (!P().alive || P().jailedUntil > w.now || attentionCount() > before) { stopped = true; break; }
       }
       // (what stopped the clock, said as what it was: picked up, something wanting him, or new work on offer; "nothing stirs" only if so)
       const jailed = P().alive && P().jailedUntil > w.now, more = needs().length - attentionCount() - offers0;
-      return pass(0, [jailed ? '' : stopped ? 'Something wants you. It’s at the top of the list.' : more > 0 ? `A day goes by. ${more === 1 ? 'Something new is on offer' : `${more} new things are on offer`}, under Opportunities.` : 'A long day. Nothing stirs.'].filter(Boolean), undefined, t0);
+      return pass(0, [jailed ? '' : stopped ? `${agoSpan(w.now - t0)}, and then something wants you. It’s at the top of the list.` : more > 0 ? `A week goes by. ${more === 1 ? 'Something new is on offer' : `${more} new things are on offer`}, under Opportunities.` : 'A long week. Nothing stirs.'].filter(Boolean), undefined, t0);
     }
     case 'cat': {
       const kind = v as Kind;
@@ -742,7 +745,7 @@ function handle(a: string, v: string) {
       const j = job(v)!;
       const p = P();
       // (a summons set for an hour is attended at that hour: the time until then passes first)
-      { const at = Number(j.extra?.at ?? 0); if (at > w.now) advance(w, at); }
+      { const at = summonsAt(w, j); if (at > w.now) advance(w, at); }
       // (coffee with the man who sent for you is a word with him, at the club: the conversation, with whatever he has on his mind)
       if (j.meeting === 'social') {
         const g = j.giver ? w.chars[j.giver] : undefined;

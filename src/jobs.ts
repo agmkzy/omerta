@@ -9,7 +9,7 @@ import { aptitude, grow, lateOf } from './people';
 import { arch, bossWhy, dodge, injury, pitch, whyOf } from './voice';
 import { confide, perform, share, tension } from './actions';
 import { afterClient, afterKilling } from './consequences';
-import { addFact, bear, clamp, concealedGap, earn, factText, feel, feelOn, handleDeath, money, newId, notifyProtector, ownerBiz, recordCareer, regard, rel, repute, shortTime, travelTime, witnessesAt } from './core';
+import { addFact, bear, clamp, concealedGap, earn, factText, feel, feelOn, handleDeath, money, newId, nextAwake, notifyProtector, ownerBiz, recordCareer, regard, rel, repute, shortTime, travelTime, witnessesAt } from './core';
 import { askBetween, move as askMove, openAsk } from './asks';
 import { isOpen } from './situ';
 import { gigApproaches, gigTick, gigOffer, gigResolve, gigStale, GIG_HELP, GIG_LABEL } from './gigs';
@@ -873,6 +873,12 @@ export function pruneJobs(w: World) {
     j.notes = [...(j.notes ?? []), why];
     if (playerSide(w, j)) addFact(w, { kind: 'report', actor: j.giver ?? undefined, minor: true, text: `${j.title}: no longer needed. ${why}`, district: p.district }, { witnesses: [p.id] });
   }
+}
+
+/** When the player can answer a summons: its set hour if it has one, and not before the man who sent for him is up. */
+export function summonsAt(w: World, j: Job): number {
+  const g = j.giver ? w.chars[j.giver] : undefined, at = Math.max(w.now, Number(j.extra?.at ?? 0));
+  return g?.alive && g.jailedUntil <= at && g.hurtUntil <= at ? nextAwake(g, at) : at;
 }
 
 const INSIDE = 'You were inside while it waited. Nobody holds it against you.';

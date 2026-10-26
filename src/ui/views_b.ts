@@ -11,7 +11,7 @@ import { repLines } from '../crewlife';
 import { careerLines, recommendable, recruitable, rewardOptions, standingTable } from '../career';
 import { factText, famName, fmtTime, money, ownerBiz, shortTime } from '../core';
 import { GIG_HELP, GIG_LABEL } from '../gigs';
-import { KIND_HELP, activityOf, KIND_LABEL, approaches, canQuestion, crewMoves, jobChecks, schemes, traitWords, ventureOf } from '../jobs';
+import { KIND_HELP, activityOf, KIND_LABEL, approaches, canQuestion, crewMoves, jobChecks, schemes, summonsAt, traitWords, ventureOf } from '../jobs';
 import { available, current as meetCurrent } from '../meetings';
 import { PLACES, isOpen, present } from '../places';
 import { RECRUIT_COST, dayJobOptions, orderMenu, prospects, reliability } from '../orders';
@@ -67,36 +67,34 @@ export function menuView(kind: Kind): string {
   return out + choices(S.opts.map((o, i) => ({ a: `opt:${i}`, label: o.label })), c?.label ?? 'Options');
 }
 export interface WaitOpt { label: string; sub: string; mins: number; event?: boolean }
-const SLOTS: [string, number][] = [['morning', 9], ['afternoon', 14], ['evening', 19], ['late tonight', 23.5]];
-export function waitChoices(full = false): WaitOpt[] {
+// Four ways to let time pass: the next morning, the next evening (business by day, the life by night), Sunday's reckoning, and a
+// week that stops early when anything comes for the player. Anything set for an hour carries its own "Go at" on its card.
+export function waitChoices(_full = false): WaitOpt[] {
   const now = W().now;
-  const tod = (now % DAY) / 60;
-  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const dayOf = (m: number) => days[Math.floor(m / DAY) % 7];
-  const hhmm = (h: number) => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.round((h % 1) * 60)).padStart(2, '0')}`;
-  const out: WaitOpt[] = [{ label: 'An hour', sub: 'keep watch', mins: 60 }];
-  const up: { name: string; at: number }[] = [];
-  for (let d = 0; d < 3 && up.length < 2; d++) for (const [name, h] of SLOTS) {
-    const at = Math.floor(now / DAY) * DAY + d * DAY + h * 60;
-    if (at - now >= 45 && up.length < 2) up.push({ name, at });
-  }
-  for (const u of up) out.push({ label: u.name[0].toUpperCase() + u.name.slice(1), sub: `until ${hhmm((u.at % DAY) / 60)}${Math.floor(u.at / DAY) !== Math.floor(now / DAY) ? ' ' + dayOf(u.at) : ''}`, mins: u.at - now });
-  out.push({ label: 'Next event', sub: 'until something comes up', mins: 24 * 60, event: true });
-  void tod;
+  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const today = Math.floor(now / DAY);
+  const when = (at: number) => { const d = Math.floor(at / DAY); return d === today ? 'today' : d === today + 1 ? 'tomorrow' : days[d % 7]; };
+  const hhmm = (m: number) => `${String(Math.floor((m % DAY) / 60)).padStart(2, '0')}:${String((m % DAY) % 60).padStart(2, '0')}`;
+  // (the next one: at least half an hour off, else the day after)
+  const next = (h: number) => { let at = today * DAY + h * 60; if (at - now < 30) at += DAY; return at; };
+  const morning = next(9), evening = next(19);
   // V89: the week ends on Sunday evening, just after the books are settled (the weekly reckoning runs at 20:00): envelopes fall due,
   // and you are there for it, with the rest of Sunday evening and Monday to hand yours over in person.
-  const dow = Math.floor(now / DAY) % 7; // 0 = Monday
-  let sunday = (Math.floor(now / DAY) + (6 - dow)) * DAY + 20 * 60 + 30;
+  const dow = today % 7; // 0 = Monday
+  let sunday = (today + (6 - dow)) * DAY + 20 * 60 + 30;
   if (sunday - now < 60) sunday += 7 * DAY;
-  out.push({ label: 'Until Sunday', sub: 'the envelopes, 20:30', mins: sunday - now });
-  if (full) out.push({ label: 'Two days', sub: 'let things ripen', mins: 48 * 60 }, { label: 'A full week', sub: 'envelopes fall due Sunday', mins: 7 * 24 * 60 });
-  return out;
+  return [
+    { label: 'Morning', sub: `${hhmm(morning)} · ${when(morning)}`, mins: morning - now },
+    { label: 'Evening', sub: `${hhmm(evening)} · ${when(evening)}`, mins: evening - now },
+    { label: 'Sunday', sub: `the envelopes${sunday - now > 7 * 60 ? '' : ', tonight'}`, mins: sunday - now },
+    { label: 'Next week', sub: 'or until something comes up', mins: 7 * DAY, event: true },
+  ];
 }
 export function waitView(): string {
-  return back() + title('Let time pass', esc(fmtTime(W().now))) + choices(waitChoices(true).map((o, i) => ({ a: `waitgo:${i}`, label: o.label, hint: o.sub })), 'How long');
+  return back() + title('Let time pass', esc(fmtTime(W().now))) + choices(waitChoices().map((o, i) => ({ a: `waitgo:${i}`, label: o.label, hint: o.sub })), 'How long');
 }
 export function timeBar(): string {
-  return `<div class="timebar">${waitChoices().map((o, i) => `<button data-a="waitgo:${i}"><b>${esc(o.label)}</b><span>${esc(o.sub)}</span></button>`).join('')}<button data-a="wait:"><b>More</b><span>two days, a week</span></button></div>`;
+  return `<div class="timebar">${waitChoices().map((o, i) => `<button data-a="waitgo:${i}"><b>${esc(o.label)}</b><span>${esc(o.sub)}</span></button>`).join('')}</div>`;
 }
 
 // --------------------------------------------------------------- rackets
@@ -172,7 +170,7 @@ export function jobView(j: Job): string {
     if (c.haggle) picks.push({ a: `jx:${j.id}|haggle`, label: 'Push for more money' });
   }
   if (j.kind === 'summons') {
-    if (j.status === 'offered') picks.push({ a: `attend:${j.id}`, label: 'Go', hint: 'It takes time. Nobody’s going to fix this for you.' }, { a: `excuse:${j.id}`, label: 'Make your excuses', hint: 'He will notice who didn’t come.' });
+    if (j.status === 'offered') { const at = summonsAt(w, j); picks.push({ a: `attend:${j.id}`, label: at > w.now + 5 ? `Go at ${String(Math.floor((at % DAY) / 60)).padStart(2, '0')}:${String((at % DAY) % 60).padStart(2, '0')}${Math.floor(at / DAY) !== Math.floor(w.now / DAY) ? ' tomorrow' : ''}` : 'Go now', hint: at > w.now + 5 ? 'The time until then passes first.' : 'It takes time. Nobody’s going to fix this for you.' }); picks.push( { a: `excuse:${j.id}`, label: 'Make your excuses', hint: 'He will notice who didn’t come.' }); }
     else out += quiet(`This one is closed (${esc(j.status)}).`);
   } else if (j.status === 'offered' || (j.status === 'active' && j.assignee === p.id)) {
     picks.push({ a: `mine:${j.id}`, label: 'Do it myself', hint: 'You choose how to play it.' });

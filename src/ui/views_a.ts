@@ -225,7 +225,7 @@ function guideCard(): string {
     ['Sit down with a man at the club', 'Sit with one of your own at the social club. Business is work and money, Personal is the man himself, Confront is for what needs having out.', !!g['g:aside'], 'place:club', 'Go to the club'],
     protStep,
     ['Follow a story', 'Stories keeps every matter you know of, in the order you learned it, and what you can do about it. Open one.', !!g['g:story'], 'tab:stories', 'Open Stories'],
-    ['Let a week go by', 'Hit Wait. The world moves while you do: men answer you, rackets pay, stories move on.', !!g['g:wait'] && w.now >= 7 * DAY, 'wait:', 'Let time pass'],
+    ['Let a week go by', 'Choose Next week under Let time pass. The world moves while you do: men answer you, rackets pay, stories move on. It stops early if something comes for you.', !!g['g:wait'] && w.now >= 7 * DAY, 'wait:', 'Let time pass'],
   ];
   const done = steps.filter((x) => x[2]).length;
   if (done === steps.length) return '';

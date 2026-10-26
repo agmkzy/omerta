@@ -219,6 +219,12 @@ export function schedule(w: World, t: number, kind: 'think' | 'weekly' | 'daily'
   w.queue.splice(lo, 0, ev);
 }
 
+// when a man is next awake, from t (t itself if he is up): his day starts at his waking hour
+export function nextAwake(c: Character, t: number): number {
+  if (isAwake(c, t)) return t;
+  const day = Math.floor(t / DAY) * DAY, at = day + c.wake * 60;
+  return at > t ? at : at + DAY;
+}
 export function isAwake(c: Character, t: number): boolean {
   const tod = t % DAY;
   if (c.sleep <= 24) return tod >= c.wake * 60 && tod < c.sleep * 60;
