@@ -5,9 +5,10 @@ import type { Action, Id, Kind, World } from '../types';
 import type { DayJobOpt } from '../orders';
 import type { Move, SchemeOpt } from '../jobs';
 
-// The overhaul's five sections are today (shown as World), people, family, business and journal; life is your own page, opened from
-// your portrait. rackets, crew and stories are older names: links and saved back-stacks that use them land in the section that holds them.
-export type Tab = 'today' | 'people' | 'family' | 'business' | 'journal' | 'life' | 'rackets' | 'crew' | 'stories';
+// The five destinations (owner, 26 October): Street and People (the world you deal with) either side of Today (the present), then
+// Business and Story (the life you're building). family, journal, life, rackets, crew and stories are older names: links and saved
+// back-stacks that use them land in the section and room that now hold them.
+export type Tab = 'street' | 'people' | 'today' | 'business' | 'story' | 'family' | 'journal' | 'life' | 'rackets' | 'crew' | 'stories';
 
 export type View =
   | { t: 'tab'; name: Tab }
@@ -61,6 +62,7 @@ export const S = {
   chips: [] as { t: string; tone: 'good' | 'bad' | '' }[],
   opts: [] as Action[],
   planOpts: [] as OrderOpt[],
+  last: {} as Record<string, { view: View; stack: View[] }>, // where you were in each section, so going back to it picks up there
   sub: {} as Record<string, string>, // which room of each section is open (family: men/org, business: rackets/money, journal: stories/known)
   worldFilter: 'all',
   look: { skin: 1, hairColour: 1, style: 0, beard: 0, glasses: 0, jaw: 1, seed: 'you1' } as import('./portrait').LookX,

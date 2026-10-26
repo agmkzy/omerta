@@ -86,3 +86,13 @@ body.g-scene .tabs { display: none; }
 @media (min-width: 1600px) {
   :root { --main-max: 860px; --side-w: 340px; }
 }
+
+/* The five destinations: Today at the centre, raised a little, always one tap away (owner, 26 October). */
+.tabs button.centre { color: var(--c-cream-2); }
+.tabs button.centre .ti { width: 30px; height: 30px; padding: 7px; box-sizing: content-box; margin-top: -14px; border-radius: 50%; background: var(--c-raise-2); box-shadow: 0 0 0 1px rgba(196, 160, 98, .35), 0 6px 16px rgba(0, 0, 0, .45); }
+.tabs button.centre.on .ti { background: var(--c-wine-2); color: #fff; box-shadow: 0 0 0 1px rgba(196, 160, 98, .55), 0 6px 18px rgba(0, 0, 0, .5); }
+.tabs button.centre.on::before { display: none; }
+.g-nav__item.centre { font-weight: 600; }
+.dot { position: absolute; top: 9px; right: calc(50% - 20px); width: 8px; height: 8px; border-radius: 50%; background: var(--c-danger); box-shadow: 0 0 0 2px var(--c-ground); }
+.tabs button.centre .dot { top: -4px; right: calc(50% - 22px); }
+.g-nav__item .dot { position: static; margin-left: auto; }

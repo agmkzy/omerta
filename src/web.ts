@@ -56,7 +56,7 @@ import { leaveCrew } from './rank';
 import type { Snap } from './storage';
 import { onSaved, openSaves, saveBox, storageNote } from './savestore';
 import { briefView } from './ui/brief';
-import { bottomTabs, rail, takeSide, topBar } from './ui/layout';
+import { bottomTabs, rail, sectionOf, takeSide, topBar } from './ui/layout';
 import { roomOf } from './ui/lifeview';
 import { openSection, sectionView } from './ui/sections';
 import { startingLines } from './background';
@@ -165,9 +165,25 @@ function go(v: View) {
   if (S.stack.length > 30) S.stack.shift();
   S.view = v;
 }
+// Today always brings you back to the present. Another section picks up where you left it (a man's page, a place, a story), unless
+// you are already in it, or what you were looking at is a passing moment (a conversation, a meeting, an encounter).
+const KEEP = new Set<View['t']>(['person', 'place', 'biz', 'story', 'fact', 'tree', 'brief', 'grudges', 'goals', 'way', 'books', 'orders']);
 function tab(name: Tab) {
+  const from = sectionOf(S.view);
+  if (from !== 'today') S.last[from] = { view: S.view, stack: S.stack.slice() };
+  const to = openSection(name), back_ = S.last[to];
   S.stack = [];
-  S.view = { t: 'tab', name: openSection(name) };
+  S.view = { t: 'tab', name: to };
+  if (to !== 'today' && to !== from && name === to && back_ && KEEP.has(back_.view.t) && viewAlive(back_.view)) { S.view = back_.view; S.stack = back_.stack; }
+  if (S.view.t === 'tab') delete S.last[to];
+}
+// (a remembered page is only worth returning to while what it shows still exists)
+function viewAlive(v: View): boolean {
+  const w = W();
+  if (v.t === 'person') return !!w.chars[v.id];
+  if (v.t === 'biz') return !!w.biz[v.id];
+  if (v.t === 'tree') return !!w.fam[v.fam];
+  return true;
 }
 function pop() {
   const prev = S.stack.pop();
@@ -356,7 +372,7 @@ function handle(a: string, v: string) {
     const n = draftName();
     if (!n.first || !n.last) { S.notice = 'He needs a first name and a surname before anyone will deal with him.'; openingAct('sec|name'); return; }
     const bg = draftBg();
-    S.w = createWorld(Math.floor(Math.random() * 1e6), fullName(n.first, n.last), { bg });
+    S.w = createWorld(Math.floor(Math.random() * 1e6), fullName(n.first, n.last), { bg }); S.last = {};
     S.w.chars[S.w.playerId!].look = { ...S.look };
     draftDone();
     const p = P();
@@ -373,7 +389,7 @@ function handle(a: string, v: string) {
   if (a === 'continue') {
     load().then((s) => {
       if (s) {
-        S.w = s;
+        S.w = s; S.last = {};
         S.save = saveBox()?.status ?? null;
         S.log = ['Welcome back.'];
         S.news = [];
@@ -514,7 +530,7 @@ function handle(a: string, v: string) {
       if (!b) return;
       b.idle().then(() => b.readSnap(v)).then((raw) => {
         if (!raw) { S.notice = 'That earlier day could not be found any more.'; render(); return; }
-        try { S.w = deserialize(raw); } catch { S.notice = 'That earlier day could not be opened.'; render(); return; }
+        try { S.w = deserialize(raw); S.last = {}; } catch { S.notice = 'That earlier day could not be opened.'; render(); return; }
         S.log = ['You go back to an earlier day.']; S.news = []; S.stack = []; S.view = { t: 'tab', name: 'today' };
         save(); render(); window.scrollTo(0, 0);
       });
@@ -987,7 +1003,7 @@ document.addEventListener('change', (e) => {
   const el = e.target as HTMLInputElement;
   if (el?.id !== 'ulfile' || !el.files?.[0]) return;
   el.files[0].text().then((raw) => {
-    try { S.w = deserialize(raw); S.stack = []; S.view = { t: 'tab', name: 'today' }; S.log = ['Save file loaded.']; save(); } catch { S.notice = 'That file is not a readable OMERTÀ save.'; }
+    try { S.w = deserialize(raw); S.last = {}; S.stack = []; S.view = { t: 'tab', name: 'today' }; S.log = ['Save file loaded.']; save(); } catch { S.notice = 'That file is not a readable OMERTÀ save.'; }
     render();
   });
 });
@@ -1004,7 +1020,7 @@ function devScenario() {
   if (!c) return;
   for (let i = 0; i < 4; i++) door.spendTime(c.w, c.henry, c.nate, 'before');
   const dm = door.demand(c.w, c.lou, c.nate, c.biz, Math.max(15, Math.round((c.w.biz[c.biz].income * 0.08) / 5) * 5), 'trouble:' + c.lou.id);
-  S.w = c.w; (S.w.goals ??= { done: {} }).done['g:off'] = S.w.now;
+  S.w = c.w; S.last = {}; (S.w.goals ??= { done: {} }).done['g:off'] = S.w.now;
   void dm; // (what happened this morning is the world's: Henry hears of it, if he does, the way anyone would)
   S.log = [esc(`You’re Henry Tedesco, an associate in ${c.riz.name}’s crew. You’ve been into ${c.w.biz[c.biz].name} a few evenings; you know ${c.nate.name} to talk to.`)];
   S.view = { t: 'tab', name: 'today' }; S.stack = [];

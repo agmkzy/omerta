@@ -8,7 +8,6 @@ import { influence, influenceWord } from '../books';
 import { standingWord } from '../jobs';
 import { avatar } from './common';
 import { attentionCount } from './views_a';
-import { newStories } from './stories';
 import { esc, P, S, W } from './links';
 import type { Tab, View } from './state';
 import { LEGACY } from './sections';
@@ -21,40 +20,41 @@ export const takeSide = () => sideParts.splice(0, sideParts.length).join('');
 
 // ------------------------------------------------------------------ navigation
 const IC: Partial<Record<Tab, string>> = {
-  today: '<path d="M3 21h18M5 21V10l4-2v13M9 21V6l6-3v18M15 21V9l4 2v10"/><path d="M11.5 8h1M11.5 11h1M11.5 14h1M6.5 13h1M16.5 14h1"/>',
+  street: '<path d="M3.5 9 5 4h14l1.5 5"/><path d="M3.5 9a2.1 2.1 0 0 0 4.25 0 2.1 2.1 0 0 0 4.25 0 2.1 2.1 0 0 0 4.25 0 2.1 2.1 0 0 0 4.25 0"/><path d="M5 11.5V20h14v-8.5M10 20v-5h4v5"/>',
+  today: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.2 2"/>',
   people: '<circle cx="9" cy="8.5" r="3.2"/><path d="M3 20c0-3.6 2.7-6 6-6s6 2.4 6 6"/><circle cx="17" cy="9.5" r="2.4"/><path d="M16.5 14.2c2.8 0 4.5 2 4.5 5"/>',
   family: '<rect x="9" y="3" width="6" height="4.5" rx="1"/><rect x="3" y="16.5" width="6" height="4.5" rx="1"/><rect x="15" y="16.5" width="6" height="4.5" rx="1"/><path d="M12 7.5v4.5M6 16.5V12h12v4.5"/>',
   business: '<rect x="3" y="8" width="18" height="12" rx="2"/><path d="M9 8V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/>',
-  journal: '<path d="M4 4.5h12.5a2 2 0 0 1 2 2V19a1.5 1.5 0 0 0 3 0V9h-3M4 4.5V18a2 2 0 0 0 2 2h14.5"/><path d="M8 9h7M8 12.5h7M8 16h4"/>',
+  story: '<path d="M4 4.5h12.5a2 2 0 0 1 2 2V19a1.5 1.5 0 0 0 3 0V9h-3M4 4.5V18a2 2 0 0 0 2 2h14.5"/><path d="M8 9h7M8 12.5h7M8 16h4"/>',
   life: '<circle cx="12" cy="8" r="4"/><path d="M4.5 21c.6-4.4 3.6-7 7.5-7s6.9 2.6 7.5 7"/>',
 };
-const LABEL: Partial<Record<Tab, string>> = { today: 'World', people: 'People', family: 'Family', business: 'Business', journal: 'Journal', life: 'You' };
-const SECTIONS: Tab[] = ['today', 'people', 'family', 'business', 'journal'];
+const LABEL: Partial<Record<Tab, string>> = { street: 'Street', people: 'People', today: 'Today', business: 'Business', story: 'Story' };
+// The world you deal with on the left of Today, the life you're building on the right.
+const SECTIONS: Tab[] = ['street', 'people', 'today', 'business', 'story'];
 const icon = (t: Tab, size = 22) => `<svg class="ti" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[t]}</svg>`;
 
 // Which section each screen belongs to, so the right one is lit and a phone's tabs say where you are. Every screen is listed: a
-// conversation and a man's page are People, his books and orders are Family, a racket is Business, a story is the Journal.
+// place is the Street; a man, a conversation, your men and the family are People; a racket is Business; a story, the Herald and
+// your own road are Story; what has reached you today is Today.
 const HOME: Record<View['t'], Tab> = {
-  tab: 'today', menu: 'today', wait: 'today', job: 'today', approach: 'today', delegate: 'today', sendorder: 'today', report: 'today', dayjob: 'today', brief: 'today', enc: 'today', place: 'today', places: 'today', bj: 'today',
+  tab: 'today', menu: 'today', wait: 'today', job: 'today', approach: 'today', delegate: 'today', sendorder: 'today', report: 'today', dayjob: 'today', enc: 'today',
+  place: 'street', places: 'street', bj: 'street',
   person: 'people', talk2: 'people', people: 'people', grudges: 'people', settle: 'people',
-  manage: 'family', comm: 'family', tree: 'family', plan: 'family', orders: 'family', recruit: 'family', books: 'family', meeting: 'family', guests: 'family', sunday: 'family', help: 'family',
+  manage: 'people', comm: 'people', tree: 'people', plan: 'people', orders: 'people', recruit: 'people', books: 'people', meeting: 'people', guests: 'people', sunday: 'people', help: 'people',
   biz: 'business', way: 'business', opstart: 'business', op: 'business', hijack: 'business',
-  fact: 'journal', dispute: 'journal', story: 'journal',
-  goals: 'life',
+  fact: 'story', dispute: 'story', story: 'story', brief: 'story', goals: 'story',
 };
-export function section(): Tab {
-  const v = S.view;
-  if (v.t === 'tab') return LEGACY[v.name]?.[0] ?? v.name;
-  return HOME[v.t];
-}
+export const sectionOf = (v: View): Tab => (v.t === 'tab' ? LEGACY[v.name]?.[0] ?? v.name : HOME[v.t]);
+export const section = (): Tab => sectionOf(S.view);
 
-const badgeOf = (t: Tab) => (t === 'today' ? attentionCount() : t === 'journal' ? newStories(W()) : 0);
-const badge = (n: number) => (n ? `<span class="badge">${n > 9 ? '9+' : n}</span>` : '');
+// One restrained mark, on Today only, when something there needs an answer: not a counter for every rumour.
+const badgeOf = (t: Tab) => (t === 'today' ? attentionCount() : 0);
+const badge = (n: number) => (n ? '<span class="dot" aria-label="Something needs you"></span>' : '');
 
 // Phone: the five sections along the bottom; your own page is your portrait in the bar above.
 export function bottomTabs(): string {
   const cur = section();
-  const t = (id: Tab) => `<button class="${cur === id ? 'on' : ''}" data-a="tab:${id}" aria-current="${cur === id ? 'page' : 'false'}">${icon(id)}<span>${LABEL[id]}</span>${badge(badgeOf(id))}</button>`;
+  const t = (id: Tab) => `<button class="${cur === id ? 'on' : ''}${id === 'today' ? ' centre' : ''}" data-a="tab:${id}" aria-current="${cur === id ? 'page' : 'false'}">${icon(id)}<span>${LABEL[id]}</span>${badge(badgeOf(id))}</button>`;
   return `<nav class="tabs" aria-label="Sections">${SECTIONS.map(t).join('')}</nav>`;
 }
 
@@ -81,10 +81,10 @@ export function rail(): string {
   const w = W(), p = P(), h = heat(), cur = section();
   const carrying = [p.cars ? `${p.cars} car${p.cars > 1 ? 's' : ''}` : '', p.goods ? `${money(p.goods)} in goods` : ''].filter(Boolean).join(', ');
   const nav = SECTIONS
-    .map((t) => `<button class="g-nav__item ${cur === t ? 'on' : ''}" data-a="tab:${t}" aria-current="${cur === t ? 'page' : 'false'}">${icon(t, 20)}<span>${LABEL[t]}</span>${badge(badgeOf(t))}</button>`).join('');
+    .map((t) => `<button class="g-nav__item ${cur === t ? 'on' : ''}${t === 'today' ? ' centre' : ''}" data-a="tab:${t}" aria-current="${cur === t ? 'page' : 'false'}">${icon(t, 20)}<span>${LABEL[t]}</span>${badge(badgeOf(t))}</button>`).join('');
   return `<aside class="g-rail">
     <div class="g-brand">Omertà</div>
-    <button class="g-me ${cur === 'life' ? 'on' : ''}" data-a="tab:life" aria-label="Your page">
+    <button class="g-me ${cur === 'story' && S.sub.story === 'life' ? 'on' : ''}" data-a="tab:life" aria-label="Your page">
       ${avatar(p)}
       <span class="g-me__name">${esc(p.name)}</span>
       <span class="g-me__rank">${esc(p.rank)}${p.familyId ? ` · ${esc(famName(w, p))}` : ''}</span>

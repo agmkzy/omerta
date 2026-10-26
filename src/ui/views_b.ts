@@ -344,11 +344,11 @@ const chipText = (id: Id) => {
 
 // Around town. In Little Italy (the district built properly, city.ts) the street's own places, open or shut, with how many men you
 // know are in, and every shop on the street; Saturday afternoons, the track. The old rooms stand for everywhere else.
-export function placesView(): string {
+export function placesView(home = false): string {
   const w = W(), p = P();
   const known = (id: string) => whoIsAt(w, id).filter((c) => (c.rels[p.id]?.known ?? 0) > 0 || c.familyId === p.familyId).length;
   const all = spots(w), shut = (x: Spot) => (openAt(x, w.now) ? '' : ' · shut right now');
-  let out = back() + title('Around town', esc(SLICE));
+  let out = (home ? '' : back()) + title(home ? 'The street' : 'Around town', esc(SLICE));
   const pub = all.filter((x) => x.kind !== 'biz');
   if (openAt(TRACK, w.now)) pub.push(TRACK);
   out += choices(pub.map((x) => ({ a: `place:${x.id}`, label: x.name, hint: `${x.kind === 'club' && x.famId !== p.familyId ? 'Another family’s club. ' : ''}${openAt(x, w.now) ? (known(x.id) ? `${known(x.id)} you know in.` : 'Open.') : 'Shut right now.'}${x.kind === 'track' ? ' Fifty minutes out to Queens.' : ''}` })), 'Where you go');
