@@ -29,6 +29,7 @@ import { askPermission } from './politics';
 import { settleDo } from './revenge';
 import { closeOp, countOp, hijack, opRule, startOp } from './rackets';
 import { DAY, Kind } from './types';
+import { nextAt } from './city';
 import { createWorld } from './world';
 import type { World } from './types';
 import { relevance } from './reports';
@@ -407,6 +408,14 @@ function handle(a: string, v: string) {
     case 'sub': { const [sec, room] = v.split('.'); S.sub[sec] = room; if (S.view.t !== 'tab' || S.view.name !== sec) tab(sec as Tab); return; }
     case 'pf': S.worldFilter = v; return;
     case 'place': return go({ t: 'place', id: v });
+    // (waiting at a place for a man who comes in: the time until he does passes, and then he is there to talk to)
+    case 'waitfor': {
+      const [sid, cid] = v.split('|'), c = w.chars[cid];
+      const at = c ? nextAt(w, c, sid, w.now) : undefined;
+      if (!c || at === undefined) return;
+      if (at > w.now) advance(w, at);
+      return talkTo(cid);
+    }
     case 'places': return go({ t: 'places' });
     case 'cscene': {
       // V90: the club's separate small talk is retired. Sitting down with a man at the club is the same conversation as anywhere

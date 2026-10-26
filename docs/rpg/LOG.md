@@ -212,3 +212,10 @@ police after a road job. Played through in the browser; tested (money conserved;
   "where is he", the conversation's scene and Around town read it). Played: on Sunday morning the shopkeepers were at mass; in the
   evening the bar had men in it.
 - **Next,** before the other six districts: approaches that happen at a place, and waiting at a place for a man.
+- **Waiting for a man.** At a place, the men the player knows who come in during the coming day are listed with when ("He usually
+  comes in around 19:00"); waiting for one passes the time until he does and opens the conversation there.
+- **One reckoning for the club.** A family's club has its own long-standing model of who is in (by rank, evening, weekday, a
+  gambler's habit, the boss's nights in: clubdata.clubPresent). "Where is he" now reads it first, for every family's club (it had
+  read it only for the player's own), and the routines leave the club to it. Found in play: the player's family's men all live in
+  Bensonhurst, so routines limited to residents had left their Little Italy club empty while Falco men sat in the café.
+- A man with a shop on the street is in it by day wherever he lives.

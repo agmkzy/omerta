@@ -14,7 +14,7 @@ import { GIG_HELP, GIG_LABEL } from '../gigs';
 import { KIND_HELP, activityOf, KIND_LABEL, approaches, canQuestion, crewMoves, jobChecks, schemes, summonsAt, traitWords, ventureOf } from '../jobs';
 import { available, current as meetCurrent } from '../meetings';
 import { PLACES, isOpen, present } from '../places';
-import { SLICE, TRACK, openAt, spotById, spots, whoIsAt, type Spot } from '../city';
+import { SLICE, TRACK, openAt, regulars, spotById, spots, whoIsAt, type Spot } from '../city';
 import { RECRUIT_COST, dayJobOptions, orderMenu, prospects, reliability } from '../orders';
 import { PROBLEM_LABEL, aptitude, lateOf } from '../people';
 import { DAY, Id, Job, Kind } from '../types';
@@ -389,8 +389,12 @@ function spotView(sp: Spot): string {
   if (sp.kind === 'club') out += note(`The ${w.fam[sp.famId!]?.name ?? ''} family’s club. You’d be noticed walking in. Men here talk to you if they choose to.`);
   if (doing.length) out += choices(doing, 'What you do');
   const people = here.filter((c) => !(b && c.id === b.ownerId) || !doing.length);
-  if (!people.length) return out + quiet(sp.kind === 'church' ? 'Mass is over, or hasn’t started. An old woman lights a candle.' : 'Nobody you’d know is in right now.');
-  return out + h('Who’s in', String(people.length)) + rows(people.map((c): Row => ({ face: avatar(c), title: esc(c.name), sub: `${c.rank === 'civilian' ? 'civilian' : `${esc(c.rank)}${c.familyId && c.familyId !== p.familyId ? `, ${esc(famName(w, c))}` : ''}`} · ${esc(ARCH_WORD[arch(c)])}`, a: `talk:${c.id}` })));
+  // (who you know comes in here, and when: you can wait for him; knowing a man's habits is how you find him)
+  const regs = sp.kind === 'biz' ? [] : regulars(w, p, sp.id);
+  const hhmm = (t: number) => `${String(Math.floor((t % DAY) / 60)).padStart(2, '0')}:${String((t % DAY) % 60).padStart(2, '0')}${Math.floor(t / DAY) !== Math.floor(w.now / DAY) ? ' tomorrow' : ''}`;
+  const regOut = regs.length ? h('Who comes in', String(regs.length)) + choices(regs.map((r) => ({ a: `waitfor:${sp.id}|${r.c.id}`, label: `Wait for ${r.c.name}`, hint: `He usually comes in around ${hhmm(r.at)}.` })), 'Who comes in') : '';
+  if (!people.length) return out + regOut + quiet(sp.kind === 'church' ? 'Mass is over, or hasn’t started. An old woman lights a candle.' : 'Nobody you’d know is in right now.');
+  return out + h('Who’s in', String(people.length)) + rows(people.map((c): Row => ({ face: avatar(c), title: esc(c.name), sub: `${c.rank === 'civilian' ? 'civilian' : `${esc(c.rank)}${c.familyId && c.familyId !== p.familyId ? `, ${esc(famName(w, c))}` : ''}`} · ${esc(ARCH_WORD[arch(c)])}`, a: `talk:${c.id}` }))) + regOut;
 }
 export function grudgesView(): string {
   const w = W();

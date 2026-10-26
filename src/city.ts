@@ -5,7 +5,7 @@
 // function of the man and the clock, so it is stable between looks, needs nothing saved, and changes nothing in the simulation
 // (only the screens and the conversation's scene read where a man is). The other districts keep the old rooms until this plays well.
 import { isAwake, ownerBiz, travelTime } from './core';
-import { clubOf } from './clubdata';
+import { clubPresent } from './clubdata';
 import { temper } from './temper';
 import { DAY, type Character, type World } from './types';
 
@@ -34,12 +34,18 @@ export const openAt = (s: Spot, t: number) => { const h = hourOf(t), dow = Math.
 
 /** Where a man who lives in the slice's district is at time t: a place id, or 'home'. Undefined for anyone else. */
 export function routine(w: World, c: Character, t: number): string | undefined {
-  if (c.district !== SLICE || c.isPlayer) return undefined;
+  if (c.isPlayer) return undefined;
   const b = ownerBiz(w, c.id);
+  // (who is in a family's club is the club's own reckoning, clubdata.clubPresent, read by whereIs first; a routine is the rest of a
+  // man's day. A man with a shop on the street is in it by day wherever he lives; a man who lives here keeps his whole day here.)
+  if (c.district !== SLICE) {
+    if (!isAwake(c, t)) return undefined;
+    const h = hourOf(t), dow = Math.floor(t / DAY) % 7;
+    return b?.district === SLICE && b.open && dow !== 6 && h >= 9 && h < 19 ? 'biz:' + b.id : undefined;
+  }
   if (c.rank === 'civilian' && !b) return undefined;
   if (!isAwake(c, t)) return 'home';
-  const h = hourOf(t), dow = Math.floor(t / DAY) % 7, tp = temper(c), all = spots(w);
-  const club = all.find((s) => s.kind === 'club' && s.famId === c.familyId);
+  const h = hourOf(t), dow = Math.floor(t / DAY) % 7, tp = temper(c);
   // Sunday morning: church, for the men who go (the gentler, the older, the ones whose mothers ask)
   if (dow === 6 && h >= 9 && h < 12 && (1 - c.traits.violence + tp.empathy) / 2 > 0.5) return 'li:church';
   // Saturday afternoon: the track, for a gambler
@@ -48,14 +54,25 @@ export function routine(w: World, c: Character, t: number): string | undefined {
   if (b?.open && dow !== 6 && h >= 9 && h < 19) return 'biz:' + b.id;
   if (c.rank === 'civilian') return h >= 19 && c.traits.vice >= 0.6 ? 'li:bar' : 'home';
   // a man in the life by day: on the street (the café for a sociable man, the barber's for a talker, his club otherwise)
-  if (h >= 9 && h < 19) return c.traits.sociability > 0.6 ? 'li:cafe' : c.traits.sociability > 0.4 && h < 13 ? 'li:barber' : club ? club.id : 'li:cafe';
-  // evening: a drinker at the bar, a made man at his family's club, the rest wherever their friends are
-  if (h >= 19 && h < 26) return c.traits.vice >= 0.65 ? 'li:bar' : club && c.rank !== 'associate' ? club.id : h < 23 ? 'li:cafe' : club?.id ?? 'home';
+  if (h >= 9 && h < 19) return c.traits.sociability > 0.6 ? 'li:cafe' : c.traits.sociability > 0.4 && h < 13 ? 'li:barber' : 'li:cafe';
+  // evening: a drinker at the bar, the rest at the café until it shuts, then home (the club, when he is there, is the club's own reckoning)
+  if (h >= 19 && h < 26) return c.traits.vice >= 0.65 ? 'li:bar' : h < 23 ? 'li:cafe' : 'home';
   return 'home';
 }
 export const spotById = (w: World, id: string) => (id === 'track' ? TRACK : spots(w).find((s) => s.id === id));
 /** Who is at a place now (men in the life and shop owners; the player sees everyone in a public place). */
 export function whoIsAt(w: World, id: string): Character[] {
+  if (id.startsWith('li:club:')) { const cl = Object.values(w.clubs ?? {}).find((x) => 'li:club:' + x.familyId === id); return cl ? clubPresent(w, cl).map((x) => x.c) : []; }
   return Object.values(w.chars).filter((c) => c.alive && !c.isPlayer && c.jailedUntil <= w.now && c.hurtUntil <= w.now && routine(w, c, w.now) === id);
 }
 export const travel = (from: string, s: Spot) => (s.kind === 'track' ? 50 : travelTime(from, s.district));
+/** When a man is next at a place, from t, within a day (half-hour steps): when the player could wait for him there. */
+export function nextAt(w: World, c: Character, id: string, t: number): number | undefined {
+  for (let x = t; x <= t + DAY; x += 30) if (routine(w, c, x) === id) return x;
+  return undefined;
+}
+/** The men the player knows who come here in the coming day, and when (not those in now). */
+export function regulars(w: World, p: Character, id: string): { c: Character; at: number }[] {
+  return Object.values(w.chars).filter((c) => c.alive && !c.isPlayer && c.jailedUntil <= w.now && ((c.rels[p.id]?.known ?? 0) > 0.1 || c.familyId === p.familyId) && routine(w, c, w.now) !== id)
+    .map((c) => ({ c, at: nextAt(w, c, id, w.now) })).filter((x): x is { c: Character; at: number } => x.at !== undefined).sort((a, b) => a.at - b.at || (a.c.id < b.c.id ? -1 : 1)).slice(0, 6);
+}
