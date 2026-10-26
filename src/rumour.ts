@@ -125,5 +125,7 @@ export function sourceOf(w: World, viewer: Character, f: Fact): string {
   if (k.from === 'public') return 'it was all over the neighbourhood';
   const c = w.chars[k.from.replace(/^told:/, '')];
   if (!c) return 'word got round';
-  return k.how === 't' ? `${c.name}, who saw it` : `${c.name}, who heard it somewhere`;
+  // (a man telling what was done to him, or to his place, or what he did, was there: he didn't hear it somewhere)
+  const his = f.victim === c.id || f.actor === c.id || (!!f.business && w.biz[f.business]?.ownerId === c.id);
+  return his ? `${c.name}, whose own business it was` : k.how === 't' ? `${c.name}, who saw it` : `${c.name}, who heard it somewhere`;
 }

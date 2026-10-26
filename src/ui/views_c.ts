@@ -195,7 +195,7 @@ export function wayView(id: string, lines: string[] = []): string {
       if (p.cars) out += `<p class="muted pad">You’re holding ${p.cars} car${p.cars > 1 ? 's' : ''}. See “Selling stolen goods”.</p>`;
       break;
     case 'burglary':
-      out += `<h2 class="ui-h">Places worth a look<small>${b.burglary.length}</small></h2>` + optList(b.burglary, 'No suitable target right now. Protected places and casinos are left out.');
+      out += `<h2 class="ui-h">Places worth a look<small>${b.burglary.length}</small></h2>` + optList(b.burglary, 'No suitable target right now. Your own family’s places and casinos are left out.');
       break;
     case 'scams':
       out += `<h2 class="ui-h">Possible marks<small>${b.scams.length}</small></h2>` + optList(b.scams, 'No obvious marks right now.');

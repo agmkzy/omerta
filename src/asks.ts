@@ -799,7 +799,8 @@ ASKS.borrow = {
   counter: (w, s, a, t) => { const amt = s.terms?.amt ?? 0, pos = loanPosition(w, t, a, amt); return !pos.refuse && pos.can >= 150 && pos.can < amt ? { amt: pos.can, why: 'that’s what I can spare' } : undefined; },
   better: (w, s) => { const amt = s.terms?.amt ?? 0, next = Math.round(amt * 0.7 / 50) * 50; return next >= 150 && next < amt ? next : undefined; },
   yes: (w, s, a, t) => {
-    const amt = Math.min(s.terms?.amt ?? 0, Math.floor(t.cash * 0.6)), pos = loanPosition(w, t, a, amt);
+    // (the rate agreed in the talk, when there was one, is the rate: what was shaken on is what is owed)
+    const amt = Math.min(s.terms?.amt ?? 0, Math.floor(t.cash * 0.6)), pos0 = loanPosition(w, t, a, amt), pos = s.terms?.rate ? { ...pos0, rate: s.terms.rate } : pos0;
     transfer(w, t, a, amt, 'loan', 'a loan');
     const d = createDebt(w, t.id, a.id, amt, pos.rate, a.isPlayer ? 'a loan to you' : 'a private loan');
     const f = addFact(w, { kind: 'loan', actor: t.id, victim: a.id, amount: amt, story: 'sit:' + s.id, text: `${t.name} lent ${a.name} ${money(amt)}.`, district: t.district });

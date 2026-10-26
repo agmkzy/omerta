@@ -135,8 +135,11 @@ function oldDebt(w: World, p: Character): boolean {
   // The money left his hands long ago (it is not in his $1,000), so nothing moves now: only the debt is written down.
   const d = createDebt(w, p.id, c.id, 500, 0.05, 'a gambling debt');
   d.nextDue = w.now + w.rng.int(2, 5) * DAY;
-  const f = addFact(w, { kind: 'loan', actor: p.id, victim: c.id, amount: 500, text: `${c.name} owes ${p.name} ${money(500)} from the book ${p.name} used to run.`, district: c.district });
+  const f = addFact(w, { kind: 'loan', actor: p.id, victim: c.id, amount: 500, text: `${c.name} owes ${p.name} ${money(500)} from the book ${p.name} used to run.`, district: c.district }, { witnesses: [p.id, c.id] });
   d.cause = f.id;
+  // (a man who has owed him for years has met him: they know each other, without any liking in it)
+  meet(w, p, c, 0.1);
+  { const r = rel(c, p.id); r.known = Math.max(r.known ?? 0, 0.45); const q = rel(p, c.id); q.known = Math.max(q.known ?? 0, 0.45); }
   return true;
 }
 

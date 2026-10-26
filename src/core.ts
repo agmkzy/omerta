@@ -26,9 +26,11 @@ export function fmtTime(t: number): string {
     minute: '2-digit',
   });
 }
+// (one way of saying a date everywhere: "Mon 2 Mar, 09:00", the calendar of 1970, never "Day 70")
+const WD = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], MO = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 export function shortTime(t: number): string {
-  const m = t % DAY;
-  return `Day ${dayNo(t)} ${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  const m = ((t % DAY) + DAY) % DAY, d = new Date(Date.UTC(1970, 2, 2) + Math.floor(t / DAY) * 86400000);
+  return `${WD[Math.floor(t / DAY) % 7 < 0 ? 0 : Math.floor(t / DAY) % 7]} ${d.getUTCDate()} ${MO[d.getUTCMonth()]}, ${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 }
 
 export function newId(w: World, prefix: string): Id {
@@ -174,7 +176,7 @@ const STANDING_WORD: Record<string, string> = { bossjob: 'work for your captain'
 /** What the player's standing has turned on since `t0`, in words, most weight first. */
 export function standingReasons(p: Character, t0: number): string[] {
   const by = new Map<string, number>();
-  for (const x of p.standingWhy ?? []) if (x.t >= t0) { const k = x.kind.startsWith('deed:') ? 'what people heard you did' : STANDING_WORD[x.kind] ?? x.kind.replace(/[-_]/g, ' '); by.set(k, (by.get(k) ?? 0) + x.d); }
+  for (const x of p.standingWhy ?? []) if (x.t >= t0) { const k = x.kind.startsWith('deed:') ? 'what people heard' : STANDING_WORD[x.kind] ?? x.kind.replace(/[-_]/g, ' '); by.set(k, (by.get(k) ?? 0) + x.d); }
   return [...by.entries()].filter(([, d]) => Math.abs(d) >= 0.3).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).map(([k]) => k);
 }
 export function repute(w: World, p: Character, amount: number, kind: string): number {

@@ -96,7 +96,7 @@ export function traitWords(c: Character): string {
   return out.slice(0, 2).join(', ') || 'steady';
 }
 export function standingWord(s: number): string {
-  return s < 20 ? 'on thin ice' : s < 40 ? 'unproven' : s < 60 ? 'trusted' : s < 80 ? 'respected' : 'a rising name';
+  return s < 20 ? 'on thin ice' : s < 45 ? 'unproven' : s < 60 ? 'trusted' : s < 80 ? 'respected' : 'a rising name';
 }
 
 // ------------------------------------------------------------------ plumbing
@@ -329,6 +329,7 @@ export function takeJob(w: World, j: Job) {
   j.accepted = w.now;
   delete j.due;
 }
+export function attendedJob(w: World, j: Job) { j.status = 'done'; j.reported = true; }
 export function declineJob(w: World, j: Job) {
   const p = PL(w);
   const g = j.giver ? w.chars[j.giver] : undefined;
@@ -577,6 +578,9 @@ export function resolve(w: World, j: Job, code: string): Result {
         gained = paid(w, doer, j.pay, giver, 'protection', boss);
         lines.push(`${giver.name} pays you ${money(gained)} for the shop.`);
       }
+      // (he hasn't said yes, and hasn't said no for good: the matter is open between them, and so is the work. It is done when he
+      // agrees, however that comes about (reached); it has not failed because the first conversation didn't settle it.)
+      { const sit = askBetween(w, 'protect', doer.id, o.id, b.id); if (!ok && sit && isOpen(sit)) return { lines: [...lines, 'He hasn’t said yes. It isn’t over: it is between you and him now, and the work stays yours until it is settled.'], minutes, ok: false }; }
       break;
     }
 

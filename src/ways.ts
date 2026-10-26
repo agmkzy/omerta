@@ -150,7 +150,7 @@ const OTHER_WAYS: Way[] = [
   {
     id: 'burglary', kind: 'burglary', name: 'Burglary', cat: 'Stealing', icon: 'box', tone: 'r',
     pitch: 'Break into a shop, take the stock and fence it.',
-    how: ['Pick a shop that isn’t paying anyone’s protection. Go in quiet, or smash and grab for more.', 'What you take has to be sold. A pawnbroker pays about 40 cents on the dollar, a friendly fence a good deal more.'],
+    how: ['Pick a place to rob. One that pays nobody is safer: one that pays a family is a quarrel with them, if they learn who did it. Go in quiet, or smash and grab for more.', 'What you take has to be sold. A pawnbroker pays about 40 cents on the dollar, a friendly fence a good deal more.'],
     pays: 'Goods worth a few hundred to a couple of thousand dollars, before fencing.', needs: 'A target and nerve. A fence for the goods.',
     risks: 'A protected shop starts a quarrel with whoever protects it. Smash and grab raises the heat.', tip: 'Check who is protecting a place before you rob it.',
   },

@@ -117,7 +117,7 @@ export function him(c: Ctx, r: Reply, salt = '') {
   for (let k = heard.length - 1; k >= 0 && heard.includes(text); k--) text = render(m0, c.n.id, c.pn().arch, new Set([...c.v.mem.said, ...heard.slice(k)]), salt + c.v.lines.length);
   c.v.mem.said.push(text);
   const m = memOf(c.w, c.n.id); m.heard.push(text); if (m.heard.length > 12) m.heard.shift();
-  text = speechFor(c.w, c.h, c.n, text);
+  text = unattributed(speechFor(c.w, c.h, c.n, text), c.n);
   const d = r.decision, trace = [...(d.constraints.length ? [`constraints: ${d.constraints.map((x) => x.kind + ' (' + x.source + ')').join('; ')}`] : []), ...[...d.candidates].sort((a, b) => b.value - a.value).filter((x) => x.value > -9).map((x) => `${x.move === d.chosen ? '▶' : ' '} ${x.move} ${x.value}: ${x.terms.map((t) => `${t.name} ${t.value >= 0 ? '+' : ''}${t.value}`).join(', ')}`), `meaning ${r.meaning.key}${r.meaning.grounds ? '.' + r.meaning.grounds : ''}${r.meaning.role ? ' (' + r.meaning.role + ')' : ''}; ${r.honest ? 'honest' : 'NOT honest'}${r.aim ? '; aim: ' + r.aim : ''}`, ...(r.changes ?? [])];
   c.v.lines.push({ who: 'him', text, trace });
 }
@@ -129,9 +129,10 @@ export const line = (c: Ctx, key: string, slots: Record<string, string> = {}) =>
 
 // He says something the decision has already settled, in words from the world's shared voice (voicesheet) or the old pools: the
 // decision is kept with the line, for the developer view, as with every line he says
+// (in front of him, a line is not attributed by his full name, as if read from a record: "…,” says Louie Costa." is "…,” he says.")
+export const unattributed = (text: string, n: Character) => text.replace(new RegExp(`says ${n.name}([.,])`, 'g'), 'he says$1');
 export function says(c: Ctx, text: string, d?: Decision) {
-  // (in front of him, a line is not attributed by his full name, as if read from a record: "…,” says Louie Costa." is "…,” he says.")
-  const t = speechFor(c.w, c.h, c.n, text).replace(new RegExp(`([,.!?]?["”]) says ${c.n.name}([.,])`, 'g'), '$1 he says$2').replace(new RegExp(`says ${c.n.name}\\.`, 'g'), 'he says.').replace(/"([^"]*)"/g, '“$1”').replace(new RegExp(`^(${c.n.name}|${first(c.n.name)}): (?=“)`), '');
+  const t = unattributed(speechFor(c.w, c.h, c.n, text), c.n).replace(/"([^"]*)"/g, '“$1”').replace(new RegExp(`^(${c.n.name}|${first(c.n.name)}): (?=“)`), '');
   c.v.mem.said.push(t);
   const m = memOf(c.w, c.n.id); m.heard.push(t); if (m.heard.length > 12) m.heard.shift();
   c.v.lines.push({ who: /^“/.test(t) || new RegExp(`^(He|His|${first(c.n.name)}|${c.n.name})\\b[^“]{0,80}“`).test(t) ? 'him' : 'narr', text: t.replace(new RegExp(`^${c.n.name} `), 'He '), trace: d ? traceOf(d) : undefined });

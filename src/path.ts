@@ -70,7 +70,7 @@ export function pathInfo(w: World, p: Character): PathInfo | undefined {
     const k = Math.max(rec.hard ?? 0, st?.kills ?? 0);
     g('kills', n.hard > 1 ? 'Do the family’s hard work, twice' : 'Do the family’s hard work', k / n.hard, `${Math.min(k, n.hard)} of ${n.hard} done on the family’s orders`, 'A man who hurt one of ours, dealt with because your superior asked. When there is such work, ask for it.');
   }
-  g('name', 'A name worth having', p.standing / n.standing, p.standing >= n.standing ? 'people speak well of you' : 'not yet', 'What people say of you comes from what you do and who sees it.');
+  g('name', 'A name worth having', p.standing / n.standing, p.standing >= n.standing ? (p.standing >= 45 ? 'people speak well of you' : 'nobody has a bad word for you') : 'not yet', 'What people say of you comes from what you do and who sees it.');
   const made = members(w, p.familyId).filter((x) => x.id !== p.id && LADDER.indexOf(x.rank) >= 1);
   if (to === 'soldier') {
     const backers = made.filter((x) => rel(x, p.id).trust >= 0.4);

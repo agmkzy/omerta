@@ -26,7 +26,7 @@ import { belief, judge, say } from './minds';
 import { onConfrontation, onProgressAsked } from './respond';
 import { compat } from '../core';
 import * as door from './doors';
-import { newThread, restate, acquainted, agoWords, card, ctx, first, him, lastOf, line, memo, memOf, narr, plain, r2, relationOf, remember, talks, you, PANES, type Choice, type Ctx, type Pane, type Say, type TalkMemory, type Visit } from './kit';
+import { newThread, restate, unattributed, acquainted, agoWords, card, ctx, first, him, lastOf, line, memo, memOf, narr, plain, r2, relationOf, remember, talks, you, PANES, type Choice, type Ctx, type Pane, type Say, type TalkMemory, type Visit } from './kit';
 export { acquainted, relationOf, PANES, type Choice, type Pane, type Say, type TalkMemory, type Visit } from './kit';
 import type { Meeting } from '../meetings';
 import { subjectsOf } from './subjects/life';
@@ -67,11 +67,14 @@ const henryKnowsTroubleBy = (c: Ctx, man: Id) => Object.values(c.w.facts).filter
 export function begin(w: World, npcId: Id, o: { approach?: Id } = {}): Visit {
   const h = w.chars[w.playerId!], n = w.chars[npcId];
   const wh = whereIs(w, h, n);
-  const v: Visit = { npc: npcId, where: wh.name, t0: w.now, lines: [], choices: [], relation: '', mem: { said: [], argued: [], pressed: 0, points: [], offered: {} }, approach: o.approach, th: newThread() };
+  // (a man who has come to find the player is where the player is, not at his own home)
+  const v: Visit = { npc: npcId, where: o.approach ? `with you in ${h.district}` : wh.name, t0: w.now, lines: [], choices: [], relation: '', mem: { said: [], argued: [], pressed: 0, points: [], offered: {} }, approach: o.approach, th: newThread() };
   const c = ctx(w, v);
   const rel0 = relationOf(w, h, n);
   v.relation = rel0.words;
   if (o.approach) narr(c, `${n.name} has come to find you.`);
+  // (calling on a man at home in the small hours is calling on a man who was asleep: he says so, and it costs a little)
+  else if (wh.kind === 'home') { const hr = (w.now % DAY) / 60; if (hr >= 23 || hr < 6) { narr(c, n.rank === 'civilian' ? `${n.name.split(' ')[0]} comes to the door in his coat, blinking. It’s the middle of the night.` : `${n.name.split(' ')[0]} opens the door himself, not pleased. “Do you know what time it is?”`); door.regard(w, n, h.id, 'affection', -0.02, `${h.name} woke him in the night`); } }
   // he decides whether there is a conversation at all: a man who threw the player out today won't start another one
   if ((h.cooldown[`shut:${n.id}`] ?? 0) > w.now && !o.approach) {
     const tp = temper(n);
@@ -80,6 +83,9 @@ export function begin(w: World, npcId: Id, o: { approach?: Id } = {}): Visit {
     door.met(w, h, n);
     return v;
   }
+  // (he sent for the player for coffee, and the player has come to him: that is what this is, and it is answered by coming)
+  const coffee = w.jobs.find((j) => j.kind === 'summons' && j.meeting === 'social' && j.status === 'offered' && j.giver === n.id && j.assignee === h.id);
+  if (coffee) { door.attended(w, coffee); narr(c, `He asked you to come by. He pours you a coffee before he says anything.`); }
   open(c, rel0.level);
   arrival(c);
   const m = memOf(w, n.id); m.visits++; m.last = w.now;
@@ -346,7 +352,7 @@ function pane(c: Ctx, k: Pane, all = false) {
 function home(c: Ctx) {
   c.v.pane = undefined; c.v.more = false; c.v.topic = undefined;
   // (what he asked and is still waiting on comes first, until it is answered: looking at something else does not unask it)
-  const his = [...(c.v.waiting ? [{ id: 'answer', label: `Answer him: ${c.v.waiting.q}`, group: 'reply' as const }] : []), ...actRows(c, undefined, ['his']).slice(0, 2)];
+  const his = [...(c.v.waiting ? (c.v.waiting.choices.length === 1 ? c.v.waiting.choices : [{ id: 'answer', label: `Answer him: ${c.v.waiting.q}`, group: 'reply' as const }]) : []), ...actRows(c, undefined, ['his']).slice(0, 2)];
   const heads: Choice[] = PANES.filter((k) => subjects(c, k).length || subjects(c, k, true).length).map((k) => ({ id: 'u:' + k, label: PANE_WORD[k], group: 'intent' }));
   c.v.choices = [...his, ...heads, { id: 'leave', label: 'Leave', group: 'leave' }];
 }
@@ -439,6 +445,8 @@ function jobNews(c: Ctx) {
     const key = j.status === 'done' ? (j.reported ? 'job.ack.thanks' : 'job.ack.done') : j.status === 'failed' ? 'job.ack.failed' : j.accepted ? 'job.ack.moot' : j.status === 'declined' ? 'job.ack.declined' : 'job.ack.ignored';
     him(c, plain(n.id, key, { job: jobPhrase(j.title) }, j.status === 'done' ? 'warm' : 'cold'));
     remember(w, n.id, 'job:' + j.id, j.status);
+    // (he has asked how it went: the answer is what the player can say first)
+    if (key === 'job.ack.done') c.v.waiting = { q: 'how the job went', choices: [{ id: 'a:report', label: line(c, 'report.job'), group: 'reply' }] };
   }
 }
 // a job's title, as a man would refer to it ("the Costa's Deli delivery"), when it reads as a name; otherwise "that job"
@@ -476,7 +484,7 @@ export function choose(w: World, v: Visit, id: string): { v: Visit; minutes: num
     if (!kept.some((l) => l.who === 'him')) {
       const dropped = mine.find((l) => l.who === 'him' && prev.has(l.text) && /^“/.test(l.text) && !/^“Like I said/.test(l.text));
       if (!again && dropped) v.lines.push({ ...dropped, text: prev.has(restate(dropped.text)) ? '“My answer’s the same.”' : restate(dropped.text) });
-      else { const c = ctx(w, v), alr = vsay(w, c.n, c.h, 'already'); v.lines.push(prev.has(alr) ? { who: 'narr', text: 'He has nothing more to say on it.' } : { who: 'him', text: alr }); }
+      else { const c = ctx(w, v), alr = unattributed(vsay(w, c.n, c.h, 'already'), c.n); v.lines.push(prev.has(alr) ? { who: 'narr', text: 'He has nothing more to say on it.' } : { who: 'him', text: alr }); }
     }
   }
   return { ...r, v: notNow(w, r.v) };
@@ -657,11 +665,11 @@ function doLoan(c: Ctx, amt: number, how?: string) {
   if (arg) neg.made.push(arg);
   const made = neg.made;
   const offered = { ...(made.includes('rep') ? { reputation: true } : {}), ...(made.includes('rate') ? { rate: 0.08 } : {}), ...(made.includes('promise') ? { promise: 'the end of the month' } : {}) };
-  if (how === 'take' && c.v.mem.offered.loan) { const sit = openAsk(w, 'borrow', h, n, { amt: Number(c.v.mem.offered.loan) }); if (sit) door.agree(w, sit, 'loan'); says(c, temper(n).agreeable > 0.55 ? '“Good. We understand each other.”' : '“Done. Don’t make me come looking for it.”', settled(n.id, 'agrees', 'you took his figure')); card(c, 'card.agreed.loan', { amt: `$${c.v.mem.offered.loan}`, rate: String(c.v.mem.offered.rate ?? 5) }); remember(w, n.id, 'loan', 'agreed'); return general(c); }
+  if (how === 'take' && c.v.mem.offered.loan) { const sit = openAsk(w, 'borrow', h, n, { amt: Number(c.v.mem.offered.loan), rate: Number(c.v.mem.offered.rate ?? 5) / 100 }); if (sit) door.agree(w, sit, 'loan'); says(c, temper(n).agreeable > 0.55 ? '“Good. We understand each other.”' : '“Done. Don’t make me come looking for it.”', settled(n.id, 'agrees', 'you took his figure')); card(c, 'card.agreed.loan', { amt: `$${c.v.mem.offered.loan}`, rate: String(c.v.mem.offered.rate ?? 5) }); remember(w, n.id, 'loan', 'agreed'); return general(c); }
   const r = onLoanRequest(c.pn(), h, amt, mem, offered, arg, made);
   c.v.mem.points = [...mem.said];
   him(c, r);
-  if (r.decision.chosen === 'accept') { const rate = offered.rate ? 8 : 5; const sit = openAsk(w, 'borrow', h, n, { amt }); if (sit) door.agree(w, sit, 'loan'); card(c, 'card.agreed.loan', { amt: `$${amt}`, rate: String(rate) }); remember(w, n.id, 'loan', 'agreed'); c.v.th.loan = undefined; return general(c); }
+  if (r.decision.chosen === 'accept') { const rate = offered.rate ? 8 : 5; const sit = openAsk(w, 'borrow', h, n, { amt, rate: rate / 100 }); if (sit) door.agree(w, sit, 'loan'); card(c, 'card.agreed.loan', { amt: `$${amt}`, rate: String(rate) }); remember(w, n.id, 'loan', 'agreed'); c.v.th.loan = undefined; return general(c); }
   remember(w, n.id, 'loan', r.decision.chosen);
   if (r.counter) { c.v.mem.offered.loan = r.counter.amt; c.v.mem.offered.rate = Math.round(r.counter.rate * 100); }
   c.v.choices = [...r.followups.slice(0, 3).map((f) => ({ id: `loan:${amt}:${f.key === 'accept.counter.loan' ? 'take' : f.key === 'argue.reputation' ? 'rep' : f.key === 'sweeten.rate' ? 'rate' : 'promise'}`, label: line(c, f.key, f.slots ?? {}), group: 'reply' as const })), { id: 'back', label: line(c, 'let.go'), group: 'reply' }, { id: 'leave', label: 'Leave', group: 'leave' }];

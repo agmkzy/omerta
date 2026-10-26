@@ -184,7 +184,7 @@ ok('35 days on, every starting life is still running through the ordinary system
         assert.equal(r.minutes, 240);
         assert.equal(p.cash - c0, b0 - shop.cash, 'every dollar of wages came out of the till');
         assert.ok(p.cash - c0 <= 75);
-        advance(w, w.now + r.minutes);
+        advance(w, w.now + DAY); // (a day job is one shift a day: orders.workShift)
       }
     }
     advance(w, w.now + 35 * DAY);

@@ -15,7 +15,7 @@ const baseCache = new Map<string, string>();
 
 /** World `seed` run for `days` days (built once per file and cached as a save), with the keyed V75 situations removed
  * (disputes and crew matters kept) and the situation cooldowns cleared, so a check starts its own situations. */
-export const situationWorld = (seed: number, days: number) => { const k = seed + ':' + days; if (!baseCache.has(k)) { const b = createWorld(seed, 'Tony Marino'); advance(b, b.now + days * DAY); baseCache.set(k, serialize(b)); } const w = deserialize(baseCache.get(k)!); w.situations = (w.situations ?? []).filter((s) => !s.key || s.kind === 'dispute' || s.kind === 'crew'); w.sitcool = {}; return w; };
+export const situationWorld = (seed: number, days: number) => { const k = seed + ':' + days; if (!baseCache.has(k)) { const b = createWorld(seed, 'Tony Marino'); advance(b, b.now + days * DAY); baseCache.set(k, serialize(b)); } const w = deserialize(baseCache.get(k)!); w.situations = (w.situations ?? []).filter((s) => !s.key || s.kind === 'dispute' || s.kind === 'crew'); w.sitcool = {}; if (w.sitpace) { w.sitpace.lastMajor = -1e9; w.sitpace.lastVisible = -1e9; } return w; }; // (the pacing of the situations it has just cleared goes with them)
 
 // A boss and a man who answers to him, both in the same family, neither the player.
 export function pair(w: World, rank = 'soldier') {

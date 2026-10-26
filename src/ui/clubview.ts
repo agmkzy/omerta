@@ -5,12 +5,14 @@ import { sundayDue } from './sunday';
 import { avatar, back } from './common';
 import { esc, lk, P, W } from './links';
 
+// an hour as a man says it: '11 in the morning', '2 at night'
+const clock = (h0: number) => { const h = h0 % 24; return h === 0 ? 'midnight' : h === 12 ? 'noon' : h < 5 ? `${h} at night` : h < 12 ? `${h} in the morning` : h < 18 ? `${h - 12} in the afternoon` : `${h - 12} in the evening`; };
 export function clubView(): string {
   const w = W(), p = P();
   const cl = clubOf(w, p.familyId);
   if (!cl) return back() + `<p class="muted pad">Your family has no club.</p>`;
   const owner = w.chars[cl.ownerId];
-  let out = back() + `<div class="ui-card"><h2>${esc(cl.name)}</h2><p class="muted">${esc(cl.district)} &middot; run by ${owner ? esc(owner.name) : 'nobody now'}. Open ${cl.open[0]}:00 to ${cl.open[1] % 24}:00.</p></div>`;
+  let out = back() + `<div class="ui-card"><h2>${esc(cl.name)}</h2><p class="muted">${esc(cl.district)} &middot; run by ${owner ? esc(owner.name) : 'nobody now'}. Open ${clock(cl.open[0])} until ${clock(cl.open[1])}.</p></div>`;
   if (!clubOpen(w, cl)) return out + `<p class="muted pad">The shutters are down. ${owner ? esc(owner.name.split(' ')[0]) + ' opens' : 'It opens'} at ${cl.open[0]}:00.</p>`;
 
   const here = clubPresent(w, cl);

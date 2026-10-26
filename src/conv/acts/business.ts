@@ -543,7 +543,7 @@ const tributeA: Act = {
 function matterOpen(w: World, s: Situation, last?: string): string {
   const b = s.biz ? w.biz[s.biz]?.name : undefined, seen = !!last;
   const L: Record<string, [string, string]> = {
-    protect: [`“I want to talk to you about ${b ?? 'the place'}. About keeping it in one piece.”`, last === 'stall' ? `“You’ve had time to think about ${b ?? 'it'}.”` : last === 'counter' ? '“I’ve thought about your figure.”' : `“About ${b ?? 'the place'}. I’d like a better answer than last time.”`],
+    protect: [`“I want to talk to you about ${b ?? 'the place'}. About keeping it in one piece.”`, last === 'stall' ? `“You’ve had time to think about ${b ?? 'it'}.”` : last === 'counter' ? '“I’ve thought about your figure.”' : `“About ${b ?? 'the place'}. Think it over again.”`],
     borrow: ['“I need to borrow some money.”', '“About the loan I asked you for.”'],
     lend: ['“I could help you out with some money.”', '“About the money I offered you.”'],
     recruit: ['“I’ve got a proposition for you. Come in with me.”', '“About what I said. Coming in with me.”'],

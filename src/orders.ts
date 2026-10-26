@@ -2,6 +2,7 @@
 // A man you send out is not a function call. He may do it well, do it and skim, lose half of it at cards,
 // find the debtor was not home, get distracted by something at home, start a fight, or decide the debtor
 // deserves more time. When he comes back he tells you a story, and the story may not be the true one.
+import { knowsProtection } from './acquaint';
 import { temper } from './temper';
 import { applyRank } from './rank';
 import { addFact, bear, clamp, feel, feelOn, feelTo, learn, money, ownerBiz, recordCareer, rel, repute, shortTime, travelTime, witnessesAt } from './core';
@@ -350,7 +351,8 @@ export function orderMenu(w: World, p: Character): OrderOpt[] {
   for (const n of needsOf(w, p)) out.push({ group: GROUP[n.kind] ?? 'Other', label: n.title, hint: n.why, need: n });
   out.push({ group: 'Cars', label: 'Boost cars', hint: 'Steal cars to sell or chop.', need: { kind: 'boost', title: 'Boost some cars', brief: 'Steal cars.', pay: 0, why: '', weight: 0 } });
   for (const b of Object.values(w.biz).filter((x) => x.open && x.kind !== 'casino' && x.protection?.familyId !== p.familyId && w.chars[x.ownerId]?.alive).sort(near).slice(0, 3))
-    out.push({ group: 'Burglary', label: `Burgle ${b.name}`, hint: b.district, need: { kind: 'burgle', title: `Burgle ${b.name}`, brief: `Take what’s in ${b.name}.`, biz: b.id, pay: 0, why: '', weight: 0 } });
+    // (what he knows of who looks after it is part of the choice: acquaint.knowsProtection; a place across the city may be anybody's)
+    out.push({ group: 'Burglary', label: `Burgle ${b.name}`, hint: `${b.district}. ${!knowsProtection(w, p, b) ? 'You don’t know who looks after it, if anyone.' : b.protection ? `It pays the ${w.fam[b.protection.familyId].name} family. They’ll take it personally.` : 'Nobody looks after it.'}`, need: { kind: 'burgle', title: `Burgle ${b.name}`, brief: `Take what’s in ${b.name}.`, biz: b.id, pay: 0, why: '', weight: 0 } });
   for (const b of Object.values(w.biz).filter((x) => x.open && x.kind !== 'casino' && x.ownerId !== p.id && w.chars[x.ownerId]?.alive).sort(near).slice(0, 4)) {
     const o = w.chars[b.ownerId];
     out.push({ group: 'Scams', label: `Work ${o.name} at ${b.name}`, hint: o.traits.caution > 0.65 ? 'Looks careful with his money.' : 'Looks trusting.', need: { kind: 'scam', title: `Work ${o.name}`, brief: `Find out how much ${o.name} will give up.`, biz: b.id, target: o.id, pay: 0, why: '', weight: 0 } });

@@ -22,6 +22,7 @@ function favours(sizes: number[]): string {
   return `${NUM[sizes.length] ?? sizes.length} favours, the largest ${favourWord(Math.max(...sizes))}`;
 }
 
+const his = (c: Character) => (isFemale(c) ? 'her' : 'his');
 export function between(w: World, p: Character, c: Character): Tie[] {
   const out: Tie[] = [];
   const He = isFemale(c) ? 'She' : 'He', him = isFemale(c) ? 'her' : 'him';
@@ -42,6 +43,9 @@ export function between(w: World, p: Character, c: Character): Tie[] {
     if (col?.id === p.id) out.push({ kind: 'place', tone: behind ? 'warn' : 'good', text: `${esc(b.name)} pays you ${esc(money(b.protection.fee))} a week${behind}.` });
     else if (col && col.bossId === p.id) out.push({ kind: 'place', tone: behind ? 'warn' : '', text: `${esc(b.name)} pays your man ${esc(col.name)} ${esc(money(b.protection.fee))} a week${behind}.` });
   }
+  // a share the player holds in his trade (econ.stakesOf): what it is, and what it pays out of his till each week
+  for (const x of Object.values(w.biz).filter((y) => y.ownerId === c.id && y.open)) for (const st of (x.stakes ?? []).filter((y) => y.holder === p.id))
+    out.push({ kind: 'place', tone: 'good', text: `You hold ${Math.round(st.share * 100)}% of ${esc(x.name)}. It pays you about ${esc(money(Math.round(x.income * st.share * 0.8)))} a week out of ${his(c)} till.` });
   // favours (from: the one owed; to: the one who owes)
   const toMe = w.favours.filter((f) => !f.settled && f.from === p.id && f.to === c.id).map((f) => f.size);
   const toHim = w.favours.filter((f) => !f.settled && f.from === c.id && f.to === p.id).map((f) => f.size);

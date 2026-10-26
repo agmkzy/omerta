@@ -190,9 +190,18 @@ const B: Record<string, Entry> = {
     _: ['“I can’t carry it. Look at this place.”'],
   },
 
+  // (each owner names his figure as the man he is: a careful man asks what he gets, a proud one makes it sound like his idea, a
+  // frightened one can hardly say it)
   'counter.protection': {
-    _: ['“{amt} I could do, if it means the street stays quiet. What do I get for it?”'],
+    _: ['“{amt} I could do, if it means the street stays quiet. What do I get for it?”', '“{amt}. More than that and I’m working for you.”'],
     bitter: ['“{amt}. That’s all there is, and what do I get for it?”'],
+    frightened: ['“I— {amt}? Could it be {amt}? That’s what I can manage. I swear it is.”'],
+    proud: ['“{amt}. And the street stays quiet, or we talk again.”'],
+    hothead: ['“{amt}, and that’s generous. Take it or don’t.”'],
+    jovial: ['“You’re a reasonable man, I can see it. {amt}, and we both sleep at night.”'],
+    schemer: ['“Let’s say {amt}, and you remember I didn’t make you work for it.”'],
+    cold: ['“{amt}.”'],
+    earnest: ['“{amt} is what the place can carry. I’m being straight with you.”'],
   },
   'accept.protection.afraid': {
     _: ['“All right. All right. {amt} a week.”'],

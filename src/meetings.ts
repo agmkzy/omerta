@@ -40,6 +40,13 @@ export interface Meeting {
 
 const PL = (w: World) => w.chars[w.playerId!];
 export const available = (w: World, c: Character) => c.alive && c.jailedUntil <= w.now && c.hurtUntil <= w.now && isAwake(c, w.now);
+// why a man who sent for the player cannot see him right now, and when he can: said plainly, not "he isn't available"
+export function notNowWhy(w: World, c: Character): string {
+  if (c.jailedUntil > w.now) return `${c.name} has been picked up. Whatever he wanted will wait until he’s out.`;
+  if (c.hurtUntil > w.now) return `${c.name} is laid up at home. He’ll send for you again when he’s on his feet.`;
+  const h = c.wake % 24;
+  return `${c.name} keeps his own hours, and this isn’t one of them. He’ll see you after ${h === 0 ? 'midnight' : h < 12 ? `${h} in the morning` : h === 12 ? 'noon' : `${h - 12} in the afternoon`}.`;
+}
 const pickN = <T>(w: World, xs: T[], n: number): T[] => {
   const a = xs.slice();
   const out: T[] = [];
@@ -311,7 +318,7 @@ export function openCrewMeeting(w: World, p: Character, focus?: Grievance): Meet
 export function openAccountsMeeting(w: World, p: Character, job: Job): Meeting | string {
   const boss = job.giver ? w.chars[job.giver] : undefined;
   if (!boss || !boss.alive) return 'He’s not around any more.';
-  if (!available(w, boss)) return `${boss.name} isn’t available right now. He expects you to try again soon.`;
+  if (!available(w, boss)) return notNowWhy(w, boss);
   const amt = Number(job.extra?.amt ?? 0);
   const kind = String(job.extra?.kind ?? 'short');
   const item = mkItem('accounts', `${boss.name}'s office`, [kind === 'missed' ? `${boss.name} doesn’t stand up. "You owe me ${money(Math.max(amt, p.books.arrears))}. I want to know when I get it."` : `${boss.name} turns a ledger around so you can read it. "About ${money(amt)} is missing from your end. Tell me where it went."`], [], { boss: boss.id, amt: Math.max(amt, p.books.arrears), kind });
@@ -852,7 +859,7 @@ export function summonsTick(w: World) {
   }
   if (boss?.alive && w.rng.chance(1 / 60) && cd('summons:coffee', 30)) {
     const rivalFam = Object.values(w.fam).find((f) => f.id !== p.familyId && (fam.tension[f.id] ?? 0) > 3);
-    mkJob(w, { kind: 'summons', meeting: 'family', giver: boss.id, via: 'boss', assignee: p.id, pay: 0, days: 4, title: rivalFam ? `A complaint from the ${rivalFam.name} family` : 'Coffee at the club', brief: rivalFam ? `${boss.name} has had a visitor from the ${rivalFam.name} family, and it was not a pleasant conversation. He wants everyone who might know something in the room.` : `${boss.name} has invited you for coffee at the club. It’s not business. It’s always business.` });
+    mkJob(w, { kind: 'summons', meeting: rivalFam ? 'family' : 'social', giver: boss.id, via: 'boss', assignee: p.id, pay: 0, days: 4, title: rivalFam ? `A complaint from the ${rivalFam.name} family` : 'Coffee at the club', brief: rivalFam ? `${boss.name} has had a visitor from the ${rivalFam.name} family, and it was not a pleasant conversation. He wants everyone who might know something in the room.` : `${boss.name} has invited you for coffee at the club. It’s not business. It’s always business.` });
     return;
   }
   const crew = subordinates(w, p).filter((c) => c.alive);

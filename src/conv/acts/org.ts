@@ -54,14 +54,15 @@ const work: Act = {
     if (t.id === p.bossId) door.bossWork(w);
     else { const d = chance(w, t.id, 'puts something your way', 'has nothing', [term('base', 0.35), term('his trust in you × 0.5', R(x).trust * 0.5)]); if (d.yes) door.offerWork(w, t, false, true); }
     line(x, voice(x, w.jobs.length > n0 ? 'work_some' : t.id === p.bossId ? 'work_boss_none' : 'work_none'));
-    if (w.jobs.length > n0) line(x, jobSaid(w.jobs.at(-1)!));
+    // (work he has just put to the player is answered now, to his face: take it or not)
+    if (w.jobs.length > n0) { const j = w.jobs.at(-1)!; line(x, jobSaid(j)); if (j.status === 'offered' && j.giver === t.id) { c.v.th.raised.push('job:' + j.id); return { minutes: 25, next: jobOffer.offersFor!(c, j.id) }; } }
     return out(25);
   },
 };
 const bNeed: Act = {
   base: 'b_need', pane: 'business',
   offers: (c) => (isBoss(c) && !asked(c, 'b_need') ? [offer(c, 'b_need', 'Ask what he needs done', 'It could be anything.')] : []),
-  run: (c) => { const x = T(c), { w, t } = x, n0 = w.jobs.length; ask(c, 'b_need'); const held = inHandFrom(c); if (held) { line(x, `"You’ve still got ${held.title.length <= 48 ? `‘${held.title}’` : 'what I gave you'}. Finish that first."`); return out(5); } if (door.bossWork(w) || w.jobs.length > n0) { c.v.lines.push({ who: 'narr', text: `${t.name} thinks a moment.` }); line(x, jobSaid(w.jobs.at(-1)!)); } else line(x, `${t.name} waves a hand. "Nothing now. Don’t look for work. It finds you."`); return out(15); },
+  run: (c) => { const x = T(c), { w, t } = x, n0 = w.jobs.length; ask(c, 'b_need'); const held = inHandFrom(c); if (held) { line(x, `"You’ve still got ${held.title.length <= 48 ? `‘${held.title}’` : 'what I gave you'}. Finish that first."`); return out(5); } if (door.bossWork(w) || w.jobs.length > n0) { const j = w.jobs.at(-1)!; c.v.lines.push({ who: 'narr', text: `${t.name} thinks a moment.` }); line(x, jobSaid(j)); c.v.th.raised.push('job:' + j.id); return { minutes: 15, next: jobOffer.offersFor!(c, j.id) }; } else line(x, `${t.name} waves a hand. "Nothing now. Don’t look for work. It finds you."`); return out(15); },
 };
 const bMore: Act = {
   base: 'b_more', pane: 'business',
@@ -76,7 +77,8 @@ const bMore: Act = {
   },
 };
 // work he has put the player's way and is waiting to hear about: raised by him, answered to his face
-const offered = (c: Ctx) => c.w.jobs.find((j) => j.giver === c.n.id && j.status === 'offered' && (!j.assignee || j.assignee === c.h.id) && !staleReason(c.w, j));
+// (a summons is not work to take care of: it is attended, where it is called; coffee he asked the player to is this conversation)
+const offered = (c: Ctx) => c.w.jobs.find((j) => j.giver === c.n.id && j.status === 'offered' && j.kind !== 'summons' && (!j.assignee || j.assignee === c.h.id) && !staleReason(c.w, j));
 // work of his the player already has in hand: he does not hand out more on top of it, and says so
 const inHandFrom = (c: Ctx) => c.w.jobs.find((j) => j.giver === c.n.id && j.status === 'active' && j.assignee === c.h.id && j.kind !== 'summons');
 const hasAsk = (c: Ctx) => c.w.enc.some((e) => e.status === 'open' && e.from === c.n.id && e.expires > c.w.now && e.opts.length);
@@ -84,7 +86,7 @@ const jobOffer: Act = {
   base: 'job', pane: 'business', opens: true,
   // (once he has put it to the player in this visit, coming back to it is "about that work", not asking whether he has any)
   offers: (c) => { const j = offered(c); return j && !hasAsk(c) ? [{ code: 'job:' + j.id, label: (() => { const k = workTo(c, j); return k ? `About the work he wants done: ${k.rest}` : `About what he asked: ${j.title}`; })(), says: c.v.th.raised.includes('job:' + j.id) ? 'About that work you mentioned.' : 'You had something for me?', note: `${j.pay ? `Pays ${money(j.pay)}. ` : ''}He wants an answer.`, kind: 'his' }] : []; },
-  offersFor: (c, id) => { const j = c.w.jobs.find((q) => q.id === id && q.status === 'offered'); return j ? [{ code: 'jobtake:' + j.id, label: 'I’ll take care of it', note: `It’s yours. Pays ${money(j.pay ?? 0)}.` }, { code: 'jobpass:' + j.id, label: 'Not this time', note: 'He will think a little less of you for it.' }] : []; },
+  offersFor: (c, id) => { const j = c.w.jobs.find((q) => q.id === id && q.status === 'offered'); return j ? [{ code: 'jobtake:' + j.id, label: 'I’ll take care of it', note: j.pay ? `It’s yours. Pays ${money(j.pay)}.` : j.kind === 'lean' ? 'It’s yours. No pay in it: the shop goes on your book, and the envelope is yours.' : 'It’s yours. There’s no money in it; it’s for him.' }, { code: 'jobpass:' + j.id, label: 'Not this time', note: 'He will think a little less of you for it.' }] : []; },
   run: (c, code) => {
     const x = T(c), id = code.split(':')[1], j = c.w.jobs.find((q) => q.id === id);
     if (!j) return out(2);
@@ -110,7 +112,7 @@ const unreported = (c: Ctx) => c.w.jobs.filter((j) => j.status === 'done' && j.g
 const report: Act = {
   base: 'report', pane: 'business',
   offers: (c) => (orders(c) && unreported(c).length ? [{ code: 'report', label: 'Tell him how the job went', says: mine(c, 'report.job'), kind: 'between' }] : []),
-  run: (c) => { const x = T(c), n = door.reportJobs(x.w, x.p, x.t); c.v.lines.push({ who: 'narr', text: `You walk ${x.t.name} through what you did. He seems satisfied. (standing +${n})` }); return out(20); },
+  run: (c) => { const x = T(c); door.reportJobs(x.w, x.p, x.t); c.v.lines.push({ who: 'narr', text: `You walk ${x.t.name.split(' ')[0]} through what you did. He seems satisfied.` }); return out(20); },
 };
 const activeOrders = (c: Ctx) => c.w.jobs.filter((q) => q.status === 'active' && q.giver === c.n.id && q.assignee === c.h.id && (q.via === 'boss' || q.via === 'tip')).slice(0, 2);
 // the work, said to the man who gave it: "he wants Vito dealt with", never his own name back at him ("Frankie wants Vito dealt with")

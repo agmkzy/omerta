@@ -5,7 +5,7 @@ import { addFact, bear, clamp, compat, ease as coreEase, feel, feelAtLeast, feel
 import * as deeds from '../deeds';
 import { share, confide as tellAbout } from '../actions';
 import { handOver as booksHandOver, react as booksReact } from '../books';
-import { bossOffer, declineJob, mkJob, oppFrom, reached, takeJob, tipFrom } from '../jobs';
+import { attendedJob, bossOffer, declineJob, mkJob, oppFrom, reached, takeJob, tipFrom } from '../jobs';
 import { choose as encChoose } from '../encounters';
 import { askAbout as sitAskAbout, helpWith as sitHelpWith } from '../situations';
 import { matterAct as mAct } from '../matters';
@@ -160,6 +160,8 @@ export function offerWork(w: World, from: Character, boss: boolean, chance: bool
 export function bossWork(w: World): boolean { return bossOffer(w, true); }
 export function fenceWork(w: World, t: Character): boolean { return oppFrom(w, t); }
 export function takeWork(w: World, j: Job): void { takeJob(w, j); }
+// a summons answered by going to him (coffee he asked the player to: the visit is the meeting)
+export function attended(w: World, j: Job): void { attendedJob(w, j); }
 export function passWork(w: World, j: Job): void { declineJob(w, j); }
 export function reportJobs(w: World, p: Character, t: Character): number { return deeds.reportJobs(w, p, t); }
 export function refuseJob(w: World, p: Character, j: Job): void { deeds.refuseJob(w, p, j); }

@@ -130,7 +130,10 @@ export function needs(): Need[] {
     if (s.group !== 'now' && !missed) continue;
     if (s.pending && out.some((n) => n.a === `story:${s.key}`)) continue;
     if (out.some((n) => n.a === `dispute:${s.key}` || n.a === `story:${s.key}`)) continue;
-    out.push({ dot: s.tone === 'red' ? 'red' : 'amber', k: storyK(w, p, s), title: s.title, sub: s.stage, a: `story:${s.key}` });
+    // (a request of the player's that was turned down is not something wanting him: it is there if he wants to try again)
+    const sit = s.kind === 'matter' ? (w.situations ?? []).find((x) => 'sit:' + x.id === s.key) : undefined;
+    const refused = !!sit && sit.terms?.by === p.id && (sit.phase === 'refused' || sit.st?.[sit.terms?.of ?? '']?.last === 'no');
+    out.push({ dot: refused ? 'green' : s.tone === 'red' ? 'red' : 'amber', k: refused ? 'Turned down' : storyK(w, p, s), title: s.title, sub: refused ? `${s.stage.replace(/[.!?]?$/, '.')} You can try again, or let it go.` : s.stage, a: `story:${s.key}` });
   }
   // his word, falling due: what he promised a man, and when he said it would be done (commitments.ts: every record his word is kept in)
   for (const r of fallingDue(w, p)) {
@@ -144,7 +147,7 @@ export function needs(): Need[] {
   // work he has taken on and not finished: his, wherever he said yes to it, until it is done (doing what it asks, his own way, does it)
   for (const j of w.jobs.filter((x) => x.status === 'active' && x.assignee === p.id && x.kind !== 'summons' && x.giver !== p.id)) {
     const g = j.giver ? w.chars[j.giver] : undefined;
-    out.push({ dot: 'amber', k: 'Work you took on', title: j.title, sub: `${g ? `For ${g.name}. ` : ''}${j.kind === 'lean' && j.biz ? `Put it to the owner of ${w.biz[j.biz]?.name ?? 'the place'}, here or in person; it is done when he pays you.` : 'Open it to see it through.'}`, a: `job:${j.id}`, who: g?.id });
+    out.push({ dot: 'amber', k: 'Work you took on', title: j.title, sub: `${g ? `For ${g.name}. ` : ''}${j.kind === 'lean' && j.biz && w.biz[j.biz] ? `Go and see ${w.chars[w.biz[j.biz].ownerId]?.name ?? 'the owner'} and put it to him. It’s done when he pays you.` : 'Open it to see it through.'}`, a: `job:${j.id}`, who: g?.id });
   }
   // work done and not yet told to the man who gave it
   for (const j of w.jobs.filter((x) => x.status === 'done' && !x.reported && x.assignee === p.id && x.giver && x.giver !== p.id && w.chars[x.giver]?.alive && w.now - x.created < 30 * DAY)) {
@@ -430,7 +433,8 @@ export function bizView(id: Id): string {
   // the place leads to its owner first, and to the business you could do with him there: buying in, lending, protection
   out += acts(btn(`talk:${o.id}`, whereIs(w, p, o).kind === 'shop' ? `Walk in and talk to ${o.name.split(' ')[0]}` : `Find ${o.name.split(' ')[0]}`, 'primary'),
     o.id !== p.id && o.alive ? btn(`talk:${o.id}|g:business`, `Talk business with ${o.name.split(' ')[0]}`) : '',
-    !prot || prot.familyId !== p.familyId ? btn(`plan:lean|${b.id}`, 'Lean on it') : btn(`plan:burgle|${b.id}`, 'Other ideas'));
+    // (leaning on a place is putting it to its owner: the same conversation, the same rule of whose place it is to lean on)
+    !prot && o.alive && o.id !== p.id ? btn(`talk:${o.id}|g:business`, 'Lean on it') : prot && prot.familyId !== p.familyId ? btn(`plan:lean|${b.id}`, 'Lean on it') : btn(`plan:burgle|${b.id}`, 'Other ideas'));
   if (prot && lateOf(b) > 0 && prot.collectorId === p.id) out += context([`${esc(o.name)} is behind by <b>${esc(money(owedOf(b)))}</b>. You can send a man to shake him, or go yourself.`], true) + acts(btn(`shake:${b.id}`, 'Shake him myself', 'danger'), btn('orders:', 'Send a man'));
   const who: KV[] = [['Owner', o.id === p.id ? 'you' : pl(o)]];
   // (who looks after it is known on his own streets, or where he has been or heard; not across the whole city: acquaint.knowsProtection)

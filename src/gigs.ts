@@ -28,6 +28,10 @@ export const isGig = (j: Job) => j.kind === 'gig';
 const open = (w: World, g: GigKind) => w.jobs.some((j) => j.kind === 'gig' && gigOf(j) === g && (j.status === 'offered' || j.status === 'active'));
 const GOODS: Record<string, string> = { bar: 'liquor', restaurant: 'meat and wine', deli: 'cured meat and cheese', grocer: 'produce and canned goods', butcher: 'sides of beef', fish: 'a morning’s catch', jeweller: 'a case of watches', pharmacy: 'prescription stock', hardware: 'power tools', garage: 'car parts', candy: 'cigarettes and candy', newsstand: 'cartons of cigarettes', cafe: 'coffee and pastries', bakery: 'flour and sugar' };
 const WEEKDAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+// the night a truck runs: nine in the evening of that day (a job named for a night happens that night, not whenever it is taken up)
+// where you would find a city man at a given hour
+const partWord = (t: number) => { const h = Math.floor((t % DAY) / 60); return h < 11 ? 'over his morning coffee' : h < 14 ? 'at lunch' : h < 18 ? 'leaving his office' : 'at his local bar'; };
+const nightOf = (w: World, days: number) => (Math.floor(w.now / DAY) + days) * DAY + 21 * 60;
 const when = (w: World, days: number) => WEEKDAY[Math.floor((w.now + days * DAY) / DAY + 4) % 7];
 
 // ---------------------------------------------------------------- offers
@@ -89,7 +93,7 @@ function shipmentGig(w: World, p: Character): boolean {
   mkJob(w, {
     kind: 'gig', title: `A truck of ${goods} is due at ${b.name}`, giver: src?.id ?? null, via: 'tip', assignee: p.id, biz: b.id, pay: Math.round(value * 0.6), days: 5,
     brief: `${src ? src.name + ' drives for the supplier and says' : 'Word is'} a truck with about ${money(value)} of ${goods} goes to ${b.name} in ${b.district} on ${when(w, 3)} night, one driver, no escort. ${fam ? `${b.name} pays the ${fam} family, and they will want to know who touched it.` : `${b.name} pays nobody, so nobody will come looking out of duty.`} You can take it, take a little of it quietly, or sell the warning.`,
-    extra: { gig: 'shipment', value },
+    extra: { gig: 'shipment', value, at: nightOf(w, 3) },
   });
   return true;
 }
@@ -106,7 +110,7 @@ function escortGig(w: World, p: Character): boolean {
   mkJob(w, {
     kind: 'gig', title: `Ride shotgun for ${b.name}’s delivery`, giver: col ? col.id : o.id, via: 'opportunity', assignee: p.id, biz: b.id, pay, days: 4,
     brief: `${b.name} pays your family, and ${o.name} has a truck of ${goods} coming in on ${when(w, 2)} night. Word is someone from outside has been watching the route. ${col ? col.name + ' would' : o.name + ' would'} like a man in the cab. It pays ${money(pay)}.`,
-    extra: { gig: 'escort' },
+    extra: { gig: 'escort', at: nightOf(w, 2) },
   });
   return true;
 }
@@ -175,8 +179,10 @@ export function gigResolve(w: World, j: Job, doer: Character, code: string): Res
   const b = j.biz ? w.biz[j.biz] : undefined;
   const o = b ? w.chars[b.ownerId] : undefined;
   const lines: string[] = [];
+  // (a job set for a night is done that night: taken up before it, the hours until then pass first)
+  const at = Number(j.extra?.at ?? 0), wait = at > w.now ? at - w.now : 0;
   let minutes = rng.int(90, 220), ok = false, gained = 0, note: string | undefined;
-  const res = (): Result => ({ lines, minutes, ok, money: gained || undefined, note });
+  const res = (): Result => ({ lines: wait ? [`You wait for ${WEEKDAY[Math.floor(at / DAY + 4) % 7]} night.`, ...lines] : lines, minutes: minutes + wait, ok, money: gained || undefined, note });
   const caution = doer.traits.caution, courage = doer.traits.courage, violence = doer.traits.violence;
   switch (gigOf(j)) {
     case 'muscle': {
@@ -317,7 +323,7 @@ export function gigResolve(w: World, j: Job, doer: Character, code: string): Res
         if (rng.chance(pr)) {
           ok = true; b.distress = Math.max(0, b.distress - 1);
           feel(w, o, doer.id, 'trust', 0.1);
-          lines.push(`You find the inspector at lunch and mention that ${o.name} is a friend of some friends. He remembers an urgent call. ${first(o)} owes you a good word.`);
+          lines.push(`You find the inspector ${partWord(w.now + minutes)} and mention that ${o.name} is a friend of some friends. He remembers an urgent call. ${first(o)} owes you a good word.`);
           addFavour(w, doer.id, o.id, 1, `a word with the inspector at ${b.name}`);
         } else {
           bump(doer, 0.05); bizMove(w, b, -Math.min(200, Math.max(0, b.cash)), 'fine');
@@ -337,6 +343,7 @@ export function gigStale(w: World, j: Job): string | null {
   const g = gigOf(j);
   const p = PL(w);
   if ((g === 'shipment') && b?.protection?.familyId === p.familyId && b.protection.collectorId === p.id) return `${b.name} is yours now. You wouldn’t rob your own shop.`;
+  if ((g === 'shipment' || g === 'escort') && Number(j.extra?.at ?? 0) && w.now > Number(j.extra?.at) + 8 * 60) return 'The truck came and went. That night is over.';
   if (g === 'inspector' && b && b.distress === 0 && b.damaged === 0 && j.status === 'offered' && w.now - j.created > 3 * DAY) return 'It was sorted without you.';
   if (g === 'courier' && j.giver && !(w.chars[j.giver] && lineOf(w, w.chars[j.giver]))) return 'He’s not running the book any more.';
   void ownerBiz; void ({} as Id);

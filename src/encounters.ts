@@ -897,7 +897,8 @@ export function eventTick(w: World) {
   if (w.rng.chance(0.035)) {
     const fam = w.fam[p.familyId];
     const host = w.rng.pick(Object.values(w.chars).filter((c) => c.alive && c.familyId === fam.id && ['soldier', 'capo', 'underboss'].includes(c.rank)));
-    if (host && !w.events.some((e) => e.host === host.id && w.now - e.t < 90 * DAY)) {
+    // (one happy occasion in the family in three weeks at most, and never the same man's twice in three months)
+    if (host && !w.events.some((e) => e.host === host.id && w.now - e.t < 90 * DAY) && !w.events.some((e) => e.kind !== 'funeral' && Math.abs(w.now - e.t) < 21 * DAY)) {
       const kind = w.rng.chance(0.55) ? 'wedding' : 'christening';
       const ev: LifeEvent = { id: newId(w, 'ev'), kind, t: w.now + 4 * DAY, host: host.id, place: pick(['the hall on Bay Ridge Avenue', 'Our Lady of Pity', "the club's back room", 'a restaurant on Mulberry Street'], host.id + w.now), invited: [] };
       w.events.push(ev);
@@ -910,15 +911,17 @@ function invite(w: World, p: Character, ev: LifeEvent, yes: boolean) {
   if (!yes || pending(w, 'invite')) return;
   const host = w.chars[ev.host];
   const dead = ev.about ? w.chars[ev.about] : undefined;
+  // (whose it is: each occasion is somebody's, so two weddings in a year are two different weddings)
+  const whose = ['daughter', 'son', 'niece', 'nephew', 'eldest', 'youngest'][[...ev.id].reduce((a, ch) => a + ch.charCodeAt(0), 0) % 6];
   const lead = ev.kind === 'funeral'
     ? `"${dead?.name ?? 'He'} is being buried from ${ev.place}. It would mean something if you were there."`
     : by(host, 'inv' + ev.id, {
         jovial: [`"My ${ev.kind === 'wedding' ? 'daughter is getting married' : 'grandson is being christened'} at ${ev.place}, and I want everyone I like in the room. You’re on that list."`],
         proud: [`"My family is holding a ${ev.kind} at ${ev.place}. I expect to see you."`],
-        _: [`"There’s a ${ev.kind} at ${ev.place}. Come. Bring something."`],
+        _: [`"My ${whose}${ev.kind === 'wedding' ? ' is getting married' : '’s little one is being christened'} at ${ev.place}. Come. Bring something."`],
       });
   addEnc(w, {
-    kind: 'invite', from: host.id, title: ev.kind === 'funeral' ? `A funeral: ${dead?.name ?? ''}` : `A ${ev.kind}`,
+    kind: 'invite', from: host.id, title: ev.kind === 'funeral' ? `A funeral: ${dead?.name ?? ''}` : `${host.name.split(' ')[0]}’s ${whose}’s ${ev.kind}`,
     lines: [`${host.name} sends word.`, lead],
     opts: [
       { code: 'big', label: `Go, with a $250 envelope`, hint: 'People see the thickness of it.' },

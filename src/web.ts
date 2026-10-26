@@ -1,3 +1,4 @@
+import { LIVING } from './engine';
 import { standingReasons } from './core';
 import { doMove } from './sitmoves';
 import { matterAct } from './matters';
@@ -17,7 +18,7 @@ import { buyLife, courtBoss, propose, setBoss, setConsigliere, setHeir } from '.
 import { auditMember, checkBooks, envelopeSum, handOver, rule, setStance } from './books';
 import { post } from './ledger';
 import { statement } from './ledger';
-import { closeMeeting, choose as meetChoose, current as meetCurrent, openAccountsMeeting, openCrewMeeting, openFamilyMeeting, openGathering, openInduction, openSitdown } from './meetings';
+import { available, closeMeeting, choose as meetChoose, current as meetCurrent, notNowWhy, openAccountsMeeting, openCrewMeeting, openFamilyMeeting, openGathering, openInduction, openSitdown } from './meetings';
 import { setManager } from './econ';
 import { giveOrder, ownJob, questionReport, recruitProspect, takeDayJob, quitDayJob, workShift } from './orders';
 import { helpMan } from './people';
@@ -27,7 +28,7 @@ import { seePartner, visitKin, askOut, askSteady, askMarry, wedding, tryForBaby,
 import { askPermission } from './politics';
 import { settleDo } from './revenge';
 import { closeOp, countOp, hijack, opRule, startOp } from './rackets';
-import { Kind } from './types';
+import { DAY, Kind } from './types';
 import { createWorld } from './world';
 import type { World } from './types';
 import { relevance } from './reports';
@@ -151,7 +152,7 @@ function collectNews(since: number): string[] {
   return picked.map(({ id, k, f, r }) => {
     const body = lk(f.kind === 'report' ? f.text : factText(f, k.knowsActor));
     const tag = `<span class="why${r.level === 2 ? ' crit' : ''}">${esc(r.why.replace(/^./, (m) => m.toUpperCase()))}</span>`;
-    const src = f.kind === 'report' ? '' : ` <span class="src">${esc(sourceOf(k))} &middot; <a class="nm" href="#" data-a="fact:${id}">details</a></span>`;
+    const src = f.kind === 'report' ? '' : ` <span class="src">${esc(sourceOf(k).replace(/^./, (m) => m.toUpperCase()))} &middot; <a class="nm" href="#" data-a="fact:${id}">details</a></span>`;
     return `${r.level === 2 ? `<b class="crit">${body}</b>` : `<span>${body}</span>`}${f.kind === 'report' ? '' : storyLink(id)}${src}${tag}`;
   });
 }
@@ -192,7 +193,9 @@ function pass(minutes: number, lines: string[], next: View = { t: 'tab', name: '
   S.chips = [];
   const pn = P();
   const dc = Math.round(pn.cash - snap.cash);
-  if (dc) S.chips.push({ t: `${dc > 0 ? '+' : '−'}${money(Math.abs(dc))}`, tone: dc > 0 ? 'good' : 'bad' });
+  // (a week's living goes out every week: when the money moved by about that and nothing else, the chip says so)
+  const weeks = Math.floor(w.now / (7 * DAY)) - Math.floor(t0 / (7 * DAY)), living = weeks * Math.max(0, (LIVING[pn.rank] ?? 100) - pn.wage);
+  if (dc) S.chips.push({ t: `${dc > 0 ? '+' : '−'}${money(Math.abs(dc))}${weeks && dc === -living ? ': a week’s living' : weeks && living ? ` (after ${money(living)} living)` : ''}`, tone: dc > 0 ? 'good' : 'bad' });
   const dh = pn.heat - snap.heat;
   if (Math.abs(dh) >= 0.04) S.chips.push({ t: `Heat ${dh > 0 ? 'up' : 'down'}`, tone: dh > 0 ? 'bad' : 'good' });
   const ds = Math.round(pn.standing - snap.standing);
@@ -738,6 +741,12 @@ function handle(a: string, v: string) {
     case 'attend': {
       const j = job(v)!;
       const p = P();
+      // (coffee with the man who sent for you is a word with him, at the club: the conversation, with whatever he has on his mind)
+      if (j.meeting === 'social') {
+        const g = j.giver ? w.chars[j.giver] : undefined;
+        if (!g?.alive || !available(w, g)) { S.view = { t: 'job', id: j.id }; S.log = [esc(g ? notNowWhy(w, g) : 'He’s not around any more.')]; return; }
+        return pass(20, [], { t: 'talk2', v: beginVisit(w, g.id) }); // (the visit marks the coffee attended)
+      }
       const m = j.meeting === 'induction' ? openInduction(w, p, j) : j.meeting === 'accounts' ? openAccountsMeeting(w, p, j) : j.meeting === 'family' ? openFamilyMeeting(w, p, j) : j.meeting === 'sitdown' ? (w.grievances.find((g) => g.id === j.extra?.g) ? openSitdown(w, p, w.grievances.find((g) => g.id === j.extra?.g)!) : 'It has sorted itself out.') : openCrewMeeting(w, p);
       if (typeof m !== 'string' && j.meeting === 'sitdown') j.status = 'done';
       return startMeeting(m, { t: 'tab', name: 'today' });
@@ -915,7 +924,9 @@ function settle(byKeyboard: boolean) {
 
 window.addEventListener('resize', () => settle(false));
 
-// The keyboard, wherever a screen offers numbered choices: 1–9 pick, Escape takes the way out, the arrows move between choices.
+// The keyboard, wherever a screen offers numbered choices: 1–9 pick (and 10 onwards, typed as two digits), Escape takes the way out,
+// the arrows move between choices.
+let keyBuf: { d: string; t: number; h: number } | undefined;
 document.addEventListener('keydown', (e) => {
   if (!S.w || e.metaKey || e.ctrlKey || e.altKey) return;
   const list = document.querySelector('.ui-choices');
@@ -929,12 +940,14 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if (typing) return;
-  if (/^[1-9]$/.test(e.key)) {
-    const c = list.querySelector(`[data-n="${e.key}"]`) as HTMLElement | null;
-    if (!c) return;
-    e.preventDefault();
-    // (a figure is named first: the number takes you to it)
-    if (c.tagName === 'BUTTON') c.click(); else (c.querySelector('input') as HTMLInputElement | null)?.focus();
+  if (/^[0-9]$/.test(e.key)) {
+    // (ten or more choices: "1" waits a moment for a second digit, so 10 to 19 can be picked; "0" alone is the tenth)
+    const pickN = (n: string) => { const c = list.querySelector(`[data-n="${n}"]`) as HTMLElement | null; if (!c) return false; if (c.tagName === 'BUTTON') c.click(); else (c.querySelector('input') as HTMLInputElement | null)?.focus(); return true; };
+    const many = !!list.querySelector('[data-n="10"]');
+    if (keyBuf && Date.now() - keyBuf.t < 700) { const two = keyBuf.d + e.key; clearTimeout(keyBuf.h); keyBuf = undefined; e.preventDefault(); if (!pickN(two)) pickN(two[0]); return; }
+    if (e.key === '0') { if (many) { e.preventDefault(); pickN('10'); } return; }
+    if (many && e.key === '1') { e.preventDefault(); keyBuf = { d: '1', t: Date.now(), h: window.setTimeout(() => { keyBuf = undefined; pickN('1'); }, 700) }; return; }
+    if (list.querySelector(`[data-n="${e.key}"]`)) { e.preventDefault(); pickN(e.key); }
     return;
   }
   if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
