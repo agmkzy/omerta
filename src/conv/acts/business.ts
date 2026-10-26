@@ -488,6 +488,13 @@ const dAsk: Act = {
   },
 };
 const DEBT: Act[] = [dRemind, dTime, dHalf, dFavour, dForgive, dPay(false), dPay(true), dAsk];
+// (Sunday, with his own men's envelopes still waiting at the club: he can't hand his own up yet, and his captain tells him why, rather
+// than the envelope simply not being there)
+const envelopeWait: Act = {
+  base: 'b_env_wait', pane: 'business',
+  offers: (c) => (isBoss(c) && kickWindow(c.w, c.h) && crewEnvelopesWaiting(c.w, c.h) && envelopeDue(c.w, c.h) >= 20 && !asked(c, 'b_env_wait') ? [{ ...offer(c, 'b_env_wait', 'About my envelope', 'Your men’s envelopes are still waiting at the club.'), kind: 'his' }] : []),
+  run: (c) => { const x = T(c); ask(c, 'b_env_wait'); line(x, ({ cold: '“Your men first. Then mine.”', jovial: '“You haven’t sat with your own boys yet! Go on, take theirs, then come and see me.”' } as Record<string, string>)[arch(x.t)] ?? '“Your men first. Sit with them at the club, take theirs, then bring me mine. That’s how it’s done.”'); return out(5); },
+};
 // ---------------------------------------------------------------- the boss's envelope, and money over and above it
 const envelope: Act = {
   base: 'b_envelope', pane: 'business',
@@ -652,5 +659,5 @@ const sitHelp = (how: 'cover' | 'lend' | 'leave' | 'rival'): Act => ({
   run: (c) => { const x = T(c); for (const l of door.situationHelp(x.w, x.p, x.t, how)) line(x, l); return out(15); },
 });
 
-export const BUSINESS: Act[] = [op, bizNone, earnA, rateAskA, partnerChop, partnerFence, termsCut, termsRaise, deal, suggest, borrow, buyAsk(false), buyAsk(true), runAsk, sellAsk, offerLoan, shHow, shWhy, shEars, shBack, shTime, shLean, ...DEBT, envelope, extra(false), extra(true), tributeA, matterA, mv, xA, nm, favcall, mtOpen, mt, sitAskA, sitDoor, sitHelp('cover'), sitHelp('lend'), sitHelp('leave'), sitHelp('rival')];
+export const BUSINESS: Act[] = [op, bizNone, earnA, rateAskA, partnerChop, partnerFence, termsCut, termsRaise, deal, suggest, borrow, buyAsk(false), buyAsk(true), runAsk, sellAsk, offerLoan, shHow, shWhy, shEars, shBack, shTime, shLean, ...DEBT, envelope, envelopeWait, extra(false), extra(true), tributeA, matterA, mv, xA, nm, favcall, mtOpen, mt, sitAskA, sitDoor, sitHelp('cover'), sitHelp('lend'), sitHelp('leave'), sitHelp('rival')];
 void sitAsk; void owedOf;

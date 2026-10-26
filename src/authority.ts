@@ -3,7 +3,7 @@
 // it touches (regard, grudges, facts with witnesses), and the crew's loyalty (orders.reliability, crewlife's restless men going
 // over his head) reads it. Everything goes through the world's own doors: regard, grudges, facts, favours, the ledger, imposed.
 import { addFact, bear, bearOn, clamp, feel, feelOn, money, peek, recordCareer, rel, repute, transfer } from './core';
-import { addEnc } from './encounters';
+import { addEnc, addFavour } from './encounters';
 import { applyRank } from './rank';
 import { temper } from './temper';
 import { DAY, type Character, type Enc, type Fact, type World } from './types';
@@ -187,7 +187,8 @@ function quarrelChoose(w: World, p: Character, e: Enc, code: string) {
   const settled = (text: string, how: string) => addFact(w, { kind: 'report', actor: p.id, minor: true, text: `${p.name} settled it between ${a.name} and ${b.name}: ${how}.`, district: p.district }, { witnesses: [p.id, a.id, b.id, ...crew.map((c) => c.id)] }) && text;
   if (code === 'a' || code === 'b') {
     const win = code === 'a' ? a : b, lose = code === 'a' ? b : a;
-    feelOn(w, rel(win, p.id), 'trust', 0.1); feelOn(w, rel(lose, p.id), 'trust', -0.1); bearOn(w, rel(lose, p.id), 0.12, `${p.name} took ${win.name}’s side against him`);
+    feelOn(w, rel(win, p.id), 'trust', 0.1); feelOn(w, rel(lose, p.id), 'trust', -0.1);
+    addFavour(w, p.id, win.id, 1, `taking his side against ${lose.name}`); bearOn(w, rel(lose, p.id), 0.12, `${p.name} took ${win.name}’s side against him`);
     if (amt) transfer(w, code === 'a' ? b : a, code === 'a' ? a : b, amt, 'gift', 'settled by ' + p.name);
     // (the rest of the crew mostly know who was in the right: backing him is respected; backing the other man is noticed)
     const fair = !wrong || win.id !== wrong.id;
@@ -270,6 +271,7 @@ function answerChoose(w: World, p: Character, e: Enc, code: string) {
     const fair = e.data?.reason === 'didnt-know';
     feel(w, cap, p.id, 'trust', fair ? -0.03 : -0.1); if (!fair) { bear(w, cap, p.id, 0.08, `${p.name} stood up for ${man.name} when he was in the wrong`); repute(w, p, -1, 'gave way'); }
     feelOn(w, rel(man, p.id), 'trust', 0.15); feelOn(w, rel(man, p.id), 'affection', 0.1);
+    addFavour(w, p.id, man.id, fair ? 1 : 2, `standing up for him to ${cap.name}`); // (he owes it, and he says so: memory.ts)
     for (const c of crew) feelOn(w, rel(c, p.id), 'trust', 0.04);
     if (fair) return { lines: [`“Nobody told him it was ours,” you say. “That’s on me, not him. It won’t happen again.” ${first(cap)} thinks about it. “See that it doesn’t.” ${first(man)} hears what you said for him.`], minutes: 20 };
     return { lines: [`“He had his reasons,” you say, “and I’ll answer for them.” ${first(cap)} looks at you for a long moment. “Then you will.” Your men hear about it by the end of the day. So does everybody else.`], minutes: 20 };

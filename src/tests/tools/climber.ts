@@ -10,6 +10,7 @@ import { approaches, resolve, takeJob } from '../../jobs';
 import { pathInfo } from '../../path';
 import { startOp } from '../../rackets';
 import { perform } from '../../actions';
+import { crewEnvelopesWaiting, openSunday } from '../../crewlife';
 import { leanable } from '../../conv/authority';
 import { DAY, type Character } from '../../types';
 import { choose as encChoose } from '../../encounters';
@@ -38,6 +39,8 @@ for (let d = 0; d < days && p.alive; d++) {
   if (p.jailedUntil > w.now) { if (process.env.DBG5) log.push(`  inside on day ${d}`); continue; }
   const cap = p.bossId ? w.chars[p.bossId] : undefined;
   if (cap?.alive) {
+    // (Sunday: his men's envelopes first, at the club, then his own to his captain)
+    if (crewEnvelopesWaiting(w, p)) openSunday(w, p);
     say(cap.id, /b_envelope|a:report|b_need/);
     for (const j of w.jobs.filter((q) => q.status === 'offered' && q.giver === cap.id && q.assignee === p.id && q.kind !== 'summons')) takeJob(w, j);
   }

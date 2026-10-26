@@ -128,8 +128,9 @@ export function perform(c: Ctx, code: string, label: string): Done {
     if (capped && before.tr >= 0.55) says(c, 'There’s a point past which talk doesn’t move a man. The rest has to be earned.');
   }
   act.conduct?.(c, before);
-  // now and then he mentions something that really happened between them, before his answer (not in the middle of a matter)
-  if (!dull && !inSubject && !/^(enc|x|mv|mt|nm|favcall|confront|tk|apx|jobtake|jobpass|m|mt_open|job|enc_open)(:|$)/.test(code) && !['biz_none', 'sit', 'amends', 'think', 'b_envelope'].includes(code) && v.lines.length > from) {
+  // now and then he mentions something that really happened between them, before his answer (not in the middle of a matter, and
+  // only in the first exchange of a visit: said on meeting, a remark reads as his; later, in front of an answer, it reads as a non sequitur)
+  if (!v.lines.slice(0, from).some((l) => l.who === 'you') && !dull && !inSubject && !/^(enc|x|mv|mt|nm|favcall|confront|tk|apx|jobtake|jobpass|m|mt_open|job|enc_open)(:|$)/.test(code) && !['biz_none', 'sit', 'amends', 'think', 'b_envelope'].includes(code) && v.lines.length > from) {
     const m = door.recall(w, p, t);
     if (m) v.lines.splice(from, 0, { who: 'him', text: m.line });
   }

@@ -181,3 +181,15 @@ police after a road job. Played through in the browser; tested (money conserved;
 - The climber now lies low when the heat shows.
 - **Measured** (240 days, three worlds): made on day 44, 79 and 89; jailed 0, 2 and 4 times (before: 4 to 9 times, 48 to 76 days
   inside); books earning $3,000–6,500; crews of 2–3; five trucks a season.
+
+## Phase 1.3: the road to captain, measured; conversation fixes from play
+- **Road to captain** (climber, seed 7, 400 days): made in week 7, captain around week 42 (about day 290). Standing climbs to the
+  70s and 80s; crew of 4 to 5; book earning; by week 55, 84% of the earnings needed for underboss.
+- A first 400-day run never got there: the bot never sat with its own men on Sunday, so its own envelope was never handed up
+  (the game holds it until the crew's are in). Earnings stalled at 18% and standing drained to 1 as "short weeks". The bot now does
+  Sunday properly.
+- For players: when his men's envelopes are still waiting, the captain now says so if asked about the envelope ("Your men first.
+  Sit with them at the club, take theirs, then bring me mine."), instead of the envelope simply not being on offer.
+- **A man's remarks about the shared past** (memory.recall) come only in the first exchange of a visit. In play, a gesture about
+  rank had appeared in front of his answer to "Something's wrong. What is it?".
+- **Standing up for a man to the captain, and backing him in a quarrel,** are favours he owes, which he remembers and says so.
