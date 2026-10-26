@@ -583,6 +583,9 @@ export function playerMoves(w: World, p: Character, s: Situation): PlayerMove[] 
   // (before he has heard your terms there is nothing to argue with or answer by force: you make the offer, or you don't)
   if (!S.last) { add('drop', '“Never mind. Forget I said anything.”', 'Walk away before it starts.'); return out; }
   const better = K.better?.(w, s);
+  // (meeting him partway only while there is ground between your figure and his: at or past his own offer, taking it is the move)
+  const his = S.last === 'counter' ? Number(s.m?.offer ?? NaN) : NaN;
+  if (!(better !== undefined && Number.isFinite(his) && (K.low ? better >= his : better <= his)))
   add('sweeten', better !== undefined ? K.sweeten?.(better) ?? q(`Call it ${money(better)}.`) : '“I can do better.”', K.low ? 'More from you, easier for him.' : 'Less for you, easier for him.', better === undefined ? (K.low ? 'You can’t go higher.' : 'You can’t go lower.') : undefined);
   add('persuade', s.ak === 'protect' ? '“Think about it. Who looks after you if something happens?”' : s.ak === 'amends' ? '“I was wrong. I want it put right between us.”' : s.ak === 'layoff' || s.ak === 'warn' ? '“He’s got enough trouble. Leave him be.”' : '“Be sensible. This is good for both of us.”', tried(S, 'persuade') >= 2 ? 'He’s heard your arguments.' : 'Reason with him.');
   const lv = leverageOf(w, p, t);

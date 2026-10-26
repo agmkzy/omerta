@@ -88,7 +88,7 @@ const jobOffer: Act = {
   base: 'job', pane: 'business', opens: true,
   // (once he has put it to the player in this visit, coming back to it is "about that work", not asking whether he has any)
   offers: (c) => { const j = offered(c); return j && !hasAsk(c) ? [{ code: 'job:' + j.id, label: (() => { const k = workTo(c, j); return k ? `About the work he wants done: ${k.rest}` : `About what he asked: ${j.title}`; })(), says: c.v.th.raised.includes('job:' + j.id) ? 'About that work you mentioned.' : 'You had something for me?', note: `${j.pay ? `Pays ${money(j.pay)}. ` : ''}He wants an answer.`, kind: 'his' }] : []; },
-  offersFor: (c, id) => { const j = c.w.jobs.find((q) => q.id === id && q.status === 'offered'); return j ? [{ code: 'jobtake:' + j.id, label: 'I’ll take care of it', note: j.pay ? `It’s yours. Pays ${money(j.pay)}.` : j.kind === 'lean' ? 'It’s yours. No pay in it: the shop goes on your book, and the envelope is yours.' : 'It’s yours. There’s no money in it; it’s for him.' }, { code: 'jobpass:' + j.id, label: 'Not this time', note: 'He will think a little less of you for it.' }] : []; },
+  offersFor: (c, id) => { const j = c.w.jobs.find((q) => q.id === id && q.status === 'offered'); return j ? [{ code: 'jobtake:' + j.id, label: 'I’ll take care of it', note: j.pay ? `It’s yours. Pays ${money(j.pay)}.` : j.kind === 'lean' ? 'It’s yours. Nothing up front: once he pays, the shop is on your book and the weekly money comes to you.' : 'It’s yours. There’s no money in it; it’s for him.' }, { code: 'jobpass:' + j.id, label: 'Not this time', note: 'He will think a little less of you for it.' }] : []; },
   run: (c, code) => {
     const x = T(c), id = code.split(':')[1], j = c.w.jobs.find((q) => q.id === id);
     if (!j) return out(2);

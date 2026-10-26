@@ -1,4 +1,5 @@
 import { epilogue } from '../epilogue';
+import { spots } from '../city';
 import { tradeOf } from './streetmap';
 import { fallingDue } from '../commitments';
 import { knowsProtection } from '../acquaint';
@@ -151,6 +152,11 @@ export function needs(): Need[] {
   // work he has taken on and not finished: his, wherever he said yes to it, until it is done (doing what it asks, his own way, does it)
   for (const j of w.jobs.filter((x) => x.status === 'active' && x.assignee === p.id && x.kind !== 'summons' && x.giver !== p.id)) {
     const g = j.giver ? w.chars[j.giver] : undefined;
+    // (one card per matter: putting it to the owner is the work; once that talk is under way, its card is this job's card too)
+    const owner = j.kind === 'lean' && j.biz ? w.biz[j.biz]?.ownerId : undefined;
+    const talk = owner ? (w.situations ?? []).find((x) => x.ak === 'protect' && x.terms?.by === p.id && x.terms?.of === owner && isOpen(x)) : undefined;
+    const card = talk ? out.find((n) => n.a === `story:sit:${talk.id}`) : undefined;
+    if (card) { if (g) card.sub = `${card.sub.replace(/[.!?]?$/, '.')} ${g.name} is waiting on it.`; continue; }
     out.push({ dot: 'amber', k: 'Work you took on', title: j.title, sub: `${g ? `For ${g.name}. ` : ''}${j.kind === 'lean' && j.biz && w.biz[j.biz] ? `Go and see ${w.chars[w.biz[j.biz].ownerId]?.name ?? 'the owner'} and put it to him. It’s done when he pays you.` : 'Open it to see it through.'}`, a: `job:${j.id}`, who: g?.id });
   }
   // work done and not yet told to the man who gave it
@@ -224,11 +230,11 @@ function guideCard(): string {
     ? [said ? `Go back to ${them.name}` : `Wait for ${them.name}’s answer`,
       said ? `${said === 'counter' ? 'He named his own price.' : said === 'stall' ? 'He asked for time.' : said === 'no' ? 'He said no.' : said === 'help' ? 'He went to someone about it.' : 'He gave you an answer.'} That isn’t the end of it. The story says where it stands and what you can try: better terms, an argument, pressure, or time.` : 'He will answer in his own time. The story keeps where it stands.',
       prot, `story:sit:${open.id}`, 'Open the story']
-    : [prot ? 'Offer a shopkeeper protection, and press it' : 'Offer a shopkeeper protection', 'Under Business, Rackets, “Shops you could lean on”: pick a shop and put it to the owner. If he says no, it isn’t over: you can come back to it with better terms, an argument, or time.', prot, 'tab:rackets', 'Find a shop'];
+    : [prot ? 'Offer a shopkeeper protection, and press it' : 'Offer a shopkeeper protection', 'Under Business, Work going, Protection: pick a shop and put it to the owner. If he says no, it isn’t over: you can come back to it with better terms, an argument, or time.', prot, 'sub:business.work', 'Find a shop'];
   const steps: [string, string, boolean, string, string][] = [
     ['Show your face to ' + (boss?.name ?? 'your boss'), 'He is the man you answer to. Respect starts with turning up.', !!g['g:boss'], boss ? `talk:${boss.id}` : '', 'Go and find him'],
-    ['Ask a man what’s on his mind', `Every man has his own worries. In a conversation, choose Personal: ask what’s new, or take him for a drink, and let him talk about himself.${peer && peer !== boss ? ` ${peer.name} is in the same crew as you.` : ''}`, tk, peer ? `talk:${peer.id}` : 'people:', peer ? `Talk to ${firstName(peer)}` : 'Find someone'],
-    ['Sit down with a man at the club', 'Sit with one of your own at the social club. Business is work and money, Personal is the man himself, Confront is for what needs having out.', !!g['g:aside'], 'place:club', 'Go to the club'],
+    ['Ask a man what’s on his mind', `Every man has his own worries. In a conversation, open Personal or People & rumours: ask how he’s keeping, buy him a drink, and let him talk about himself.${peer && peer !== boss ? ` ${peer.name} is in the same crew as you.` : ''}`, tk, peer ? `talk:${peer.id}` : 'people:', peer ? `Talk to ${firstName(peer)}` : 'Find someone'],
+    ['Sit down with a man at the club', 'Sit with one of your own at the club. What is between you comes first; then pick a subject: Work & money, Personal, Settle something.', !!g['g:aside'], 'place:club', 'Go to the club'],
     protStep,
     ['Follow a story', 'Stories keeps every matter you know of, in the order you learned it, and what you can do about it. Open one.', !!g['g:story'], 'tab:stories', 'Open Stories'],
     ['Let a week go by', 'Choose Next week under Let time pass. The world moves while you do: men answer you, rackets pay, stories move on. It stops early if something comes for you.', !!g['g:wait'] && w.now >= 7 * DAY, 'wait:', 'Let time pass'],
@@ -322,7 +328,7 @@ function couldDo(w: World, p: Character): Row[] {
   if (p.heat > 0.15) out.push({ mark: 'amber', title: 'Lay low', sub: 'The heat is on you. Let it fade before you do anything loud.', a: 'cat:work' });
   if (men.length) { const idle = men.filter((c) => !Object.values(w.jobs).some((j) => j.assignee === c.id && j.status === 'active')).length; out.push({ mark: 'blue', title: 'Put your men to work', sub: idle ? `${idle} of ${men.length} have nothing from you.` : 'Every man has something from you.', a: 'orders:' }); }
   if (p.job) { const done = p.job.last === Math.floor(w.now / DAY); if (!done) out.push({ mark: 'blue', title: 'Work a shift', sub: `${p.job.kind} at ${p.job.biz ? w.biz[p.job.biz].name : w.chars[p.job.boss].name}. Honest money, and cover.`, a: 'shift:' }); }
-  else if (p.rank === 'associate') out.push({ mark: 'blue', title: 'Find legit work', sub: 'A clean job buys cover, and a little money.', a: 'dayjob:' });
+  else if (p.rank === 'associate' && w.now < 21 * DAY) { const cl = spots(w).find((x) => x.kind === 'club' && x.famId === p.familyId); out.push({ mark: 'blue', title: 'Go down to the club', sub: 'Be seen. The men who matter drink their coffee there, and work goes to the faces it knows.', a: cl ? `place:${cl.id}` : 'place:club' }); }
   const hint = grudgeHint();
   if (!/^no\b|nobody|nothing/i.test(hint)) out.push({ mark: 'red', title: 'Settle a score', sub: hint.charAt(0).toUpperCase() + hint.slice(1) + '.', a: 'grudges:' });
   return out.slice(0, 3);

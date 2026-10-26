@@ -201,6 +201,9 @@ function govern(c: Ctx, code: string, from: number): { end?: boolean; cold?: boo
     th.cold = true;
     if (left > 0 && !th.raised.includes('cold')) { th.raised.push('cold'); says(c, PUSHY.test(code) ? (vw.fear > 0.45 || tp.caution > 0.6 ? 'He says nothing. He is waiting for you to go.' : tp.volatility > 0.55 ? '“You’ve said your piece. Now go.”' : 'He has stopped looking at you.') : tp.agreeable > 0.55 ? '“Is there anything else? I have things to do.”' : tp.volatility > 0.55 ? '“Are we done here?”' : 'He has stopped looking at you.'); }
   }
+  // (a man who has just named his terms does not end it in the same breath: the offer stands, once, to be taken or left)
+  const offering = left <= 0 && !th.raised.includes('last') && openAsks(w).some((s) => s.terms?.by === p.id && s.terms?.of === t.id && s.st?.[t.id]?.last === 'counter');
+  if (offering) { th.raised.push('last'); th.cold = true; th.patience = 0.2; says(c, tp.volatility > 0.55 ? '“That’s my number. Take it or get out.”' : '“That’s what I can do. Take it or leave it.”'); return { cold: true }; }
   if (left <= 0) {
     if (vw.fear > 0.55) { says(c, 'He says nothing more. He is waiting for you to go.'); th.shut = true; return { cold: true }; }
     says(c, tp.volatility + tp.pride > 1.15 ? '“That’s enough. Get out.”' : tp.agreeable > 0.55 ? '“I think we’ve said all there is to say today.”' : '“We’re finished. Good day.”');

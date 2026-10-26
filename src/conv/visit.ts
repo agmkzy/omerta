@@ -516,7 +516,7 @@ function chooseIn(w: World, v: Visit, id: string): { v: Visit; minutes: number; 
   const ak = fig ? openAsks(w).find((q) => q.id === base!.id.split(':')[2])?.ak : undefined;
   const figSaid = fig ? `“${money(fig[0])}${fig[1] !== undefined ? `, at ${Math.round(fig[1] * 100)} percent a week` : ak === 'protect' || ak === 'rate' ? ' a week' : ''}.”` : undefined;
   // (answering something he came about by doing it, "Go, with a modest envelope", is an act, told by what follows, not a line of speech)
-  if (label && kind === 'a') { if (a1 !== 'enc' || base?.says) you(c, figSaid ?? base?.says ?? label); return { v, ...doAct(c, id.slice(2), label) }; }
+  if (label && kind === 'a') { if ((a1 !== 'enc' || base?.says) && !/:force$/.test(id)) you(c, figSaid ?? base?.says ?? label); /* (a thing done, not said: its own narration tells it) */ return { v, ...doAct(c, id.slice(2), label) }; }
   // (an approach is chosen by name and said in words: what the player says is the line it stands for)
   const spoken = base?.says ?? label;
   if (id === 'leave') {
