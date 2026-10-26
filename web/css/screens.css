@@ -446,3 +446,25 @@ a.story { font-size: .85em; white-space: nowrap; color: var(--c-gold-2); }
 .way > .go { display: block; margin: 0; padding: 0; border: 0; border-radius: 0; color: var(--c-dim); }
 .way:hover > .go { color: var(--c-gold-2); }
 .spark i { max-width: 28px; }
+
+/* Today (owner, 26 October): the present, plainly. Your situation in a line, then what needs you, what has reached you, what you
+   could do, and time. */
+.td-now { margin: var(--s-2) 0 var(--s-4); padding-bottom: var(--s-4); border-bottom: 1px solid var(--c-line); }
+.td-when { margin: 0; font: 400 13px var(--f-fig); color: var(--c-muted); letter-spacing: .02em; }
+.td-who { margin: 4px 0 0; font: 500 26px/1.2 var(--f-display); color: var(--c-cream); }
+.td-next { margin: 8px 0 0; font: 400 14px var(--f-ui); color: var(--c-cream-2); }
+.td-next span { font: 600 10.5px var(--f-ui); letter-spacing: .14em; text-transform: uppercase; color: var(--c-gold); margin-right: 6px; }
+.td-calm { margin: var(--s-4) 0; font: italic 400 19px var(--f-display); color: var(--c-cream-2); }
+.td-paper { display: flex; flex-direction: column; gap: 4px; width: 100%; margin: var(--s-5) 0 var(--s-2); padding: var(--s-3) var(--s-4); background: var(--c-raise); border: 1px solid var(--c-line); border-left: 2px solid var(--c-gold-line); border-radius: var(--radius); text-align: left; color: var(--c-cream); font: 500 18px/1.3 var(--f-display); cursor: pointer; transition: background var(--t-fast); }
+.td-paper:hover { background: var(--c-raise-2); }
+.td-paper span { font: 600 10.5px var(--f-ui); letter-spacing: .14em; text-transform: uppercase; color: var(--c-gold); }
+/* The guide, lighter: one step and one button; the list and the way out are small links beside it. */
+.g-guide__acts .ui-btn--primary { width: auto; }
+.g-guide__acts .ui-btn--quiet { width: auto; min-height: 40px; padding: 6px 0; font-size: 11px; color: var(--c-muted); }
+.g-guide__acts details { flex: none; order: 0; }
+.g-guide__acts details[open] { flex: 1 1 100%; order: 3; }
+/* On a phone, the four ways to let time pass sit in a square: all four in view, none behind the edge. */
+@media (max-width: 559px) {
+  .timebar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: visible; }
+  .timebar button { border-radius: var(--radius); padding: 8px 12px; }
+}

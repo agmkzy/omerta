@@ -14,7 +14,7 @@ import { queueOf, queueView } from './family';
 import { pathCard, powersCard } from './pathview';
 import { pathInfo } from '../path';
 import { capOf, careerLines, isRunner, members, promoSteps, seats, standingTable, vacancy } from '../career';
-import { factText, famName, money, ownerBiz, shortTime } from '../core';
+import { factText, famName, fmtTime, money, ownerBiz, shortTime } from '../core';
 import { KIND_LABEL, playerSide, standingWord, staleReason } from '../jobs';
 import { GIG_LABEL } from '../gigs';
 import { lateOf, PROBLEM_LABEL } from '../people';
@@ -42,7 +42,6 @@ import { acts, btn, choices, context, h, kv, meter, note, quiet, rows, title, ty
 import { relationOf } from '../conv/kit';
 import { ARCH_WORD } from '../voice';
 import { traitWords } from '../jobs';
-import { week, weekLine } from './money';
 import { avatar, banner, back, chevron, meterRow, skillBars, skillLine, traitTags } from './common';
 import { toSide } from './layout';
 import { bl, chip, esc, famClass, fl, known, lk, P, pl, S, statusOf, W, who } from './links';
@@ -251,63 +250,79 @@ export function todayView(): string {
       + (e.glad.length ? `<p>${esc(e.glad.map((c) => c.name).join(', '))} ${e.glad.length === 1 ? 'was' : 'were'} not sorry.</p>` : '')
       + h('The Herald') + `<p class="herald-line">${esc(e.herald)}</p>` + acts(btn('reset:go', 'Start a new life', 'primary'));
   }
-  // V88: the street first. What happened, what is said, what wants you, where you can go. Where you stand goes to the side.
+  // Today (owner, 26 October): the present, and nothing that has a home elsewhere. Your situation in a line; what needs you; what
+  // has reached you; what you could do next; and time. Places are the Street, men are People, money is Business, the record is Story.
   const dg = dangerLevel(w);
   if (dg.level > 0 && dg.who) out += context([`<b>Watch your back.</b> ${lk(dg.who.name)} is after you: ${esc(LADDER_WORDS[dg.level])}. It won’t stop by itself.`], true);
   // out from inside: the account of it, once, before anything else (inside.ts)
   if (p.inside?.done && !p.inside.seen && p.inside.account?.length) out += `<section class="wd-inside ui-card" aria-label="Inside"><h2>Back on the street</h2>${p.inside.account.map((l, i) => `<p${i ? '' : ' class="lead"'}>${lk(esc(l))}</p>`).join('')}${acts(btn('insideok:', 'Get back to it', 'primary'))}</section>`;
-  // what just happened, and what it changed: the consequence first, then the word that reached you while time passed
+  // what just happened, and what it changed
   if (S.log.length) out += `<section class="wd-just" aria-label="Just now">${S.log.map((l) => `<p>${l}</p>`).join('')}${S.chips.length ? `<p class="wd-fx" aria-label="What changed">${S.chips.map((c) => `<span class="${c.tone}">${esc(c.t)}</span>`).join('')}</p>` : ''}</section>`;
   else if (S.chips.length) out += `<p class="wd-fx" aria-label="What changed">${S.chips.map((c) => `<span class="${c.tone}">${esc(c.t)}</span>`).join('')}</p>`;
-  if (S.news.length) out += h('Word reaches you') + `<ul class="wd-news">${S.news.map((n) => `<li>${n}</li>`).join('')}</ul>${S.routine ? note(`${S.routine} routine matter${S.routine > 1 ? 's' : ''} besides, in the Journal.`) : ''}`;
-  out += h('Let time pass') + timeBar();
-  out += guideCard();
+  // ---- your situation: who you are today, and what is coming due
+  const cu = comingUp()[0];
+  out += `<header class="td-now"><p class="td-when">${esc(fmtTime(w.now))}</p><p class="td-who">${esc(situationLine(w, p))}</p>${cu ? `<p class="td-next"><span>Coming up</span> ${esc(shortTime(cu.t))} · ${esc(cu.text)}</p>` : ''}</header>`;
+  // ---- what needs you: one card per matter, the most pressing first
   const ns = needs();
-  const attn = ns.filter(isAttn);
-  const opps = ns.filter((n) => !attn.includes(n));
-  out += h('Needs you', attn.length ? attn.length + ' waiting' : 'nothing urgent');
-  if (!attn.length) out += quiet('Nothing is demanding you. Use the quiet to build something.');
-  out += rows((S.open.needs ? attn : attn.slice(0, 5)).map(needRow));
-  if (attn.length > 5) out += acts(btn('tog:needs', S.open.needs ? 'Show fewer' : `Show ${attn.length - 5} more`, 'quiet'));
-  if (opps.length) {
-    out += h('Opportunities', String(opps.length)) + rows((S.open.opps ? opps : opps.slice(0, 3)).map(needRow));
-    if (opps.length > 3) out += acts(btn('tog:opps', S.open.opps ? 'Show fewer' : `Show ${opps.length - 3} more`, 'quiet'));
-  }
-  // Where to go. Crew and Rackets are their own sections, so they are not repeated here.
-  out += h('Go and do something') + `<div class="grid g-places">`;
-  out += `<button class="tile" data-a="place:club"><span class="t">Social Club</span><span class="s">${esc(clubHint())}</span></button><button class="tile" data-a="places:"><span class="t">Around town</span><span class="s">Little Italy: the café, the barber, the bar, the shops</span></button><button class="tile" data-a="people:"><span class="t">Find someone</span><span class="s">Who’s where, right now</span></button>`;
-  out += `<button class="tile" data-a="orders:"><span class="t">Give orders</span><span class="s">Put a man to work</span></button>`;
-  const shiftDone = !!p.job && p.job.last === Math.floor(w.now / DAY);
-  out += p.job
-    ? `<button class="tile${shiftDone ? '' : ' hot'}" data-a="shift:"><span class="t">${shiftDone ? 'Shift done today' : 'Work a shift'}</span><span class="s">${esc(p.job.kind)} · ${p.job.biz ? esc(w.biz[p.job.biz].name) : esc(w.chars[p.job.boss].name)}${shiftDone ? ' · back tomorrow' : ''}</span></button>`
-    : `<button class="tile" data-a="dayjob:"><span class="t">Legit work</span><span class="s">A clean job buys cover.</span></button>`;
-  if (grudgeHint() && !/^no\b|nobody|nothing/i.test(grudgeHint())) out += `<button class="tile" data-a="grudges:"><span class="t">Settle a score</span><span class="s">${esc(grudgeHint())}</span></button>`;
-  out += `<button class="tile" data-a="bj:"><span class="t">Gamble</span><span class="s">Blackjack at the family casinos</span></button>`;
-  if (p.heat > 0.15) out += `<button class="tile" data-a="cat:work"><span class="t">Lay low</span><span class="s">Heat is on you. Let it fade.</span></button>`;
-  out += `</div>`;
-  out += heardLately();
-  // the papers and the stories the city is telling, always one tap away
-  { const run = storiesOf(w).filter((s) => !s.closed); const fresh = (w.snaps ?? []).length && (S.seenBrief ?? 0) < w.snaps![w.snaps!.length - 1].t;
-    out += acts((w.snaps ?? []).length ? btn('brief:', `The Herald, and your week${fresh ? ' (new)' : ''}`, 'quiet') : '', btn('tab:stories', run.length ? `${run.length} ${run.length > 1 ? 'stories' : 'story'} running` : 'Stories', 'quiet')); }
+  const attn = ns.filter(isAttn), opps = ns.filter((n) => !attn.includes(n));
+  if (attn.length) {
+    out += h('Needs you', String(attn.length)) + rows((S.open.needs ? attn : attn.slice(0, 3)).map(needRow));
+    if (attn.length > 3) out += acts(btn('tog:needs', S.open.needs ? 'Show fewer' : `${attn.length - 3} more`, 'quiet'));
+  } else out += `<p class="td-calm">Nothing is pressing. The day is yours.</p>`;
+  out += guideCard();
+  // ---- what has reached you: the word while time passed, then what you've heard lately
+  const word = S.news.slice(0, 3);
+  if (word.length) out += h('Word reaches you') + `<ul class="wd-news">${word.map((n) => `<li>${n}</li>`).join('')}</ul>`;
+  else out += heardLately();
+  // ---- what you could do: the offers in front of you, then what your position puts in reach
+  const could: Row[] = (S.open.opps ? opps : opps.slice(0, 3)).map(needRow);
+  for (const x of couldDo(w, p)) could.push(x);
+  if (could.length) out += h('What you could do') + rows(could);
+  if (opps.length > 3) out += acts(btn('tog:opps', S.open.opps ? 'Show fewer' : `${opps.length - 3} more offers`, 'quiet'));
+  // ---- time
+  out += h('Let time pass') + timeBar();
+  // ---- the paper, one line
+  const paper = (w.papers ?? []).at(-1);
+  if (paper) { const fresh = (S.seenBrief ?? 0) < paper.t; out += `<button class="td-paper" data-a="brief:"><span>The Herald${fresh ? ' · new' : ''}</span>${esc(paper.lead)}</button>`; }
 
-  // ---- beside it: where you stand
-  let side = h('Where you stand');
-  { const mine = Object.values(w.ops).filter((o) => o.owner === p.id).length + Object.values(w.biz).filter((x) => x.protection?.collectorId === p.id).length;
-    const crewN = Object.values(w.chars).filter((c) => c.alive && c.bossId === p.id).length;
-    // (the week's money is the one account ui/money.ts keeps, so World, Rackets and Money never disagree)
-    side += `<button class="ui-card" data-a="sub:business.money" style="text-align:left"><b>${mine} ${mine === 1 ? 'racket' : 'rackets'}</b> &middot; <b>${crewN} ${crewN === 1 ? 'man' : 'men'}</b><br><span class="muted">${esc(weekLine(week(w, p)))}</span></button>`; }
-  // Your career is a page of its own in Life (rank progress and ambition together); here, just where it stands.
-  { const steps = promoSteps(w, p), a = p.ambition, amb = a ? AMBS.find((x) => x.kind === a.kind) : undefined;
-    const now = steps ? `being considered: ${steps.filter((x) => x.state === 'done').length} of ${steps.length} steps` : pathInfo(w, p) ? 'on the path' : `reputation ${standingWord(p.standing)}`;
-    side += `<button class="ui-card g-career" data-a="career:"><h2>Your career<small>&rsaquo;</small></h2><p><b class="g-cap">${esc(p.rank)}</b> · ${esc(now)}</p><p class="muted">${amb ? `Ambition: ${esc(amb.label)}${a?.done ? ' (done)' : ''}` : 'No ambition chosen yet.'}</p></button>`; }
-  { const cu = comingUp(); if (cu.length) side += `<div class="ui-card"><h2>Coming up</h2><ul class="ui-list">${cu.slice(0, 3).map((c) => `<li><span>${esc(shortTime(c.t))}</span><span class="v" style="text-align:left;margin-left:12px">${esc(c.text)}</span></li>`).join('')}</ul></div>`; }
+  // ---- beside it (desktop), or after it (phone): where you stand, briefly
+  const steps = promoSteps(w, p), a_ = p.ambition, amb = a_ ? AMBS.find((x) => x.kind === a_.kind) : undefined;
+  const now = steps ? `being considered: ${steps.filter((x) => x.state === 'done').length} of ${steps.length} steps` : pathInfo(w, p) ? 'on the path' : `reputation ${standingWord(p.standing)}`;
+  let side = `<button class="ui-card g-career" data-a="career:"><h2>Your road<small>&rsaquo;</small></h2><p><b class="g-cap">${esc(p.rank)}</b> · ${esc(now)}</p>${amb ? `<p class="muted">Ambition: ${esc(amb.label)}${a_?.done ? ' (done)' : ''}</p>` : ''}</button>`;
+  const more = comingUp().slice(1, 4);
+  if (more.length) side += `<div class="ui-card"><h2>Later</h2><ul class="ui-list">${more.map((c) => `<li><span>${esc(shortTime(c.t))}</span><span class="v" style="text-align:left;margin-left:12px">${esc(c.text)}</span></li>`).join('')}</ul></div>`;
   toSide(side);
   return out;
 }
 
-function clubHint(): string {
-  const w = W(), cl = clubOf(w, P().familyId); if (!cl) return 'Cards, drinks, whispers.'; if (!clubOpen(w, cl)) return 'Shut right now.'; const n = clubPresent(w, cl).length; return n ? `${n} in. ${waiting(w, P(), cl, clubPresent(w, cl)).length ? 'Somebody wants a word.' : ''}`.trim() : 'Quiet right now.';
+// Who you are today, in a sentence that changes with rank: an associate has a captain; a soldier has a captain and maybe men; a
+// captain has a crew; above that, the family.
+function situationLine(w: World, p: Character): string {
+  const boss = p.bossId ? w.chars[p.bossId] : undefined, fam = p.familyId ? famName(w, p) : '';
+  const men = Object.values(w.chars).filter((c) => c.alive && c.bossId === p.id).length;
+  const crew = boss ? `${boss.name}’s crew` : `the ${fam} family`;
+  if (p.jailedUntil > w.now) return 'Inside, and counting the days.';
+  if (p.rank === 'associate') return `An associate with ${crew}${promoSteps(w, p) ? '. Your name is up to be made' : ''}.`;
+  if (p.rank === 'soldier') return `A made man in ${crew}${men ? `, with ${men} ${men === 1 ? 'man' : 'men'} of your own` : ''}.`;
+  if (p.rank === 'capo') return `Captain of your own crew: ${men} ${men === 1 ? 'man' : 'men'}.`;
+  if (p.rank === 'underboss') return `Underboss of the ${fam} family.`;
+  if (p.rank === 'boss') return `Boss of the ${fam} family.`;
+  return 'Nobody’s man yet.';
 }
+
+// What your position puts in reach today, at most three: never what another section already offers as a matter of course.
+function couldDo(w: World, p: Character): Row[] {
+  const out: Row[] = [];
+  const men = Object.values(w.chars).filter((c) => c.alive && c.bossId === p.id);
+  if (p.heat > 0.15) out.push({ mark: 'amber', title: 'Lay low', sub: 'The heat is on you. Let it fade before you do anything loud.', a: 'cat:work' });
+  if (men.length) { const idle = men.filter((c) => !Object.values(w.jobs).some((j) => j.assignee === c.id && j.status === 'active')).length; out.push({ mark: 'blue', title: 'Put your men to work', sub: idle ? `${idle} of ${men.length} have nothing from you.` : 'Every man has something from you.', a: 'orders:' }); }
+  if (p.job) { const done = p.job.last === Math.floor(w.now / DAY); if (!done) out.push({ mark: 'blue', title: 'Work a shift', sub: `${p.job.kind} at ${p.job.biz ? w.biz[p.job.biz].name : w.chars[p.job.boss].name}. Honest money, and cover.`, a: 'shift:' }); }
+  else if (p.rank === 'associate') out.push({ mark: 'blue', title: 'Find legit work', sub: 'A clean job buys cover, and a little money.', a: 'dayjob:' });
+  const hint = grudgeHint();
+  if (!/^no\b|nobody|nothing/i.test(hint)) out.push({ mark: 'red', title: 'Settle a score', sub: hint.charAt(0).toUpperCase() + hint.slice(1) + '.', a: 'grudges:' });
+  return out.slice(0, 3);
+}
+
 function grudgeHint(): string {
   const w = W();
   const p = P();

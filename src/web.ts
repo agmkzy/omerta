@@ -377,7 +377,7 @@ function handle(a: string, v: string) {
     draftDone();
     const p = P();
     const bs = S.w.chars[p.bossId!];
-    S.log = [esc(`New York, March 1970. You’re ${p.name}, an associate of the ${famName(S.w, p)} family. You’re not made, and you’re nobody’s friend yet.`), ...startingLines(S.w, p).map(esc), esc(`${bs.name} is the man you answer to. Go and find him at his usual place, and let him see your face. Then make yourself useful.`), 'Needs you, on this page, says what wants doing. Business says how you earn, and what you could. Everything else is people.'];
+    S.log = [esc(`New York, March 1970. You’re ${p.name}, an associate of the ${famName(S.w, p)} family. You’re not made, and you’re nobody’s friend yet.`), ...startingLines(S.w, p).map(esc), esc(`${bs.name} is the man you answer to. Go and find him at his usual place, and let him see your face. Then make yourself useful.`), 'Today is your day: what needs you, what has reached you, what you could do. The Street is where you go; People, who you know; Business, what you run; Story, who you are becoming.'];
     S.news = [];
     S.stack = [];
     S.view = { t: 'tab', name: 'today' };
@@ -432,7 +432,6 @@ function handle(a: string, v: string) {
       if (at > w.now) advance(w, at);
       return talkTo(cid);
     }
-    case 'places': return go({ t: 'places' });
     case 'cscene': {
       // V90: the club's separate small talk is retired. Sitting down with a man at the club is the same conversation as anywhere
       // else, opened at the club (a scene already under way in an old save still plays out below).

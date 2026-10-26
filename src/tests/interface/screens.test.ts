@@ -35,7 +35,7 @@ describe('the money, in one account', () => {
     assert.equal(wk.inTotal, wk.comingIn.reduce((s, f) => s + f.amt, 0));
     const line = weekLine(wk);
     assert.ok(line.includes(`$${wk.inTotal.toLocaleString('en-US')}`), line);
-    assert.ok(draw(w, todayView).includes(line.replace(/’/g, '&#39;').replace(/;/g, ';')) || draw(w, todayView).includes(`$${wk.inTotal.toLocaleString('en-US')} a week`), 'World says it');
+    // (Today no longer carries the week's money: Business is its one home, and the cash is in the bar on every screen)
     assert.ok(draw(w, businessRoom).includes(`$${wk.inTotal.toLocaleString('en-US')} in`), 'Money says it');
   });
 });

@@ -355,7 +355,7 @@ export function placesView(home = false): string {
   const shops = all.filter((x) => x.kind === 'biz');
   if (shops.length) out += h('The shops on the street', String(shops.length)) + rows(shops.map((x): Row => { const b = w.biz[x.biz!], o = w.chars[b.ownerId]; return { title: esc(x.name), sub: `${o ? esc(o.name) : ''}${knowsProtection(w, p, b) && b.protection && b.protection.collectorId !== b.ownerId ? ` · pays ${b.protection.collectorId === p.id ? 'you' : esc(w.chars[b.protection.collectorId]?.name ?? 'somebody')}` : ''}${shut(x)}`, a: `place:${x.id}` }; }));
   // (the old rooms, for everywhere else; the family's own club is on the street above when it stands in this district)
-  out += h('Elsewhere') + choices(PLACES.filter((pl_) => !(pl_.id === 'club' && all.some((x) => x.kind === 'club' && x.famId === p.familyId))).map((pl_) => ({ a: `place:${pl_.id}`, label: pl_.name, hint: `${pl_.blurb} ${isOpen(w, pl_.id) ? 'Open.' : 'Shut right now.'}` })), 'Elsewhere');
+  out += h('Elsewhere') + choices([...(home ? [{ a: 'bj:', label: 'A card table', hint: 'Blackjack at the family casinos. The house usually wins.' }] : []), ...PLACES.filter((pl_) => !(pl_.id === 'club' && all.some((x) => x.kind === 'club' && x.famId === p.familyId))).map((pl_) => ({ a: `place:${pl_.id}`, label: pl_.name, hint: `${pl_.blurb} ${isOpen(w, pl_.id) ? 'Open.' : 'Shut right now.'}` }))], 'Elsewhere');
   return out;
 }
 export function placeView(id: string): string {
