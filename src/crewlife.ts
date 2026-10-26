@@ -8,6 +8,7 @@ import { pulseChoose } from './pulse';
 // None of it is shown until you work it out. Most of it comes out on a Sunday.
 import { addFact, bear, bearOn, clamp, compat, createDebt, feel, feelAtLeast, feelOn, money, rel } from './core';
 import { addEnc, addFavour } from './encounters';
+import { authorityWeek, quarrel } from './authority';
 import { Character, DAY, Enc, Id, World } from './types';
 import { arch, pick } from './voice';
 
@@ -89,8 +90,10 @@ export function crewTick(w: World) {
       } else if (roll < 0.62 && bad) {
         bearOn(w, ra, 0.25, `${b.name} rubs him the wrong way`); bearOn(w, rb, 0.25, `${a.name} rubs him the wrong way`);
         a.cooldown.friction = w.now + 14 * DAY; b.cooldown.friction = w.now + 14 * DAY;
-        addFact(w, { kind: 'trouble', actor: a.id, victim: b.id, minor: true, text: pick([`${a.name} and ${b.name} had words over money.`, `${a.name} and ${b.name} stopped speaking after an argument nobody will repeat.`, `${a.name} thinks ${b.name} got credit he didn’t earn.`], a.id + b.id + w.now), district: a.district }, { witnesses: [p.id] });
-        tells.push({ who: b.id, text: `${first(b)} isn’t saying much about ${first(a)}. Whatever it was, it isn’t finished.`, learn: `rival:${a.id}` });
+        const about = (['money', 'words', 'credit'] as const)[[...(a.id + b.id + w.now)].reduce((s, ch) => s + ch.charCodeAt(0), 0) % 3];
+        addFact(w, { kind: 'trouble', actor: a.id, victim: b.id, minor: true, text: about === 'money' ? `${a.name} and ${b.name} had words over money.` : about === 'words' ? `${a.name} and ${b.name} stopped speaking after an argument nobody will repeat.` : `${a.name} thinks ${b.name} got credit he didn’t earn.`, district: a.district }, { witnesses: [p.id] });
+        // (it comes to the man they both answer to, to settle: authority.ts)
+        if (!quarrel(w, p, a, b, about)) tells.push({ who: b.id, text: `${first(b)} isn’t saying much about ${first(a)}. Whatever it was, it isn’t finished.`, learn: `rival:${a.id}` });
       } else if (roll < 0.82 && gr > 0.9) {
         const borrower = a.cash < b.cash ? a : b, lender = borrower === a ? b : a;
         if (lender.cash > 400 && !w.debts.some((d) => d.status === 'active' && d.debtor === borrower.id && d.creditor === lender.id)) {
@@ -130,6 +133,8 @@ export function crewTick(w: World) {
   }
   // somebody asks you for something
   favourRequest(w, p, ok);
+  // men who come to him, and what he answers for upstairs
+  authorityWeek(w, p);
   // keep only a couple of tells for Sunday
   w.sunday = { t: w.now, tells: tells.sort(() => rng.next() - 0.5).slice(0, 2), seen: false };
 }

@@ -362,7 +362,9 @@ export function promoTick(w: World) {
   const pc = w.promo;
   if (!pc || !p?.alive || !p.familyId) return;
   if (pc.result) {
-    if (w.now - pc.since > 60 * DAY && pc.stage >= 4) delete w.promo;
+    // (a man passed over is told to try again in a week or two, and can be: the record goes when his wait does; a man chosen keeps it
+    // while the ceremony and its aftermath run)
+    if (pc.stage >= 4 && (pc.result === 'passed' ? (p.cooldown['induct'] ?? 0) <= w.now : w.now - pc.since > 60 * DAY)) delete w.promo;
     return;
   }
   const sp = w.chars[pc.sponsor];

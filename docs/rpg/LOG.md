@@ -97,3 +97,40 @@ Arrests from heat are still the largest drag on a careful player too (1–3 spel
   something comes for the player and says how long it ran ("Four days, and then something wants you"). A summons card says when he
   can go ("Go at 10:00"), and going waits until the man who sent for him is up. Played: the week stopped on a family meeting; "Go at
   10:00" opened it at ten.
+
+## Phase 1.2: crew and authority (authority.ts)
+**Built:**
+- **Men come to a made man.** His captain gives him a man when he has none ("Take Patsy. He's hungry. Point him the right way.
+  What he does is on you now."). Associates whose own man is gone, inside or sour on them, and hopefuls on his street who've heard
+  of him, ask to run with him, each saying why. He can take them on, tell them to show him something first, or say he's full.
+- **Quarrels come to him.** Crewlife's fallings-out, and the old "mediate" approach when both men are his, become one quarrel. Both
+  men wait at opposite ends of the bar, and one of them is in the wrong (the greedier over money, the prouder over credit, the
+  hotter over words). Hearing them out one at a time costs an hour; the man in the wrong tells it differently the second time.
+  Backing the man in the right is respected by the crew; backing the other is noticed. Paying it yourself ends it. Making them
+  shake hands works if they respect you enough. Leaving it to them can end in a beating, which costs the man who could have
+  stopped it.
+- **He answers upstairs.** When one of his men hits a place the family protects, or one of its men, and his captain knows, the
+  captain asks what he means to do. Hearing his man's side first gives his real reason: a debt or a habit, bad blood with the
+  owner, not knowing the place paid, or greed. Then:
+  - make it right (from the man's pocket, or his own);
+  - have him roughed up (the captain satisfied; the man resentful; hard men in the crew respect it, easy ones like him less);
+  - stand up for him (costly with the captain, cheaper if the man truly didn't know);
+  - put him out.
+- **It feeds back.**
+  - A man who holds something against the man who sent him works less cleanly and skims more (orders.behaviour).
+  - Discipline is something a man remembers you did to him (memory.ts), and says so.
+  - The weekly crew envelopes, crewlife's tells, restless men going over his head and backing requests all now have a crew to
+    work on.
+
+**Found by long play (the climber over 220 days):**
+- A man passed over at the table was told to try again in a week or two, but the stale proposal blocked a new one for 60 days.
+  Now it clears when his wait does.
+- `p.cooldown.handed` was already the Sunday envelope's key (books.ts). Renamed.
+- The "mediate" approach had no cooldown per pair, so the same two men came back almost weekly while the grudge lasted (10–15
+  times in 150 days). Now once per pair in six weeks, and two of his own men go to the quarrel.
+- "X wants you to put his name forward" repeated eight times: a yes was never recorded as asked. Fixed (goals.ts).
+- The bot itself took the first answer to everything, including selling out its captain and doing a rival family's job behind his
+  back. Now that both are real betrayals with consequences, that wrecked its climb. It now plays loyally (LOYAL=0 for the old bot).
+
+**Measured (loyal bot, before the last two fixes):** made on day 54, 100 and 135 (seeds 7, 11, 3); crews of 2–3 men afterwards;
+standing 46–71 at weeks 30–31.

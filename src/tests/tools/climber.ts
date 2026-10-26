@@ -47,7 +47,14 @@ for (let d = 0; d < days && p.alive; d++) {
   // take up a tip or an opportunity on offer, now and then
   for (const j of w.jobs.filter((q) => !hot && q.status === 'offered' && q.assignee === p.id && q.kind !== 'summons' && q.giver !== cap?.id).slice(0, 2)) { takeJob(w, j); const a = approaches(w, j)[0]; if (a) resolve(w, j, a.code); }
   // what is put to him: the trial, an invitation, the family's requests (the first answer that isn't refusing); the induction, attended
-  for (const e of w.enc.filter((x) => x.status === 'open' && x.opts.length)) { const o = e.opts.find((x) => !/no|regrets|not/i.test(x.code + x.label)) ?? e.opts[0]; encChoose(w, p, e, o.code); }
+  // (a man climbing stays loyal: a rival captain's money is taken to his own captain, another family's job is asked about first, a quarrel
+  // is heard out, a man's wrong is made right; LOYAL=0 for the old bot, which took the first answer to everything)
+  const LOYAL: Record<string, string[]> = process.env.LOYAL === '0' ? {} : { courting: ['tell'], crossdeal: ['cap'], quarrel: ['hear', 'a'], answer: ['side', 'pay'], cometo: ['take', 'ok'] };
+  for (const e of w.enc.filter((x) => x.status === 'open' && x.opts.length)) {
+    for (const code of LOYAL[e.kind] ?? []) if (e.status === 'open' && e.opts.some((o) => o.code === code)) encChoose(w, p, e, code);
+    if (e.status !== 'open') continue;
+    const o = e.opts.find((x) => !/no|regrets|not/i.test(x.code + x.label)) ?? e.opts[0]; encChoose(w, p, e, o.code);
+  }
   for (const j of w.jobs.filter((q) => q.kind === 'summons' && q.meeting === 'induction' && q.status === 'offered')) { const at = Number(j.extra?.at ?? 0); if (at > w.now) advance(w, at); const m = openInduction(w, p, j); if (typeof m !== 'string') { for (let i = 0; i < 20 && current(m); i++) mChoose(w, p, m, current(m)!.opts[0].code); closeMeeting(w, p, m); } }
   // when he is sent for, he goes (as the screen's 'attend' does: at the hour set, to the meeting it is), unless NOATTEND is set
   if (!process.env.NOATTEND) for (const j of w.jobs.filter((q) => q.kind === 'summons' && q.meeting !== 'induction' && q.status === 'offered' && q.assignee === p.id)) {

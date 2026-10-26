@@ -29,14 +29,14 @@ export function reliability(w: World, m: Character, by: Character = PL(w)): numb
 export function behaviour(w: World, j: Job, m: Character): Behaviour {
   const T = m.traits;
   const p = senderOf(w, j);
-  const trust = m.rels[p.id]?.trust ?? 0.4;
+  const trust = m.rels[p.id]?.trust ?? 0.4, sore = m.rels[p.id]?.grudge ?? 0; // (a man who holds something against the man who sent him works for him less well, and helps himself more)
   const pr = m.problem;
   const money = MONEY_KINDS.includes(j.kind);
   const apt = aptitude(m, j.kind);
   const weights: [Behaviour, number][] = [
-    ['clean', 1.4 * reliability(w, m, p)],
+    ['clean', 1.4 * reliability(w, m, p) * (1 - sore * 0.5)],
     ['bungle', (1 - apt) * 0.3],
-    ['skim', money ? (T.greed * 0.4 + (pr && ['house', 'gambling', 'debt'].includes(pr.kind) ? 0.5 * pr.sev : 0)) * (1 - trust * 0.5) : 0],
+    ['skim', money ? (T.greed * 0.4 + sore * 0.4 + (pr && ['house', 'gambling', 'debt'].includes(pr.kind) ? 0.5 * pr.sev : 0)) * (1 - trust * 0.5) : 0],
     ['gamble', money ? T.vice * 0.35 + (pr?.kind === 'gambling' ? 0.7 * pr.sev : 0) : 0],
     ['unavailable', 0.07],
     ['distracted', pr ? pr.sev * 0.7 : 0.02],

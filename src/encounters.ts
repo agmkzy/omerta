@@ -1,6 +1,7 @@
 import { answerImposed } from './imposed';
 import { answerCourting, courter, makeCourting } from './loyalty';
 import { answerDeal, dealer, makeDeal } from './crossdeal';
+import { authorityChoose, quarrel } from './authority';
 import { answerAsk, answerWord, callFavour, putToPlayer } from './asks';
 import { answerMatter } from './matters';
 // People come to you. Each approach is a small scene in the man's own voice, with choices that carry weight:
@@ -180,10 +181,13 @@ function mediate(w: World, p: Character): Cand[] {
   for (const a of Object.values(w.chars).filter((c) => c.alive && c.bossId === p.id)) {
     for (const [id, r] of Object.entries(a.rels)) {
       const b = w.chars[id];
-      if (!b?.alive || b.id === p.id || r.grudge < 0.22 || b.familyId !== p.familyId || b.rank === 'civilian' || pending(w, 'mediate', a.id)) continue;
+      if (!b?.alive || b.id === p.id || r.grudge < 0.22 || b.familyId !== p.familyId || b.rank === 'civilian' || pending(w, 'mediate', a.id) || (a.cooldown[`med:${b.id}`] ?? 0) > w.now) continue;
       out.push({
         weight: 1.1,
         make: () => {
+          // (the same two men come to him at most once in six weeks; two of his own men's quarrel is settled the crew's way: authority.ts)
+          a.cooldown[`med:${b.id}`] = w.now + 45 * DAY;
+          if (b.bossId === p.id) { quarrel(w, p, a, b, 'words'); return; }
           const lead = by(a, 'med' + w.now, {
             hothead: [`${b.name} and I are going to have a problem. I’m telling you now so you can’t say I didn’t.`],
             proud: [`${b.name} showed me disrespect in front of people. I won’t let that stand, but I wanted you to hear it from me first.`],
@@ -514,6 +518,7 @@ export function choose(w: World, p: Character, e: Enc, code: string): { lines: s
   if (e.kind === 'word') return answerWord(w, p, e, code); // V89: a superior's word about trouble
   if (e.kind === 'matter') return answerMatter(w, p, e, code); // V89: someone in a matter wants the player's answer
   if (e.kind === 'imposed') return answerImposed(w, p, e, code);
+  if (e.kind === 'cometo' || e.kind === 'quarrel' || e.kind === 'answer') return authorityChoose(w, p, e, code); // his crew and what he answers for: authority.ts
   if (e.kind === 'crossdeal') return answerDeal(w, p, e, code); // a man of another family with a job to split: crossdeal.ts
   if (e.kind === 'courting') return answerCourting(w, p, e, code); // a captain asking him to inform on his own: loyalty.ts // a decision made over his head: taken, asked about, or objected to
   if (e.kind === 'crew') { lines.push(...crewChoose(w, p, e, code)); return { lines, minutes: 25 }; }

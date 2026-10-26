@@ -9,7 +9,7 @@ import { ledgerOf } from './powers2';
 import type { Character, Fact, World } from './types';
 
 const DAY = 1440;
-const HARM = new Set(['beating', 'vandalism', 'robbery', 'burglary', 'theft', 'scam', 'poach']);
+const HARM = new Set(['beating', 'vandalism', 'robbery', 'burglary', 'theft', 'scam', 'poach', 'discipline']); // (discipline: what a man's own boss did to him, authority.ts)
 
 // What was done, as the man it was done for would say it: "covering $200 of his envelope" -> "covering $200 of my envelope".
 const mine = (s: string) => s.replace(/\bhis\b/g, 'my').replace(/\bhim\b/g, 'me').replace(/\bhe\b/g, 'I').replace(/\bhe’s\b/g, 'I’m');
@@ -27,7 +27,7 @@ export function recall(w: World, p: Character, t: Character): Memory | undefined
   // Each kind of memory comes up at most once a fortnight with the same man: a callback, not a refrain.
   const cool = (k: string) => (p.cooldown[`recallk:${t.id}:${k}`] ?? -1) >= day;
   // (the voice sheet writes a remark as `Name: "..."`; in a conversation with him it is simply what he says)
-  const speech = (line: string) => { const m = /^[^:“"]+: "(.*)"$/.exec(line); return m ? `“${m[1].replace(/"([^"]*)"/g, '‘$1’')}”` : line; };
+  const speech = (line: string) => { const m = /^[^:“"]+: "(.*)"$/.exec(line); return m ? `“${m[1].replace(/"([^"]*)"/g, '‘$1’')}”` : line.replace(/"([^"]*)"/g, '“$1”'); };
   const out = (kind: Memory['kind'], line: string): Memory => { p.cooldown[`recall:${t.id}`] = day; p.cooldown[`recallk:${t.id}:${kind}`] = day + 14; return { kind, line: speech(line) }; };
 
   // 0. what has just happened to him, that this man has heard: a man of his own family says something about it the next time they

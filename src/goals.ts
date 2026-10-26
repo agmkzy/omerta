@@ -1004,6 +1004,7 @@ function answered(w: World, g: Goal, code: string): string[] {
       if (c.bossId === p.id && LADDER.indexOf(p.rank) >= 1) lines.push(...recommend(w, p, c));
       else { c.backer = p.id; feelOn(w, r, 'trust', 0.1); feelOn(w, r, 'affection', 0.05); }
       feelAtLeast(w, p, c.id, 'trust', 0.35); // you have put your name on him: the rule reads that as your trust
+      (g.asked ??= []).push(p.id); // (asked and answered: he doesn't ask again; now he waits on the nod)
       lines.push(`"You won't regret it," ${first(c)} says.`);
       later(w, g, 1);
     } else {
