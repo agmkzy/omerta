@@ -46,6 +46,17 @@ glance. It folds in the October roadmap (V90 places, V91 The Living Ecosystem, V
 - Men with arcs.
 - Consequences that come back months later.
 
+## Phase 2b: UI redesign (after Phase 2; owner, 26 October)
+The game has outgrown its screens: crew, the book, trucks and places arrive as cards under "Needs you" and "Opportunities", with
+no pages of their own.
+- **Audit first:** every screen against what the game now does, and what the player needs to see and decide in each.
+- **Then the design:**
+  - home pages for the crew, the book and rackets, and the street (Little Italy as a place, not a list);
+  - a calmer "Needs you" that separates what demands an answer from what is merely on offer;
+  - the time bar and the day's shape around the new controls;
+  - the Herald and the stories as the way the world reaches the player.
+- **Built on the existing component kit** (ui/kit.ts), phone first, keeping every save working.
+
 ## Phase 3: The Living Ecosystem
 - **Feuds and authority:**
   - family feuds with causes, phases and endings;
