@@ -319,3 +319,33 @@ Looked at the Herald and the Stories page as a player in the playthrough save:
   - "X has had enough" (the player's girl) could come again within days while things stayed cold. Now three weeks between.
 - **A hardcoded name:** "I made dinner, Tony" and "Tony, my friend" used that name whatever the player was called. Now his own
   first name.
+
+## The redesign, first round (Phase 2b; owner's brief: a complete redesign, clean, not overloaded)
+Played and checked on a phone and a desktop against a soldier's game 150 days in (crew of three, a book, 95 people known); the plan
+is docs/rpg/REDESIGN.md.
+- **Five destinations:**
+  - Street | People | Today | Business | Story;
+  - Today raised at the exact centre;
+  - More at the far right of the top bar: the Herald, who's where, the city's shops, what you know, milestones, scores to
+    settle, honest work, saves;
+  - each section picks up where you left it, and Today always returns to the present;
+  - one mark on Today when something needs an answer.
+- **Today:**
+  - your situation in a line, by rank;
+  - what needs you (one card per matter);
+  - what has reached you;
+  - what you could do;
+  - time;
+  - the Herald's headline.
+- **People:**
+  - Everyone is grouped by what each person is to you (above you, your men, owed either way, bad blood, at home, everyone else),
+    and a man is described only when there is something to say;
+  - a man's page says how he sees you in words, with no meters;
+  - Your men: the week in a sentence, who needs a word, each man in a line, running the crew as numbered choices.
+- **Business:** What you run (the week, rackets, the envelope, money owed) and Work going (offers, rackets and scores to start,
+  loans, the hidden racket).
+- **Story:** Stories, Your road, Your life, Your word (favours one row a man).
+- **Street:**
+  - the drawn neighbourhood, a static picker with a signboard for each place;
+  - places by their proper names, with the street, who's in and the hours;
+  - one layout for every place page: where it is, who's in, what you do.
