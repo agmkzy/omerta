@@ -6,7 +6,7 @@
 import { addFact, bear, feel, repute } from './core';
 import { addEnc } from './encounters';
 import { mkJob } from './jobs';
-import { temper } from './temper';
+import { noteConduct, temper } from './temper';
 import { imposed } from './imposed';
 import { DAY, type Business, type Character, type Enc, type Pending, type World } from './types';
 
@@ -59,7 +59,7 @@ export function answerDeal(w: World, p: Character, e: Enc, code: string): { line
   e.status = 'done';
   if (!x?.alive || !cap?.alive || !b?.open) return { lines: ['By the time you have an answer, he has gone cold on it.'], minutes: 5 };
   if (code === 'quiet') {
-    const j = theJob(w, p, x, b, false);
+    const j = theJob(w, p, x, b, false); noteConduct(p, 'lies'); // (behind his captain's back)
     feel(w, x, p.id, 'trust', 0.08);
     (w.pending ??= []).push({ id: 'p' + w.nextId++, due: w.now + w.rng.int(10, 35) * DAY, kind: 'crossdeal', a: p.id, b: cap.id, c: x.id, note: j.id });
     return { lines: [`“When you’re ready, then, and soon,” ${first(x)} says. “Come alone.” It’s in your work now.`], minutes: 20 };

@@ -301,3 +301,8 @@ Looked at the Herald and the Stories page as a player in the playthrough save:
   it, and when he is asking what a man gets for himself); so is a man whose name the player has put forward ("Patsy's chance").
 - **Approaches happen somewhere:** a man who comes to the player comes where his day has him at that hour ("At Ferrara's pastry
   shop."), unless what he says already names the place.
+- **What kind of man he is:** the decisions added today now count towards the player's conduct (temper.ts), which describes him on
+  his own page: roughing up his own man is force; standing up to his captain for one of his men is defiance; making a wrong right or
+  paying a quarrel off is a deal, and generosity; making two men shake hands is a deal; selling out his captain or doing another
+  family's job behind his back is a lie; a book that stalls a winner breaks his word. How other men see him already comes from what
+  they have seen and heard him do (viewOf: violence they know of makes him dangerous; a broken word lowers trust).

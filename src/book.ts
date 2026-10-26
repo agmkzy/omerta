@@ -169,7 +169,8 @@ function cantPayChoose(w: World, p: Character, e: Enc, code: string) {
     feel(w, g, p.id, 'trust', 0.02);
     return { lines: [`${first(cap)} counts it out without a word, then says one: “Once.” ${first(g)} is paid in full by noon.`], minutes: 40 };
   }
-  // stall: he takes it as it is, and so do his people
+  // stall: he takes it as it is, and so do his people (and the player is a man whose book didn't pay: his word)
+  p.rep = { ...(p.rep ?? { kept: 0, broken: 0, asked: 0, ignored: 0, favoured: null }), broken: (p.rep?.broken ?? 0) + 1 };
   bear(w, g, p.id, 0.3, `${p.name}’s book wouldn’t pay him`); repute(w, p, -3, 'welshed');
   createDebt(w, g.id, p.id, short, 0, 'what the book owed him');
   const gb = g.bossId ? w.chars[g.bossId] : undefined;

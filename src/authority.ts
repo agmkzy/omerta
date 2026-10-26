@@ -5,7 +5,7 @@
 import { addFact, bear, bearOn, clamp, feel, feelOn, money, peek, recordCareer, rel, repute, transfer } from './core';
 import { addEnc, addFavour } from './encounters';
 import { applyRank } from './rank';
-import { temper } from './temper';
+import { noteConduct, temper } from './temper';
 import { DAY, type Character, type Enc, type Fact, type World } from './types';
 
 const first = (c: Character) => c.name.split(' ')[0];
@@ -198,7 +198,7 @@ function quarrelChoose(w: World, p: Character, e: Enc, code: string) {
   }
   if (code === 'pay') {
     if (p.cash < amt) { e.status = 'open'; return { lines: ['You haven’t got it on you.'], minutes: 0 }; }
-    transfer(w, p, a, amt, 'gift', 'to end a quarrel');
+    transfer(w, p, a, amt, 'gift', 'to end a quarrel'); noteConduct(p, 'generous');
     for (const [x, y] of [[a, b], [b, a]] as const) bear(w, x, y.id, -0.2, 'settled');
     feelOn(w, ra, 'trust', 0.05); feelOn(w, rb, 'trust', 0.05);
     return { lines: [settled(`You count ${money(amt)} onto the bar in front of ${first(a)}. “That’s the end of it.” It is. They both know what it cost you, and that you paid it.`, 'he paid it out of his own pocket')], minutes: 30 };
@@ -208,6 +208,7 @@ function quarrelChoose(w: World, p: Character, e: Enc, code: string) {
     if (w.rng.chance(clamp(weight + 0.25, 0.15, 0.9))) {
       for (const [x, y] of [[a, b], [b, a]] as const) { bear(w, x, y.id, -0.3, 'settled'); feelOn(w, rel(x, y.id), 'trust', 0.05); }
       feelOn(w, ra, 'respect', 0.05); feelOn(w, rb, 'respect', 0.05);
+      noteConduct(p, 'deals');
       return { lines: [settled(`You sit them down at the same table and don’t let either of them leave until they’ve shaken on it. They do. It takes a while.`, 'he made them shake hands')], minutes: 50 };
     }
     feelOn(w, ra, 'respect', -0.04); feelOn(w, rb, 'respect', -0.04);
@@ -255,6 +256,7 @@ function answerChoose(w: World, p: Character, e: Enc, code: string) {
     if (from === man) { feelOn(w, rel(man, p.id), 'trust', -0.05); bear(w, man, p.id, 0.05, `${p.name} made him pay it back`); }
     else feelOn(w, rel(man, p.id), 'trust', 0.06);
     seen(`made ${man.name} pay back what he did${from === p ? ', and paid it himself when he couldn’t' : ''}`);
+    noteConduct(p, 'deals'); if (from === p) noteConduct(p, 'generous'); // (what kind of man he is: temper.ts)
     return { lines: [`${money(owed)} goes back where it belongs${from === p ? `, out of your own pocket, because ${first(man)} hasn’t got it` : `, out of ${first(man)}’s pocket`}. ${first(cap)} nods. “Good. Keep him on a shorter leash.”`], minutes: 40 };
   }
   if (code === 'rough') {
@@ -264,11 +266,13 @@ function answerChoose(w: World, p: Character, e: Enc, code: string) {
     // (the rest of the crew read it by temperament: a hard man respects it, an easy one fears it)
     for (const c of crew) { if (temper(c).volatility > 0.5 || c.traits.violence > 0.6) feelOn(w, rel(c, p.id), 'respect', 0.05); else feelOn(w, rel(c, p.id), 'affection', -0.03); }
     seen(`had ${man.name} roughed up for what he did`);
+    noteConduct(p, 'force');
     return { lines: [`Two men from the club pay ${first(man)} a visit. They don’t break anything that won’t mend. ${first(cap)} hears of it by evening. ${first(man)} hears who sent them.`], minutes: 30 };
   }
   if (code === 'stand') {
     // (standing up for a man who truly didn't know is an argument a captain can accept; for a greedy one it is taking his side)
     const fair = e.data?.reason === 'didnt-know';
+    noteConduct(p, 'defied'); // (standing up to the man above him, for one of his own)
     feel(w, cap, p.id, 'trust', fair ? -0.03 : -0.1); if (!fair) { bear(w, cap, p.id, 0.08, `${p.name} stood up for ${man.name} when he was in the wrong`); repute(w, p, -1, 'gave way'); }
     feelOn(w, rel(man, p.id), 'trust', 0.15); feelOn(w, rel(man, p.id), 'affection', 0.1);
     addFavour(w, p.id, man.id, fair ? 1 : 2, `standing up for him to ${cap.name}`); // (he owes it, and he says so: memory.ts)

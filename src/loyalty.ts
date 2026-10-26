@@ -5,7 +5,7 @@
 // Everything goes through the world's own records (regard, grudges, favours, facts, the family's tension, the pending queue).
 import { addFact, bear, clamp, feel, money, rel, repute, transfer } from './core';
 import { addEnc, addFavour } from './encounters';
-import { temper } from './temper';
+import { noteConduct, temper } from './temper';
 import { imposed } from './imposed';
 import { DAY, type Character, type Enc, type Pending, type World } from './types';
 
@@ -49,7 +49,7 @@ export function answerCourting(w: World, p: Character, e: Enc, code: string): { 
   e.status = 'done';
   if (!x?.alive || !cap?.alive) return { lines: ['He has other things on his mind now. It came to nothing.'], minutes: 5 };
   if (code === 'deal') {
-    const got = transfer(w, x, p, Number(e.data?.pay ?? 150), 'gift', 'for keeping him informed');
+    const got = transfer(w, x, p, Number(e.data?.pay ?? 150), 'gift', 'for keeping him informed'); noteConduct(p, 'lies'); // (he is now a man who tells tales)
     feel(w, x, p.id, 'trust', 0.15); feel(w, x, p.id, 'respect', 0.05);
     addFavour(w, p.id, x.id, 1, `telling him how things go in ${first(cap)}’s crew`);
     lines.push(`You tell him what you know: who is earning in ${first(cap)}’s crew, who is short, what ${first(cap)} has said in front of you. ${first(x)} listens without writing anything down. He counts out ${money(got)}. “We’ll talk again.”`);
