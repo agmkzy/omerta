@@ -375,7 +375,7 @@ function actRows(c: Ctx, k: Pane | undefined, kinds: NonNullable<Offer['kind']>[
   const said = new Set(c.v.th.used ?? []);
   const xs = memo(c, 'acts', () => offersNow(c)).filter((o) => kinds.includes(o.kind ?? 'other') && (!k || o.pane === k) && !(c.h.cash < (o.cost ?? 0)) && !said.has(o.code));
   // (a man who has turned cold on the player is in no mood for small talk or proposals: only what is between them)
-  return xs.filter((o) => !c.v.th.cold || o.kind === 'his' || o.kind === 'between').map((o) => ({ id: 'a:' + o.code, label: o.label, says: o.says, note: o.note, group: o.kind === 'his' ? 'reply' : o.kind === 'between' || o.kind === 'mind' ? 'matter' : 'matter', pane: o.pane, ...(o.amount ? { amount: o.amount } : {}) }) as Choice);
+  return xs.filter((o) => !c.v.th.cold || o.kind === 'his' || o.kind === 'between').map((o) => ({ id: 'a:' + o.code, label: o.label, says: o.says, note: o.note, group: o.kind === 'his' ? 'reply' : o.kind === 'between' || o.kind === 'mind' ? 'matter' : 'matter', pane: o.pane, ...(o.kind === 'lead' || o.kind === 'mind' ? { lead: true } : {}), ...(o.amount ? { amount: o.amount } : {}) }) as Choice);
 }
 // One of them said: carried through by the conversation's runner (run.ts), then what follows: his answers to it, or back to the talk
 function doAct(c: Ctx, code: string, label: string): { minutes: number; meeting?: Meeting; settle?: Id } {
@@ -439,7 +439,7 @@ function guardedCue(c: Ctx, code: string) {
 // He says so, in his own words, once; the record is the job itself (jobs.ts), and what he made of it is the record's own consequence.
 function jobNews(c: Ctx) {
   const { w, h, n } = c;
-  const xs = w.jobs.filter((j) => j.giver === n.id && j.assignee === h.id && ['done', 'failed', 'expired'].includes(j.status) && w.now - j.created < 45 * DAY && !lastOf(w, n.id, 'job:' + j.id));
+  const xs = w.jobs.filter((j) => j.giver === n.id && j.assignee === h.id && j.kind !== 'summons' && ['done', 'failed', 'expired'].includes(j.status) && w.now - j.created < 45 * DAY && !lastOf(w, n.id, 'job:' + j.id)); // (coming when he sent for you is not work to hear about)
   for (const j of xs.slice(-2)) {
     // (work the player took on and that stopped being needed is not work he turned his nose up at: he knows it was taken)
     const key = j.status === 'done' ? (j.reported ? 'job.ack.thanks' : 'job.ack.done') : j.status === 'failed' ? 'job.ack.failed' : j.accepted ? 'job.ack.moot' : j.status === 'declined' ? 'job.ack.declined' : 'job.ack.ignored';
@@ -453,7 +453,7 @@ function jobNews(c: Ctx) {
 // (by its place or its man, as men say it: "Palumbo's Tavern", "the business with Eddie"; never the record's own title)
 const jobPhrase = (w: World, j: { title: string; biz?: Id; target?: Id }) => j.biz && w.biz[j.biz] ? w.biz[j.biz].name : j.target && w.chars[j.target] ? `the business with ${w.chars[j.target].name.split(' ')[0]}` : 'that job';
 // Finished work of his not yet reported to him: the conversation's first business (the old engine's report, which he rewards)
-const unreported = (c: Ctx) => c.w.jobs.some((j) => j.giver === c.n.id && j.assignee === c.h.id && j.status === 'done' && !j.reported);
+const unreported = (c: Ctx) => c.w.jobs.some((j) => j.giver === c.n.id && j.assignee === c.h.id && j.kind !== 'summons' && j.status === 'done' && !j.reported);
 
 const shopOf = (c: Ctx) => { const b = ownerBiz(c.w, c.n.id); return b?.open && c.n.rank === 'civilian' ? b : undefined; };
 const feeOf = (c: Ctx) => { const b = shopOf(c)!; return Math.max(15, Math.round((b.income * 0.08) / 5) * 5); };

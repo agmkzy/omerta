@@ -160,10 +160,11 @@ export function needs(): Need[] {
     out.push({ dot: 'amber', k: 'Work you took on', title: j.title, sub: `${g ? `For ${g.name}. ` : ''}${j.kind === 'lean' && j.biz && w.biz[j.biz] ? `Go and see ${w.chars[w.biz[j.biz].ownerId]?.name ?? 'the owner'} and put it to him. It’s done when he pays you.` : 'Open it to see it through.'}`, a: `job:${j.id}`, who: g?.id });
   }
   // work done and not yet told to the man who gave it
-  for (const j of w.jobs.filter((x) => x.status === 'done' && !x.reported && x.assignee === p.id && x.giver && x.giver !== p.id && w.chars[x.giver]?.alive && w.now - x.created < 30 * DAY)) {
-    const g = w.chars[j.giver!];
-    out.push({ dot: 'blue', k: 'Done', title: `Tell ${g.name} how it went`, sub: j.title, a: `talk:${g.id}`, who: g.id });
-  }
+  // (a man who gave you work wants to hear it's done: owed him, not on offer; one card a man, however many jobs; coming when he sent for
+  // you is not work to report)
+  const told = new Map<string, string[]>();
+  for (const j of w.jobs.filter((x) => x.status === 'done' && !x.reported && x.kind !== 'summons' && x.assignee === p.id && x.giver && x.giver !== p.id && w.chars[x.giver]?.alive && w.now - x.created < 30 * DAY)) told.set(j.giver!, [...(told.get(j.giver!) ?? []), j.title]);
+  for (const [gid, titles] of told) { const g = w.chars[gid]; out.push({ dot: 'amber', k: 'Done', title: `Tell ${g.name} how it went`, sub: titles.join(' · '), a: `talk:${g.id}`, who: g.id }); }
   for (const j of w.jobs.filter((x) => x.rep && !x.acked && playerSide(w, x) && (x.status === 'done' || x.status === 'failed')).slice(-3).reverse())
     out.push({ dot: 'blue', k: 'Reporting back', title: `${w.chars[j.rep!.by].name} reports back`, sub: j.title, a: `report:${j.id}`, who: j.rep!.by });
   for (const b of Object.values(w.biz).filter((x) => x.open && x.protection && lateOf(x) > 0 && (x.protection.collectorId === p.id || w.chars[x.protection.collectorId]?.bossId === p.id)))
@@ -247,6 +248,18 @@ function guideCard(): string {
   return `<div class="ui-card guide g-guide"><h2>Your first week<small>${done} of ${steps.length}</small></h2><p class="g-guide__step">${esc(steps[next][0])}</p><p class="muted">${esc(steps[next][1])}</p><div class="g-guide__acts">${steps[next][3] ? `<button class="ui-btn ui-btn--primary" data-a="${esc(steps[next][3])}">${esc(steps[next][4])}</button>` : ''}<details class="fold"><summary class="ui-btn ui-btn--quiet">All ${steps.length} steps</summary><ul class="gl">${rest}</ul></details><button class="ui-btn ui-btn--quiet" data-a="guideoff:">Skip the guide</button></div></div>`;
 }
 
+// What just happened, and what it changed: shown wherever the player is when it happens (Today, or the place he is in)
+// Who in this room has something for you: what Today would list, found where he is
+export function wantsHere(ids: Set<string>): string {
+  const xs = needs().filter((n) => n.who && ids.has(n.who));
+  return xs.length ? h('Wants a word', String(xs.length)) + rows(xs.map(needRow)) : '';
+}
+export function justNow(at?: string): string {
+  if (at && S.logAt !== at) return '';
+  const fx = S.chips.length ? `<p class="wd-fx" aria-label="What changed">${S.chips.map((c) => `<span class="${c.tone}">${esc(c.t)}</span>`).join('')}</p>` : '';
+  if (S.log.length) return `<section class="wd-just" aria-label="Just now">${S.log.map((l) => `<p>${l}</p>`).join('')}${fx}</section>`;
+  return fx;
+}
 export function todayView(): string {
   const w = W();
   const p = P();
@@ -266,8 +279,7 @@ export function todayView(): string {
   // out from inside: the account of it, once, before anything else (inside.ts)
   if (p.inside?.done && !p.inside.seen && p.inside.account?.length) out += `<section class="wd-inside ui-card" aria-label="Inside"><h2>Back on the street</h2>${p.inside.account.map((l, i) => `<p${i ? '' : ' class="lead"'}>${lk(esc(l))}</p>`).join('')}${acts(btn('insideok:', 'Get back to it', 'primary'))}</section>`;
   // what just happened, and what it changed
-  if (S.log.length) out += `<section class="wd-just" aria-label="Just now">${S.log.map((l) => `<p>${l}</p>`).join('')}${S.chips.length ? `<p class="wd-fx" aria-label="What changed">${S.chips.map((c) => `<span class="${c.tone}">${esc(c.t)}</span>`).join('')}</p>` : ''}</section>`;
-  else if (S.chips.length) out += `<p class="wd-fx" aria-label="What changed">${S.chips.map((c) => `<span class="${c.tone}">${esc(c.t)}</span>`).join('')}</p>`;
+  out += justNow();
   // ---- your situation: who you are today, and what is coming due
   const cu = comingUp()[0];
   out += `<header class="td-now"><p class="td-when">${esc(fmtTime(w.now))}</p><p class="td-who">${esc(situationLine(w, p))}</p>${cu ? `<p class="td-next"><span>Coming up</span> ${esc(shortTime(cu.t))} · ${esc(cu.text)}</p>` : ''}</header>`;
@@ -328,7 +340,7 @@ function couldDo(w: World, p: Character): Row[] {
   if (p.heat > 0.15) out.push({ mark: 'amber', title: 'Lay low', sub: 'The heat is on you. Let it fade before you do anything loud.', a: 'cat:work' });
   if (men.length) { const idle = men.filter((c) => !Object.values(w.jobs).some((j) => j.assignee === c.id && j.status === 'active')).length; out.push({ mark: 'blue', title: 'Put your men to work', sub: idle ? `${idle} of ${men.length} have nothing from you.` : 'Every man has something from you.', a: 'orders:' }); }
   if (p.job) { const done = p.job.last === Math.floor(w.now / DAY); if (!done) out.push({ mark: 'blue', title: 'Work a shift', sub: `${p.job.kind} at ${p.job.biz ? w.biz[p.job.biz].name : w.chars[p.job.boss].name}. Honest money, and cover.`, a: 'shift:' }); }
-  else if (p.rank === 'associate' && w.now < 21 * DAY) { const cl = spots(w).find((x) => x.kind === 'club' && x.famId === p.familyId); out.push({ mark: 'blue', title: 'Go down to the club', sub: 'Be seen. The men who matter drink their coffee there, and work goes to the faces it knows.', a: cl ? `place:${cl.id}` : 'place:club' }); }
+  else if (p.rank === 'associate' && w.now < 21 * DAY && !w.goals?.done['g:club']) { const cl = spots(w).find((x) => x.kind === 'club' && x.famId === p.familyId); out.push({ mark: 'blue', title: 'Go down to the club', sub: 'Be seen. The men who matter drink their coffee there, and work goes to the faces it knows.', a: cl ? `place:${cl.id}` : 'place:club' }); }
   const hint = grudgeHint();
   if (!/^no\b|nobody|nothing/i.test(hint)) out.push({ mark: 'red', title: 'Settle a score', sub: hint.charAt(0).toUpperCase() + hint.slice(1) + '.', a: 'grudges:' });
   return out.slice(0, 3);

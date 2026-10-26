@@ -675,7 +675,8 @@ ASKS.protect = {
     const b = w.biz[s.biz!];
     b.damaged = Math.max(b.damaged, 2); bizMove(w, b, -150, 'damage');
     a.cooldown.restraint = w.now + 10 * DAY;
-    const f = tell(w, s, `${a.name}'s people smashed up ${b.name} after ${t.name} refused to pay.`, { kind: 'vandalism', actor: a.id, victim: t.id, witnesses: witnessesAt(w, b.district, [a.id, t.id], 3) });
+    const men = Object.values(w.chars).some((c) => c.alive && c.bossId === a.id); // (his people, when he has any; otherwise he did it himself)
+    const f = tell(w, s, `${men ? `${a.name}'s people` : a.name} smashed up ${b.name} after ${t.name} refused to pay.`, { kind: 'vandalism', actor: a.id, victim: t.id, witnesses: witnessesAt(w, b.district, [a.id, t.id], 3) });
     if (s.m?.refusal && w.facts[String(s.m.refusal)]) f.cause = String(s.m.refusal);
     notifyProtector(w, b, f);
     return `Chairs break, glass goes. ${b.name} will be shut a while.`;

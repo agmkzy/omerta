@@ -5,7 +5,8 @@ import { sundayDue } from './sunday';
 import { avatar, back } from './common';
 import { choices, h, quiet, rows, type Pick, type Row } from './kit';
 import { placeHead, waitPicks } from './views_b';
-import { esc, lk, P, W } from './links';
+import { justNow, wantsHere } from './views_a';
+import { esc, lk, P, S, W } from './links';
 
 // an hour as a man says it: '11 in the morning', '2 at night'
 const clock = (h0: number) => { const h = h0 % 24; return h === 0 ? 'midnight' : h === 12 ? 'noon' : h < 5 ? `${h} at night` : h < 12 ? `${h} in the morning` : h < 18 ? `${h - 12} in the afternoon` : `${h - 12} in the evening`; };
@@ -15,10 +16,11 @@ export function clubView(): string {
   if (!cl) return back() + quiet('Your family has no club.');
   const owner = w.chars[cl.ownerId], open = clubOpen(w, cl), sid = 'li:club:' + p.familyId;
   const fam = p.familyId ? w.fam[p.familyId]?.name ?? '' : '';
-  let out = back() + placeHead(`The ${fam} club · ${open ? `open till ${clock(cl.open[1])}` : 'shut'}`, cl.name, `Espresso, a card table in the back, and the men who matter.${owner ? ` ${owner.name} runs it.` : ''}`);
+  let out = back() + placeHead(`The ${fam} club · ${open ? `open till ${clock(cl.open[1])}` : 'shut'}`, cl.name, `Espresso, a card table in the back, and the men who matter.${owner ? ` ${owner.name} runs it.` : ''}`) + justNow(S.view.t === 'place' ? 'place:' + S.view.id : 'x');
   const waits = waitPicks(w, p, sid);
   if (!open) return out + quiet(`The shutters are down. ${owner ? esc(owner.name.split(' ')[0]) + ' opens' : 'It opens'} at ${cl.open[0]}:00.`) + (waits.length ? h('Who comes in') + choices(waits, 'Who comes in') : '');
   const here = clubPresent(w, cl);
+  out += wantsHere(new Set(here.map((x) => x.c.id)));
   const wait = waiting(w, p, cl, here);
   if (wait.length) out += h('Wants a word') + rows(wait.map(({ c, t }): Row => ({ face: avatar(c), title: esc(c.name), sub: esc(t.cue), tone: 'warn', a: `cscene:${c.id}` })));
   const others = here.filter((x) => !wait.some((y) => y.c.id === x.c.id));

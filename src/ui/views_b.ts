@@ -27,7 +27,7 @@ import { standingWord } from '../jobs';
 import { disputesList } from './views_c';
 import { avatar, back, banner, sink, meterRow, skillBars, skillLine, traitTags } from './common';
 import { bl, chip, esc, fl, known, lk, P, pl, S, statusOf, W, who } from './links';
-import { bizView, treeView } from './views_a';
+import { bizView, justNow, treeView, wantsHere } from './views_a';
 import { takeSide, toSide } from './layout';
 import { whereIs } from '../where';
 import { kinWord, stageWord, warmthWord, DATES, datingPool } from '../life';
@@ -405,7 +405,7 @@ export function placeView(id: string): string {
   if (sp) return spotView(sp);
   if (id === 'club') return clubView();
   const pl_ = PLACES.find((x) => x.id === id)!;
-  let out = back() + title(pl_.name, esc(pl_.blurb));
+  let out = back() + title(pl_.name, esc(pl_.blurb)) + justNow('place:' + id);
   if (!isOpen(w, id)) return out + quiet(`It’s shut. Come back between ${pl_.open[0]}:00 and ${pl_.open[1] % 24}:00.`);
   if (id === 'barber') return out + choices([{ a: 'club:shave', label: 'Get a shave', hint: '$20. You’ll hear things.' }], 'What you do');
   if (id === 'bar') return out + choices([{ a: 'club:drink', label: 'Have a few drinks', hint: '$30. Strangers talk. So do you.' }], 'What you do');
@@ -427,7 +427,7 @@ function spotView(sp: Spot): string {
   const pays = b && knowsProtection(w, p, b) && b.protection && b.protection.collectorId !== b.ownerId ? (b.protection.collectorId === p.id ? 'pays you' : `pays ${w.chars[b.protection.collectorId]?.name ?? 'somebody'}`) : '';
   const kick = [sp.kind === 'club' ? `The ${w.fam[sp.famId!]?.name ?? ''} club` : b ? tradeOf(b.kind) : '', sp.on ?? (b ? b.district : ''), open ? `open till ${sp.open[1] % 24}:00` : 'shut'].filter(Boolean).join(' · ');
   const blurb = b ? `${owner ? `${owner.name}’s place` : 'A shop'}${pays ? `. It ${pays}` : ''}.` : sp.blurb;
-  let out = back() + placeHead(kick, sp.name, blurb);
+  let out = back() + placeHead(kick, sp.name, blurb) + justNow('place:' + sp.id);
   const waits = sp.kind === 'biz' ? [] : waitPicks(w, p, sp.id);
   if (!open) return out + quiet(sp.kind === 'track' ? 'The track runs on Saturday afternoons.' : sp.kind === 'biz' ? `It keeps ${sp.open[0]}:00 to ${sp.open[1] % 24}:00.` : `It opens at ${sp.open[0]}:00.`) + (waits.length ? h('Who comes in') + choices(waits, 'Who comes in') : '');
   const here = whoIsAt(w, sp.id);
@@ -436,6 +436,7 @@ function spotView(sp: Spot): string {
   if (sp.kind === 'cafe' || sp.kind === 'bar') doing.push({ a: 'club:drink', label: sp.kind === 'cafe' ? 'Sit at the window with a coffee' : 'Have a few drinks', hint: sp.kind === 'cafe' ? '$30 with the pastries. The street goes past; so does what it’s saying.' : '$30. Strangers talk. So do you.' });
   if (sp.kind === 'barber') doing.push({ a: 'club:shave', label: 'Get a shave', hint: '$20. You’ll hear things.' });
   doing.push(...waits);
+  out += wantsHere(new Set(here.map((c) => c.id)));
   const people = here.filter((c) => !(owner && c.id === owner.id && doing.some((d) => d.a === `talk:${owner.id}`)));
   if (people.length) out += h('Who’s in', String(people.length)) + rows(people.map((c): Row => ({ face: avatar(c), title: esc(c.name), sub: `${c.rank === 'civilian' ? 'civilian' : `${esc(c.rank === 'capo' ? 'captain' : c.rank)}${c.familyId && c.familyId !== p.familyId ? `, ${esc(famName(w, c))}` : ''}`} · ${esc(ARCH_WORD[arch(c)])}`, a: `talk:${c.id}` })));
   else out += quiet(sp.kind === 'church' ? 'Mass is over, or hasn’t started. An old woman lights a candle.' : 'Nobody you’d know is in right now.');

@@ -49,7 +49,7 @@ export interface Act {
 // ---------------------------------------------------------------- what the engine hands a screen
 export interface Say { who: 'him' | 'you' | 'narr' | 'card'; text: string; trace?: string[] }
 // label: what the button says (a line, or for an approach its name); says: what the player then says, when that is not the label
-export interface Choice { id: string; label: string; says?: string; note?: string; group: 'reply' | 'matter' | 'social' | 'intent' | 'more' | 'leave'; amount?: Amount; pane?: Pane }
+export interface Choice { id: string; label: string; says?: string; note?: string; group: 'reply' | 'matter' | 'social' | 'intent' | 'more' | 'leave'; amount?: Amount; pane?: Pane; lead?: boolean } // lead: what a man in the player's position would naturally say first, or what is on the other man's mind
 export interface Visit {
   npc: Id; where: string; t0: number;
   lines: Say[];            // this visit so far

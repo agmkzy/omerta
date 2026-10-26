@@ -63,6 +63,7 @@ export const S = {
   opts: [] as Action[],
   planOpts: [] as OrderOpt[],
   last: {} as Record<string, { view: View; stack: View[] }>, // where you were in each section, so going back to it picks up there
+  logAt: '' as string, // where the last thing that happened happened (a place shows it only if it happened there)
   cxSubject: undefined as string | undefined,
   cxLast: undefined as string | undefined, // the subject an exchange began from: when it is over, that subject is open again // the subject open in a conversation (presentation only: nothing is said)
   talkFrom: undefined as View | undefined, // where you were when a conversation began: leaving it takes you back there

@@ -49,12 +49,30 @@ export const isOpen = (w: World, id: string) => {
   return h >= pl.open[0] && h < pl.open[1];
 };
 
+// The room as you sit down in it: the hour, and the men in it doing what men do at a club. Said once a visit, never the same way twice
+// running (the hour and the men pick it, so the same afternoon reads the same).
+function clubAir(w: World, p: Character, here: Character[]): string {
+  const h = (w.now % 1440) / 60, k = String(w.now);
+  const men = here.filter((c) => c.id !== p.id);
+  const a = men[hash(k + 'a') % Math.max(1, men.length)], b = men.filter((c) => c !== a)[hash(k + 'b') % Math.max(1, men.length - 1)];
+  const top = men.find((c) => c.rank === 'boss' || c.rank === 'underboss');
+  const fn = (c: Character) => c.name.split(' ')[0];
+  const plain = h < 12
+    ? ['The morning crowd: espresso, the Daily News folded to the racing page, and nobody saying much before ten.', 'Somebody’s mother has sent over a tray of sfogliatelle. Nobody admits to being hungry. The tray is empty in ten minutes.', 'The shutters are half up. The men who are here this early are the ones who never really leave.']
+    : h < 18
+      ? ['Smoke, espresso, the click of a dominoes game. Nobody asks what you want. They already know.', 'A card game in the back, and a quiet table by the window where the older men sit. You nod at both.', 'The radio is on a ballgame. Nobody’s listening to it. Everybody is listening to everybody else.', 'Two men at the counter are arguing about Sinatra. It is not really about Sinatra.']
+      : ['The lights are low and the talk is lower. This is the hour business gets done.', 'Anisette in small glasses, a pot of coffee nobody pays for, and the door watched without anyone seeming to watch it.', 'The card game has been going since supper. The pot in the middle is more than most men here make in a week.', 'A man comes in, says a name to the counter, and is shown to the back. Nobody turns round.'];
+  const named = a && b ? [`${fn(a)} is losing at gin to ${fn(b)} and pretending he isn’t.`, `${fn(a)} and ${fn(b)} stop talking when you sit down, then start again, about something else.`, `${fn(a)} catches your eye across the room and lifts his cup an inch. It is not nothing.`, `${fn(b)} is telling a story about a truck and a priest. ${fn(a)} has heard it before and laughs anyway.`] : a ? [`${fn(a)} is alone at the counter with the paper. He folds it when you come in.`] : [];
+  if (top && hash(k + 't') % 3 === 0) return `${top.name} is at the back table, and the whole room is quieter for it. Men lower their voices without being asked.`;
+  const pool = [...plain, ...named];
+  return pool[hash(k) % pool.length];
+}
 // An evening of sitting with the men. Things find you.
 export function sitAtClub(w: World, p: Character): { lines: string[]; minutes: number } {
   const here = present(w, p, 'club');
   const lines: string[] = [];
   if (!here.length) return { lines: ['The club is quiet. A radio plays low, and the man behind the counter polishes the same cup for ten minutes.'], minutes: 60 };
-  lines.push(pick(["Smoke, espresso, the click of a dominoes game. Nobody asks what you want. They already know.", "A card game in the back, and a quiet table by the window where the older men sit. You nod at both.", "The radio is on a ballgame. Nobody’s listening to it. Everybody is listening to everybody else."], String(w.now)));
+  lines.push(clubAir(w, p, here));
   // overhear
   const talkers = here.filter((c) => c.rank !== 'boss');
   const t = talkers.length ? talkers[hash(String(w.now)) % talkers.length] : undefined;

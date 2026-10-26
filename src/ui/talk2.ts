@@ -7,6 +7,7 @@ import type { Visit } from '../conv/visit';
 import type { Choice } from '../conv/kit';
 import { approaches } from '../conv/approach';
 import { everything } from '../conv/visit';
+import { narrow } from './streetmap';
 import { ownerBiz } from '../core';
 import { avatar } from './common';
 import { between, knownOf } from './between';
@@ -159,17 +160,25 @@ export function talk2View(v: Visit): string {
   if (cur.fx.length) out += `<p class="cx-fx" aria-label="What changed">${cur.fx.join(' · ')}</p>`;
   out += `</div>`;
   // ---- what you can say: the exchange in hand, or the subject you have opened, or what is between you; beside it, the subjects
-  const sx = v.ended ? undefined : sorted(w, v);
+  // (a man who will not talk today, or has stopped: only the way out)
+  const sx = v.ended || v.th?.shut ? undefined : sorted(w, v);
   const subj = S.cxSubject as Subj | undefined;
   const leaveLabel = v.choices.find((c) => c.id === 'leave')?.label ?? 'Leave';
   out += `<div class="cx-act">`;
-  if (v.ended || !sx) out += choices([{ a: 'back:', label: 'Go on', hint: 'Back to where you were.' }, { a: `ent:${t.id}`, label: `${t.name.split(' ')[0]}’s page`, hint: 'Everything you know of him, and what is between you.' }], 'Where now');
+  if (!v.ended && v.th?.shut) out += choices([{ a: 't2:leave', label: 'Leave', kind: 'out' }], 'Leave');
+  else if (v.ended || !sx) out += choices([{ a: 'back:', label: 'Go on', hint: 'Back to where you were.' }, { a: `ent:${t.id}`, label: `${t.name.split(' ')[0]}’s page`, hint: 'Everything you know of him, and what is between you.' }], 'Where now');
   else if (sx.now.length && !subj) out += `<p class="cx-under">${v.waiting ? 'He’s waiting on you' : 'Your answer'}</p>` + choices([...sx.now.map((c, i) => pickOf(c, i === 0 && !!v.approach)), { a: 't2:leave', label: leaveLabel, kind: 'out' }], 'Your answer');
   else if (subj) {
     const xs = sx.by.get(subj)!;
     out += `<p class="cx-under"><button class="cx-subback" data-a="cxs:" aria-label="Back to what’s between you">‹</button>${esc(SUBJ.find((x) => x.k === subj)!.name)}</p>` + (xs.length ? subjectPicks(xs) : `<p class="ui-quiet">Nothing to say on that, with him, now.</p>`);
   } else if (sx.matters.length) out += `<p class="cx-under">Between you</p>` + choices(sx.matters.slice(0, 5).map((c) => pickOf(c)), 'Between you');
-  else out += `<p class="cx-under">What’s on your mind?</p><p class="cx-pick cx-only-wide">Pick a subject beside the conversation.</p><div class="cx-phone-subjs">${choices(SUBJ.filter((x) => sx.by.get(x.k)!.length).map((x) => ({ a: 'cxs:' + x.k, label: x.name, hint: x.hint })), 'Subjects')}</div>`;
+  else {
+    // nothing between you: what a man in your position would naturally say to him first, then the subjects (on a phone, in place)
+    const lead = [...sx.by.values()].flat().filter((c) => c.lead).slice(0, 3);
+    const easy = lead.length ? lead : [...sx.by.values()].flat().filter((c) => c.group === 'social').slice(0, 2);
+    const subjs = SUBJ.filter((x) => sx.by.get(x.k)!.length).map((x): Pick => ({ a: 'cxs:' + x.k, label: x.name, hint: x.hint, kind: 'more' }));
+    out += `<p class="cx-under">What’s on your mind?</p>` + choices([...easy.map((c) => pickOf(c)), ...(narrow() ? subjs : [])], 'To start') + (narrow() ? '' : `<p class="cx-pick">Or pick a subject beside the conversation.</p>`);
+  }
   if (sx && (sx.now.length || subj || sx.matters.length)) out += `<button class="cx-subjbtn" data-a="tog:cxsubj" aria-expanded="${!!S.open.cxsubj}"><span>Subjects</span><b>${sx.matters.length ? `${sx.matters.length} between you` : ''}</b></button>`;
   out += `</div>`;
   // ---- the subjects: what is between you first, then the five subjects; a panel beside on a desktop, a drawer on a phone

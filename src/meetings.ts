@@ -338,7 +338,25 @@ export function openFamilyMeeting(w: World, p: Character, job?: Job): Meeting | 
     const v = f.victim ? w.chars[f.victim] : undefined;
     return a?.familyId === fam.id || v?.familyId === fam.id;
   }).sort((a, b) => b.t - a.t).slice(0, 4);
-  const lines: string[] = [`${boss.name} opens the meeting${top.length ? `, with ${top.slice(0, 3).map((c) => c.name).join(', ')} at the table` : ''}.`];
+  // the room, and where a man stands in it: the boss at the head, his captains along the table, associates against the wall
+  const fn = (c: Character) => c.name.split(' ')[0];
+  const club = Object.values(w.clubs ?? {}).find((c) => c.familyId === fam.id);
+  const lines: string[] = [`The back room${club ? ` at ${club.name}` : ''}. ${boss.name} at the head of the table${top.length ? `, ${top.slice(0, 4).map(fn).join(', ')} along it` : ''}. ${p.rank === 'associate' ? 'Associates stand against the wall. You stand.' : p.rank === 'soldier' ? 'You take a chair near the end, where the soldiers sit.' : 'You take your place at the table.'}`];
+  // the first time he lays eyes on a new man of the family
+  const done = (w.goals ??= { done: {} }).done;
+  if (!done['g:famMeet'] && p.rank === 'associate') {
+    const cap = p.bossId ? w.chars[p.bossId] : undefined;
+    lines.push(`${fn(boss)} looks along the wall and stops at you. "${cap ? `${fn(cap)}’s new one?` : 'Who’s this?'}"${cap ? ` ${fn(cap)} nods.` : ''} ${fn(boss)} looks at you a moment longer. "Eyes open, mouth shut. You’ll do fine." Then he moves on, and so does the room.`);
+  }
+  done['g:famMeet'] = w.now;
+  // how the family stands, as the boss puts it
+  const sd = fam.standing ?? 50;
+  lines.push(sd >= 65 ? `"We’re doing good. Nobody in this city does better than us right now. That’s exactly when men get careless."` : sd < 35 ? `"We’re not where we were. There are people in this city who think we’ve gone soft. They’re wrong, and you’re going to show them."` : `"Things are steady. Steady is fine. Steady pays."`);
+  if (fam.directive && fam.directive.until > w.now) lines.push(fam.directive.kind === 'push' ? `"This month, we push. Every crew brings in more than last month. I don’t want to hear why it can’t be done."` : `"Until I say different, nothing loud. Nobody gets hurt, nothing burns. Keep your heads down and your envelopes full."`);
+  const light = Object.values(w.chars).filter((c) => c.alive && !c.isPlayer && c.familyId === fam.id && (c.books?.arrears ?? 0) > 0).length;
+  if (light >= 2) lines.push(`"Some of you have been light on Sunday. You know who you are. Fix it before I have to."`);
+  const raids = Object.values(w.facts).filter((f) => f.kind === 'raid' && w.now - f.t < 21 * DAY && fam.districts.includes(f.district ?? '')).length;
+  if (raids) lines.push(`"The cops have been busy in ${fam.districts[0]}. Watch what you say on the phone, and who you say it in front of."`);
   for (const f of news) {
     lines.push(f.text);
     if (!p.known[f.id]) learn(w, p.id, f, boss.id, true);

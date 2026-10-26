@@ -110,7 +110,7 @@ const jobAnswer = (take: boolean): Act => ({
   },
 });
 // work done, told to the man it was done for (he rewards it: the old engine's report)
-const unreported = (c: Ctx) => c.w.jobs.filter((j) => j.status === 'done' && j.giver === c.n.id && j.assignee === c.h.id && !j.reported);
+const unreported = (c: Ctx) => c.w.jobs.filter((j) => j.status === 'done' && j.kind !== 'summons' && j.giver === c.n.id && j.assignee === c.h.id && !j.reported);
 const report: Act = {
   base: 'report', pane: 'business',
   offers: (c) => (orders(c) && unreported(c).length ? [{ code: 'report', label: 'Tell him how the job went', says: mine(c, 'report.job'), kind: 'between' }] : []),

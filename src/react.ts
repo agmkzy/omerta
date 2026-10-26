@@ -45,7 +45,7 @@ const OPEN: Record<Mood, Pool> = {
   cowed: { pressure: ['“All right. All right, I hear you.”', '“There’s no need for that. You’ll have it.”', 'His hands aren’t quite steady. “Fine. Fine.”'], force: ['He looks at the damage, and then at you. “Enough. You’ll have it.”'], leverage: ['He goes pale. “Keep your voice down. All right.”'], senior: ['“If he’s behind it… all right.”'], _: ['He swallows. “All right.”'] },
   bitter: { pressure: ['“Fine. Take it. Just remember I didn’t want this.”'], force: ['“You’ve made your point. You’ll get it. I won’t forget how.”'], _: ['“Fine. Remember it was you who made it this way.”'] },
   moved: { _: ['“You make sense. I hate that you make sense. All right.”', '“Put like that… all right.”'] },
-  keen: { sweeten: ['“Now that I can live with.”', '“That’s better. All right.”'], take: ['“Good. Then we understand each other.”'], _: ['“All right. We have a deal.”', '“That suits me.”'] },
+  keen: { sweeten: ['“Now that I can live with.”', '“That’s better. All right.”'], take: ['“Then that’s settled. That I can carry.”', 'He lets out a breath. “All right. That much I can do.”'], _: ['“All right. We have a deal.”', '“That suits me.”'] },
   agree: { _: ['“All right.”', '“Fine. Agreed.”', 'He thinks it over, then nods.'] },
   wary: { _: ['“I need to think about it.”', '“Not today. Let me think.”'] },
   grudging: { _: [] },

@@ -529,3 +529,6 @@ a.story { font-size: .85em; white-space: nowrap; color: var(--c-gold-2); }
 .st-pane__x { position: absolute; top: -6px; right: -4px; width: 36px; height: 36px; border: 0; border-radius: 50%; background: none; color: var(--c-muted); font-size: 22px; cursor: pointer; }
 .st-pane__x:hover { color: var(--c-cream); background: var(--c-raise-2); }
 .st-pane--empty { padding: var(--s-4) 0; }
+/* Word reaches you: the news in the book face, and quietly where it came from. */
+.wd-news li { font: 400 17px/1.45 var(--f-display); color: var(--c-cream); }
+.wd-news .src { display: block; margin-top: 3px; font: 400 12px var(--f-ui); color: var(--c-muted); }

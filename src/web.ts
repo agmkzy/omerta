@@ -153,9 +153,9 @@ function collectNews(since: number): string[] {
     .slice(0, 5);
   return picked.map(({ id, k, f, r }) => {
     const body = lk(f.kind === 'report' ? f.text : factText(f, k.knowsActor));
-    const tag = `<span class="why${r.level === 2 ? ' crit' : ''}">${esc(r.why.replace(/^./, (m) => m.toUpperCase()))}</span>`;
-    const src = f.kind === 'report' ? '' : ` <span class="src">${esc(sourceOf(k).replace(/^./, (m) => m.toUpperCase()))} &middot; <a class="nm" href="#" data-a="fact:${id}">details</a></span>`;
-    return `${r.level === 2 ? `<b class="crit">${body}</b>` : `<span>${body}</span>`}${f.kind === 'report' ? '' : storyLink(id)}${src}${tag}`;
+    // (the news, and quietly where it came from; why it matters to him is what it says, not a label under it)
+    const src = f.kind === 'report' ? '' : `<span class="src">${esc(sourceOf(k).replace(/^./, (m) => m.toUpperCase()))}</span>`;
+    return `${r.level === 2 ? `<b class="crit">${body}</b>` : `<span>${body}</span>`}${f.kind === 'report' ? '' : storyLink(id)}${src}`;
   });
 }
 
@@ -226,6 +226,7 @@ function pass(minutes: number, lines: string[], next: View = { t: 'tab', name: '
   if (pn.rank !== snap.rank) S.chips.push({ t: `Now ${pn.rank}`, tone: 'good' });
   S.stack = [];
   if (next.t === 'talk2' && S.view.t !== 'talk2') { S.talkFrom = S.view; S.cxSubject = undefined; S.cxLast = undefined; }
+  S.logAt = next.t === 'place' ? 'place:' + next.id : '';
   S.view = next;
   save();
 }
@@ -448,7 +449,12 @@ function handle(a: string, v: string) {
     }
     case 'club': {
       const r = v === 'sit' ? sitAtClub(w, P()) : v === 'shave' ? shave(w, P()) : drinkAt(w, P());
-      return pass(r.minutes, r.lines);
+      (w.goals ??= { done: {} }).done['g:club'] = w.now;
+      // (you are still in the room when it is over: whoever has been waiting for you is here, and so are you)
+      const here = S.view.t === 'place' ? S.view : undefined;
+      pass(r.minutes, r.lines, here ?? { t: 'tab', name: 'today' });
+      if (here) S.stack = [{ t: 'tab', name: 'street' }];
+      return;
     }
     case 'people': return go({ t: 'people' });
     case 'grudges': return go({ t: 'grudges' });
@@ -480,7 +486,13 @@ function handle(a: string, v: string) {
       const agoSpan = (m: number) => (m < 120 ? 'An hour or so' : m < DAY ? 'A few hours' : m < 2 * DAY ? 'A day' : `${['', '', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven'][Math.floor(m / DAY)]} days`);
       const o = waitChoices(true)[Number(v)];
       if (!o) return;
-      if (!o.event) return doAction({ kind: 'wait', actor: w.playerId!, hours: o.mins / 60, label: 'wait', score: 0 });
+      if (!o.event) {
+        doAction({ kind: 'wait', actor: w.playerId!, hours: o.mins / 60, label: 'wait', score: 0 });
+        // (the hours, said as they go by, when nothing else came of them)
+        if (!S.log.length) { const h = Math.floor((W().now % DAY) / 60), k = Math.floor(W().now / 60); const say = (xs: string[]) => xs[k % xs.length];
+          S.log = [h >= 17 || h < 4 ? say(['The afternoon drains away. The lights come on along Mulberry Street.', 'Evening. The cafés fill up and the shutters come down on the shops that close.', 'The day goes quiet the way it does around six, and then the night starts.']) : say(['You sleep. The city doesn’t.', 'Morning. Bread, coffee, the Daily News, and the street already awake under the window.', 'A night goes by. Somewhere in it, other men were busy.'])]; }
+        return;
+      }
       const t0 = w.now;
       const before = attentionCount(), offers0 = needs().length - before;
       let stopped = false;
@@ -492,7 +504,7 @@ function handle(a: string, v: string) {
       }
       // (what stopped the clock, said as what it was: picked up, something wanting him, or new work on offer; "nothing stirs" only if so)
       const jailed = P().alive && P().jailedUntil > w.now, more = needs().length - attentionCount() - offers0;
-      return pass(0, [jailed ? '' : stopped ? `${agoSpan(w.now - t0)}, and then something wants you. It’s at the top of the list.` : more > 0 ? `A week goes by. ${more === 1 ? 'Something new is on offer' : `${more} new things are on offer`}, under Opportunities.` : 'A long week. Nothing stirs.'].filter(Boolean), undefined, t0);
+      return pass(0, [jailed ? '' : stopped ? `${agoSpan(w.now - t0)}, and then something wants you. It’s at the top of the list.` : more > 0 ? `A week goes by. ${more === 1 ? 'Something new is on offer' : `${more} new things are on offer`}, under What you could do.` : 'A long week. Nothing stirs.'].filter(Boolean), undefined, t0);
     }
     case 'cat': {
       const kind = v as Kind;
