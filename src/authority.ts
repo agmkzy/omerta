@@ -37,7 +37,7 @@ function handedAMan(w: World, p: Character, crew: Character[]): boolean {
   feelOn(w, rel(spare, p.id), 'trust', 0.1);
   addEnc(w, {
     kind: 'cometo', from: cap.id, about: spare.id, title: `${first(cap)} gives you ${first(spare)}`, days: 5, data: { stage: 'handed' },
-    lines: [`${cap.name} puts a hand on the shoulder of ${spare.name}.`, `“A made man needs somebody to send. Take ${first(spare)}. ${temper(spare).caution > 0.55 ? 'He’s careful, and he listens.' : spare.traits.ambition > 0.6 ? 'He’s hungry. Point him the right way.' : 'He’s green, but he shows up.'} What he does is on you now.”`],
+    lines: [`${cap.name} puts a hand on the shoulder of ${spare.name}.`, `“A made man needs somebody to send. Take ${first(spare)}. ${temper(spare).caution > 0.55 ? 'He’s careful, and he listens.' : spare.traits.ambition > 0.6 ? 'He’s hungry. Point him the right way.' : 'He’s green, but he shows up.'} What he does is on you now. And get yourself something of your own: a book, a few loans. A made man who only earns from other men’s work doesn’t stay one long.”`],
     opts: [{ code: 'ok', label: `Thank ${first(cap)} and take him`, hint: `${first(spare)} answers to you from today.` }],
   });
   return true;

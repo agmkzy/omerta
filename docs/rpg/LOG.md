@@ -137,3 +137,21 @@ standing 46–71 at weeks 30–31.
 - Validation: grudges in authority.ts go through the one door (bear), as the architecture rule requires. The quiet-weeks pacing test
   now checks the property across two worlds (each at least 20% quiet, a third on average); four worlds measured 9, 9, 9 and 11
   quiet weeks in 28, steadier than before (5 to 13). Full suite passes.
+
+## Phase 1.4: the book, run (book.ts)
+One racket made into a business with decisions, for the player's own bookmaking operation (NPC books are unchanged):
+- **The big bet.** A gambler (any with money and the habit, the keener likelier, not the same man twice in two months) wants a
+  large bet on the favourite for Saturday's race at Aqueduct. The player can take it whole, take half and lay half off with another
+  book, lay it all off for the vig (that book carries it and is owed the courtesy, a favour), or turn it down (and be called a
+  small book). The race is run on the actual Saturday; the favourite wins 45% of the time. Money is conserved through stake, lay-off
+  and payout (tested).
+- **A winner the drawer can't cover.** Ask him to take it over weeks (a debt, and the street hears), go to the captain (he covers
+  it once, a debt and a favour, and remembers), or stall (a grudge, standing lost; if he is another family's man, his boss resents
+  it and the families' tension rises).
+- **Another book on his ground.** Run him off (a careful man goes; another family's man becomes tension between the families; one
+  of ours, his captain hears), take him in (an associate's book folds into the player's, he becomes its runner with a cut, the
+  book grows a level), or live with the thinner trade (crowding already reads it).
+- **The precinct's envelope.** Paid weekly, raids on the book are a quarter as likely. Refused, the player draws heat.
+- The captain who gives a new made man his first man also tells him to get something of his own: a book, a few loans.
+- **Measured** (climber, 240 days, the book started after being made): about $5,000 over 25 weeks, four to six decisions a season,
+  the precinct paid. The first runs showed every big bet at the $1,200 cap, mostly from the same rich gambler; now varied.

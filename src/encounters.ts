@@ -2,6 +2,7 @@ import { answerImposed } from './imposed';
 import { answerCourting, courter, makeCourting } from './loyalty';
 import { answerDeal, dealer, makeDeal } from './crossdeal';
 import { authorityChoose, quarrel } from './authority';
+import { bookChoose } from './book';
 import { answerAsk, answerWord, callFavour, putToPlayer } from './asks';
 import { answerMatter } from './matters';
 // People come to you. Each approach is a small scene in the man's own voice, with choices that carry weight:
@@ -518,6 +519,7 @@ export function choose(w: World, p: Character, e: Enc, code: string): { lines: s
   if (e.kind === 'word') return answerWord(w, p, e, code); // V89: a superior's word about trouble
   if (e.kind === 'matter') return answerMatter(w, p, e, code); // V89: someone in a matter wants the player's answer
   if (e.kind === 'imposed') return answerImposed(w, p, e, code);
+  if (['bigbet', 'cantpay', 'rivalbook', 'pad'].includes(e.kind)) return bookChoose(w, p, e, code); // the book: book.ts
   if (e.kind === 'cometo' || e.kind === 'quarrel' || e.kind === 'answer') return authorityChoose(w, p, e, code); // his crew and what he answers for: authority.ts
   if (e.kind === 'crossdeal') return answerDeal(w, p, e, code); // a man of another family with a job to split: crossdeal.ts
   if (e.kind === 'courting') return answerCourting(w, p, e, code); // a captain asking him to inform on his own: loyalty.ts // a decision made over his head: taken, asked about, or objected to

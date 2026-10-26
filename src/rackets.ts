@@ -7,6 +7,7 @@ import { move, openAsk } from './asks';
 import { askToInvest } from './reports';
 import { temper } from './temper';
 import { addEnc } from './encounters';
+import { bookWeek } from './book';
 import { Character, DAY, Id, Op, OpKind, WEEK, World } from './types';
 import { arch, pick } from './voice';
 
@@ -184,6 +185,7 @@ export function enterpriseWeek(w: World) {
     const doer = runner && runner.alive ? runner : owner;
     if (doer.jailedUntil > w.now) { op.last = Math.round(op.last * 0.3); continue; }
     if (!owner.isPlayer && npcTend(w, op, owner, d)) continue;
+    if (owner.isPlayer && op.kind === 'bookie') bookWeek(w, op, owner); // (the player's book has decisions: book.ts)
     const lvl = op.level ?? 1;
     if (op.kind === 'shylock') { shylockWeek(w, op, owner, lvl); continue; }
     const fam = owner.familyId ? w.fam[owner.familyId] : undefined;
@@ -199,7 +201,7 @@ export function enterpriseWeek(w: World) {
     if (!fam?.districts.includes(op.district)) take *= 0.7;
     const hot = Object.values(fam?.tension ?? {}).reduce((a, b) => Math.max(a, b), 0);
     // police
-    if (d.risk > 0 && w.rng.chance((d.risk + owner.heat * 0.06) * (owner.isPlayer ? 1 : 1.2 - temper(owner).caution * 0.6) * (dir === 'push' ? 1.5 : dir === 'quiet' ? 0.4 : 1))) {
+    if (d.risk > 0 && w.rng.chance((d.risk + owner.heat * 0.06) * (owner.isPlayer ? 1 : 1.2 - temper(owner).caution * 0.6) * (dir === 'push' ? 1.5 : dir === 'quiet' ? 0.4 : 1) * ((op.pad ?? 0) > w.now ? 0.25 : 1))) {
       op.state = 'raided';
       op.until = w.now + w.rng.int(2, 4) * DAY * 7;
       const fine = w.rng.int(150, 450);

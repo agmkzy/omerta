@@ -460,7 +460,7 @@ export interface Memo {
 export interface Pending {
   id: Id;
   due: number;
-  kind: 'reveal' | 'heat' | 'blackmail' | 'truth' | 'dispute' | 'seat' | 'intent' | 'plan' | 'hunt' | 'loyalty' | 'crossdeal';
+  kind: 'reveal' | 'heat' | 'blackmail' | 'truth' | 'dispute' | 'seat' | 'intent' | 'plan' | 'hunt' | 'loyalty' | 'crossdeal' | 'bet';
   fact?: Id;
   a?: Id;
   b?: Id;
@@ -625,6 +625,7 @@ export interface Op {
   cause?: string;
   stake?: number;
   lull?: number;
+  pad?: number; // the precinct paid until (book.ts): the police leave it alone
   cut?: number; // (Stage 4) the runner's agreed share of each week's take, paid by the owner
   tipped?: number; // (Stage 5) when the player was last told the count on it was coming up light
 }

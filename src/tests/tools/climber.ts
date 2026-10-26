@@ -8,6 +8,7 @@ import { createWorld } from '../../world';
 import { begin, choose, everything } from '../../conv/visit';
 import { approaches, resolve, takeJob } from '../../jobs';
 import { pathInfo } from '../../path';
+import { startOp } from '../../rackets';
 import { leanable } from '../../conv/authority';
 import { DAY, type Character } from '../../types';
 import { choose as encChoose } from '../../encounters';
@@ -49,7 +50,7 @@ for (let d = 0; d < days && p.alive; d++) {
   // what is put to him: the trial, an invitation, the family's requests (the first answer that isn't refusing); the induction, attended
   // (a man climbing stays loyal: a rival captain's money is taken to his own captain, another family's job is asked about first, a quarrel
   // is heard out, a man's wrong is made right; LOYAL=0 for the old bot, which took the first answer to everything)
-  const LOYAL: Record<string, string[]> = process.env.LOYAL === '0' ? {} : { courting: ['tell'], crossdeal: ['cap'], quarrel: ['hear', 'a'], answer: ['side', 'pay'], cometo: ['take', 'ok'] };
+  const LOYAL: Record<string, string[]> = process.env.LOYAL === '0' ? {} : { courting: ['tell'], crossdeal: ['cap'], quarrel: ['hear', 'a'], answer: ['side', 'pay'], cometo: ['take', 'ok'], bigbet: ['half', 'take'], pad: ['pay'], rivalbook: ['absorb', 'live'], cantpay: ['cap', 'weeks'] };
   for (const e of w.enc.filter((x) => x.status === 'open' && x.opts.length)) {
     for (const code of LOYAL[e.kind] ?? []) if (e.status === 'open' && e.opts.some((o) => o.code === code)) encChoose(w, p, e, code);
     if (e.status !== 'open') continue;
@@ -67,6 +68,8 @@ for (let d = 0; d < days && p.alive; d++) {
     for (let i = 0; i < 20 && current(m); i++) mChoose(w, p, m, current(m)!.opts[0].code);
     closeMeeting(w, p, m);
   }
+  // once made, something of his own: a book, when he can afford it
+  if (p.rank !== 'associate' && p.cash > 1500 && !w.ops.some((o) => o.owner === p.id && o.kind === 'bookie' && o.state !== 'closed')) startOp(w, p, 'bookie', p.district, null);
   // protection
   for (const b of leanable(w, p).slice(0, 1)) say(b.ownerId, /^protect$|protect:take/);
   // an evening with a made man of his family
@@ -82,7 +85,7 @@ for (let d = 0; d < days && p.alive; d++) {
     if (process.env.DBG) log.push(`   hold=${w.path?.hold} wait=${w.path?.seatWait} promo=${JSON.stringify(w.promo ?? null)?.slice(0,160)} induct=${p.cooldown.induct} summons=${w.jobs.filter((j) => j.kind === 'summons').map((j) => j.meeting + ':' + j.status).join(',')} encs=${w.enc.filter((e) => e.status === 'open').map((e) => e.kind + ':' + (e.data?.stage ?? '')).join(',')}`);
     if (process.env.DBG3) log.push(...reached());
     if (process.env.DBG4) { log.push('  standing: ' + [...why].sort((a, b) => a[1] - b[1]).map(([k, v]) => `${k} ${v.toFixed(1)}`).join(', ')); why.clear(); }
-    log.push(`week ${wk}: ${p.rank} $${Math.round(p.cash)} standing ${Math.round(p.standing)} | ${pi ? pi.goals.map((g) => `${g.key} ${Math.round(g.frac * 100)}%`).join(', ') : 'top'} | shops ${Object.values(w.biz).filter((b) => b.protection?.collectorId === p.id).length} | done ${p.career?.done ?? 0} | crew ${Object.values(w.chars).filter((c) => c.alive && c.bossId === p.id).length}`);
+    log.push(`week ${wk}: ${p.rank} $${Math.round(p.cash)} standing ${Math.round(p.standing)} | ${pi ? pi.goals.map((g) => `${g.key} ${Math.round(g.frac * 100)}%`).join(', ') : 'top'} | shops ${Object.values(w.biz).filter((b) => b.protection?.collectorId === p.id).length} | done ${p.career?.done ?? 0} | crew ${Object.values(w.chars).filter((c) => c.alive && c.bossId === p.id).length}${(() => { const b = w.ops.find((o) => o.owner === p.id && o.kind === 'bookie' && o.state !== 'closed'); return b ? ` | book ${b.state} L${b.level ?? 1} total $${Math.round(b.total)} last $${Math.round(b.last)}${(b.pad ?? 0) > w.now ? ' paid' : ''}` : ''; })()}`);
   }
   if (p.rank !== 'associate' && made < 0) { made = d; log.push(`MADE on day ${d}`); }
   advance(w, day0 + DAY);
