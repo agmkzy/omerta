@@ -28,6 +28,7 @@ export interface Result {
   ok: boolean;
   money?: number;
   note?: string;
+  moment?: boolean; // it has come to a moment the player plays: the job stays open, and its choices are the moment's (gigs.ts)
 }
 export interface Move {
   kind: 'sell_cars' | 'pawn_goods' | 'deliver_cars' | 'chop_start' | 'meeting' | 'bonus' | 'topic';
@@ -560,6 +561,8 @@ export function resolve(w: World, j: Job, code: string): Result {
   switch (j.kind) {
     case 'gig': {
       const r = gigResolve(w, j, doer, code);
+      // (it has come to a moment: nothing is settled yet; the job stays his, and what he does next is the moment's choice)
+      if (r.moment) return { lines: r.lines, minutes: r.minutes, ok: false, moment: true };
       lines.push(...r.lines); minutes = r.minutes; ok = r.ok; gained = r.money ?? 0; note = r.note;
       break;
     }

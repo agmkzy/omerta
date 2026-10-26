@@ -95,8 +95,9 @@ function statusOf(w: World, way: Way, b: ReturnType<typeof bucket>): Status {
   }
 }
 
-const cardOf = (way: Way, st: Status) =>
-  `<button class="way ${st.tone}" data-a="way:${way.id}"><span class="ico ${way.tone}">${svg(way.icon)}</span><span class="wt"><b>${esc(way.name)}<i class="wtag ${st.tone === 'run' ? '' : st.tone === 'ok' ? 'ok' : 'off'}">${esc(st.badge)}</i></b><span class="wp">${esc(way.pitch)}</span><span class="wl">${esc(st.line)}</span></span><svg class="go" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>`;
+// (a racket you run exactly one of opens on that operation itself, not on the explanation of the racket)
+const cardOf = (way: Way, st: Status) => { const mine = way.op ? W().ops.filter((o) => o.kind === way.op && o.owner === P().id && (o.state === 'running' || o.state === 'out')) : [];
+  return `<button class="way ${st.tone}" data-a="${mine.length === 1 ? `op:${mine[0].id}` : `way:${way.id}`}"><span class="ico ${way.tone}">${svg(way.icon)}</span><span class="wt"><b>${esc(way.name)}<i class="wtag ${st.tone === 'run' ? '' : st.tone === 'ok' ? 'ok' : 'off'}">${esc(st.badge)}</i></b><span class="wp">${esc(way.pitch)}</span><span class="wl">${esc(st.line)}</span></span><svg class="go" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>`; };
 
 // The catalogue row: name and where it stands for you. The pitch and the details are one tap away (wayView).
 const rowOf = (way: Way, st: Status) =>

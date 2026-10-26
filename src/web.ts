@@ -903,6 +903,8 @@ function handle(a: string, v: string) {
       const m = t?.alive ? openAsks(w).find((x) => x.terms?.by === P().id && x.terms?.of === t.id && Number(x.m?.at ?? -1) >= w.now - r.minutes - 1) : undefined;
       // (the matter is new: what follows is the first exchange, said as one, not a return to it: business.ts matterA reads m.fresh)
       if (t && m) { m.m = { ...(m.m ?? {}), fresh: w.now }; const v0 = beginVisit(w, t.id), pick = [...v0.choices, ...everythingVisit(w, v0)].find((c) => c.id === 'a:m:' + m.id), r2 = pick ? chooseVisit(w, v0, pick.id) : undefined; return pass(r.minutes + (r2?.minutes ?? 0), r.lines, { t: 'talk2', v: r2?.v ?? v0 }); }
+      // (it has come to a moment: you are there, and the choice is yours)
+      if (r.moment) return pass(r.minutes, r.lines, { t: 'approach', id: j.id });
       pass(r.minutes, r.lines);
       // (how it came out, said plainly beside what happened: a job that fell through says so)
       if (j.status === 'failed') S.chips.unshift({ t: 'It fell through', tone: 'bad' });

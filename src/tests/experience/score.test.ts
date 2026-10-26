@@ -78,3 +78,42 @@ describe('a truck, played', { tags: ['scenario'] }, () => {
     assert.fail('no protected load in eight worlds');
   });
 });
+
+describe('muscle work, played', { tags: ['scenario'] }, () => {
+  // (standing behind a man who is refused is a moment the player plays: the job waits on it, and what he does decides it)
+  const refusedJob = async () => {
+    const { mkJob, takeJob, resolve, approaches } = await import('../../jobs');
+    const { newWorld } = await import('../helpers');
+    for (let seed = 1; seed < 60; seed++) {
+      const w = newWorld(seed), p = P(w);
+      const civs = Object.values(w.chars).filter((c) => c.alive && c.rank === 'civilian' && !c.isPlayer).sort((a, b) => (a.id < b.id ? -1 : 1));
+      const giver = civs[0], target = civs[1];
+      target.cash = 2000;
+      const j = mkJob(w, { kind: 'gig', title: 'Somebody to stand behind him', giver: giver.id, via: 'opportunity', assignee: p.id, target: target.id, pay: 150, days: 5, brief: 'x', extra: { gig: 'muscle', owed: 400 } });
+      takeJob(w, j);
+      const r = resolve(w, j, 'stand');
+      if (r.moment) return { w, p, j, giver, target, resolve, approaches };
+    }
+    throw new Error('never refused in sixty worlds');
+  };
+  ok('refused to his face, the job waits on the moment, and the moment has three ways', async () => {
+    const { w, j, approaches } = await refusedJob();
+    assert.equal(j.status, 'active', 'nothing is settled yet');
+    assert.deepEqual(approaches(w, j).map((a) => a.code), ['m_close', 'm_wall', 'm_walk']);
+  });
+  ok('walking away settles it: no pay, and the man who hired you thinks less of you', async () => {
+    const { w, p, j, giver, resolve } = await refusedJob();
+    (giver.rels[p.id] ??= { trust: 0.5, respect: 0.3, affection: 0.2, grudge: 0, lastMet: w.now }).trust = 0.5;
+    const cash = p.cash, trust = giver.rels[p.id].trust;
+    resolve(w, j, 'm_walk');
+    assert.notEqual(j.status, 'active');
+    assert.equal(p.cash, cash, 'not paid');
+    assert.ok((giver.rels[p.id]?.trust ?? 0) < trust);
+  });
+  ok('stepping in settles it one way or the other, and the moment is over', async () => {
+    const { w, j, resolve } = await refusedJob();
+    resolve(w, j, 'm_wall');
+    assert.notEqual(j.status, 'active');
+    assert.equal(j.extra?.moment, undefined);
+  });
+});

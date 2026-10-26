@@ -191,6 +191,8 @@ export function jobView(j: Job): string {
   return out;
 }
 export function approachView(j: Job): string {
+  // (a job come to its moment: what just happened, and what you do now)
+  if (j.extra?.moment) return title(j.title) + justNow() + choices(approaches(W(), j).map((a) => ({ a: `go:${j.id}|${a.code}`, label: a.label, hint: a.hint })), 'What you do');
   return back() + title(j.title, 'How do you want to play it?') + choices(approaches(W(), j).map((a) => ({ a: `go:${j.id}|${a.code}`, label: a.label, hint: a.hint })), 'How you play it');
 }
 export function delegateView(j: Job): string {
@@ -568,6 +570,14 @@ export function opView(id: Id, lines: string[], found?: number): string {
   const r = op.runner ? w.chars[op.runner] : undefined;
   let out = back() + title(d?.label ?? 'Job');
   out += kv([['Where', esc(op.district)], ['Run by', r ? pl(r) : 'you'], ['Last week', `<span class="fig">${esc(money(op.last))}</span>`, op.last < 0 ? 'warn' : 'good'], ['Since you started', `<span class="fig">${esc(money(op.total))}</span> in ${op.weeks} weeks`], ['Status', op.state === 'raided' ? 'shut down by police' : op.state === 'closed' ? 'closed' : 'running', op.state === 'raided' ? 'warn' : '']]);
+  // (what the record knows of how it is going, said in words: why last week went as it did, how big it has grown, the precinct)
+  const said: string[] = [];
+  if (op.cause) said.push(op.cause.replace(/^./, (m) => m.toUpperCase()).replace(/[.!?]?$/, '.'));
+  if ((op.level ?? 1) > 1) said.push(`It has grown: ${(op.level ?? 1) >= 3 ? 'a real operation now, with a name of its own' : 'more than a sideline now'}.`);
+  if ((op.bad ?? 0) >= 2) said.push(`${op.bad} bad weeks running. Men notice when a thing stops paying.`);
+  if (op.kind === 'bookie') said.push(op.pad && op.pad > w.now ? `The precinct is taken care of until ${shortTime(op.pad)}. The police look the other way.` : 'Nobody at the precinct is being looked after. Sooner or later a sergeant will want his envelope, or there’ll be a raid.');
+  if (op.tipped && w.now - op.tipped < 21 * DAY && r) said.push(`You’ve been told the count on it has been coming up light. ${r.name.split(' ')[0]} runs it.`);
+  if (said.length) out += `<div class="op-said">${said.map((x) => `<p>${esc(x)}</p>`).join('')}</div>`;
   if (lines.length) out += `<div class="sc-said">${lines.map((l) => `<p class="sc-narr">${lk(l)}</p>`).join('')}</div>`;
   if (op.state === 'closed') return out;
   const picks: Pick[] = [];

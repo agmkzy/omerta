@@ -151,7 +151,12 @@ function inspectorGig(w: World, p: Character): boolean {
 // ---------------------------------------------------------------- the choices
 export function gigApproaches(w: World, j: Job): Approach[] {
   switch (gigOf(j)) {
-    case 'muscle': return [
+    case 'muscle': return j.extra?.moment === 'refused' ? [
+      // (the moment: he has said no to Carmine's face, with you standing there)
+      { code: 'm_close', label: 'Step in close and say his name', hint: 'Quietly, from very near. Most men find the money.' },
+      { code: 'm_wall', label: 'Put him against the wall', hint: 'It usually works. The street will hear how.' },
+      { code: 'm_walk', label: 'Walk away', hint: 'You were told to say nothing. Nobody pays for that.' },
+    ] : [
       { code: 'stand', label: 'Stand behind him and say nothing', hint: 'Low risk. Most men pay when they see who’s listening.' },
       { code: 'lean', label: 'Lean on the man yourself', hint: 'Bigger fee. He may get hurt, and he’ll remember your face.' },
     ];
@@ -194,6 +199,25 @@ export function gigResolve(w: World, j: Job, doer: Character, code: string): Res
       const t = w.chars[j.target!];
       if (!giver?.alive || !t?.alive) { lines.push('The man you were meant to stand behind, or the man he was asking, is gone.'); return res(); }
       doer.district = t.district;
+      // (the moment, played: he said no to Carmine's face, and now it is up to you)
+      if (code.startsWith('m_')) {
+        delete j.extra!.moment;
+        const owedM = Number(j.extra?.owed ?? 400), settleM = () => { const x = Math.min(owedM, Math.max(0, t.cash)); t.cash -= x; giver.cash += x; return x; };
+        if (code === 'm_walk') { bump(doer, 0.02); lines.push(`You turn and walk. Behind you ${first(t)} laughs, and ${first(giver)} follows you out without a word. He doesn’t pay a man for standing there.`); feel(w, giver, doer.id, 'trust', -0.05); minutes = 20; return res(); }
+        const wall = code === 'm_wall';
+        if (rng.chance(wall ? 0.8 : clamp(0.42 + doer.skills.nerve * 0.3 + (violence - 0.5) * 0.2, 0.3, 0.85))) {
+          const got = settleM(); gained = paid(w, doer, Math.round((wall ? j.pay * 1.25 : j.pay * 1.1) / 10) * 10, giver, 'handle'); ok = true;
+          lines.push(wall ? `You take a fistful of his shirt and put him against the bricks, not hard, just enough. He finds ${money(got)} in his pocket he’d forgotten about.` : `You step in close and say his name. Just his name, quietly, from a foot away. ${first(t)} looks at ${first(giver)}, then back at you, and goes inside for ${money(got)}.`);
+          lines.push(`Out on the street ${first(giver)} pays you ${money(gained)}, and looks at you a moment longer than he has to.`);
+          feel(w, giver, doer.id, 'trust', 0.1); feel(w, giver, doer.id, 'respect', 0.06);
+          if (wall) { addFact(w, { kind: 'beating', actor: doer.id, victim: t.id, hiddenActor: true, text: `${doer.name} put ${t.name} against a wall over money he owed.`, textHidden: `${t.name} was roughed up outside his own door.`, district: t.district }, { witnesses: witnessesAt(w, t.district, [doer.id, t.id], 2) }); bump(doer, 0.08); bear(w, t, doer.id, 0.2, `${doer.name} put him against a wall`); }
+        } else {
+          bump(doer, wall ? 0.12 : 0.04);
+          lines.push(wall ? `He’s stronger than he looks. It turns into a shoving match on the sidewalk, a woman screams from a window, and you both walk away with nothing but torn collars.` : `You say his name. He says yours back, louder, so the street can hear it. It isn’t going to happen today.`);
+          lines.push(`${first(giver)} doesn’t pay for that.`); feel(w, giver, doer.id, 'trust', -0.04);
+        }
+        return res();
+      }
       const lean = code === 'lean';
       const pr = clamp(0.62 + (lean ? 0.15 : 0) + (violence - 0.5) * 0.3 - rel(t, doer.id).respect * 0.1, 0.35, 0.92);
       const owed = Number(j.extra?.owed ?? 400);
@@ -211,6 +235,11 @@ export function gigResolve(w: World, j: Job, doer: Character, code: string): Res
           bump(doer, 0.08); bear(w, t, doer.id, 0.25, `${doer.name} roughed him up`);
           lines.push(`It got rougher than it needed to. ${first(t)} will remember.`);
         }
+      } else if (!lean && doer.isPlayer) {
+        // (the moment: he refuses to Carmine's face, with you standing there; what happens now is yours)
+        lines.push(`${t.name} refuses, and says things about ${first(giver)}’s mother while he’s at it. ${first(giver)} goes red, then looks at you. This is the part he’s paying for.`);
+        (j.extra ??= {}).moment = 'refused';
+        return { lines, minutes: 30, ok: false, moment: true };
       } else {
         bump(doer, 0.06);
         lines.push(`${t.name} refuses and says things about ${first(giver)}’s mother. ${lean ? 'You don’t take it further than you were paid to.' : 'You were told to say nothing, so you say nothing, and leave.'}`);
