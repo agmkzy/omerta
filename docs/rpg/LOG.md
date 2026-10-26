@@ -251,3 +251,6 @@ family), the negotiation with its owner, a rival family's job, the club on Sunda
 - **The rival family's man is in the scene:** he keeps watch and has the van at the back door, or is gone when it goes wrong.
 - The Around town tile names Little Italy's places.
 - Tests: the courting sample widened to eight worlds (each about 40% to come out; four could all miss when the draw shifts).
+- Validation: a debt matter is looked at again the moment its debt defaults (a player-negotiated one checked back only after 30
+  days, so the audit found it open after the default; surfaced when the run shifted). The "nobody asked twice" check counts both
+  ways a man going to someone is recorded ("asks X to take up his trouble", "going to X came to nothing").

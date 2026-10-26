@@ -70,9 +70,11 @@ describe('pursuits, not automatic fulfilment (priority 2)', () => {
     assert.match(t, /starts a pursuit: make .* leave him alone/);
     assert.match(t, /changes his plan: .* because he now believes .* answers to/);
     // (by who asked whom: two shopkeepers may each go to the same man once)
-    const asks = [...t.matchAll(/: (\w+ \w+) asks (\w+ \w+) to take up his trouble/g)].map((m) => `${m[1]} → ${m[2]}`);
-    assert.ok(asks.length, 'somebody was asked');
-    assert.equal(new Set(asks).size, asks.length, `nobody asked twice: ${asks.join(', ')}`);
+    // (over both runs of the month: whom each man asks is his own pursuit's choice, and in one run he may ask nobody)
+    // (a man gone to is recorded either as asked, or as the going to him having come to nothing)
+    const goneTo = (tx: string) => [...tx.matchAll(/: (\w+ \w+) asks (\w+ \w+) to take up his trouble|: (\w+ \w+): going to (\w+ \w+) came to nothing/g)].map((m) => `${m[1] ?? m[3]} → ${m[2] ?? m[4]}`);
+    for (const tx of [t, G.acquainted.o.text()]) { const xs = goneTo(tx); assert.equal(new Set(xs).size, xs.length, `nobody asked twice: ${xs.join(', ')}`); }
+    assert.ok([t, G.acquainted.o.text()].some((tx) => goneTo(tx).length), 'somebody was gone to, in one run or the other');
   });
   ok('relationships change what people initiate: the shopkeeper comes to Henry only if he knows him', { tags: ['scenario'] }, () => {
     assert.equal(G.acquainted.m.nateCame, true);

@@ -151,6 +151,8 @@ function weekly(w: World) {
       addFact(w, { kind: 'debt_missed', actor: debtor.id, victim: cred.id, amount: pay, text: `${debtor.name} missed a ${money(pay)} payment to ${cred.name}.`, minor: d.missed > 1, cause: d.cause, district: debtor.district });
       if (d.missed >= 4) {
         d.status = 'defaulted';
+        // (a matter about this debt is looked at again now, not on whatever later day it was next due: it ends with the debt)
+        for (const sx of w.situations ?? []) if (sx.link?.debt === d.id && (sx.next ?? 0) > w.now) sx.next = w.now;
         addFact(w, { kind: 'debt_default', actor: debtor.id, victim: cred.id, amount: d.balance, text: `${debtor.name} defaulted on ${money(d.balance)} owed to ${cred.name}.`, cause: d.cause, district: debtor.district });
         seizeShare(w, d);
       }
