@@ -108,3 +108,22 @@ The rail keeps name, rank, money and heat, with direction arrows (cash and heat 
 3. **Build one section at a time,** starting with Today: its one-card-per-matter rule fixes the most visible problem. Each section
    ships when it's tested and played, with the old screens retired as each new one lands.
 4. **The scorecard and a browser playthrough** after each section.
+
+## Decision: the street is a place picker, not a live map (owner, 26 October)
+The street is an illustrated, static view of the neighbourhood: you pick a place from it. Movement is not gameplay.
+- **Keep:**
+  - the illustrated streets;
+  - named places, each with its own identity;
+  - the selected place's panel (description, who's in, what you can do);
+  - opening hours and what's going on there;
+  - the switch to other districts.
+- **Drop:**
+  - the player's marker, men moving about, walking routes and distances;
+  - territory overlays and tracking men geographically.
+- **Routines** still decide who is in each place. Nobody is drawn walking.
+- **People are shown as the game already shows them:** rank, family and temperament. They are not tagged with how they feel about you.
+- **The effort goes into each place:**
+  - what the men present offer;
+  - listening and watching;
+  - the business conducted there.
+- Mockups: the Map, MapFerrara and MapPhone boards on the wireframe canvas.

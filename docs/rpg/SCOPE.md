@@ -51,7 +51,7 @@ The game has outgrown its screens: crew, the book, trucks and places arrive as c
 no pages of their own.
 - **Audit first:** every screen against what the game now does, and what the player needs to see and decide in each.
 - **Then the design:**
-  - home pages for the crew, the book and rackets, and the street (Little Italy as a place, not a list);
+  - home pages for the crew, the book and rackets, and the street (an illustrated, static picker of places; what matters is what happens inside each place: see UI_AUDIT.md);
   - a calmer "Needs you" that separates what demands an answer from what is merely on offer;
   - the time bar and the day's shape around the new controls;
   - the Herald and the stories as the way the world reaches the player.
