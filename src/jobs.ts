@@ -396,6 +396,8 @@ export function objectiveMet(w: World, j: Job): boolean {
   const who = new Set([j.assignee, ...Object.values(w.chars).filter((c) => c.bossId === j.assignee).map((c) => c.id)]);
   if (j.kind === 'lean') { const b = j.biz ? w.biz[j.biz] : undefined; return !!b?.protection && who.has(b.protection.collectorId) && (b.protection.since ?? j.created) >= j.created - DAY; }
   if (j.kind === 'handle' && j.target) return Object.values(w.facts).some((f) => f.t >= j.created && f.actor && who.has(f.actor) && (f.victim === j.target || (!!f.business && w.biz[f.business]?.ownerId === j.target)) && ['beating', 'threat', 'vandalism'].includes(f.kind));
+  //   message  he has told the man to his face (a warning given in conversation is the message delivered)
+  if (j.kind === 'message' && j.target) return Object.values(w.facts).some((f) => f.t >= j.created && f.actor && who.has(f.actor) && f.victim === j.target && f.kind === 'threat');
   return false;
 }
 // Work of the player's that has been done by doing it: finished as if he had done it from the job's own screen (paid, credited, counted
@@ -466,9 +468,21 @@ export function approaches(w: World, j: Job): Approach[] {
         { code: 'firm', label: 'Make it plain', hint: 'Pays what’s owed.' },
         { code: 'hard', label: 'Make an example', hint: 'More than owed. Everyone on the street hears.' },
       ];
-    case 'watch':
+    // (a pickup is trust handed to you in an envelope: carry it straight, or help yourself and hope nobody counts)
     case 'deliver':
+      if (j.giver && j.via !== 'order' && /envelopes/.test(j.title)) return [
+        { code: 'go', label: 'Carry it straight up', hint: 'Every dollar where it belongs. It’s how men learn they can trust you.' },
+        { code: 'skim', label: 'Take a little off the top', hint: 'A few dollars from each envelope. Most men never count. Some always do.' },
+      ];
+    // (a message to another family's man: said straight, or said so he remembers it; either way it is your face he sees)
+    // falls through
     case 'message':
+      if (j.kind === 'message') return [
+        { code: 'go', label: 'Say it civilly, once', hint: 'He hears it, and he knows who sent it.' },
+        { code: 'hard', label: 'Say it so he remembers', hint: 'It may settle it. It may make it worse between the families.' },
+      ];
+    // falls through
+    case 'watch':
     case 'guard':
     case 'find':
     case 'fix':
@@ -494,7 +508,7 @@ function conclude(w: World, j: Job, res: Result): Result {
   if (j.via === 'boss' && giver && doer?.isPlayer) {
     const d = repute(w, p, res.ok ? 4 : -5, 'bossjob');
     res.lines.push(res.ok ? (d >= 2 ? `${giver.name} will hear it went well. That does your name some good.` : `${giver.name} will hear it went well, for what one more errand is worth.`) : `${giver.name} won’t like this. It costs you.`);
-  } else if (res.ok && giver && (j.via === 'tip' || j.via === 'contract')) res.lines.push(`${giver.name} owes you one now. In this life that’s worth more than cash.`);
+  } else if (res.ok && giver && (j.via === 'tip' || j.via === 'contract')) res.lines.push(ERRAND_KINDS.includes(j.kind) ? `${giver.name.split(' ')[0]} will remember who did it for him.` : `${giver.name} owes you one now. In this life that’s worth more than cash.`);
   return res;
 }
 // V89: a job whose outcome was left open (a quiet word the man has not yet answered, asks.ts 'layoff') is finished later, when the

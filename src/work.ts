@@ -85,19 +85,19 @@ export function needsOf(w: World, g: Character): Need[] {
     const book = Object.values(w.biz).filter((b) => b.open && b.protection?.collectorId === g.id);
     const up = g.bossId ? w.chars[g.bossId] : undefined;
     if (book.length && up?.alive && !up.isPlayer && (g.cooldown['need:pickup'] ?? 0) <= w.now)
-      out.push({ kind: 'deliver', target: up.id, title: `Carry ${first(g)}’s envelopes to ${first(up)}`, brief: `${g.name} has ${book.length === 1 ? 'a shop' : `${book.length} shops`} paying him. The week’s envelopes go up to ${up.name}, in one piece and unopened.`, pay: 25 + book.length * 10, why: 'A pickup. Trusted work, and he sees who does it.', weight: 0.22, cool: 'need:pickup' });
+      out.push({ kind: 'deliver', target: up.id, title: `Carry the week’s envelopes up to ${first(up)}`, brief: `${g.name} has ${book.length === 1 ? 'a shop' : `${book.length} shops`} paying him. The week’s envelopes go up to ${up.name}, in one piece and unopened.`, pay: 25 + book.length * 10, why: 'A pickup. Trusted work, and he sees who does it.', weight: 0.22, cool: 'need:pickup' });
     // a man of another family who has been leaning on his ground: told to stay off it
     const ground = crewGround(w, g);
     const intruder = Object.values(w.facts).filter((f) => ['protection_started', 'poach', 'threat', 'protection_refused'].includes(f.kind) && w.now - f.t < 14 * DAY && ground.has(f.district) && !!f.actor && g.known[f.id]).map((f) => w.chars[f.kind === 'protection_refused' ? f.victim ?? '' : f.actor!]).find((x) => x?.alive && !x.isPlayer && x.familyId && x.familyId !== g.familyId && x.rank !== 'boss' && x.rank !== 'underboss');
     if (intruder && (g.cooldown['need:msg:' + intruder.id] ?? 0) <= w.now) {
       const n = { kind: 'message' as const, target: intruder.id };
-      if (open(w, n)) out.push({ ...n, title: `Tell ${intruder.name} to stay off ${first(g)}’s ground`, brief: `${intruder.name} of the ${w.fam[intruder.familyId!].name} family has been seen working shops in ${g.name}’s ground. ${first(g)} wants it said to his face, once, politely, before it has to be said another way.`, pay: 40, why: 'A message to another family. Say it right, say it once.', weight: 0.3, cool: 'need:msg:' + intruder.id });
+      if (open(w, n)) out.push({ ...n, title: `Tell ${intruder.name} to stay off our ground`, brief: `${intruder.name} of the ${w.fam[intruder.familyId!].name} family has been seen working shops in ${g.name}’s ground. ${first(g)} wants it said to his face, once, politely, before it has to be said another way.`, pay: 40, why: 'A message to another family. Say it right, say it once.', weight: 0.3, cool: 'need:msg:' + intruder.id });
     }
     // a man he holds something against: watched, so he knows what he's dealing with
     const sore = Object.entries(g.rels).filter(([id, r]) => r.grudge >= 0.35 && w.chars[id]?.alive && !w.chars[id].isPlayer && w.chars[id].rank !== 'civilian').sort((a, b) => b[1].grudge - a[1].grudge || (a[0] < b[0] ? -1 : 1))[0];
     if (sore && (g.cooldown['need:watch:' + sore[0]] ?? 0) <= w.now) {
       const t = w.chars[sore[0]], n = { kind: 'watch' as const, target: t.id };
-      if (open(w, n)) out.push({ ...n, title: `Keep an eye on ${t.name} for ${first(g)}`, brief: `${g.name} doesn’t trust ${t.name}. He wants to know who he sees and where he goes, and he wants it from somebody ${t.name} won’t notice.`, pay: 60, why: 'A day of following a man. Patience, and not being seen.', weight: 0.25, cool: 'need:watch:' + t.id });
+      if (open(w, n)) out.push({ ...n, title: `Keep an eye on ${t.name}`, brief: `${g.name} doesn’t trust ${t.name}. He wants to know who he sees and where he goes, and he wants it from somebody ${t.name} won’t notice.`, pay: 60, why: 'A day of following a man. Patience, and not being seen.', weight: 0.25, cool: 'need:watch:' + t.id });
     }
   }
   return out.sort((a, b) => b.weight - a.weight);

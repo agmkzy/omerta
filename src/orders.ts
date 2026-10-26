@@ -5,7 +5,7 @@
 import { knowsProtection } from './acquaint';
 import { temper } from './temper';
 import { applyRank } from './rank';
-import { addFact, bear, clamp, feel, feelOn, feelTo, learn, money, ownerBiz, recordCareer, rel, repute, shortTime, travelTime, witnessesAt } from './core';
+import { addFact, bear, clamp, feel, feelOn, feelTo, learn, money, ownerBiz, recordCareer, rel, repute, shortTime, transfer, travelTime, witnessesAt } from './core';
 import { aptitude, grow, lateOf, PROBLEM_LABEL } from './people';
 import { bizMove, clearArrears, owedOf, takeFromBiz } from './econ';
 import { arch, admit, excuse, pick } from './voice';
@@ -259,6 +259,19 @@ export function resolveErrand(w: World, j: Job, doer: Character, code: string): 
     }
     case 'deliver': {
       const minutes = 150;
+      // a little taken off the top of a made man's envelopes: money in the pocket, and a chance he counts
+      if (code === 'skim') {
+        const g = j.giver ? w.chars[j.giver] : undefined, take = g ? transfer(w, g, doer, Math.max(10, Math.round((j.pay || 30) * 1.2)), 'earn', 'off the top of his envelopes') : 0;
+        if (g && rng.chance(clamp(0.3 + temper(g).caution * 0.35, 0.2, 0.75))) {
+          feel(w, g, doer.id, 'trust', -0.18); bear(w, g, doer.id, 0.25, `${doer.name} was into his envelopes`);
+          repute(w, doer, -3, 'caught');
+          addFact(w, { kind: 'discipline', actor: g.id, victim: doer.id, amount: take, text: `${g.name} counted his envelopes and found ${doer.name} had been into them.`, district: doer.district }, { witnesses: [g.id, doer.id] });
+          lines.push(`You take ${money(take)} from the envelopes and deliver the rest. ${g.name.split(' ')[0]} counts. He always counts. You will hear about this.`);
+          return { lines, minutes, ok: false };
+        }
+        lines.push(`You take ${money(take)} from the envelopes and deliver the rest. Nobody says anything. Not yet.`);
+        return { lines, minutes, ok: true, money: j.pay };
+      }
       if (caught(0.14)) {
         doer.heat = clamp(doer.heat + 0.1, 0, 1.5);
         lines.push(`A patrolman stops the car and goes through the glovebox. The envelope is in the lining of the seat. It stays there.`);
@@ -272,6 +285,16 @@ export function resolveErrand(w: World, j: Job, doer: Character, code: string): 
       if (!t?.alive) return { lines: ['He’s gone.'], minutes: 30, ok: false };
       const minutes = travelTime(doer.district, t.district) + 90;
       doer.district = t.district;
+      // said so he remembers it: he backs off, or he takes it as an insult to his family, as the man he is
+      if (code === 'hard') {
+        const g = j.giver ? w.chars[j.giver] : undefined, tp = temper(t), backs = rng.chance(clamp(0.55 - tp.pride * 0.35 - tp.courage * 0.25 + (apt - 0.5) * 0.3, 0.1, 0.85));
+        addFact(w, { kind: 'threat', actor: doer.id, victim: t.id, minor: false, text: `${doer.name} warned ${t.name} off ${g ? g.name + '’s' : 'the family’s'} ground, and made sure he’d remember it.`, district: t.district }, { witnesses: [doer.id, t.id] });
+        if (backs) { feel(w, t, doer.id, 'fear', 0.15); lines.push(`${t.name} goes a shade paler than he’d like. "All right. I heard you." He means it, for now.`); if (g) feel(w, g, doer.id, 'respect', 0.04); return { lines, minutes, ok: true, money: j.pay }; }
+        bear(w, t, doer.id, 0.25, `${doer.name} threatened him on behalf of ${g?.name ?? 'his people'}`);
+        if (t.familyId && doer.familyId && t.familyId !== doer.familyId) { const A = w.fam[doer.familyId], B = w.fam[t.familyId]; A.tension[t.familyId] = (A.tension[t.familyId] ?? 0) + 0.5; B.tension[doer.familyId] = (B.tension[doer.familyId] ?? 0) + 0.5; }
+        lines.push(`${t.name} hears you out, then laughs in your face. "Tell ${g ? g.name.split(' ')[0] : 'him'} to come himself next time." It’s gone further than it was. People will hear.`);
+        return { lines, minutes, ok: false };
+      }
       const reply = pick([`${t.name} listens, says nothing for a while, then: "Tell him I heard."`, `${t.name} smiles. "He always did know how to ask."`, `${t.name} reads you more than the message. "And what do you think of it?"`], t.id + j.id);
       lines.push(reply);
       feel(w, t, doer.id, 'trust', (caught(0.2) ? -0.03 : 0.05));

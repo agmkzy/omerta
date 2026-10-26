@@ -76,6 +76,8 @@ function toYou(w: World, p: Character, s: string): string {
 export function speechFor(w: World, p: Character, t: Character, line: string): string {
   if (!/["“]/.test(line)) return line;
   if (p.isPlayer && t.id !== p.id && (line.includes(p.name) || line.includes(p.name.split(' ')[0]))) line = line.replace(/(["“])([^"“”]+)(["”])/g, (_m, a: string, body: string, z: string) => `${a}${toYou(w, p, body)}${z}`);
+  // (his first name with a possessive, where nobody else has it, is "my": "carry Sammy's envelopes" said by Sammy)
+  { const f = t.name.split(' ')[0]; if (line.includes(f) && !Object.values(w.chars).some((c) => c.id !== t.id && c.alive && c.name.split(' ')[0] === f)) line = line.replace(/(["“])([^"“”]+)(["”])/g, (_m, a: string, body: string, z: string) => `${a}${body.replace(new RegExp(`\\b${rx(f)}[’']s\\b`, 'g'), 'my')}${z}`); }
   const found = Object.values(w.chars).filter((c) => c.id !== p.id && line.includes(c.name));
   if (!found.length) return line;
   const first = (n: string) => n.split(' ')[0];
