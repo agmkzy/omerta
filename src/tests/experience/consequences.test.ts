@@ -4,7 +4,8 @@
 import assert from 'node:assert';
 import { describe, test as ok } from 'vitest';
 import { advance } from '../../engine';
-import { addFact } from '../../core';
+import { addFact, handleDeath, rel } from '../../core';
+import { epilogue } from '../../epilogue';
 import { daily, mkJob } from '../../jobs';
 import { recall } from '../../memory';
 import { summonsTick } from '../../meetings';
@@ -89,5 +90,22 @@ describe('a man inside is not blamed for what he could not do', { tags: ['scenar
     const before = w.jobs.filter((q) => q.kind === 'summons').length;
     for (let i = 0; i < 40; i++) summonsTick(w);
     assert.equal(w.jobs.filter((q) => q.kind === 'summons').length, before, 'nobody sends for a man who is inside');
+  });
+});
+
+describe('the end, told', { tags: ['scenario'] }, () => {
+  ok('killed, the player’s end says who the street says did it (only if a man of his family knows), who came, and how the Herald put it', () => {
+    const w = worldFor(3), p = P(w), cap = captain(w);
+    const k = Object.values(w.chars).find((c) => c.alive && c.familyId && c.familyId !== p.familyId && c.rank === 'soldier')!;
+    rel(cap, p.id).trust = 0.6;
+    const f = addFact(w, { kind: 'murder', actor: k.id, victim: p.id, text: `${k.name} had ${p.name} killed.`, district: p.district }, { witnesses: [] })!;
+    handleDeath(w, p.id);
+    let e = epilogue(w, p);
+    assert.match(e.who ?? '', /Nobody says who/);
+    assert.ok(e.mourners.some((c) => c.id === cap.id), 'his captain came');
+    assert.match(e.herald, /found shot/);
+    cap.known[f.id] = { t: w.now, from: cap.id, knowsActor: true } as never;
+    e = epilogue(w, p);
+    assert.match(e.who ?? '', new RegExp(k.name));
   });
 });

@@ -1,3 +1,4 @@
+import { epilogue } from '../epilogue';
 import { fallingDue } from '../commitments';
 import { knowsProtection } from '../acquaint';
 import { enterpriseLine, lineOf } from '../rackets';
@@ -239,7 +240,14 @@ export function todayView(): string {
   const w = W();
   const p = P();
   let out = '';
-  if (!p.alive) return `<div class="ui-card"><h2>You’re dead</h2><p>The world goes on without you.</p><button class="ui-btn ui-btn--primary" data-a="reset:go">Start a new game</button></div>`;
+  if (!p.alive) {
+    // the end, told: how it ended, the life, the funeral, the Herald (epilogue.ts)
+    const e = epilogue(w, p);
+    return title('The end', esc(e.how)) + (e.who ? context([esc(e.who)]) : '') + h('The life') + e.life.map((l) => `<p>${esc(l)}</p>`).join('')
+      + h('The funeral', String(e.mourners.length)) + (e.mourners.length ? `<p>${esc(e.mourners.map((c) => c.name).join(', '))} came.</p>` : quiet('Hardly anyone came. The ones who did kept their hats on.'))
+      + (e.glad.length ? `<p>${esc(e.glad.map((c) => c.name).join(', '))} ${e.glad.length === 1 ? 'was' : 'were'} not sorry.</p>` : '')
+      + h('The Herald') + `<p class="herald-line">${esc(e.herald)}</p>` + acts(btn('reset:go', 'Start a new life', 'primary'));
+  }
   // V88: the street first. What happened, what is said, what wants you, where you can go. Where you stand goes to the side.
   const dg = dangerLevel(w);
   if (dg.level > 0 && dg.who) out += context([`<b>Watch your back.</b> ${lk(dg.who.name)} is after you: ${esc(LADDER_WORDS[dg.level])}. It won’t stop by itself.`], true);

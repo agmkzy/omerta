@@ -219,3 +219,12 @@ police after a road job. Played through in the browser; tested (money conserved;
   read it only for the player's own), and the routines leave the club to it. Found in play: the player's family's men all live in
   Bensonhurst, so routines limited to residents had left their Little Italy club empty while Falco men sat in the café.
 - A man with a shop on the street is in it by day wherever he lives.
+
+## Phase 1.7: the end, told (epilogue.ts)
+When the player dies, the screen tells:
+- how it ended, and who the street says did it (only if a man of his own family knows, and naming him);
+- his life: days in the life, the rank he died at, what men thought of him, the men who answered to him, what his book took, what
+  he left, his last deeds;
+- the funeral: the men who trusted or liked him came, and the men who held something against him were not sorry;
+- the Herald's notice.
+It replaces "You're dead. The world goes on without you." Read only from the world's records; tested; seen in the browser.
