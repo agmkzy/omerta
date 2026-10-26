@@ -255,18 +255,22 @@ function crewStories(w: World, p: Character): Story[] {
     const prob = c.problem?.revealed ? c.problem : undefined;
     const flag = p.books.flags[c.id];
     const recent = !!c.cooldown.helped && w.now - c.cooldown.helped < 14 * DAY;
-    if (!prob && !flag?.amt && !recent) continue;
-    const settled = !prob && !flag?.amt;
+    // (his arc, as it shows: souring on the player, with the reason he holds; or rising, his name put forward and waiting)
+    const r = c.rels[p.id], sour = !!r && r.grudge >= 0.3, rising = c.backer === p.id && c.rank === 'associate';
+    if (!prob && !flag?.amt && !recent && !sour && !rising) continue;
+    const settled = !prob && !flag?.amt && !sour && !rising;
     const facts = known(w, p, (f) => ((f.actor === c.id || f.victim === c.id) && w.now - f.t < 90 * DAY && f.kind !== 'report') || f.story === 'man:' + c.id);
     const tl = facts.map((f) => entry(p, f));
     const bits: string[] = [];
     if (prob) bits.push(`You know he’s ${PROBLEM_LABEL[prob.kind]}.`);
     if (flag?.amt) bits.push(`About ${money(flag.amt)} doesn’t add up in what he hands over.`);
+    if (sour) bits.push(r!.why?.text ? `He holds something against you: ${r!.why.text.replace(/\.$/, '')}.` : 'He holds something against you, and it shows.');
+    if (rising) bits.push('You have put his name forward. He is waiting to hear, and so is everyone who watched you do it.');
     const helped = !!c.cooldown.helped && w.now - c.cooldown.helped < 45 * DAY;
     out.push({
-      key: 'man:' + c.id, kind: 'crew', title: `Trouble with ${first(c)}`, origin: flag?.amt ? 'Began with missing money' : 'One of your men',
+      key: 'man:' + c.id, kind: 'crew', title: rising && !prob && !flag?.amt && !sour ? `${first(c)}’s chance` : sour && !prob && !flag?.amt ? `${first(c)} is cooling on you` : `Trouble with ${first(c)}`, origin: flag?.amt ? 'Began with missing money' : 'One of your men',
       closed: settled, group: flag?.amt ? 'now' : 'in',
-      stage: settled ? 'Resolved. He’s back on his feet' : flag?.amt ? 'Money is missing' : helped ? (prob && prob.sev > 0.5 ? 'You helped. It’s still bad' : 'You helped. It’s easing') : 'You know. He may not know you know',
+      stage: settled ? 'Resolved. He’s back on his feet' : flag?.amt ? 'Money is missing' : sour && !prob ? (c.cooldown.restless && c.cooldown.restless >= 3 ? 'He’s asking what a man gets for himself' : 'He holds something against you') : rising && !prob ? 'His name is in front of the family' : helped ? (prob && prob.sev > 0.5 ? 'You helped. It’s still bad' : 'You helped. It’s easing') : 'You know. He may not know you know',
       tone: settled ? 'green' : flag?.amt ? 'red' : helped ? 'blue' : 'amber',
       last: tl[0]?.learned ?? (prob?.since ?? w.now), lastText: tl[0]?.text ?? bits[0] ?? '', timeline: tl, blurb: bits.join(' '),
       people: [{ id: c.id, role: 'one of your men' }],

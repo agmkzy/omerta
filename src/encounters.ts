@@ -1,3 +1,4 @@
+import { routine, spotById } from './city';
 import { kinTie } from './kin';
 import { answerImposed } from './imposed';
 import { answerCourting, courter, makeCourting } from './loyalty';
@@ -24,8 +25,12 @@ const by = (c: Character, seed: string, m: VMap) => pick(m[arch(c)] ?? m._ ?? (O
 const first = (c: Character) => c.name.split(' ')[0];
 const wk = (w: World, t: number) => Math.floor(t / DAY);
 
+// (a man who comes to the player comes somewhere: where his day has him at that hour, when that is a place on the street, city.ts)
+const PLACED = new Set(['favour_ask', 'crossdeal', 'courting', 'cometo', 'score', 'mediate', 'quarrel', 'crew']);
 export function addEnc(w: World, e: Omit<Enc, 'id' | 't' | 'status' | 'expires'> & { days?: number }): Enc {
   const { days, ...rest } = e;
+  const from = rest.from ? w.chars[rest.from] : undefined, r = from && PLACED.has(rest.kind) ? routine(w, from, w.now) : undefined, sp = r && r !== 'home' ? spotById(w, r) : undefined;
+  if (sp && sp.kind !== 'biz' && !/\b(club|bar|outside|at the|back room|on the street|door|car|office|house|home)\b/i.test(rest.lines[0] ?? '')) rest.lines = [`At ${sp.name.replace(/, on .*$/, '')}.`, ...rest.lines];
   const enc: Enc = { ...rest, id: newId(w, 'e'), t: w.now, expires: w.now + (days ?? 4) * DAY, status: 'open' };
   w.enc.push(enc);
   return enc;

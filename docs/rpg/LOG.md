@@ -297,3 +297,7 @@ Looked at the Herald and the Stories page as a player in the playthrough save:
     (March 1970), the postal strike, Apollo 13, Earth Day, Serpico, Kent State, the hard-hat riot and the Knicks' title, the Unity
     Day rally, the Tombs riots, the first Marathon and the Organized Crime Control Act, into 1971 (the police strike, Colombo shot,
     Attica) and 1972 (The Godfather, Joey Gallo). The city's small news fills a quiet week. Tested (experience/herald).
+- **Men with arcs:** a man of the player's crew who is souring on him is a story ("Gino is cooling on you", with the reason he holds
+  it, and when he is asking what a man gets for himself); so is a man whose name the player has put forward ("Patsy's chance").
+- **Approaches happen somewhere:** a man who comes to the player comes where his day has him at that hour ("At Ferrara's pastry
+  shop."), unless what he says already names the place.
