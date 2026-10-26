@@ -8,7 +8,7 @@ import { todayView } from './views_a';
 import { crewList, crewView, familyTab, placesView } from './views_b';
 import { storiesTab } from './stories';
 import { peopleRoom, roadRoom, youRoom } from './lifeview';
-import { businessRoom } from './business';
+import { businessRoom, workRoom } from './business';
 import { P, S } from './links';
 import { wordRoom } from './word';
 import { moreView } from './more';
@@ -16,12 +16,13 @@ import type { Tab } from './state';
 
 type Room = [id: string, label: string, view: () => string];
 const ROOMS: Partial<Record<Tab, Room[]>> = {
+  business: [['run', 'What you run', businessRoom], ['work', 'Work going', workRoom]],
   people: [['men', 'Your men', crewView], ['org', 'The family', familyTab], ['all', 'Everyone', peopleRoom]],
   story: [['stories', 'Stories', storiesTab], ['road', 'Your road', roadRoom], ['life', 'Your life', youRoom], ['word', 'Your word', wordRoom]],
 };
 // Where an older name lands: the section, and the room in it (none: the section's own first room).
 export const LEGACY: Partial<Record<Tab, [Tab, string | undefined]>> = {
-  rackets: ['business', 'home'], crew: ['people', 'men'], family: ['people', 'org'],
+  rackets: ['business', 'run'], crew: ['people', 'men'], family: ['people', 'org'],
   stories: ['story', 'stories'], journal: ['story', undefined], life: ['story', 'life'],
 };
 
@@ -49,7 +50,6 @@ export function sectionView(raw: Tab): string {
   if (name === 'today') return todayView();
   if (name === 'street') return placesView(true);
   if (name === 'more') return moreView();
-  if (name === 'business') return businessRoom();
   const rs = roomsOf(name), cur = roomIn(name)!;
   const nav = `<nav class="lf-nav" aria-label="${name}">${rs.map(([id, label]) => `<button class="${cur[0] === id ? 'on' : ''}" data-a="sub:${name}.${id}" aria-current="${cur[0] === id ? 'page' : 'false'}">${label}</button>`).join('')}</nav>`;
   return nav + cur[2]();

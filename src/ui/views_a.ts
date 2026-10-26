@@ -169,7 +169,7 @@ export function needs(): Need[] {
 
 // One row of the Today list: a man's face when a man has come to you, a quiet mark otherwise; what it is, the thing itself, and
 // what it comes to (or how long it will wait).
-function needRow(n: Need): Row {
+export function needRow(n: Need): Row {
   const w = W(), c = n.who ? w.chars[n.who] : undefined;
   const plain = (x: string) => lk(x).replace(/<a [^>]*>(.*?)<\/a>/g, '$1');
   // (a label that the title already says is left off: "A quarrel" over "A quarrel: Sammy and Gino")
@@ -266,7 +266,9 @@ export function todayView(): string {
   out += `<header class="td-now"><p class="td-when">${esc(fmtTime(w.now))}</p><p class="td-who">${esc(situationLine(w, p))}</p>${cu ? `<p class="td-next"><span>Coming up</span> ${esc(shortTime(cu.t))} · ${esc(cu.text)}</p>` : ''}</header>`;
   // ---- what needs you: one card per matter, the most pressing first
   const ns = needs();
-  const attn = ns.filter(isAttn), opps = ns.filter((n) => !attn.includes(n));
+  // (the same thing twice is one card: "Tell Sal Gallo how it went" for three jobs is one visit)
+  const seen = new Set<string>();
+  const attn = ns.filter(isAttn), opps = ns.filter((n) => !attn.includes(n) && !seen.has(n.title) && !!seen.add(n.title));
   if (attn.length) {
     out += h('Needs you', String(attn.length)) + rows((S.open.needs ? attn : attn.slice(0, 3)).map(needRow));
     if (attn.length > 3) out += acts(btn('tog:needs', S.open.needs ? 'Show fewer' : `${attn.length - 3} more`, 'quiet'));

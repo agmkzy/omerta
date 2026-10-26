@@ -350,28 +350,31 @@ export function placesView(home = false): string {
   const w = W(), p = P();
   const all = spots(w);
   // when a place keeps its hours, and who is in it, in a phrase: the first man you know by name, and how many more
-  const hours = (x: Spot) => { const o = x.open[0] % 24, c = x.open[1] % 24, hh = (n: number) => `${n}:00`; return openAt(x, w.now) ? `Open till ${hh(c)}` : x.kind === 'track' ? 'Saturday afternoons' : `Shut · opens ${hh(o)}`; };
+  // when a place keeps its hours, and who is in it, in a phrase: the first man you know by name, and how many more
+  const hh = (n: number) => `${n % 24}:00`;
+  const hours = (x: Spot) => (openAt(x, w.now) ? `Open till ${hh(x.open[1])}` : x.kind === 'track' ? 'Saturdays' : `Opens ${hh(x.open[0])}`);
   const inside = (x: Spot) => {
-    if (!openAt(x, w.now)) return '';
+    if (!openAt(x, w.now)) return 'Shut';
     const here = whoIsAt(w, x.id), mine = here.filter((c) => (c.rels[p.id]?.known ?? 0) > 0 || c.familyId === p.familyId);
-    if (!mine.length) return here.length ? 'nobody you know' : 'quiet';
+    if (!mine.length) return here.length ? 'Nobody you know' : 'Quiet';
     const first = mine.sort((a2, b2) => (b2.rels[p.id]?.trust ?? 0) - (a2.rels[p.id]?.trust ?? 0))[0];
-    return `${first.name}${mine.length > 1 ? `, and ${mine.length - 1} more you know` : ' is in'}`;
+    return mine.length > 1 ? `${first.name} and ${mine.length - 1} more you know` : `${first.name} is in`;
   };
-  let out = (home ? '' : back()) + title(SLICE, home ? 'Where you go. Pick a place to see who’s in, and what you can do there.' : '');
+  const kickOf = (x: Spot) => [x.kind === 'club' ? `The ${w.fam[x.famId!]?.name ?? ''} club` : '', x.on ?? ''].filter(Boolean).join(' · ');
+  let out = (home ? '' : back()) + title(SLICE, home ? 'Pick a place to see who’s in, and what you can do there.' : '');
   const pub = all.filter((x) => x.kind !== 'biz');
   if (openAt(TRACK, w.now)) pub.push(TRACK);
-  out += choices(pub.map((x) => ({ a: `place:${x.id}`, label: x.name, hint: [x.kind === 'club' && x.famId !== p.familyId ? 'Another family’s club' : '', hours(x), inside(x), x.kind === 'track' ? 'fifty minutes out to Queens' : ''].filter(Boolean).join(' · ') })), 'Where you go');
+  out += rows(pub.map((x): Row => ({ kick: kickOf(x), title: esc(x.name), sub: esc(inside(x)), end: esc(hours(x)), mark: openAt(x, w.now) ? (x.kind === 'club' && x.famId === p.familyId ? 'red' : 'amber') : 'dead', tone: openAt(x, w.now) ? '' : 'dim', a: `place:${x.id}` })));
   // the shops: the ones that pay you first, then your men's, then the rest, folded
   const shops = all.filter((x) => x.kind === 'biz').map((x) => ({ x, b: w.biz[x.biz!] }));
   const payer = (b: (typeof shops)[number]['b']) => (knowsProtection(w, p, b) && b.protection && b.protection.collectorId !== b.ownerId ? b.protection.collectorId : '');
-  const shopRow = ({ x, b }: (typeof shops)[number]): Row => { const o = w.chars[b.ownerId], who = payer(b); return { title: esc(x.name), sub: `${o ? esc(o.name) : ''}${who && who !== p.id && w.chars[who]?.bossId !== p.id ? ` · pays ${esc(w.chars[who]?.name ?? 'somebody')}` : ''} · ${esc(hours(x).toLowerCase())}`, a: `place:${x.id}` }; };
+  const shopRow = ({ x, b }: (typeof shops)[number]): Row => { const o = w.chars[b.ownerId], who = payer(b); return { title: esc(x.name), sub: `${o ? esc(o.name) : ''}${who && who !== p.id && w.chars[who]?.bossId !== p.id ? ` · pays ${esc(w.chars[who]?.name ?? 'somebody')}` : ''}`, end: esc(openAt(x, w.now) ? hours(x) : 'Shut'), tone: openAt(x, w.now) ? '' : 'dim', a: `place:${x.id}` }; };
   const yours = shops.filter((s2) => payer(s2.b) === p.id), mens = shops.filter((s2) => payer(s2.b) && w.chars[payer(s2.b)]?.bossId === p.id), rest = shops.filter((s2) => !yours.includes(s2) && !mens.includes(s2));
   if (yours.length) out += h('Paying you', String(yours.length)) + rows(yours.map(shopRow));
   if (mens.length) out += h('Paying your men', String(mens.length)) + rows(mens.map(shopRow));
   if (rest.length) out += `<details class="pp-more"${yours.length + mens.length ? '' : ' open'}><summary>${yours.length + mens.length ? 'The other shops' : 'The shops'} (${rest.length})</summary>${rows(rest.map(shopRow))}</details>`;
   // (the old rooms, for everywhere else; the family's own club is on the street above when it stands in this district)
-  out += h('Elsewhere') + choices([...(home ? [{ a: 'bj:', label: 'A card table', hint: 'Blackjack at the family casinos. The house usually wins.' }] : []), ...PLACES.filter((pl_) => !(pl_.id === 'club' && all.some((x) => x.kind === 'club' && x.famId === p.familyId))).map((pl_) => ({ a: `place:${pl_.id}`, label: pl_.name, hint: `${pl_.blurb} ${isOpen(w, pl_.id) ? 'Open.' : 'Shut right now.'}` }))], 'Elsewhere');
+  out += h('Elsewhere') + rows([...(home ? [{ title: 'A Card Table', sub: 'Blackjack at the family casinos. The house usually wins.', a: 'bj:' } as Row] : []), ...PLACES.filter((pl_) => !(pl_.id === 'club' && all.some((x) => x.kind === 'club' && x.famId === p.familyId))).map((pl_): Row => ({ title: esc(pl_.name), sub: esc(pl_.blurb), end: isOpen(w, pl_.id) ? 'Open' : 'Shut', tone: isOpen(w, pl_.id) ? '' : 'dim', a: `place:${pl_.id}` }))]);
   return out;
 }
 export function placeView(id: string): string {

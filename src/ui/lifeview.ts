@@ -233,7 +233,7 @@ export function weekFull(): string {
   let out = '';
   // the week: what comes in, what goes out, and how far into it you are (ui/money.ts, the one account every screen reads)
   out += h('Your week', wk.inTotal || wk.outTotal ? `${money(wk.inTotal)} in · ${money(wk.outTotal)} out` : '');
-  if (!wk.comingIn.length && !wk.goingOut.length) out += quiet('Nothing comes in yet beyond what’s in your pocket. Rackets is where the money starts.') + acts(btn('sub:business.new', 'Start something'));
+  if (!wk.comingIn.length && !wk.goingOut.length) out += quiet('Nothing comes in yet beyond what’s in your pocket. Rackets is where the money starts.') + acts(btn('sub:business.work', 'Start something'));
   else out += rows([
     ...wk.comingIn.map((f): Row => ({ title: esc(f.label), sub: f.note ? esc(f.note) : '', end: `<span class="fig">+${esc(money(f.amt))}</span> <small>a week</small>`, tone: 'good', a: f.a })),
     ...wk.goingOut.map((f): Row => ({ title: esc(f.label), sub: f.note ? esc(f.note) : '', end: `<span class="fig">−${esc(money(f.amt))}</span> <small>a week</small>`, tone: 'warn', a: f.a })),

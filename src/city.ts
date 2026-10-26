@@ -12,20 +12,20 @@ import { DAY, type Character, type World } from './types';
 export const SLICE = 'Little Italy';
 const bizKind = new Map<string, string>(); // (filled as places are listed: what trade a business is, for its hours)
 export type SpotKind = 'club' | 'cafe' | 'barber' | 'bar' | 'church' | 'track' | 'biz';
-export interface Spot { id: string; name: string; kind: SpotKind; blurb: string; open: [number, number]; district: string; biz?: string; famId?: string }
+export interface Spot { id: string; name: string; kind: SpotKind; blurb: string; open: [number, number]; district: string; biz?: string; famId?: string; on?: string }
 
 const FIXED: Omit<Spot, 'district'>[] = [
-  { id: 'li:cafe', name: 'Ferrara’s pastry shop, on Grand', kind: 'cafe', blurb: 'Espresso, cannoli and a window onto the whole street. Men who want to be seen sit at the front.', open: [8, 23] },
-  { id: 'li:barber', name: 'Sal’s barber shop, on Mott', kind: 'barber', blurb: 'Three chairs, a radio, and more gossip per square foot than the courthouse.', open: [8, 19] },
-  { id: 'li:bar', name: 'The Grotto, on Grand', kind: 'bar', blurb: 'Dark at noon, darker at midnight. Where men stop pretending to be anything but what they are.', open: [16, 28] },
-  { id: 'li:church', name: 'Most Precious Blood, on Baxter', kind: 'church', blurb: 'The feast starts from its steps. On Sunday mornings the men who matter stand at the back.', open: [7, 13] },
+  { id: 'li:cafe', name: 'Ferrara’s Pastry Shop', on: 'Grand Street', kind: 'cafe', blurb: 'Espresso, cannoli and a window onto the whole street. Men who want to be seen sit at the front.', open: [8, 23] },
+  { id: 'li:barber', name: 'Sal’s Barber Shop', on: 'Mott Street', kind: 'barber', blurb: 'Three chairs, a radio, and more gossip per square foot than the courthouse.', open: [8, 19] },
+  { id: 'li:bar', name: 'The Grotto', on: 'Grand Street', kind: 'bar', blurb: 'Dark at noon, darker at midnight. Where men stop pretending to be anything but what they are.', open: [16, 28] },
+  { id: 'li:church', name: 'Most Precious Blood', on: 'Baxter Street', kind: 'church', blurb: 'The feast starts from its steps. On Sunday mornings the men who matter stand at the back.', open: [7, 13] },
 ];
-export const TRACK: Spot = { id: 'track', name: 'Aqueduct racetrack', kind: 'track', blurb: 'Saturday afternoons, the horses, and every gambler in the city.', open: [12, 18], district: 'Queens' };
+export const TRACK: Spot = { id: 'track', name: 'Aqueduct Racetrack', on: 'Queens', kind: 'track', blurb: 'Saturday afternoons, the horses, and every gambler in the city.', open: [12, 18], district: 'Queens' };
 
 /** Every place in the slice's district: the family club (its headquarters), the fixed places, and every business. */
 export function spots(w: World): Spot[] {
   const out: Spot[] = [];
-  for (const cl of Object.values(w.clubs ?? {})) if (cl.district === SLICE) out.push({ id: 'li:club:' + cl.familyId, name: `${cl.name}, the ${w.fam[cl.familyId]?.name ?? ''} club`, kind: 'club', blurb: `The ${w.fam[cl.familyId]?.name ?? ''} family’s club. Espresso, a card table in the back, and the men who matter.`, open: [11, 26], district: SLICE, famId: cl.familyId });
+  for (const cl of Object.values(w.clubs ?? {})) if (cl.district === SLICE) out.push({ id: 'li:club:' + cl.familyId, name: cl.name, on: 'Mulberry Street', kind: 'club', blurb: `The ${w.fam[cl.familyId]?.name ?? ''} family’s club. Espresso, a card table in the back, and the men who matter.`, open: [11, 26], district: SLICE, famId: cl.familyId });
   for (const s of FIXED) out.push({ ...s, district: SLICE });
   for (const b of Object.values(w.biz)) if (b.district === SLICE && b.open) bizKind.set(b.id, b.kind);
   for (const b of Object.values(w.biz)) if (b.district === SLICE && b.open) out.push({ id: 'biz:' + b.id, name: b.name, kind: 'biz', blurb: '', open: HOURS[b.kind] ?? [9, 19], district: SLICE, biz: b.id });

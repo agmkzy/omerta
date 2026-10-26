@@ -28,7 +28,7 @@ export function week(w: World, p: Character): Week {
   const shops = Object.values(w.biz).filter((b) => b.open && b.protection?.collectorId === p.id);
   if (shops.length) {
     const behind = shops.reduce((a, b) => a + owedOf(b), 0);
-    comingIn.push({ label: 'Protection', amt: shops.reduce((a, b) => a + (b.protection?.fee ?? 0), 0), note: `${plural(shops.length, 'shop')}${behind ? `, ${money(behind)} behind` : ''}`, a: 'sub:business.home' });
+    comingIn.push({ label: 'Protection', amt: shops.reduce((a, b) => a + (b.protection?.fee ?? 0), 0), note: `${plural(shops.length, 'shop')}${behind ? `, ${money(behind)} behind` : ''}`, a: 'sub:business.run' });
   }
   // rackets you own: what each took last week
   for (const o of w.ops.filter((x) => x.owner === p.id && (x.state === 'running' || x.state === 'out'))) {

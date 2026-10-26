@@ -18,7 +18,7 @@ export interface Row {
   face?: string;          // html: a portrait, when a man is the subject
   mark?: string;          // a coloured mark (green, amber, red, blue, dead) when there is no face
   end?: string;           // html: a figure or a word at the end
-  tone?: '' | 'good' | 'warn' | 'bad';
+  tone?: '' | 'good' | 'warn' | 'bad' | 'dim';
   a?: string;             // the action the whole row takes (data-a)
   label?: string;         // accessible name, when the row's text is not enough
 }

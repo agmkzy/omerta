@@ -168,3 +168,4 @@ h3.ui-h { margin: var(--s-5) 0 var(--s-2); }
 .ui-list li:last-child { border-bottom: 0; }
 .ui-list li .v { font-weight: 500; text-align: right; color: var(--c-cream); }
 .ui-list li .v.good { color: var(--c-good); } .ui-list li .v.bad { color: var(--c-danger); } .ui-list li .v.warn { color: var(--c-gold-2); }
+.ui-row__end.dim { color: var(--c-dim); }
