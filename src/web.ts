@@ -29,7 +29,8 @@ import { askPermission } from './politics';
 import { settleDo } from './revenge';
 import { closeOp, countOp, hijack, opRule, startOp } from './rackets';
 import { DAY, Kind } from './types';
-import { nextAt } from './city';
+import { nextAt, spotById } from './city';
+import { narrow } from './ui/streetmap';
 import { createWorld } from './world';
 import type { World } from './types';
 import { relevance } from './reports';
@@ -417,6 +418,15 @@ function handle(a: string, v: string) {
     case 'sub': { const [sec, room] = v.split('.'); if (S.view.t !== 'tab' || S.view.name !== sec) { tab(sec as Tab); S.view = { t: 'tab', name: sec as Tab }; S.stack = []; } S.sub[sec] = room; return; }
     case 'pf': S.worldFilter = v; return;
     case 'place': return go({ t: 'place', id: v });
+    // the street's districts, and a place picked on its map: beside the map on a desktop, its own page on a phone
+    case 'sdist': S.sub.street = v; S.streetSel = undefined; return;
+    case 'spot': {
+      if (!v) { S.streetSel = undefined; return; }
+      if (!narrow()) { S.streetSel = S.streetSel === v ? undefined : v; return; }
+      if (v.startsWith('club:')) return go({ t: 'tree', fam: v.slice(5) });
+      if (v.startsWith('biz:') && !spotById(W(), v)) return go({ t: 'biz', id: v.slice(4) });
+      return go({ t: 'place', id: v });
+    }
     // (waiting at a place for a man who comes in: the time until he does passes, and then he is there to talk to)
     case 'waitfor': {
       const [sid, cid] = v.split('|'), c = w.chars[cid];

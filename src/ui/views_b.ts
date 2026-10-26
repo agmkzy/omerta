@@ -1,8 +1,8 @@
 import { knowsProtection } from '../acquaint';
-import { streetMap } from './streetmap';
+import { districtBar, narrow, streetMap } from './streetmap';
 import { sundayDue } from './sunday';
 import { acts, btn, choices, context, h, kv, meter, note, quiet, rows, title, type KV, type Pick, type Row } from './kit';
-import type { Character, World } from '../types';
+import type { Business, Character, World } from '../types';
 // Rackets, crew, orders, jobs, talk, meetings, life.
 import { owedOf, stakesOf } from '../econ';
 import { grudgeWord } from '../actions';
@@ -27,8 +27,8 @@ import { standingWord } from '../jobs';
 import { disputesList } from './views_c';
 import { avatar, back, banner, sink, meterRow, skillBars, skillLine, traitTags } from './common';
 import { bl, chip, esc, fl, known, lk, P, pl, S, statusOf, W, who } from './links';
-import { treeView } from './views_a';
-import { toSide } from './layout';
+import { bizView, treeView } from './views_a';
+import { takeSide, toSide } from './layout';
 import { whereIs } from '../where';
 import { kinWord, stageWord, warmthWord, DATES, datingPool } from '../life';
 import { canStart, lineOf, OP_GROUPS, OPS } from '../rackets';
@@ -349,8 +349,11 @@ const chipText = (id: Id) => {
 // know are in, and every shop on the street; Saturday afternoons, the track. The old rooms stand for everywhere else.
 export function placesView(home = false): string {
   const w = W(), p = P();
-  const all = spots(w);
-  // when a place keeps its hours, and who is in it, in a phrase: the first man you know by name, and how many more
+  const dist = home ? S.sub.street || SLICE : SLICE;
+  const sel = home && !narrow() ? S.streetSel : undefined;
+  let out = home ? districtBar(dist) + streetMap(dist, sel) : back() + title(SLICE);
+  // beside the drawing on a desktop: the place you picked, while the map stays put
+  if (home && !narrow()) toSide(sel ? placePane(sel) : `<div class="st-pane st-pane--empty"><p class="pl-blurb">Pick a place on the map to see who’s in, and what you can do there.</p></div>`);
   // when a place keeps its hours, and who is in it, in a phrase: the first man you know by name, and how many more
   const hh = (n: number) => `${n % 24}:00`;
   const hours = (x: Spot) => (openAt(x, w.now) ? `Open till ${hh(x.open[1])}` : x.kind === 'track' ? 'Saturdays' : `Opens ${hh(x.open[0])}`);
@@ -362,21 +365,38 @@ export function placesView(home = false): string {
     return mine.length > 1 ? `${first.name} and ${mine.length - 1} more you know` : `${first.name} is in`;
   };
   const kickOf = (x: Spot) => [x.kind === 'club' ? `The ${w.fam[x.famId!]?.name ?? ''} club` : '', x.on ?? ''].filter(Boolean).join(' · ');
-  let out = (home ? '' : back()) + title(SLICE) + (home ? streetMap() : '');
-  const pub = all.filter((x) => x.kind !== 'biz');
-  if (openAt(TRACK, w.now)) pub.push(TRACK);
-  out += rows(pub.map((x): Row => ({ kick: kickOf(x), title: esc(x.name), sub: esc(inside(x)), end: esc(hours(x)), mark: openAt(x, w.now) ? (x.kind === 'club' && x.famId === p.familyId ? 'red' : 'amber') : 'dead', tone: openAt(x, w.now) ? '' : 'dim', a: `place:${x.id}` })));
+  const act = (id: string) => (home ? `spot:${id}` : `place:${id}`);
+  if (dist === SLICE) {
+    const pub = spots(w).filter((x) => x.kind !== 'biz');
+    if (openAt(TRACK, w.now)) pub.push(TRACK);
+    out += h('Places') + rows(pub.map((x): Row => ({ kick: kickOf(x), title: esc(x.name), sub: esc(inside(x)), end: esc(hours(x)), mark: openAt(x, w.now) ? (x.kind === 'club' && x.famId === p.familyId ? 'red' : 'amber') : 'dead', tone: openAt(x, w.now) ? '' : 'dim', a: x.kind === 'track' ? `place:${x.id}` : act(x.id) })));
+  } else {
+    const clubs = Object.values(w.clubs ?? {}).filter((c) => c.district === dist);
+    if (clubs.length) out += h('Clubs') + rows(clubs.map((c): Row => ({ kick: c.familyId === p.familyId ? 'Your family’s club' : `The ${w.fam[c.familyId]?.name ?? ''} club`, title: esc(c.name), mark: c.familyId === p.familyId ? 'red' : 'blue', a: home ? `spot:${c.familyId === p.familyId ? 'club' : 'club:' + c.familyId}` : `tree:${c.familyId}` })));
+  }
   // the shops: the ones that pay you first, then your men's, then the rest, folded
-  const shops = all.filter((x) => x.kind === 'biz').map((x) => ({ x, b: w.biz[x.biz!] }));
-  const payer = (b: (typeof shops)[number]['b']) => (knowsProtection(w, p, b) && b.protection && b.protection.collectorId !== b.ownerId ? b.protection.collectorId : '');
-  const shopRow = ({ x, b }: (typeof shops)[number]): Row => { const o = w.chars[b.ownerId], who = payer(b); return { title: esc(x.name), sub: `${o ? esc(o.name) : ''}${who && who !== p.id && w.chars[who]?.bossId !== p.id ? ` · pays ${esc(w.chars[who]?.name ?? 'somebody')}` : ''}`, end: esc(openAt(x, w.now) ? hours(x) : 'Shut'), tone: openAt(x, w.now) ? '' : 'dim', a: `place:${x.id}` }; };
+  const slice = dist === SLICE;
+  const shops = Object.values(w.biz).filter((b) => b.district === dist && b.open).map((b) => ({ b, x: slice ? spots(w).find((x) => x.biz === b.id) : undefined }));
+  const payer = (b: Business) => (knowsProtection(w, p, b) && b.protection && b.protection.collectorId !== b.ownerId ? b.protection.collectorId : '');
+  const shopRow = ({ x, b }: (typeof shops)[number]): Row => { const o = w.chars[b.ownerId], who = payer(b); return { title: esc(b.name), sub: `${o ? esc(o.name) : ''}${who && who !== p.id && w.chars[who]?.bossId !== p.id ? ` · pays ${esc(w.chars[who]?.name ?? 'somebody')}` : ''}`, end: x ? esc(openAt(x, w.now) ? hours(x) : 'Shut') : '', tone: x && !openAt(x, w.now) ? 'dim' : '', a: x ? act(x.id) : home ? `spot:biz:${b.id}` : `biz:${b.id}` }; };
   const yours = shops.filter((s2) => payer(s2.b) === p.id), mens = shops.filter((s2) => payer(s2.b) && w.chars[payer(s2.b)]?.bossId === p.id), rest = shops.filter((s2) => !yours.includes(s2) && !mens.includes(s2));
   if (yours.length) out += h('Paying you', String(yours.length)) + rows(yours.map(shopRow));
   if (mens.length) out += h('Paying your men', String(mens.length)) + rows(mens.map(shopRow));
   if (rest.length) out += `<details class="pp-more"${yours.length + mens.length ? '' : ' open'}><summary>${yours.length + mens.length ? 'The other shops' : 'The shops'} (${rest.length})</summary>${rows(rest.map(shopRow))}</details>`;
-  // (the old rooms, for everywhere else; the family's own club is on the street above when it stands in this district)
-  out += h('Elsewhere') + rows([...(home ? [{ title: 'A Card Table', sub: 'Blackjack at the family casinos. The house usually wins.', a: 'bj:' } as Row] : []), ...PLACES.filter((pl_) => !(pl_.id === 'club' && all.some((x) => x.kind === 'club' && x.famId === p.familyId))).map((pl_): Row => ({ title: esc(pl_.name), sub: esc(pl_.blurb), end: isOpen(w, pl_.id) ? 'Open' : 'Shut', tone: isOpen(w, pl_.id) ? '' : 'dim', a: `place:${pl_.id}` }))]);
+  out += h('Elsewhere') + rows([...(home ? [{ title: 'A Card Table', sub: 'Blackjack at the family casinos. The house usually wins.', a: 'bj:' } as Row] : []), ...PLACES.filter((pl_) => !(pl_.id === 'club' && spots(w).some((x) => x.kind === 'club' && x.famId === p.familyId))).map((pl_): Row => ({ title: esc(pl_.name), sub: esc(pl_.blurb), end: isOpen(w, pl_.id) ? 'Open' : 'Shut', tone: isOpen(w, pl_.id) ? '' : 'dim', a: `place:${pl_.id}` }))]);
   return out;
+}
+// The place you picked on the map, in the pane beside it (desktop): the same page as on its own, without its way back.
+export function placePane(id: string): string {
+  const w = W();
+  const before = takeSide();
+  let html: string;
+  if (id.startsWith('club:')) { const fam = w.fam[id.slice(5)], cl = Object.values(w.clubs ?? {}).find((c) => c.familyId === fam?.id); html = placeHead(`The ${fam?.name ?? ''} club · ${cl?.district ?? ''}`, cl?.name ?? 'A club', 'Another family’s club. You’d be noticed walking in, and nobody there owes you a word.') + rows([{ title: `The ${esc(fam?.name ?? '')} family`, sub: 'Who runs it, and who stands where.', a: `tree:${fam?.id}` }]); }
+  else if (id.startsWith('biz:') && !spotById(w, id)) html = bizView(id.slice(4));
+  else html = placeView(id);
+  const theirs = takeSide();
+  toSide(before);
+  return `<div class="st-pane"><button class="st-pane__x" data-a="spot:" aria-label="Close">×</button>${html.replace(/<button class="ui-back"[^>]*>[\s\S]*?<\/button>/, '')}${theirs}</div>`;
 }
 export function placeView(id: string): string {
   const w = W();
