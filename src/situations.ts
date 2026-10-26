@@ -105,7 +105,8 @@ export function sitChoose(w: World, p: Character, e: Enc, code: string): string[
 // What he says, when you ask how business is going. A proud man hides it; someone who trusts you doesn’t.
 export function askAbout(w: World, p: Character, c: Character): string[] {
   const s = sitOf(w, c.id);
-  if (!s) return [`${c.name}: "Business is business."`];
+  // (what a man wants for himself is not how business is going: that is its own conversation)
+  if (!s || s.kind === 'ambition') return [`${c.name}: "Business is business."`];
   const r = rel(c, p.id);
   const open = r.trust >= 0.4 || s.stage === 'asking' || temper(c).caution < 0.3;
   if (!open) { p.cooldown[`sitask:${c.id}`] = w.now + 3 * DAY; return [`${c.name} shrugs. "Fine. Slow, but fine."`, 'He isn’t telling you everything. Give it time, or ask someone who knows him.']; }

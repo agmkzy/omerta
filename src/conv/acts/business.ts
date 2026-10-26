@@ -26,6 +26,17 @@ import { incidentsOf, told } from './words';
 import { said } from './personal';
 import { ACTS } from '.';
 
+// A matter's title said out loud: "Johnny wants to rise" to Johnny is "About you wanting to rise…"; "Mario and Louie: bad blood" is
+// "This business between Mario and Louie…"; anything else, as it is called.
+function aboutSaid(title: string, him: string): string {
+  const want = /^(.+?) wants to (.+)$/.exec(title);
+  if (want) return `About ${want[1] === him ? 'you' : want[1]} wanting to ${want[2]}…`;
+  const pair = /^(.+?) and (.+?): (.+)$/.exec(title);
+  if (pair) { const a = pair[1] === him ? 'you' : pair[1], b = pair[2] === him ? 'you' : pair[2]; return `This business between ${a === 'you' ? b : a} and ${a === 'you' ? 'you' : b}…`; }
+  return `About ${title.replace(/^(A|An|The) /, (m) => m.toLowerCase())}…`;
+}
+
+
 // "About …" a matter, as a man would say it: a title that is a command ("Leave Teddy alone") becomes the matter of it, never "About leave
 // Teddy alone"; a name keeps its capital
 const aboutLabel = (title: string) => {
@@ -197,7 +208,7 @@ const termsRaise: Act = {
     if (!pos.strained && counter > fee) {
       c.v.th.deal.offer = counter;
       line(x, voice(x, 'fee_counter', { X, Y: money(counter) }), settled(t.id, 'counters', `the shop bears ${money(pos.cap)}, not ${X}`));
-      return out(10, [{ code: 'deal:take', label: `Settle at ${money(counter)}`, note: 'He keeps his dignity. You keep the peace.' }, { code: 'deal:hold', label: `It’s ${X}, or there’s trouble`, note: 'He may give in. He won’t forget it.' }, { code: 'deal:drop', label: 'Leave it as it is, then' }]);
+      return out(10, [{ code: 'deal:take', label: `“${money(counter)}, then. We’ll leave it there.”`, note: 'He keeps his dignity. You keep the peace.' }, { code: 'deal:hold', label: `It’s ${X}, or there’s trouble`, note: 'He may give in. He won’t forget it.' }, { code: 'deal:drop', label: 'Leave it as it is, then' }]);
     }
     line(x, voice(x, pos.strained ? 'fee_cant' : 'fee_wont'), settled(t.id, pos.strained ? 'cannot' : 'will not', pos.strained ? 'the shop is strained' : 'nothing between his fee and what you ask'));
     return out(10, [{ code: 'deal:hold', label: 'It isn’t a request', note: pos.strained ? 'He really may not have it.' : 'He may give in. He won’t forget it.' }, { code: 'deal:drop', label: 'All right. For now' }]);
@@ -626,7 +637,7 @@ const favcall: Act = {
 // ---------------------------------------------------------------- a matter he is in that the player knows of (matters.ts), and his trouble
 const mtOpen: Act = {
   base: 'mt_open', pane: 'personal', opens: true,
-  offers: (c) => { const seen = new Set<string>(), out0: Offer[] = []; for (const { s } of topicsWith(c.w, c.h, c.n)) if (!seen.has(s.id)) { seen.add(s.id); out0.push({ code: 'mt_open:' + s.id, label: aboutLabel(matterTitle(c.w, s) ?? s.cause), says: `This business with ${(matterTitle(c.w, s) ?? s.cause).replace(/^./, (m) => m.toLowerCase())}…`, note: 'Something you both know about.', kind: 'between' }); } return out0; },
+  offers: (c) => { const seen = new Set<string>(), out0: Offer[] = []; for (const { s } of topicsWith(c.w, c.h, c.n)) if (!seen.has(s.id)) { seen.add(s.id); out0.push({ code: 'mt_open:' + s.id, label: aboutLabel(matterTitle(c.w, s) ?? s.cause), says: aboutSaid(matterTitle(c.w, s) ?? s.cause, c.n.name.split(' ')[0]), note: 'Something you both know about.', kind: 'between' }); } return out0; },
   offersFor: (c, sid) => topicsWith(c.w, c.h, c.n).filter((q) => q.s.id === sid).map(({ s, o }) => ({ code: `mt:${s.id}:${o.code}`, label: o.label, note: o.hint })),
   run: (c, code) => {
     const x = T(c), sid = code.split(':')[1], pickL = (xs: string[]) => xs[(x.t.id.charCodeAt(x.t.id.length - 1) + (x.w.now / 1440 | 0)) % xs.length];
@@ -644,7 +655,8 @@ const sitAskA: Act = {
 };
 function sitRows(c: Ctx): Offer[] {
   const { w, h: p, n: t } = c, sit = sitOf(w, t.id);
-  if (!sit || !(sit.told || sit.knows)) return [];
+  // (covering a loss, lending, sending word to a rival: answers to trouble with money, not to a man who wants to rise)
+  if (!sit || !(sit.told || sit.knows) || sit.kind === 'ambition') return [];
   const o: Offer[] = [];
   if (sit.rival && w.biz[sit.rival]?.open) o.push({ code: 'sit_rival', label: `“I’ll send word to ${w.biz[sit.rival].name}.”`, note: 'Nothing violent. A little heat, a grudge, and his customers come back.' });
   if (p.cash >= 600) o.push({ code: 'sit_cover', label: '“Let me cover what you’ve lost.” ($600)', note: 'No book, no vig. He won’t forget it.' });

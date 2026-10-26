@@ -752,7 +752,7 @@ MATTERS.climb = {
       if (peek(c, p.id).trust < 0.35) return [`"Where I am is fine," ${first(c)} says, which is what men say when it isn't.`];
       know(w, s, p.id, 2, 'he told you');
       const g = agencyOf(w).goals.find((x) => x.id === s.m?.goal);
-      return [`${first(c)} leans in. "${g?.next && g.next !== 'wait for the nod' ? `I need to ${g.next.replace(/^he /, '')}.` : 'I\'m waiting on the nod.'} After that, a crew of my own."`];
+      return [`${first(c)} leans in. "${g?.next && g.next !== 'wait for the nod' ? `I need to ${g.next.replace(/^he /, '').replace(/\s*\([^)]*\)/g, '')}.` : 'I\'m waiting on the nod.'} After that, a crew of my own."`];
     }
     if (code === 'wait') { bear(w, c, p.id, 0.1, `${p.name} told him to wait his turn`); const g = agencyOf(w).goals.find((x) => x.id === s.m?.goal); if (g && c.traits.caution > 0.6) g.review = w.now + 4 * WEEK; return [`${first(c)} hears you out. "Sure. My turn." He doesn't say when that is.`]; }
     if (code === 'praise') { praise(); return [`${first(boss)} listens. "${first(c)}. Hm. Maybe."`]; }

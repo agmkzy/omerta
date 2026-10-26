@@ -181,6 +181,8 @@ export function move(w: World, s: Situation, mv: AskMove): Outcome {
       const amt = K.better?.(w, s);
       if (amt === undefined) return { lines: ['There is no better offer to make.'] };
       s.terms!.amt = amt; S.good = clamp(S.good + 0.01 + tp.agreeable * 0.04);
+      // (a new figure on the table: his old counter is off it, so a yes now is a yes to this figure, not to what he offered before)
+      if (s.m) { if (s.m.offer !== undefined) s.m.held = s.m.offer; delete s.m.offer; } if (S.last === 'counter') S.last = undefined;
       if (tp.pride > 0.66 && tp.agreeable < 0.5) S.anger = clamp(S.anger + 0.03); // a proud man can take a small sweetener as an insult
       noteConduct(a, 'deals', 0.5);
       if (!a.isPlayer) lines.push(K.low ? `${first(a)} goes to ${fmtOf(K, amt)}.` : `${first(a)} comes down to ${money(amt)}.`);
@@ -270,7 +272,7 @@ function answer(w: World, s: Situation, a: Character, t: Character, K: AskKind, 
   // kind's weighing below is used only where no such decision exists)
   // (his own word holds: what is put to him that meets the terms he offered himself, he takes; found in play, where a man who said
   // "$55, not a cent more" was offered $55 and came back with $40)
-  const prev = s.m?.offer !== undefined ? Number(s.m.offer) : undefined;
+  const prev = s.m?.offer !== undefined ? Number(s.m.offer) : s.m?.held !== undefined ? Number(s.m.held) : undefined; // (what he offered before stands, even once a new figure is on the table)
   if (prev !== undefined && s.terms?.amt !== undefined && (K.low ? s.terms.amt >= prev : s.terms.amt <= prev)) { say('yes'); return finish(w, s, a, t, K, S, lines, false); }
   const D = w.social ? (DECIDERS.answer[s.ak ?? ''] ?? DECIDERS.answer['*'])?.(w, s, a, t) : undefined;
   const score = D ? 0 : v + S.fear * 0.7 * (1 - tp.courage * 0.6) + S.good * 0.45 - S.anger * 0.55 - S.resolve * 0.55 + jitter(w, s, 'ans' + tried(stance(w, s, a.id), 'ask'));
@@ -799,7 +801,7 @@ ASKS.help = {
 // ---------------------------------------------------------------- asking a man for a loan
 ASKS.borrow = {
   id: 'borrow', sev: 0.15, roles: ['borrower', 'lender'], cool: 2,
-  moves: ['take', 'ask', 'sweeten', 'persuade', 'leverage', 'wait', 'drop'], sweeten: (amt) => `Ask for ${money(amt)} instead`,
+  moves: ['take', 'ask', 'sweeten', 'persuade', 'leverage', 'wait', 'drop'], sweeten: (amt) => `“Make it ${money(amt)}.”`,
   title: (w, s) => { const t = askee(w, s); return t ? `A loan from ${first(t)}` : 'A loan'; },
   valid: (w, s) => !!askee(w, s) && !!asker(w, s) && !wontBorrowFrom(asker(w, s)!, askee(w, s)!),
   lean: (w, s, a, t) => {
@@ -993,7 +995,7 @@ const favOf = (w: World, s: Situation): Favour | undefined => (s.m?.fav ? w.favo
 ASKS.favour = {
   id: 'favour', sev: 0.2, roles: ['owed', 'owes'], cool: 4, keepOnNo: true, fear0: 0.6,
   moves: ['take', 'ask', 'sweeten', 'persuade', 'pressure', 'senior', 'wait', 'drop'], // (not leverage: what he owes is the ask itself)
-  sweeten: (amt) => `Ask for ${money(amt)} instead`,
+  sweeten: (amt) => `“Make it ${money(amt)}.”`,
   title: (w, s) => { const a = asker(w, s), t = askee(w, s); return a && t ? (t.isPlayer ? `${first(a)} calls in a favour` : `Calling in what ${first(t)} owes`) : 'A favour'; },
   valid: (w, s) => { const f = favOf(w, s); return !!asker(w, s) && !!askee(w, s) && !(f && f.settled); },
   lean: (w, s, a, t) => {
@@ -1103,7 +1105,7 @@ export function amendsPrice(w: World, s: Situation, t: Character, a: Character):
 ASKS.amends = {
   id: 'amends', sev: 0.2, roles: ['makes amends', 'wronged'], cool: 4, low: true, fear0: 0.5,
   moves: ['take', 'ask', 'sweeten', 'persuade', 'wait', 'drop'],
-  sweeten: (amt) => `Offer ${money(amt)} with it`, take: (f) => `Pay him ${f}`,
+  sweeten: (amt) => `Offer him ${money(amt)} with it`, take: (f) => `Pay him ${f}`,
   askLabel: (w, s) => (s.terms?.amt ? `Offer him ${money(s.terms.amt)} and your word` : 'Own up to him, no excuses'),
   title: (w, s) => { const t = askee(w, s); return t ? `Making it right with ${first(t)}` : 'Making it right'; },
   valid: (w, s) => {
@@ -1160,7 +1162,7 @@ const curRate = (c: Character) => Math.round(c.kickRate * 100);
 ASKS.rate = {
   id: 'rate', sev: 0.1, roles: ['earner', 'boss'], cool: 8, low: true, fmt: pct, fear0: 0,
   moves: ['take', 'ask', 'sweeten', 'persuade', 'leverage', 'wait', 'drop'],
-  sweeten: (x) => `Ask for ${x}% instead`, take: (f) => `Settle at ${f}`,
+  sweeten: (x) => `“What about ${x}%?”`, take: (f) => `“${f}, then. Fine.”`,
   title: () => 'A smaller share',
   valid: (w, s) => { const a = asker(w, s), t = askee(w, s); return !!a && !!t && a.bossId === t.id && (s.terms?.amt ?? 0) < curRate(a) && a.kickRate > rateView(w, a, t).floor + 0.001; },
   lean: (w, s, a, t) => { const v = rateView(w, a, t), cut = curRate(a) - (s.terms?.amt ?? curRate(a)); return v.score - 0.3 - Math.max(0, cut - 2) * 0.06; },
@@ -1196,7 +1198,7 @@ const jobOf = (w: World, s: Situation) => w.jobs.find((x) => x.id === s.m?.job);
 ASKS.jobpay = {
   id: 'jobpay', sev: 0.1, roles: ['doer', 'giver'], cool: 4, fear0: 0.3,
   moves: ['take', 'ask', 'sweeten', 'persuade', 'leverage', 'wait', 'drop'],
-  sweeten: (amt) => `Settle for ${money(amt)}`,
+  sweeten: (amt) => `“Call it ${money(amt)}.”`,
   title: (w, s) => { const j = jobOf(w, s); return j ? `The money for “${j.title}”` : 'The money for a job'; },
   valid: (w, s) => { const j = jobOf(w, s); return !!j && (j.status === 'offered' || j.status === 'active') && !!askee(w, s) && (s.terms?.amt ?? 0) > j.pay; },
   lean: (w, s, a, t) => {
@@ -1267,7 +1269,7 @@ ASKS.buy = {
 const worthTo = (w: World, s: Situation, t: Character) => Math.round(fullOf(w, s) * (1.05 - t.traits.caution * 0.15 + t.traits.ambition * 0.05) / 50) * 50;
 ASKS.sell = {
   id: 'sell', sev: 0.12, roles: ['seller', 'buyer'], cool: 4, ttl: 21, fear0: 0.3,
-  moves: ['take', 'ask', 'sweeten', 'persuade', 'leverage', 'pressure', 'senior', 'wait', 'drop', 'name'], sweeten: (amt) => `Come down to ${money(amt)}`,
+  moves: ['take', 'ask', 'sweeten', 'persuade', 'leverage', 'pressure', 'senior', 'wait', 'drop', 'name'], sweeten: (amt) => `“I’ll come down to ${money(amt)}.”`,
   title: (w, s) => { const b = s.biz ? w.biz[s.biz] : undefined; return !b ? 'A sale' : pieceOf(s) ? `Selling a piece of ${b.name}` : `Selling ${b.name}`; },
   valid: (w, s) => { const b = s.biz ? w.biz[s.biz] : undefined; return !!b?.open && b.ownerId === s.terms?.by && !!askee(w, s) && (!pieceOf(s) || stakeRoom(b) >= pieceOf(s)! - 1e-9); },
   lean: (w, s, a, t) => {
@@ -1298,7 +1300,7 @@ ASKS.sell = {
 const opOf = (w: World, s: Situation) => w.ops.find((o) => o.id === s.terms?.what);
 ASKS.run = {
   id: 'run', sev: 0.1, roles: ['runner', 'owner'], cool: 4, ttl: 14, fear0: 0.3,
-  moves: ['take', 'ask', 'sweeten', 'persuade', 'senior', 'wait', 'drop', 'name'], fmt: (n) => `${n}%`, sweeten: (n) => `Settle for ${n}%`,
+  moves: ['take', 'ask', 'sweeten', 'persuade', 'senior', 'wait', 'drop', 'name'], fmt: (n) => `${n}%`, sweeten: (n) => `“Call it ${n}%.”`,
   title: (w, s) => { const o = opOf(w, s); return o ? `Running ${first(w.chars[o.owner])}’s ${OPS[o.kind as keyof typeof OPS]?.label.toLowerCase() ?? 'operation'}` : 'Running an operation'; },
   valid: (w, s) => { const o = opOf(w, s); return !!o && (o.state === 'running' || o.state === 'raided') && o.owner === s.terms?.of && o.runner !== s.terms?.by; },
   lean: (w, s, a, t) => {
@@ -1328,7 +1330,7 @@ ASKS.run = {
 const debtOf = (w: World, s: Situation) => w.debts.find((d) => d.id === s.terms?.what && d.status === 'active');
 ASKS.time = {
   id: 'time', sev: 0.1, roles: ['debtor', 'creditor'], cool: 3, ttl: 10, low: true, fear0: 0.3,
-  moves: ['take', 'ask', 'sweeten', 'persuade', 'wait', 'drop', 'name'], fmt: (n) => `${money(n)} a week`, sweeten: (n) => `Offer ${money(n)} a week`,
+  moves: ['take', 'ask', 'sweeten', 'persuade', 'wait', 'drop', 'name'], fmt: (n) => `${money(n)} a week`, sweeten: (n) => `“${money(n)} a week. That’s my offer.”`,
   title: (w, s) => { const t = askee(w, s); return t ? `More time from ${first(t)}` : 'More time'; },
   valid: (w, s) => { const d = debtOf(w, s); return !!d && d.debtor === s.terms?.by && d.creditor === s.terms?.of; },
   lean: (w, s, a, t) => {

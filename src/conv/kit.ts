@@ -124,7 +124,8 @@ export function him(c: Ctx, r: Reply, salt = '') {
   c.v.lines.push({ who: 'him', text, trace });
 }
 export const plain = (by: Id, key: string, slots: Record<string, string> = {}, stance: Reply['meaning']['stance'] = 'flat'): Reply => ({ decision: { by, constraints: [], candidates: [], chosen: key }, meaning: { key, stance, toward: 'speaker', slots }, intent: key, honest: true });
-export function you(c: Ctx, label: string) { c.v.lines.push({ who: 'you', text: label }); }
+// (what the player says ends as speech does: "Take more time. I’ll hold off.", never a button's bare imperative)
+export function you(c: Ctx, label: string) { c.v.lines.push({ who: 'you', text: /[\p{L}\d)]$/u.test(label) ? label + '.' : label }); }
 export function narr(c: Ctx, text: string) { c.v.lines.push({ who: 'narr', text }); }
 export function card(c: Ctx, key: string, slots: Record<string, string> = {}) { c.v.lines.push({ who: 'card', text: render({ key, stance: 'flat', toward: 'speaker', slots: { first: first(c.n.name), ...slots } }, 'card', 'earnest') }); }
 export const line = (c: Ctx, key: string, slots: Record<string, string> = {}) => render({ key, stance: 'flat', toward: 'speaker', slots: { selfName: c.h.name, selfFirst: first(c.h.name), selfFamily: c.h.familyId ? c.w.fam[c.h.familyId].name : '', ...slots } }, c.h.id, 'earnest');

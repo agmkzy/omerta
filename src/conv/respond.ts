@@ -301,7 +301,7 @@ export function onLoanRequest(p: Perception, asker: Character, amt: number, mem:
   } else {
     // (the reason he gives answers what was just said: a name, a better rate, a promise of when; the first refusal gives his own)
     const left = (['rep', 'rate', 'promise'] as const).filter((x) => !made.includes(x));
-    const g = repeated ? 'already' : spare < amt * 0.4 ? (arg ? 'cannotSpare.terms' : 'cannotSpare') : arg === 'rep' ? 'wordNotEnough' : arg === 'rate' ? 'rateNotEnough' : arg === 'promise' ? (broke ? 'promiseBroken' : 'promiseNotEnough') : f.known < 0.3 ? (f.known >= 0.15 ? 'notClose' : 'doesNotKnow') : 'risk';
+    const g = repeated ? 'already' : spare < amt * 0.4 ? (arg ? 'cannotSpare.terms' : 'cannotSpare') : arg === 'rep' ? (f.known >= 0.3 ? 'wordNotEnough.known' : 'wordNotEnough') : arg === 'rate' ? 'rateNotEnough' : arg === 'promise' ? (broke ? 'promiseBroken' : 'promiseNotEnough') : f.known < 0.3 ? (f.known >= 0.15 ? 'notClose' : 'doesNotKnow') : 'risk';
     meaning = { key: 'refuse.loan', stance: g === 'already' ? 'weary' : 'flat', toward: g === 'doesNotKnow' || g === 'notClose' ? 'speaker' : 'request', grounds: !left.length && arg && !repeated && !g.startsWith('cannotSpare') ? g + '.last' : g, slots };
   }
   mem.note('answered:loan');

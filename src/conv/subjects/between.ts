@@ -379,8 +379,10 @@ function hurting(x: X): Subject | undefined {
       const list = [...known].map((id) => w.biz[id]).filter((b) => b?.open).slice(0, 3);
       if (!list.length) return { lines: [q(t, 'Nobody’s crying that I know of.')], choices: [end(key, '“Good to know.”')] };
       for (const b of list) note(x.p, t, `He said ${b.name} is struggling.`);
-      const words = list.map((b) => `${b.name}${b.distress >= 3 ? ', in a bad way' : b.distress >= 2 ? ', behind on everything' : ', slow'}`);
-      return { lines: [q(t, words.length > 1 ? `${words.slice(0, -1).join('. ')}. And ${words.at(-1)}.` : `${words[0]}.`)], choices: [end(key, '“Good to know.”')] };
+      // (said as a man runs down a street of places, not a list: each how it is, and the same word not three times running)
+      const how = (b: (typeof list)[number], i: number) => b.distress >= 3 ? [`${b.name} is in a bad way`, `${b.name}, that one’s in trouble`, `${b.name} won’t last the year`][i % 3] : b.distress >= 2 ? [`${b.name} is behind on everything`, `${b.name} owes half the street`, `${b.name} can’t make its rent`][i % 3] : [`${b.name} is slow`, `${b.name} isn’t much better`, `${b.name}, quiet too`][i % 3];
+      const words = list.map(how);
+      return { lines: [q(t, words.length > 1 ? `${words.slice(0, -1).join('. ')}. And ${words.at(-1)!.charAt(0).toLowerCase() === words.at(-1)!.charAt(0) ? words.at(-1) : words.at(-1)}.` : `${words[0]}.`)], choices: [end(key, '“Good to know.”')] };
     },
     reply: () => ({ lines: [], choices: [] }),
   };

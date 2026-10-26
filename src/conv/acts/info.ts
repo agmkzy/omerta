@@ -31,6 +31,12 @@ function questions(c: Ctx): Offer[] {
   const q = (xs: Offer[], code: string, label: string, note?: string) => { if (!asked(c, code)) xs.push({ code, label: said(c, code, label), note }); };
   // (an arrangement is not a crime: nobody asks who did it, what it cost, or what is behind it; what there is to ask is how it came
   // about and whether anyone else has a claim on the place)
+  // (a business in trouble is not a crime either: nobody asks who did it; what there is to ask is how bad, and who might take advantage)
+  if (/^business_(struggling|failed|recovering)$/.test(f.kind)) {
+    const out0: Offer[] = [];
+    q(out0, 'view', 'How bad is it?'); if (!asked(c, 'p_claim')) q(out0, 'p_claim', 'Is anybody circling it?');
+    return [...out0, ...(incidentsOf(w, t).length > 1 ? [{ code: 'pick_incident', label: 'What else have you heard?' }] : [])];
+  }
   const deal = DEALS.has(f.kind);
   if (deal) {
     const b0 = f.business ? w.biz[f.business] : undefined;
@@ -340,11 +346,13 @@ function subjectQs(c: Ctx): Offer[] {
   if (!s) return [];
   const o: Offer[] = [];
   const theirs = Object.values(w.facts).find((f) => f.actor === s.id && p.known[f.id]?.knowsActor && !t.known[f.id]?.knowsActor && !BORING.has(f.kind));
-  if (theirs) o.push({ code: 'tell:' + theirs.id, label: said(c, 'tell', `Tell him what you know about ${s.name}`) });
+  // (a second thing told about the same man is "more", not the same words again)
+  const toldOne = (c.v.th.used ?? []).some((u) => /^tell(:|$)/.test(u));
+  if (theirs) o.push({ code: 'tell:' + theirs.id, label: said(c, 'tell', `Tell him what you know about ${s.name}`).replace(/^There’s something you should know/, toldOne ? 'There’s more you should know' : 'There’s something you should know') });
   const exon = Object.values(w.facts).find((f) => f.actor && f.actor !== s.id && p.known[f.id]?.knowsActor && f.victim === t.id && t.rels[s.id]?.grudge >= 0.3);
   // (only when you know of nothing he did to him: vouching for a man you know is guilty is not clearing him)
   const guilty = Object.values(w.facts).some((f) => f.actor === s.id && f.victim === t.id && p.known[f.id]?.knowsActor);
-  if (exon && !guilty) o.push({ code: 'exon:' + exon.id, label: said(c, 'exon', `Tell him it wasn’t ${s.name}`), note: `You know it was ${w.chars[exon.actor!]?.name ?? 'somebody else'}.` });
+  if (exon && !guilty) o.push({ code: 'exon:' + exon.id, label: said(c, 'exon', `Tell him it wasn’t ${s.name}`), note: exon.actor === p.id ? 'It was you. He doesn’t know that.' : `You know it was ${w.chars[exon.actor!]?.name ?? 'somebody else'}.` });
   if (!asked(c, 'handle') && s.rank !== 'boss' && s.rank !== 'underboss' && s.familyId !== p.familyId) o.push({ code: 'handle', label: said(c, 'handle', `Offer to deal with ${s.name}`) });
   if (!asked(c, 'mediate')) o.push({ code: 'mediate2', label: said(c, 'mediate2', 'Offer to mediate') });
   return o;

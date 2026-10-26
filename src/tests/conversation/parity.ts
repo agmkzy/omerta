@@ -19,7 +19,8 @@ export function state(w: World): Map<string, unknown> {
     for (const [f, kn] of Object.entries(c.known)) put(`${k}.known.${f}`, { a: kn.knowsActor, from: kn.from, blame: kn.blame });
     for (const mm of c.memos) put(`${k}.memo.${mm.id}`, { kind: mm.kind, other: mm.other, text: mm.text, due: mm.due, ref: mm.ref, done: mm.done });
     for (const [ck, v] of Object.entries(c.cooldown)) if (!/^say:/.test(ck)) put(`${k}.cool.${ck}`, v);
-    for (const [tk, v] of Object.entries(c.talk ?? {})) put(`${k}.talk.${tk}`, v);
+    // (named: the layer remembers the day a man last gave his opinion of another, so he doesn't say it twice word for word; the old engine kept no such note)
+    for (const [tk, v] of Object.entries(c.talk ?? {})) if (!/^opd:/.test(tk)) put(`${k}.talk.${tk}`, v);
   }
   for (const f of Object.values(w.facts)) put(`fact.${f.id}`, { kind: f.kind, actor: f.actor, victim: f.victim, story: f.story, minor: f.minor, amount: f.amount, business: f.business });
   for (const d of w.debts) put(`debt.${d.id}`, d);

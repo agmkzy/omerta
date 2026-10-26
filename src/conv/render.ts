@@ -271,6 +271,7 @@ const B: Record<string, Entry> = {
   'refuse.doesNotKnow': { _: ['“I don’t know you well enough for that.”'], cold: ['“I don’t know you.”'], jovial: ['“Ah, I don’t know you from Adam, friend. Ask me again in a month.”'] },
   'refuse.risk': { _: ['“I’d like to help. I’d also like to see my money again.”'], cold: ['“I don’t lend to people I’d have to chase.”'], bitter: ['“And when would I see it back? Never, that’s when.”'] },
   'refuse.cannotSpare': { _: ['“I haven’t got it to spare. Not this week.”'], proud: ['“It isn’t there to lend. Leave it.”'] },
+  'refuse.wordNotEnough.known': { _: ['“I know you. I also know what money does to men who know each other.”', '“It isn’t your word. It’s money. Money is different.”'], jovial: ['“I know you’re good for it. I knew my brother-in-law was good for it too.”'], cold: ['“Knowing you is why I’m careful.”'] },
   'refuse.wordNotEnough': { _: ['“Everybody’s good for it, until they’re not. I don’t know you.”'], jovial: ['“Sure you are. They all are. Ask me again when I know you.”'], cold: ['“Anyone can say that.”'] },
   // (a loan negotiation: each argument gets its own answer; the last, when nothing is left to argue, closes it)
   'refuse.loan.cannotSpare.terms': { _: ['“It isn’t the terms. I haven’t got it, that’s all.”', '“Whatever you offer, it isn’t there to lend.”'], proud: ['“Terms don’t come into it. It isn’t there.”'] },
@@ -278,6 +279,7 @@ const B: Record<string, Entry> = {
   'refuse.loan.rateNotEnough': { _: ['“It isn’t the vig. It’s whether I ever see the money again.”', '“A higher rate on money I never get back is nothing.”'], cold: ['“The rate isn’t the problem.”'], schemer: ['“Eight percent of nothing is nothing.”'] },
   'refuse.loan.promiseNotEnough': { _: ['“Your word. I don’t know yet what your word is worth.”', '“A promise is a promise. It isn’t collateral.”'], cold: ['“Everyone gives me their word.”'], jovial: ['“The end of the month, he says. I’ve heard that one before, friend.”'] },
   'refuse.loan.promiseBroken': { _: ['“Your word? I’ve heard what your word is worth.”', '“You gave a man your word not long ago. Ask him how that went.”'] },
+  'refuse.loan.wordNotEnough.known.last': { _: ['“You’ve made your case. I heard all of it. It’s still no.”'], cold: ['“No. That’s all of it.”'] },
   'refuse.loan.wordNotEnough.last': { _: ['“You’ve made your case. I heard all of it. It’s still no.”'], cold: ['“No. That’s all of it.”'] },
   'refuse.loan.rateNotEnough.last': { _: ['“You’ve put everything on the table. I still can’t.”', '“I’ve heard you out. The answer is no.”'], jovial: ['“You’ve tried everything but flowers, friend. Still no.”'] },
   'refuse.loan.promiseNotEnough.last': { _: ['“You’ve made your case. Come back when I know you better.”', '“I’ve heard all of it. Not this time.”'] },

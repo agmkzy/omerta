@@ -473,7 +473,7 @@ const interveneSig = (c: Ctx, ob: Obligation) => { const a = ob.matter?.against 
 
 // ---------------------------------------------------------------- choosing
 // a choice that is a thing done, not said: told as what he does
-const DEED = /^(Walk over|Ask around|Ask \w+ to |Ask to |Ask whether|Ask if|Offer to |Offer him |Offer a |Call in |Propose |Suggest |Remind him|Hand back|Hand him|Give him time|Halve |Forgive |Write off|Settle it|Put him |Make him |Say you’ll|Tell him (you|he|that|the|it)|Wreck |Send |Lean on|Bring in|Congratulate him|Welcome him|Find out|Check )/;
+const DEED = /^(Walk over|Ask around|Ask \w+ to |Ask to |Ask whether|Ask if|Offer to |Offer him |Offer a |Call in |Propose |Suggest |Remind him|Hand back|Hand him|Give him |Pay him |Halve |Forgive |Write off|Settle it|Put him |Make him |Say you’ll|Tell him (you|he|that|the|it)|Wreck |Send |Lean on|Bring in|Congratulate him|Welcome him|Find out|Check )/;
 export function choose(w: World, v: Visit, id: string): { v: Visit; minutes: number; meeting?: Meeting; settle?: Id } {
   // (what the player has chosen in this visit: only a choice made before is "again"; moving between the headings is not saying anything)
   const picked = (v.th.picked ??= []), again = picked.includes(id), said = !/^(u|all):|^(home|more|back|leave)$/.test(id);

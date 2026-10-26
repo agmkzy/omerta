@@ -406,6 +406,9 @@ function opinion(x: X): Subject | undefined {
       const cs: Choice[] = [ch(key, 'agree', `“I never liked ${first(o)} either.”`, `He will warm to you. ${first(o)} may hear of it.`), ch(key, 'defend', `“${first(o)}’s all right. Give him a chance.”`, 'He may respect it. He may not.')];
       if (wrong || pick.r.grudge > 0.45) cs.push(ch(key, 'more', '“What’s really between you two?”', 'There’s a story. You might do something about it.'));
       cs.push(done(key));
+      // (asked twice in a day, he doesn't say it again word for word: he said it, and he lets you know he did)
+      const again = mem(t, 'opd:' + o.id)?.sig === String(day(w)); remember(w, t, 'opd:' + o.id, String(day(w)));
+      if (again) return { lines: [q(t, by(t, { hothead: `I told you already. Don’t get me started on ${first(o)} again.`, cold: `You heard me the first time.`, frightened: `I said what I’m going to say about ${first(o)}.`, _: `I told you what I think of ${first(o)}. It hasn’t changed since.` }))], choices: cs };
       return { lines: [q(t, by(t, { hothead: `I’d like to break ${first(o)}’s face.${why}`, bitter: `${first(o)} smiles at you and counts your pockets.${why}`, cold: `I don’t think about ${first(o)}. When I do, it isn’t kindly.${why}`, frightened: `I keep away from ${first(o)}. That’s all I’ll say.`, _: `I’ve no use for ${first(o)}.${why}` }))], choices: cs };
     },
     reply: (x, code) => {
