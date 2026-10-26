@@ -1,0 +1,61 @@
+// Places and routines (the made man's life, Phase 1.6: locations, as a slice: one district done properly before seven). Little Italy
+// has its own places, each with its hours and its regulars, and every business in it can be walked into. Where a man who lives there
+// is, at any hour, follows his life: his shop or the street by day, his family's club in the evening if he is made, the bar if he
+// drinks, the track on a Saturday if he gambles, church on a Sunday morning if he is that kind of man, home late. It is a pure
+// function of the man and the clock, so it is stable between looks, needs nothing saved, and changes nothing in the simulation
+// (only the screens and the conversation's scene read where a man is). The other districts keep the old rooms until this plays well.
+import { isAwake, ownerBiz, travelTime } from './core';
+import { clubOf } from './clubdata';
+import { temper } from './temper';
+import { DAY, type Character, type World } from './types';
+
+export const SLICE = 'Little Italy';
+export type SpotKind = 'club' | 'cafe' | 'barber' | 'bar' | 'church' | 'track' | 'biz';
+export interface Spot { id: string; name: string; kind: SpotKind; blurb: string; open: [number, number]; district: string; biz?: string; famId?: string }
+
+const FIXED: Omit<Spot, 'district'>[] = [
+  { id: 'li:cafe', name: 'Ferrara’s pastry shop, on Grand', kind: 'cafe', blurb: 'Espresso, cannoli and a window onto the whole street. Men who want to be seen sit at the front.', open: [8, 23] },
+  { id: 'li:barber', name: 'Sal’s barber shop, on Mott', kind: 'barber', blurb: 'Three chairs, a radio, and more gossip per square foot than the courthouse.', open: [8, 19] },
+  { id: 'li:bar', name: 'The Grotto, on Grand', kind: 'bar', blurb: 'Dark at noon, darker at midnight. Where men stop pretending to be anything but what they are.', open: [16, 28] },
+  { id: 'li:church', name: 'Most Precious Blood, on Baxter', kind: 'church', blurb: 'The feast starts from its steps. On Sunday mornings the men who matter stand at the back.', open: [7, 13] },
+];
+export const TRACK: Spot = { id: 'track', name: 'Aqueduct racetrack', kind: 'track', blurb: 'Saturday afternoons, the horses, and every gambler in the city.', open: [12, 18], district: 'Queens' };
+
+/** Every place in the slice's district: the family club (its headquarters), the fixed places, and every business. */
+export function spots(w: World): Spot[] {
+  const out: Spot[] = [];
+  for (const cl of Object.values(w.clubs ?? {})) if (cl.district === SLICE) out.push({ id: 'li:club:' + cl.familyId, name: `${cl.name}, the ${w.fam[cl.familyId]?.name ?? ''} club`, kind: 'club', blurb: `The ${w.fam[cl.familyId]?.name ?? ''} family’s club. Espresso, a card table in the back, and the men who matter.`, open: [11, 26], district: SLICE, famId: cl.familyId });
+  for (const s of FIXED) out.push({ ...s, district: SLICE });
+  for (const b of Object.values(w.biz)) if (b.district === SLICE && b.open) out.push({ id: 'biz:' + b.id, name: b.name, kind: 'biz', blurb: '', open: [9, 19], district: SLICE, biz: b.id });
+  return out;
+}
+const hourOf = (t: number) => { const h = (t % DAY) / 60; return h < 4 ? h + 24 : h; };
+export const openAt = (s: Spot, t: number) => { const h = hourOf(t), dow = Math.floor(t / DAY) % 7; if (s.kind === 'track') return dow === 5 && h >= 12 && h < 18; if (s.kind === 'biz' && dow === 6) return false; return h >= s.open[0] && h < s.open[1]; };
+
+/** Where a man who lives in the slice's district is at time t: a place id, or 'home'. Undefined for anyone else. */
+export function routine(w: World, c: Character, t: number): string | undefined {
+  if (c.district !== SLICE || c.isPlayer) return undefined;
+  const b = ownerBiz(w, c.id);
+  if (c.rank === 'civilian' && !b) return undefined;
+  if (!isAwake(c, t)) return 'home';
+  const h = hourOf(t), dow = Math.floor(t / DAY) % 7, tp = temper(c), all = spots(w);
+  const club = all.find((s) => s.kind === 'club' && s.famId === c.familyId);
+  // Sunday morning: church, for the men who go (the gentler, the older, the ones whose mothers ask)
+  if (dow === 6 && h >= 9 && h < 12 && (1 - c.traits.violence + tp.empathy) / 2 > 0.5) return 'li:church';
+  // Saturday afternoon: the track, for a gambler
+  if (dow === 5 && h >= 12 && h < 18 && c.traits.vice >= 0.55) return 'track';
+  // working hours: his own shop, if he has one
+  if (b?.open && dow !== 6 && h >= 9 && h < 19) return 'biz:' + b.id;
+  if (c.rank === 'civilian') return h >= 19 && c.traits.vice >= 0.6 ? 'li:bar' : 'home';
+  // a man in the life by day: on the street (the café for a sociable man, the barber's for a talker, his club otherwise)
+  if (h >= 9 && h < 19) return c.traits.sociability > 0.6 ? 'li:cafe' : c.traits.sociability > 0.4 && h < 13 ? 'li:barber' : club ? club.id : 'li:cafe';
+  // evening: a drinker at the bar, a made man at his family's club, the rest wherever their friends are
+  if (h >= 19 && h < 26) return c.traits.vice >= 0.65 ? 'li:bar' : club && c.rank !== 'associate' ? club.id : h < 23 ? 'li:cafe' : club?.id ?? 'home';
+  return 'home';
+}
+export const spotById = (w: World, id: string) => (id === 'track' ? TRACK : spots(w).find((s) => s.id === id));
+/** Who is at a place now (men in the life and shop owners; the player sees everyone in a public place). */
+export function whoIsAt(w: World, id: string): Character[] {
+  return Object.values(w.chars).filter((c) => c.alive && !c.isPlayer && c.jailedUntil <= w.now && c.hurtUntil <= w.now && routine(w, c, w.now) === id);
+}
+export const travel = (from: string, s: Spot) => (s.kind === 'track' ? 50 : travelTime(from, s.district));

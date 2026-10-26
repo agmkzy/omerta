@@ -193,3 +193,22 @@ police after a road job. Played through in the browser; tested (money conserved;
 - **A man's remarks about the shared past** (memory.recall) come only in the first exchange of a visit. In play, a gesture about
   rank had appeared in front of his answer to "Something's wrong. What is it?".
 - **Standing up for a man to the captain, and backing him in a quarrel,** are favours he owes, which he remembers and says so.
+
+## Phase 1.6: places and routines, the Little Italy slice (city.ts)
+- **Little Italy, built properly:**
+  - the family's club (its headquarters);
+  - Ferrara's pastry shop on Grand;
+  - Sal's barber on Mott;
+  - The Grotto, a bar on Grand;
+  - Most Precious Blood on Baxter;
+  - every open business on the street, which can be walked into (owner behind the counter, who it pays as far as the player knows);
+  - Aqueduct on Saturday afternoons.
+  Around town lists them with open or shut and how many men he knows are in. The old rooms stand for everywhere else.
+- **Routines with reasons,** for every man in the life and every shop owner who lives in Little Italy: his shop by day (not
+  Sundays); the café, the barber's or his club by day for a man in the life, by temperament; the bar of an evening for a drinker; his
+  family's club of an evening if he is made; Aqueduct on a Saturday afternoon for a gambler; Most Precious Blood on a Sunday morning
+  for the gentler men; home late or asleep.
+- **What it changes:** a pure function of the man and the clock, so nothing is saved and nothing in the simulation changes (only
+  "where is he", the conversation's scene and Around town read it). Played: on Sunday morning the shopkeepers were at mass; in the
+  evening the bar had men in it.
+- **Next,** before the other six districts: approaches that happen at a place, and waiting at a place for a man.

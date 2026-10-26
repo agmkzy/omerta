@@ -14,6 +14,7 @@ import { GIG_HELP, GIG_LABEL } from '../gigs';
 import { KIND_HELP, activityOf, KIND_LABEL, approaches, canQuestion, crewMoves, jobChecks, schemes, summonsAt, traitWords, ventureOf } from '../jobs';
 import { available, current as meetCurrent } from '../meetings';
 import { PLACES, isOpen, present } from '../places';
+import { SLICE, TRACK, openAt, spotById, spots, whoIsAt, type Spot } from '../city';
 import { RECRUIT_COST, dayJobOptions, orderMenu, prospects, reliability } from '../orders';
 import { PROBLEM_LABEL, aptitude, lateOf } from '../people';
 import { DAY, Id, Job, Kind } from '../types';
@@ -341,13 +342,27 @@ const chipText = (id: Id) => {
 
 // ------------------------------------------------------------- club etc.
 
+// Around town. In Little Italy (the district built properly, city.ts) the street's own places, open or shut, with how many men you
+// know are in, and every shop on the street; Saturday afternoons, the track. The old rooms stand for everywhere else.
 export function placesView(): string {
-  const w = W();
-  return back() + title('Around town') + choices(PLACES.map((pl_) => ({ a: `place:${pl_.id}`, label: pl_.name, hint: `${pl_.blurb} ${isOpen(w, pl_.id) ? 'Open.' : 'Shut right now.'}` })), 'Where you go');
+  const w = W(), p = P();
+  const known = (id: string) => whoIsAt(w, id).filter((c) => (c.rels[p.id]?.known ?? 0) > 0 || c.familyId === p.familyId).length;
+  const all = spots(w), shut = (x: Spot) => (openAt(x, w.now) ? '' : ' · shut right now');
+  let out = back() + title('Around town', esc(SLICE));
+  const pub = all.filter((x) => x.kind !== 'biz');
+  if (openAt(TRACK, w.now)) pub.push(TRACK);
+  out += choices(pub.map((x) => ({ a: `place:${x.id}`, label: x.name, hint: `${x.kind === 'club' && x.famId !== p.familyId ? 'Another family’s club. ' : ''}${openAt(x, w.now) ? (known(x.id) ? `${known(x.id)} you know in.` : 'Open.') : 'Shut right now.'}${x.kind === 'track' ? ' Fifty minutes out to Queens.' : ''}` })), 'Where you go');
+  const shops = all.filter((x) => x.kind === 'biz');
+  if (shops.length) out += h('The shops on the street', String(shops.length)) + rows(shops.map((x): Row => { const b = w.biz[x.biz!], o = w.chars[b.ownerId]; return { title: esc(x.name), sub: `${o ? esc(o.name) : ''}${knowsProtection(w, p, b) && b.protection && b.protection.collectorId !== b.ownerId ? ` · pays ${b.protection.collectorId === p.id ? 'you' : esc(w.chars[b.protection.collectorId]?.name ?? 'somebody')}` : ''}${shut(x)}`, a: `place:${x.id}` }; }));
+  // (the old rooms, for everywhere else; the family's own club is on the street above when it stands in this district)
+  out += h('Elsewhere') + choices(PLACES.filter((pl_) => !(pl_.id === 'club' && all.some((x) => x.kind === 'club' && x.famId === p.familyId))).map((pl_) => ({ a: `place:${pl_.id}`, label: pl_.name, hint: `${pl_.blurb} ${isOpen(w, pl_.id) ? 'Open.' : 'Shut right now.'}` })), 'Elsewhere');
+  return out;
 }
 export function placeView(id: string): string {
   const w = W();
   const p = P();
+  const sp = spotById(w, id);
+  if (sp) return spotView(sp);
   if (id === 'club') return clubView();
   const pl_ = PLACES.find((x) => x.id === id)!;
   let out = back() + title(pl_.name, esc(pl_.blurb));
@@ -358,6 +373,24 @@ export function placeView(id: string): string {
   out += choices([{ a: 'club:sit', label: 'Sit and listen', hint: 'An hour or two. Things find you here.' }], 'What you do');
   if (!here.length) return out + quiet('Nobody you know is in right now.');
   return out + h('Who’s in', String(here.length)) + rows(here.map((c): Row => ({ face: avatar(c), title: esc(c.name), sub: `${esc(c.rank)} · ${esc(ARCH_WORD[arch(c)])}`, a: `talk:${c.id}` })));
+}
+// A place on the street: who is in now, and what you can do there.
+function spotView(sp: Spot): string {
+  const w = W(), p = P();
+  if (sp.kind === 'club' && sp.famId === p.familyId) return clubView();
+  const b = sp.biz ? w.biz[sp.biz] : undefined, owner = b ? w.chars[b.ownerId] : undefined;
+  let out = back() + title(sp.name, esc(b ? `${owner ? `${owner.name}’s place` : 'A shop'}${knowsProtection(w, p, b!) && b!.protection && b!.protection.collectorId !== b!.ownerId ? `. It pays ${b!.protection.collectorId === p.id ? 'you' : w.chars[b!.protection.collectorId]?.name ?? 'somebody'}` : ''}.` : sp.blurb));
+  if (!openAt(sp, w.now)) return out + quiet(sp.kind === 'track' ? 'The track runs on Saturday afternoons.' : sp.kind === 'biz' ? 'It’s shut. Open nine to seven, not Sundays.' : `It’s shut. It opens at ${sp.open[0]}:00.`);
+  const here = whoIsAt(w, sp.id);
+  const doing: Pick[] = [];
+  if (sp.kind === 'cafe' || sp.kind === 'bar') doing.push({ a: 'club:drink', label: sp.kind === 'cafe' ? 'Sit at the window with a coffee' : 'Have a few drinks', hint: sp.kind === 'cafe' ? '$30 with the pastries. The street goes past; so does what it’s saying.' : '$30. Strangers talk. So do you.' });
+  if (sp.kind === 'barber') doing.push({ a: 'club:shave', label: 'Get a shave', hint: '$20. You’ll hear things.' });
+  if (sp.kind === 'biz' && owner?.alive && here.some((c) => c.id === owner.id)) doing.push({ a: `talk:${owner.id}`, label: `Talk to ${owner.name.split(' ')[0]}`, hint: 'He’s behind the counter.' });
+  if (sp.kind === 'club') out += note(`The ${w.fam[sp.famId!]?.name ?? ''} family’s club. You’d be noticed walking in. Men here talk to you if they choose to.`);
+  if (doing.length) out += choices(doing, 'What you do');
+  const people = here.filter((c) => !(b && c.id === b.ownerId) || !doing.length);
+  if (!people.length) return out + quiet(sp.kind === 'church' ? 'Mass is over, or hasn’t started. An old woman lights a candle.' : 'Nobody you’d know is in right now.');
+  return out + h('Who’s in', String(people.length)) + rows(people.map((c): Row => ({ face: avatar(c), title: esc(c.name), sub: `${c.rank === 'civilian' ? 'civilian' : `${esc(c.rank)}${c.familyId && c.familyId !== p.familyId ? `, ${esc(famName(w, c))}` : ''}`} · ${esc(ARCH_WORD[arch(c)])}`, a: `talk:${c.id}` })));
 }
 export function grudgesView(): string {
   const w = W();
