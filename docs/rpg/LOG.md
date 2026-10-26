@@ -52,3 +52,13 @@ before, it stayed an associate.
 ## Stage B2: the world notices the player
 - A man of his own family who has heard what just happened to him (made, out from inside, beaten, disciplined, a shop on his book
   hit) says so the next time they talk, in his own voice, once. A man who hasn't heard says nothing (memory.ts recall, step 0).
+
+## Stage B3: a man inside is not blamed for what he could not do
+**Found** (climber, now answering summons and logging what moved standing and when he was put inside): work and summons his captain
+sent while he was inside lapsed as "ignored": standing −3, trust −0.05 each, and two in a month brought a beating or a bigger share.
+His captain also sent for him for coffee while he was inside.
+**Changed:** an offer that lapses while he was inside lapses with no word against him (and does not count towards "twice in a
+month"); nobody sends for a man who is inside (jobs.daily, meetings.summonsTick). Tested in experience/consequences.
+**Measured:** a careful player (who answers summons and lies low when the heat bar shows) is made on day 72, 86 and 94 (seeds 7, 3,
+11) and his standing climbs after (53–75 by week 19–21). A reckless one, who takes every job, spends 48–76 of 150 days inside.
+Arrests from heat are still the largest drag on a careful player too (1–3 spells of 5–33 days in 150 days); left as balance, reported.

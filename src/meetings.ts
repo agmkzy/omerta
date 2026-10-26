@@ -834,7 +834,8 @@ export function closeMeeting(w: World, p: Character, m: Meeting): { minutes: num
 
 export function summonsTick(w: World) {
   const p = PL(w);
-  if (!p || !p.alive || !p.familyId) return;
+  // (nobody sends for a man who is inside)
+  if (!p || !p.alive || !p.familyId || p.jailedUntil > w.now) return;
   const boss = p.bossId ? w.chars[p.bossId] : undefined;
   const fam = w.fam[p.familyId];
   const open = w.jobs.some((j) => j.kind === 'summons' && j.status === 'offered');

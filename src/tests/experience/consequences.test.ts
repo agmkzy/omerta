@@ -7,6 +7,7 @@ import { advance } from '../../engine';
 import { addFact } from '../../core';
 import { daily, mkJob } from '../../jobs';
 import { recall } from '../../memory';
+import { summonsTick } from '../../meetings';
 import { DAY, type World } from '../../types';
 import { P } from '../helpers';
 import { captain, days, familyMen, worldFor } from './play';
@@ -71,5 +72,22 @@ describe('the world notices what happens to the player', { tags: ['scenario'] },
     w.now += DAY;
     assert.notEqual(recall(w, p, a)?.kind, 'news', 'it is said once');
     assert.notEqual(recall(w, p, b)?.kind, 'news', 'he never heard it');
+  });
+});
+
+describe('a man inside is not blamed for what he could not do', { tags: ['scenario'] }, () => {
+  ok('work his captain sent while he was inside lapses without a word against him, and nobody sends for him there', () => {
+    const w = worldFor(3), p = P(w), cap = captain(w);
+    p.jailedUntil = w.now + 10 * DAY;
+    const j = mkJob(w, { kind: 'summons', meeting: 'accounts', giver: cap.id, via: 'boss', assignee: p.id, pay: 0, days: 3, title: 'Your recent earnings', brief: '' });
+    const s0 = p.standing, t0 = cap.rels[p.id]?.trust ?? 0;
+    w.now = j.expires; daily(w);
+    assert.equal(j.status, 'expired');
+    assert.equal(p.standing, s0, 'no standing lost');
+    assert.equal(cap.rels[p.id]?.trust ?? 0, t0, 'no trust lost');
+    assert.ok(!(p.standingWhy ?? []).some((x) => x.kind === 'ignored summons'));
+    const before = w.jobs.filter((q) => q.kind === 'summons').length;
+    for (let i = 0; i < 40; i++) summonsTick(w);
+    assert.equal(w.jobs.filter((q) => q.kind === 'summons').length, before, 'nobody sends for a man who is inside');
   });
 });

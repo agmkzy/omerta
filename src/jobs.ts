@@ -875,6 +875,8 @@ export function pruneJobs(w: World) {
   }
 }
 
+const INSIDE = 'You were inside while it waited. Nobody holds it against you.';
+
 export function daily(w: World) {
   const p = PL(w);
   if (!p) return;
@@ -883,13 +885,15 @@ export function daily(w: World) {
     if (j.status === 'offered' && w.now >= j.expires) {
       j.status = 'expired';
       const g = j.giver ? w.chars[j.giver] : undefined;
+      // (a man who was inside while it waited for him could not come, and everybody knows it: it lapses, and nobody holds it against him)
+      if (p.jailedUntil > j.created) { j.notes = [...(j.notes ?? []), INSIDE]; continue; }
       if (j.via === 'boss' && g) {
         repute(w, p, -3, 'ignored summons');
         feel(w, g, p.id, 'trust', -0.05);
         // Ignoring the man who runs your end twice in a month is asking for it.
-        if (j.kind === 'summons' && w.jobs.filter((q) => q.kind === 'summons' && q.status === 'expired' && w.now - q.expires < 30 * DAY).length >= 2 && p.hurtUntil <= w.now) {
+        if (j.kind === 'summons' && w.jobs.filter((q) => q.kind === 'summons' && q.status === 'expired' && !q.notes?.includes(INSIDE) && w.now - q.expires < 30 * DAY).length >= 2 && p.hurtUntil <= w.now) {
           // (it is done to him, so he knows it, and why: from the man who did it)
-          const missed = w.jobs.filter((q) => q.kind === 'summons' && q.status === 'expired' && q.giver === g.id && w.now - q.expires < 30 * DAY).length;
+          const missed = w.jobs.filter((q) => q.kind === 'summons' && q.status === 'expired' && !q.notes?.includes(INSIDE) && q.giver === g.id && w.now - q.expires < 30 * DAY).length;
           if (temper(g).volatility > 0.5) {
             p.hurtUntil = w.now + 3 * DAY;
             bear(w, p, g.id, 0.3, `${g.name} had him roughed up for not coming when called`);

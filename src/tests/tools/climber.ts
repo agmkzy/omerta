@@ -11,12 +11,14 @@ import { pathInfo } from '../../path';
 import { leanable } from '../../conv/authority';
 import { DAY, type Character } from '../../types';
 import { choose as encChoose } from '../../encounters';
-import { openInduction, current, choose as mChoose, closeMeeting } from '../../meetings';
+import { openInduction, current, choose as mChoose, closeMeeting, openAccountsMeeting, openCrewMeeting, openFamilyMeeting, openSitdown, available, notNowWhy } from '../../meetings';
 
 const seed = Number(process.argv[2] ?? 3), days = Number(process.argv[3] ?? 120);
 const w = createWorld(seed, 'Tony Marino'), p = w.chars[w.playerId!];
 const say = (id: string, re: RegExp) => { const v = begin(w, id); (p.intro ??= {})[id] ??= w.now; for (let i = 0; i < 4 && !v.ended; i++) { const c = [...v.choices, ...everything(w, v)].find((x) => re.test(x.id) || re.test(x.label)); if (!c) break; choose(w, v, c.amount ? `${c.id}:${c.amount.value}` : c.id); } return v; };
 const log: string[] = [];
+// (DBG6: each time he is put inside, for how long, and by what)
+if (process.env.DBG6) { let ju = p.jailedUntil; Object.defineProperty(p, 'jailedUntil', { enumerable: true, get: () => ju, set: (v: number) => { if (v > ju && v > w.now) log.push(`  jailed day ${Math.floor(w.now / DAY)} for ${Math.round((v - w.now) / DAY)}d: ${new Error().stack!.split('\n').slice(2, 5).map((x) => x.trim().replace(/^at /, '').replace(/\(.*src\//, '(')).join(' < ')}`); ju = v; } }); }
 // (DBG3: everything that reached the player each week, as he would see it: approaches, offers, and what he came to know)
 const seenE = new Set<string>(), seenJ = new Set<string>(), seenF = new Set<string>();
 const reached = () => { const out: string[] = [];
@@ -24,23 +26,40 @@ const reached = () => { const out: string[] = [];
   for (const j of w.jobs) if (j.assignee === p.id && !seenJ.has(j.id)) { seenJ.add(j.id); out.push(`  offer: ${j.title} (${w.chars[j.giver ?? '']?.name ?? 'tip'})`); }
   for (const [id, k] of Object.entries(p.known)) if (!seenF.has(id)) { seenF.add(id); const f = w.facts[id]; if (f && !f.minor && k.from !== 'self') out.push('  heard: ' + f.text.slice(0, 110)); }
   return out; };
-let lastWeek = -1, made = -1;
+let lastWeek = -1, made = -1, lastT = -1;
+// (DBG4: what the player's standing turned on each week, by kind)
+const why = new Map<string, number>();
+const noteWhy = () => { for (const x of p.standingWhy ?? []) if (x.t > lastT) { why.set(x.kind, (why.get(x.kind) ?? 0) + x.d); } lastT = Math.max(lastT, ...(p.standingWhy ?? []).map((x) => x.t)); };
 for (let d = 0; d < days && p.alive; d++) {
   const day0 = d * DAY;
   if (w.now < day0 + 9 * 60) advance(w, day0 + 9 * 60);
-  if (p.jailedUntil > w.now) continue;
+  if (p.jailedUntil > w.now) { if (process.env.DBG5) log.push(`  inside on day ${d}`); continue; }
   const cap = p.bossId ? w.chars[p.bossId] : undefined;
   if (cap?.alive) {
     say(cap.id, /b_envelope|a:report|b_need/);
     for (const j of w.jobs.filter((q) => q.status === 'offered' && q.giver === cap.id && q.assignee === p.id && q.kind !== 'summons')) takeJob(w, j);
   }
-  // his own work, done his own way: the first approach on each job in hand
-  for (const j of w.jobs.filter((q) => q.status === 'active' && q.assignee === p.id && q.kind !== 'summons')) { const a = approaches(w, j)[1] ?? approaches(w, j)[0]; if (a) resolve(w, j, a.code); }
+  // his own work, done his own way; but when the heat on him shows (the bar at the top of the screen), the quietest way there is, and
+  // no work but his captain's until it cools (unless RECKLESS is set: the old bot, which did everything)
+  const hot = !process.env.RECKLESS && p.heat > 0.35;
+  const quiet = (as: { code: string; hint: string }[]) => as.find((a) => !/heat|risk|loud|smash|police/i.test(a.hint)) ?? as[0];
+  for (const j of w.jobs.filter((q) => q.status === 'active' && q.assignee === p.id && q.kind !== 'summons')) { const as = approaches(w, j), a = hot ? quiet(as) : as[1] ?? as[0]; if (a) resolve(w, j, a.code); }
   // take up a tip or an opportunity on offer, now and then
-  for (const j of w.jobs.filter((q) => q.status === 'offered' && q.assignee === p.id && q.kind !== 'summons' && q.giver !== cap?.id).slice(0, 2)) { takeJob(w, j); const a = approaches(w, j)[0]; if (a) resolve(w, j, a.code); }
+  for (const j of w.jobs.filter((q) => !hot && q.status === 'offered' && q.assignee === p.id && q.kind !== 'summons' && q.giver !== cap?.id).slice(0, 2)) { takeJob(w, j); const a = approaches(w, j)[0]; if (a) resolve(w, j, a.code); }
   // what is put to him: the trial, an invitation, the family's requests (the first answer that isn't refusing); the induction, attended
   for (const e of w.enc.filter((x) => x.status === 'open' && x.opts.length)) { const o = e.opts.find((x) => !/no|regrets|not/i.test(x.code + x.label)) ?? e.opts[0]; encChoose(w, p, e, o.code); }
   for (const j of w.jobs.filter((q) => q.kind === 'summons' && q.meeting === 'induction' && q.status === 'offered')) { const at = Number(j.extra?.at ?? 0); if (at > w.now) advance(w, at); const m = openInduction(w, p, j); if (typeof m !== 'string') { for (let i = 0; i < 20 && current(m); i++) mChoose(w, p, m, current(m)!.opts[0].code); closeMeeting(w, p, m); } }
+  // when he is sent for, he goes (as the screen's 'attend' does: at the hour set, to the meeting it is), unless NOATTEND is set
+  if (!process.env.NOATTEND) for (const j of w.jobs.filter((q) => q.kind === 'summons' && q.meeting !== 'induction' && q.status === 'offered' && q.assignee === p.id)) {
+    const at = Math.max(Number(j.extra?.at ?? 0), day0 + 10 * 60 + 5); if (at > w.now) advance(w, at);
+    if (j.meeting === 'social') { const g = j.giver ? w.chars[j.giver] : undefined; if (process.env.DBG5) log.push(`  coffee day ${d} at ${at ? new Date(at * 60000).toISOString().slice(11, 16) : '-'}: ${g && available(w, g) ? 'went' : 'not there: ' + (g ? notNowWhy(w, g) : '')} status ${j.status}`); if (g?.alive && available(w, g)) say(g.id, /^a:work$|b_need/); continue; }
+    const gv = w.grievances.find((g) => g.id === j.extra?.g);
+    const m = j.meeting === 'accounts' ? openAccountsMeeting(w, p, j) : j.meeting === 'family' ? openFamilyMeeting(w, p, j) : j.meeting === 'sitdown' ? (gv ? openSitdown(w, p, gv) : 'gone') : openCrewMeeting(w, p);
+    if (typeof m === 'string') { if (process.env.DBG5) log.push(`  ${j.meeting} day ${d}: ${m}`); continue; }
+    if (j.meeting === 'sitdown') j.status = 'done';
+    for (let i = 0; i < 20 && current(m); i++) mChoose(w, p, m, current(m)!.opts[0].code);
+    closeMeeting(w, p, m);
+  }
   // protection
   for (const b of leanable(w, p).slice(0, 1)) say(b.ownerId, /^protect$|protect:take/);
   // an evening with a made man of his family
@@ -55,10 +74,13 @@ for (let d = 0; d < days && p.alive; d++) {
     if (process.env.DBG2) log.push('   made men trust: ' + Object.values(w.chars).filter((c) => c.alive && !c.isPlayer && c.familyId === p.familyId && ['soldier','capo','underboss'].includes(c.rank)).map((c) => `${c.name.split(' ')[1]} ${(c.rels[p.id]?.trust ?? 0).toFixed(2)}`).join(', ') + ' | peer jobs ' + w.jobs.filter((j) => j.assignee === p.id && j.via === 'tip' && w.chars[j.giver ?? '']?.familyId === p.familyId).map((j) => j.status).join(','));
     if (process.env.DBG) log.push(`   hold=${w.path?.hold} wait=${w.path?.seatWait} promo=${JSON.stringify(w.promo ?? null)?.slice(0,160)} induct=${p.cooldown.induct} summons=${w.jobs.filter((j) => j.kind === 'summons').map((j) => j.meeting + ':' + j.status).join(',')} encs=${w.enc.filter((e) => e.status === 'open').map((e) => e.kind + ':' + (e.data?.stage ?? '')).join(',')}`);
     if (process.env.DBG3) log.push(...reached());
+    if (process.env.DBG4) { log.push('  standing: ' + [...why].sort((a, b) => a[1] - b[1]).map(([k, v]) => `${k} ${v.toFixed(1)}`).join(', ')); why.clear(); }
     log.push(`week ${wk}: ${p.rank} $${Math.round(p.cash)} standing ${Math.round(p.standing)} | ${pi ? pi.goals.map((g) => `${g.key} ${Math.round(g.frac * 100)}%`).join(', ') : 'top'} | shops ${Object.values(w.biz).filter((b) => b.protection?.collectorId === p.id).length} | done ${p.career?.done ?? 0}`);
   }
   if (p.rank !== 'associate' && made < 0) { made = d; log.push(`MADE on day ${d}`); }
   advance(w, day0 + DAY);
+  noteWhy();
+  if (process.env.DBG5) for (const j of w.jobs) if (j.status === 'expired' && j.assignee === p.id && j.via === 'boss' && !seenJ.has('x' + j.id)) { seenJ.add('x' + j.id); log.push(`  expired (day ${d}): ${j.kind} ${j.title} from ${w.chars[j.giver ?? '']?.name} (${w.chars[j.giver ?? '']?.rank})`); }
 }
 console.log(log.join('\n'));
 void ({} as Character);
