@@ -111,7 +111,9 @@ export function needs(): Need[] {
   // the boss. While the Sunday screen is still to be done it is one row covering both; after it, or for a man with no crew, his own
   // envelope is its own row until he hands it over in person or the window closes.
   { const boss = p.bossId ? w.chars[p.bossId] : undefined;
-    const owes = !!boss?.alive && !!w.sunday && kickWindow(w, p) && envelopeDue(w, p) > 0;
+    // (one card per matter: when he has sent for the player about the money, that summons is the card, and says what is owed)
+    const sentFor = !!boss && w.jobs.some((j) => j.kind === 'summons' && j.status === 'offered' && j.giver === boss.id && j.meeting === 'accounts');
+    const owes = !!boss?.alive && !!w.sunday && kickWindow(w, p) && envelopeDue(w, p) > 0 && !sentFor;
     const by = w.sunday ? byWhen(w.now, w.sunday.t + 2 * DAY) : '';
     if (sundayDue()) {
       out.push(owes && boss
@@ -129,6 +131,7 @@ export function needs(): Need[] {
   for (const s of live) {
     const missed = s.kind === 'debt' && s.tone !== 'green';
     if (s.group !== 'now' && !missed) continue;
+    if (s.kind === 'envelope') continue; // (the envelope, or the summons about it, is already its card)
     if (s.pending && out.some((n) => n.a === `story:${s.key}`)) continue;
     if (out.some((n) => n.a === `dispute:${s.key}` || n.a === `story:${s.key}`)) continue;
     // (a request of the player's that was turned down is not something wanting him: it is there if he wants to try again)
@@ -143,7 +146,7 @@ export function needs(): Need[] {
     out.push({ dot: r.late ? 'red' : 'amber', k: 'Your word', title: `What you told ${c.name}`, sub: `${r.text} ${isFemale(c) ? 'She' : 'He'} ${r.late ? 'expected it done by now.' : `expects it done ${byWhen(w.now, r.due!)}.`}`, a: `talk:${c.id}`, who: c.id });
   }
   for (const j of w.jobs.filter((x) => x.status === 'offered' && playerSide(w, x) && !staleReason(w, x)).sort((a, b) => Number(b.kind === 'summons') - Number(a.kind === 'summons') || Number(b.via === 'boss') - Number(a.via === 'boss'))) {
-    out.push({ dot: j.kind === 'summons' || j.via === 'boss' ? 'amber' : j.via === 'tip' || j.kind === 'gig' ? 'green' : 'green', k: j.kind === 'gig' ? GIG_LABEL[String(j.extra?.gig) as keyof typeof GIG_LABEL] ?? 'Opportunity' : KIND_LABEL[j.kind], title: j.title, sub: `${j.giver ? 'From ' + w.chars[j.giver]?.name : 'A tip'}${j.pay > 0 ? ', about ' + money(j.pay) : ''}. It won’t wait past ${byWhen(w.now, j.expires).replace(/^by /, '')}.`, when: byWhen(w.now, j.expires).replace(/^by /, ''), a: `job:${j.id}` });
+    out.push({ dot: j.kind === 'summons' || j.via === 'boss' ? 'amber' : j.via === 'tip' || j.kind === 'gig' ? 'green' : 'green', k: j.kind === 'gig' ? GIG_LABEL[String(j.extra?.gig) as keyof typeof GIG_LABEL] ?? 'Opportunity' : KIND_LABEL[j.kind], title: j.title, sub: `${j.meeting === 'accounts' && p.books.arrears >= 20 ? `You owe him ${money(Math.round(p.books.arrears))}. ` : ''}${j.giver ? 'From ' + w.chars[j.giver]?.name : 'A tip'}${j.pay > 0 ? ', about ' + money(j.pay) : ''}. It won’t wait past ${byWhen(w.now, j.expires).replace(/^by /, '')}.`, when: byWhen(w.now, j.expires).replace(/^by /, ''), a: `job:${j.id}` });
   }
   // work he has taken on and not finished: his, wherever he said yes to it, until it is done (doing what it asks, his own way, does it)
   for (const j of w.jobs.filter((x) => x.status === 'active' && x.assignee === p.id && x.kind !== 'summons' && x.giver !== p.id)) {
