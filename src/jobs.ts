@@ -749,6 +749,7 @@ export function resolve(w: World, j: Job, code: string): Result {
       if (rng.chance(risk)) {
         bump(doer, quiet ? 0.15 : 0.3);
         lines.push(quiet ? 'A dog starts barking. You walk away.' : 'The alarm and a neighbour at the same time. You leave empty-handed.');
+        { const mate = w.chars[String(j.extra?.with ?? '')]; if (mate?.alive) lines.push(`${mate.name.split(' ')[0]} is already gone when you get back to the car. So much for a second man.`); }
         if (!quiet && rng.chance(0.35)) {
           jail(w, doer, rng.int(5, 20), 'The alarm went, a neighbour saw you, and the police were there before you were round the corner.');
           lines.push('The police are quicker than you hoped. You’re arrested.');
@@ -763,6 +764,7 @@ export function resolve(w: World, j: Job, code: string): Result {
       ok = true;
       const f = addFact(w, { kind: 'burglary', actor: doer.id, victim: o.id, business: b.id, amount: value, hiddenActor: true, text: `${doer.name} burgled ${b.name}.`, textHidden: `${b.name} was burgled.`, district: b.district }, { witnesses: witnessesAt(w, b.district, [doer.id, o.id], 2).filter(() => rng.chance(0.3)) });
       notifyProtector(w, b, f);
+      { const mate = w.chars[String(j.extra?.with ?? '')]; if (mate?.alive) lines.push(`${mate.name.split(' ')[0]} keeps watch at the corner and has the van at the back door before you’re out.`); }
       lines.push(`You carry out about ${money(value)} in goods. Heavy, hot and not yours.`);
       if (b.protection && b.protection.familyId !== doer.familyId) lines.push(`${b.name} pays ${w.fam[b.protection.familyId].name} protection. They’ll take this personally if they learn who did it.`);
       if (giver && j.via === 'opportunity') {

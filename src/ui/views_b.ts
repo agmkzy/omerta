@@ -380,7 +380,7 @@ function spotView(sp: Spot): string {
   if (sp.kind === 'club' && sp.famId === p.familyId) return clubView();
   const b = sp.biz ? w.biz[sp.biz] : undefined, owner = b ? w.chars[b.ownerId] : undefined;
   let out = back() + title(sp.name, esc(b ? `${owner ? `${owner.name}’s place` : 'A shop'}${knowsProtection(w, p, b!) && b!.protection && b!.protection.collectorId !== b!.ownerId ? `. It pays ${b!.protection.collectorId === p.id ? 'you' : w.chars[b!.protection.collectorId]?.name ?? 'somebody'}` : ''}.` : sp.blurb));
-  if (!openAt(sp, w.now)) return out + quiet(sp.kind === 'track' ? 'The track runs on Saturday afternoons.' : sp.kind === 'biz' ? 'It’s shut. Open nine to seven, not Sundays.' : `It’s shut. It opens at ${sp.open[0]}:00.`);
+  if (!openAt(sp, w.now)) return out + quiet(sp.kind === 'track' ? 'The track runs on Saturday afternoons.' : sp.kind === 'biz' ? `It’s shut. It keeps ${sp.open[0]}:00 to ${sp.open[1] % 24}:00.` : `It’s shut. It opens at ${sp.open[0]}:00.`);
   const here = whoIsAt(w, sp.id);
   const doing: Pick[] = [];
   if (sp.kind === 'cafe' || sp.kind === 'bar') doing.push({ a: 'club:drink', label: sp.kind === 'cafe' ? 'Sit at the window with a coffee' : 'Have a few drinks', hint: sp.kind === 'cafe' ? '$30 with the pastries. The street goes past; so does what it’s saying.' : '$30. Strangers talk. So do you.' });

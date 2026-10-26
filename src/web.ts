@@ -854,7 +854,8 @@ function handle(a: string, v: string) {
       // conversation opens on it, with what he said, rather than his answer turning up on another screen
       const t = j.target ? w.chars[j.target] : undefined;
       const m = t?.alive ? openAsks(w).find((x) => x.terms?.by === P().id && x.terms?.of === t.id && Number(x.m?.at ?? -1) >= w.now - r.minutes - 1) : undefined;
-      if (t && m) { const v0 = beginVisit(w, t.id), pick = [...v0.choices, ...everythingVisit(w, v0)].find((c) => c.id === 'a:m:' + m.id), r2 = pick ? chooseVisit(w, v0, pick.id) : undefined; return pass(r.minutes + (r2?.minutes ?? 0), r.lines, { t: 'talk2', v: r2?.v ?? v0 }); }
+      // (the matter is new: what follows is the first exchange, said as one, not a return to it: business.ts matterA reads m.fresh)
+      if (t && m) { m.m = { ...(m.m ?? {}), fresh: w.now }; const v0 = beginVisit(w, t.id), pick = [...v0.choices, ...everythingVisit(w, v0)].find((c) => c.id === 'a:m:' + m.id), r2 = pick ? chooseVisit(w, v0, pick.id) : undefined; return pass(r.minutes + (r2?.minutes ?? 0), r.lines, { t: 'talk2', v: r2?.v ?? v0 }); }
       return pass(r.minutes, r.lines);
     }
     case 'talkm': { // go and see him about a particular matter (from its page): the conversation opens on it

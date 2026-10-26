@@ -7,9 +7,9 @@
 // a promise of yours he is waiting on, something he believes you did, news of something he did for you), or a greeting that fits what
 // you are to each other. Then two to four things worth saying now, "Something else…" for anything else plausible, and leaving. What he
 // says next answers what you said; follow-ups answer his reply, not a menu. Nothing technical is shown: commitments are in the words.
-import { ownerBiz, peek } from '../core';
+import { money, ownerBiz, peek } from '../core';
 import { crewGround } from '../econ';
-import { askBetween, openAsk } from '../asks';
+import { askBetween, openAsk, openAsks } from '../asks';
 import { whereIs } from '../where';
 import { DAY, type Character, type Fact, type Id, type World } from '../types';
 import { newSession, perceive, type Perception, type Session } from './perception';
@@ -443,14 +443,15 @@ function jobNews(c: Ctx) {
   for (const j of xs.slice(-2)) {
     // (work the player took on and that stopped being needed is not work he turned his nose up at: he knows it was taken)
     const key = j.status === 'done' ? (j.reported ? 'job.ack.thanks' : 'job.ack.done') : j.status === 'failed' ? 'job.ack.failed' : j.accepted ? 'job.ack.moot' : j.status === 'declined' ? 'job.ack.declined' : 'job.ack.ignored';
-    him(c, plain(n.id, key, { job: jobPhrase(j.title) }, j.status === 'done' ? 'warm' : 'cold'));
+    him(c, plain(n.id, key, { job: jobPhrase(w, j) }, j.status === 'done' ? 'warm' : 'cold'));
     remember(w, n.id, 'job:' + j.id, j.status);
     // (he has asked how it went: the answer is what the player can say first)
     if (key === 'job.ack.done') c.v.waiting = { q: 'how the job went', choices: [{ id: 'a:report', label: line(c, 'report.job'), group: 'reply' }] };
   }
 }
 // a job's title, as a man would refer to it ("the Costa's Deli delivery"), when it reads as a name; otherwise "that job"
-const jobPhrase = (t: string) => (t.length <= 48 ? `‘${t}’` : 'that job');
+// (by its place or its man, as men say it: "Palumbo's Tavern", "the business with Eddie"; never the record's own title)
+const jobPhrase = (w: World, j: { title: string; biz?: Id; target?: Id }) => j.biz && w.biz[j.biz] ? w.biz[j.biz].name : j.target && w.chars[j.target] ? `the business with ${w.chars[j.target].name.split(' ')[0]}` : 'that job';
 // Finished work of his not yet reported to him: the conversation's first business (the old engine's report, which he rewards)
 const unreported = (c: Ctx) => c.w.jobs.some((j) => j.giver === c.n.id && j.assignee === c.h.id && j.status === 'done' && !j.reported);
 
@@ -510,7 +511,11 @@ function chooseIn(w: World, v: Visit, id: string): { v: Visit; minutes: number; 
   const base = [...v.choices, ...everything(w, v)].find((x) => x.id === id || (!!x.amount && id.startsWith(x.id + ':') && /^:\d+(:[\d.]+)?$/.test(id.slice(x.id.length))));
   const label = base?.label;
   // (where he stands: answered from the family's actual conditions, and against what he was told last time: see doAdvance)
-  if (label && kind === 'a') { you(c, base?.says ?? label); return { v, ...doAct(c, id.slice(2), label) }; }
+  // (a figure is said as the figure: "$70 a week.", not the name of the button)
+  const fig = base?.amount && id !== base.id ? id.slice(base.id.length + 1).split(':').map(Number) : undefined;
+  const ak = fig ? openAsks(w).find((q) => q.id === base!.id.split(':')[2])?.ak : undefined;
+  const figSaid = fig ? `“${money(fig[0])}${fig[1] !== undefined ? `, at ${Math.round(fig[1] * 100)} percent a week` : ak === 'protect' || ak === 'rate' ? ' a week' : ''}.”` : undefined;
+  if (label && kind === 'a') { you(c, figSaid ?? base?.says ?? label); return { v, ...doAct(c, id.slice(2), label) }; }
   // (an approach is chosen by name and said in words: what the player says is the line it stands for)
   const spoken = base?.says ?? label;
   if (id === 'leave') {

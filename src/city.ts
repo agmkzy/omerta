@@ -10,6 +10,7 @@ import { temper } from './temper';
 import { DAY, type Character, type World } from './types';
 
 export const SLICE = 'Little Italy';
+const bizKind = new Map<string, string>(); // (filled as places are listed: what trade a business is, for its hours)
 export type SpotKind = 'club' | 'cafe' | 'barber' | 'bar' | 'church' | 'track' | 'biz';
 export interface Spot { id: string; name: string; kind: SpotKind; blurb: string; open: [number, number]; district: string; biz?: string; famId?: string }
 
@@ -26,11 +27,16 @@ export function spots(w: World): Spot[] {
   const out: Spot[] = [];
   for (const cl of Object.values(w.clubs ?? {})) if (cl.district === SLICE) out.push({ id: 'li:club:' + cl.familyId, name: `${cl.name}, the ${w.fam[cl.familyId]?.name ?? ''} club`, kind: 'club', blurb: `The ${w.fam[cl.familyId]?.name ?? ''} family’s club. Espresso, a card table in the back, and the men who matter.`, open: [11, 26], district: SLICE, famId: cl.familyId });
   for (const s of FIXED) out.push({ ...s, district: SLICE });
-  for (const b of Object.values(w.biz)) if (b.district === SLICE && b.open) out.push({ id: 'biz:' + b.id, name: b.name, kind: 'biz', blurb: '', open: [9, 19], district: SLICE, biz: b.id });
+  for (const b of Object.values(w.biz)) if (b.district === SLICE && b.open) bizKind.set(b.id, b.kind);
+  for (const b of Object.values(w.biz)) if (b.district === SLICE && b.open) out.push({ id: 'biz:' + b.id, name: b.name, kind: 'biz', blurb: '', open: HOURS[b.kind] ?? [9, 19], district: SLICE, biz: b.id });
   return out;
 }
+// (a place keeps the hours of its trade: a tavern opens in the afternoon and shuts late; a bakery is up before dawn; the casino is a
+// night's business; ordinary shops keep nine to seven and shut on Sundays)
+const HOURS: Record<string, [number, number]> = { bar: [15, 27], restaurant: [11, 24], cafe: [7, 23], bakery: [6, 17], casino: [19, 28], funeral: [9, 20] };
+const SUNDAY_OPEN = new Set(['bar', 'restaurant', 'cafe', 'bakery', 'casino', 'funeral']);
 const hourOf = (t: number) => { const h = (t % DAY) / 60; return h < 4 ? h + 24 : h; };
-export const openAt = (s: Spot, t: number) => { const h = hourOf(t), dow = Math.floor(t / DAY) % 7; if (s.kind === 'track') return dow === 5 && h >= 12 && h < 18; if (s.kind === 'biz' && dow === 6) return false; return h >= s.open[0] && h < s.open[1]; };
+export const openAt = (s: Spot, t: number) => { const h = hourOf(t), dow = Math.floor(t / DAY) % 7; if (s.kind === 'track') return dow === 5 && h >= 12 && h < 18; if (s.kind === 'biz' && dow === 6 && !SUNDAY_OPEN.has(bizKind.get(s.biz ?? '') ?? '')) return false; return h >= s.open[0] && h < s.open[1]; };
 
 /** Where a man who lives in the slice's district is at time t: a place id, or 'home'. Undefined for anyone else. */
 export function routine(w: World, c: Character, t: number): string | undefined {
@@ -40,18 +46,18 @@ export function routine(w: World, c: Character, t: number): string | undefined {
   // man's day. A man with a shop on the street is in it by day wherever he lives; a man who lives here keeps his whole day here.)
   if (c.district !== SLICE) {
     if (!isAwake(c, t)) return undefined;
-    const h = hourOf(t), dow = Math.floor(t / DAY) % 7;
-    return b?.district === SLICE && b.open && dow !== 6 && h >= 9 && h < 19 ? 'biz:' + b.id : undefined;
+    if (b?.district === SLICE && b.open) { const sp = spots(w).find((x) => x.biz === b.id); if (sp && openAt(sp, t)) return sp.id; }
+    return undefined;
   }
   if (c.rank === 'civilian' && !b) return undefined;
   if (!isAwake(c, t)) return 'home';
-  const h = hourOf(t), dow = Math.floor(t / DAY) % 7, tp = temper(c);
+  const h = hourOf(t), dow = Math.floor(t / DAY) % 7, tp = temper(c), all = spots(w);
   // Sunday morning: church, for the men who go (the gentler, the older, the ones whose mothers ask)
   if (dow === 6 && h >= 9 && h < 12 && (1 - c.traits.violence + tp.empathy) / 2 > 0.5) return 'li:church';
   // Saturday afternoon: the track, for a gambler
   if (dow === 5 && h >= 12 && h < 18 && c.traits.vice >= 0.55) return 'track';
   // working hours: his own shop, if he has one
-  if (b?.open && dow !== 6 && h >= 9 && h < 19) return 'biz:' + b.id;
+  if (b?.open && b.district === SLICE) { const sp = all.find((x) => x.biz === b.id); if (sp && openAt(sp, t)) return sp.id; }
   if (c.rank === 'civilian') return h >= 19 && c.traits.vice >= 0.6 ? 'li:bar' : 'home';
   // a man in the life by day: on the street (the café for a sociable man, the barber's for a talker, his club otherwise)
   if (h >= 9 && h < 19) return c.traits.sociability > 0.6 ? 'li:cafe' : c.traits.sociability > 0.4 && h < 13 ? 'li:barber' : 'li:cafe';

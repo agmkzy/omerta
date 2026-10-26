@@ -272,7 +272,7 @@ export function todayView(): string {
   }
   // Where to go. Crew and Rackets are their own sections, so they are not repeated here.
   out += h('Go and do something') + `<div class="grid g-places">`;
-  out += `<button class="tile" data-a="place:club"><span class="t">Social Club</span><span class="s">${esc(clubHint())}</span></button><button class="tile" data-a="places:"><span class="t">Around town</span><span class="s">Barber shop, corner bar</span></button><button class="tile" data-a="people:"><span class="t">Find someone</span><span class="s">Who’s where, right now</span></button>`;
+  out += `<button class="tile" data-a="place:club"><span class="t">Social Club</span><span class="s">${esc(clubHint())}</span></button><button class="tile" data-a="places:"><span class="t">Around town</span><span class="s">Little Italy: the café, the barber, the bar, the shops</span></button><button class="tile" data-a="people:"><span class="t">Find someone</span><span class="s">Who’s where, right now</span></button>`;
   out += `<button class="tile" data-a="orders:"><span class="t">Give orders</span><span class="s">Put a man to work</span></button>`;
   const shiftDone = !!p.job && p.job.last === Math.floor(w.now / DAY);
   out += p.job

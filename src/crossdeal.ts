@@ -17,7 +17,8 @@ const tension = (w: World, a?: string | null, b?: string | null) => (a && b ? (w
  *  once the player has a name, and a place neither family looks after. */
 export function dealer(w: World, p: Character): { x: Character; cap: Character; b: Business } | undefined {
   const cap = p.bossId ? w.chars[p.bossId] : undefined;
-  if (!cap?.alive || !p.familyId || !['associate', 'soldier'].includes(p.rank) || p.jailedUntil > w.now || p.standing < 30) return undefined;
+  // (a man of another family comes to somebody who has been around a while and shown he can do things: three weeks, three jobs)
+  if (!cap?.alive || !p.familyId || !['associate', 'soldier'].includes(p.rank) || p.jailedUntil > w.now || p.standing < 30 || w.now < 21 * DAY || (p.career?.done ?? 0) < 3) return undefined;
   if ((p.cooldown['crossdeal'] ?? 0) > w.now || w.enc.some((e) => e.kind === 'crossdeal' && e.status === 'open')) return undefined;
   const x = Object.values(w.chars).filter((c) => c.alive && !c.isPlayer && c.familyId && c.familyId !== p.familyId && ['soldier', 'capo'].includes(c.rank) && c.jailedUntil <= w.now
     && c.traits.greed > 0.5 && tension(w, p.familyId, c.familyId) < 3 && (c.rels[p.id]?.grudge ?? 0) < 0.2)
@@ -47,7 +48,7 @@ export function makeDeal(w: World, p: Character, x: Character, cap: Character, b
 
 function theJob(w: World, p: Character, x: Character, b: Business, allowed: boolean) {
   return mkJob(w, {
-    kind: 'burgle', via: 'opportunity', giver: x.id, assignee: p.id, biz: b.id, target: b.ownerId, pay: 0, days: 4, status: 'active',
+    kind: 'burgle', via: 'opportunity', giver: x.id, assignee: p.id, biz: b.id, target: b.ownerId, pay: 0, days: 4, status: 'active', extra: { with: x.id },
     title: `${first(x)}’s job at ${b.name}`, brief: `The stock in the back of ${b.name}, with ${x.name}. He moves the goods and pays you your half.${allowed ? '' : ' Your captain doesn’t know.'}`,
   });
 }

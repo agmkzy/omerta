@@ -35,7 +35,8 @@ describe('a rival captain courts the player', { tags: ['scenario'] }, () => {
   });
   ok('selling the captain pays, and can come out weeks later, told to the player by the captain himself', () => {
     let caught = false;
-    for (const seed of [3, 7, 11, 13]) {
+    // (each world has about a two-in-five chance of it coming out; eight worlds make missing it everywhere a one-in-sixty chance)
+    for (const seed of [3, 7, 11, 13, 17, 19, 23, 29]) {
       const { w, p, cap, x } = setUp(seed);
       makeCourting(w, p, x, cap);
       const cash0 = p.cash;
@@ -44,13 +45,13 @@ describe('a rival captain courts the player', { tags: ['scenario'] }, () => {
       advance(w, w.now + 43 * DAY);
       if (w.enc.some((e) => e.kind === 'imposed' && e.from === cap.id && /knows/.test(e.title))) { caught = true; assert.ok(rel(cap, p.id).trust < 0.2); break; }
     }
-    assert.ok(caught, 'it never came out in four worlds');
+    assert.ok(caught, 'it never came out in eight worlds');
   });
 });
 
 describe('a man of another family puts a job to the player', { tags: ['scenario'] }, () => {
   const deal = (seed: number) => {
-    const w = worldFor(seed), p = P(w); p.standing = 40;
+    const w = worldFor(seed), p = P(w); p.standing = 40; p.career = { done: 3, failed: 0, log: [] }; w.now = Math.max(w.now, 21 * DAY); // (three weeks in, three jobs done)
     const d = dealer(w, p);
     if (!d) return undefined;
     makeDeal(w, p, d.x, d.cap, d.b);

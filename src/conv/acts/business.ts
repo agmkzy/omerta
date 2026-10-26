@@ -565,6 +565,8 @@ function matterOpen(w: World, s: Situation, last?: string): string {
 }
 const matterWhere = (s: Situation, t: Character) => { const S0 = s.st?.[t.id]; return S0?.last === 'counter' ? 'He named his own terms.' : S0?.last === 'stall' ? 'He asked for time.' : S0?.last === 'no' ? 'He said no, for now.' : s.m?.help ? 'He went to someone about it.' : 'Waiting on his answer.'; };
 const mine = (c: Ctx) => openAsks(c.w).filter((x) => x.terms?.by === c.h.id && x.terms?.of === c.n.id);
+// (opened a moment ago by an approach the player chose: the conversation is its first exchange)
+const fresh = (w: World, s: Situation) => Number(s.m?.fresh ?? -1e9) >= w.now - 120;
 // what can be said to a matter in hand: answers to the point he has just made, then the plain moves that still make sense, the figure
 export function matterRows(c: Ctx, sid: Id): Offer[] {
   const { w, h: p } = c, s = openAsks(w).find((x) => x.id === sid && x.terms?.by === p.id);
@@ -581,7 +583,7 @@ export function matterRows(c: Ctx, sid: Id): Offer[] {
 const matterA: Act = {
   base: 'm', pane: 'business', opens: true,
   offersFor: matterRows,
-  offers: (c) => mine(c).slice(0, 3).map((s) => ({ code: 'm:' + s.id, label: aboutLabel(mTitle(c.w, s)), says: matterOpen(c.w, s, s.st?.[c.n.id]?.last).replace(/^“|”$/g, ''), note: matterWhere(s, c.n), kind: 'between' as const, pane: (s.ak === 'amends' ? 'confront' : 'business') as never })),
+  offers: (c) => mine(c).slice(0, 3).map((s) => ({ code: 'm:' + s.id, label: aboutLabel(mTitle(c.w, s)), says: matterOpen(c.w, s, fresh(c.w, s) ? undefined : s.st?.[c.n.id]?.last).replace(/^“|”$/g, ''), note: matterWhere(s, c.n), kind: 'between' as const, pane: (s.ak === 'amends' ? 'confront' : 'business') as never })),
   run: (c, code) => {
     const x = T(c), { w, t } = x, sid = code.split(':')[1], s = openAsks(w).find((q) => q.id === sid);
     if (!s) return out(2);
@@ -594,6 +596,8 @@ const matterA: Act = {
     if (!him && s.m?.caught && s.m?.claim === 'money') him = last === 'counter' ? '“You’ve seen enough. You know what I can do.”' : '“All right. You know I can pay something.”';
     if (!him && s.m?.beat === 'claim' && RESTATE[String(s.m.claim)]) him = RESTATE[String(s.m.claim)];
     him ??= last === 'no' ? (hot ? '“I gave you my answer.”' : soft ? '“I know. I’m sorry, it’s still the same.”' : '“Nothing’s changed.”') : last === 'stall' ? (hot ? '“I said I’d think about it.”' : '“I’ve been thinking about it. I have.”') : last === 'counter' ? '“You heard what I can do.”' : s.m?.help ? (hot ? '“I’ve got people now. Talk to them.”' : '“It’s not just me you’re dealing with any more.”') : pickL(['“Go on.”', '“I’m listening.”', '“Say what you came to say.”']);
+    // (a matter just opened by the approach: his answer is said for the first time, not "like I said")
+    if (fresh(w, s)) him = him.replace(/^“(?:Like I (?:said|told you)[.,]? |I told you\. )(.)/, (_m, ch: string) => '“' + ch.toUpperCase());
     line(x, him);
     return { minutes: 2, next: matterRows(c, sid) };
   },

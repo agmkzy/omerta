@@ -268,10 +268,16 @@ function answer(w: World, s: Situation, a: Character, t: Character, K: AskKind, 
   const say = (decision: 'yes' | 'counter' | 'stall' | 'no' | 'help', o: { again?: number; reason?: string; terms?: string; coerced?: boolean } = {}) => { if (toP && how) lines.push(...speak(w, a, t, { ...how, decision, again: o.again ?? 0, cls: classOf(s), kind: s.ak, above: rk(t) > rk(a), claim: s.m?.claim ? String(s.m.claim) : undefined, ...o })); };
   // (Gate 2b: in a world running the conversation layer, the answer is that layer's decision, from the man's own perception; the
   // kind's weighing below is used only where no such decision exists)
+  // (his own word holds: what is put to him that meets the terms he offered himself, he takes; found in play, where a man who said
+  // "$55, not a cent more" was offered $55 and came back with $40)
+  const prev = s.m?.offer !== undefined ? Number(s.m.offer) : undefined;
+  if (prev !== undefined && s.terms?.amt !== undefined && (K.low ? s.terms.amt >= prev : s.terms.amt <= prev)) { say('yes'); return finish(w, s, a, t, K, S, lines, false); }
   const D = w.social ? (DECIDERS.answer[s.ak ?? ''] ?? DECIDERS.answer['*'])?.(w, s, a, t) : undefined;
   const score = D ? 0 : v + S.fear * 0.7 * (1 - tp.courage * 0.6) + S.good * 0.45 - S.anger * 0.55 - S.resolve * 0.55 + jitter(w, s, 'ans' + tried(stance(w, s, a.id), 'ask'));
   if (D ? D.move === 'yes' : score > 0.12) { const coerced = S.fear > S.good + 0.1; say('yes', { coerced }); return finish(w, s, a, t, K, S, lines, coerced); }
-  const kc = K.counter?.(w, s, a, t), c = D?.move === 'counter' && D.amt !== undefined ? { amt: D.amt, why: D.why ?? kc?.why ?? 'that is what I can do' } : kc;
+  const kc = K.counter?.(w, s, a, t), c0 = D?.move === 'counter' && D.amt !== undefined ? { amt: D.amt, why: D.why ?? kc?.why ?? 'that is what I can do' } : kc;
+  // (and a new counter never takes back what he offered before)
+  const c = c0 && prev !== undefined ? { ...c0, amt: K.low ? Math.min(c0.amt, prev) : Math.max(c0.amt, prev) } : c0;
   // an agreeable man looks for terms he could live with sooner than a proud one does
   if (c && S.last !== 'counter' && (D ? D.move === 'counter' : score > -0.12 - tp.agreeable * 0.14)) {
     S.last = 'counter'; s.m = { ...(s.m ?? {}), offer: c.amt };
@@ -676,7 +682,10 @@ ASKS.protect = {
   // no's in one negotiation made him beat the shopkeeper; repeats are now told as the same story going on.)
   onNo: (w, s, a, t) => {
     const b = w.biz[s.biz!];
-    const f = tell(w, s, `${t.name} told ${a.name} to get out of ${b.name}.`, { kind: s.m?.refusal ? 'rumour' : 'protection_refused', actor: t.id, victim: a.id, witnesses: witnessesAt(w, b.district, [a.id, t.id], 2), minor: !!s.m?.refusal });
+    // (what he said, as it was: a man who said he didn't know him, or couldn't pay, or already pays someone, said that; only a flat no is
+    // being shown the door)
+    const why = String(s.m?.claim ?? ''), said = why === 'doubt' ? `${t.name} told ${a.name} he didn’t know him, and wasn’t paying a man he didn’t know for ${b.name}.` : why === 'money' ? `${t.name} told ${a.name} that ${b.name} couldn’t afford to pay him.` : why === 'taken' ? `${t.name} told ${a.name} that ${b.name} already pays somebody.` : `${t.name} told ${a.name} to get out of ${b.name}.`;
+    const f = tell(w, s, said, { kind: s.m?.refusal ? 'rumour' : 'protection_refused', actor: t.id, victim: a.id, witnesses: witnessesAt(w, b.district, [a.id, t.id], 2), minor: !!s.m?.refusal });
     if (!s.m?.refusal) noteRefusal(w, b, a); // the shop remembers whom it turned away
     s.m = { ...(s.m ?? {}), refusal: s.m?.refusal ?? f.id };
     return undefined;

@@ -228,3 +228,26 @@ When the player dies, the screen tells:
 - the funeral: the men who trusted or liked him came, and the men who held something against him were not sorry;
 - the Herald's notice.
 It replaces "You're dead. The world goes on without you." Read only from the world's records; tested; seen in the browser.
+
+## A new game, played in the browser (enjoyment pass 1)
+Played a fresh associate (Union Man background) through his first week: the captain's first job (a tavern brought under the
+family), the negotiation with its owner, a rival family's job, the club on Sunday. Fixed what read wrong or contradicted itself:
+- **The first exchange is a first exchange.** A protection approach chosen from a job opened the conversation as a return visit:
+  "About Palumbo's Tavern. Think it over again." / "Like I said, I don't know you". The matter opened by the approach is now said
+  as new.
+- **The record says what he said.** A refusal was always recorded as "told him to get out of the place" and "ran you out of the
+  place", even when he had only said he didn't know the player. Now: he didn't know him, couldn't afford it, already pays somebody,
+  or (only for a flat no) showed him the door. Parity tests name the change.
+- **A named figure is said as the figure** ("$70 a week."), not as the button's name ("Name your own figure").
+- **His own word holds.** He said "$55 a week. Not a cent more", was offered $55, and came back with $40. A man now takes what
+  meets his own last terms, and never counters below his own last offer (regression test in experience/exploits; this is the V85
+  "haggling" item, closed).
+- **Places keep their trade's hours:** a tavern from the afternoon till late, a restaurant lunch to midnight, a café early to late,
+  a bakery dawn to afternoon, the casino at night, ordinary shops nine to seven and not Sundays. Owners keep them.
+- **A captain refers to a job by its place or its man** ("I hear you took care of Palumbo's Tavern. Good."), not by the record's
+  title in quotes, and doesn't ask a question another matter then buries.
+- **The wedding invitation lasts the day,** since the reception is tonight. The card had said "answer by Saturday".
+- **A rival family's man comes to somebody worth having:** three weeks in the life and three jobs done (it had come on day 3).
+- **The rival family's man is in the scene:** he keeps watch and has the van at the back door, or is gone when it goes wrong.
+- The Around town tile names Little Italy's places.
+- Tests: the courting sample widened to eight worlds (each about 40% to come out; four could all miss when the draw shifts).
