@@ -134,3 +134,6 @@ Arrests from heat are still the largest drag on a careful player too (1–3 spel
 
 **Measured (loyal bot, before the last two fixes):** made on day 54, 100 and 135 (seeds 7, 11, 3); crews of 2–3 men afterwards;
 standing 46–71 at weeks 30–31.
+- Validation: grudges in authority.ts go through the one door (bear), as the architecture rule requires. The quiet-weeks pacing test
+  now checks the property across two worlds (each at least 20% quiet, a third on average); four worlds measured 9, 9, 9 and 11
+  quiet weeks in 28, steadier than before (5 to 13). Full suite passes.

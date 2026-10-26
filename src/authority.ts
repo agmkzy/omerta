@@ -198,14 +198,14 @@ function quarrelChoose(w: World, p: Character, e: Enc, code: string) {
   if (code === 'pay') {
     if (p.cash < amt) { e.status = 'open'; return { lines: ['You haven’t got it on you.'], minutes: 0 }; }
     transfer(w, p, a, amt, 'gift', 'to end a quarrel');
-    for (const [x, y] of [[a, b], [b, a]] as const) { const r = rel(x, y.id); r.grudge = Math.max(0, r.grudge - 0.2); }
+    for (const [x, y] of [[a, b], [b, a]] as const) bear(w, x, y.id, -0.2, 'settled');
     feelOn(w, ra, 'trust', 0.05); feelOn(w, rb, 'trust', 0.05);
     return { lines: [settled(`You count ${money(amt)} onto the bar in front of ${first(a)}. “That’s the end of it.” It is. They both know what it cost you, and that you paid it.`, 'he paid it out of his own pocket')], minutes: 30 };
   }
   if (code === 'shake') {
     const weight = (peek(a, p.id).respect + peek(b, p.id).respect) / 2 + (p.standing - 40) / 200 - (temper(a).volatility + temper(b).volatility) / 4;
     if (w.rng.chance(clamp(weight + 0.25, 0.15, 0.9))) {
-      for (const [x, y] of [[a, b], [b, a]] as const) { const r = rel(x, y.id); r.grudge = Math.max(0, r.grudge - 0.3); feelOn(w, r, 'trust', 0.05); }
+      for (const [x, y] of [[a, b], [b, a]] as const) { bear(w, x, y.id, -0.3, 'settled'); feelOn(w, rel(x, y.id), 'trust', 0.05); }
       feelOn(w, ra, 'respect', 0.05); feelOn(w, rb, 'respect', 0.05);
       return { lines: [settled(`You sit them down at the same table and don’t let either of them leave until they’ve shaken on it. They do. It takes a while.`, 'he made them shake hands')], minutes: 50 };
     }
