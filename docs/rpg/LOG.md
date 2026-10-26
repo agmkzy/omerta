@@ -87,3 +87,13 @@ Arrests from heat are still the largest drag on a careful player too (1–3 spel
   being handed over with a second piece of praise; it is now his speech, and handing over the envelope is left to itself.
 - Pressing a man on his trouble after he named it ("Cards. Horses.") offered "Something's wrong. I can see it."; the follow-up now
   answers what he said ("It's more than a few bad nights, isn't it?").
+
+## Phase 0 and 1.1 (owner's scope, 26 October)
+- Save size measured: 265 KB on day 0, 1.9 MB by day 30, 4.9 MB by day 180 (relationships 2.8 MB, mostly real: about 72 per
+  person). Saves live in IndexedDB (no 5 MB cap) and take about 30 ms to write at day 180, so the old day-60 failure is gone. The
+  page-close emergency copy goes to localStorage and cannot hold more than 5 MB (about day 150+); left as a known limit (a gzip copy
+  would be 1.2 MB) rather than change save-critical code now.
+- Time controls: Morning, Evening, Sunday, Next week. Morning and Evening say when ("19:00 · today"); Next week stops early when
+  something comes for the player and says how long it ran ("Four days, and then something wants you"). A summons card says when he
+  can go ("Go at 10:00"), and going waits until the man who sent for him is up. Played: the week stopped on a family meeting; "Go at
+  10:00" opened it at ten.
