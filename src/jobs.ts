@@ -893,11 +893,11 @@ export function daily(w: World) {
           if (temper(g).volatility > 0.5) {
             p.hurtUntil = w.now + 3 * DAY;
             bear(w, p, g.id, 0.3, `${g.name} had him roughed up for not coming when called`);
-            addFact(w, { kind: 'discipline', actor: g.id, victim: p.id, text: `${g.name} had ${p.name} beaten for ignoring him.`, district: p.district }, { witnesses: [p.id] });
+            addFact(w, { kind: 'discipline', actor: g.id, victim: p.id, text: `${g.name} had ${p.name} beaten for ignoring him.`, district: p.district }, { witnesses: [] }); // (he hears it from the man himself: imposed)
             imposed(w, p, g, { title: `${g.name.split(' ')[0]} had you roughed up`, said: `Two of ${g.name.split(' ')[0]}’s men catch you outside. When they’re done, one of them says: “He sent for you ${missed > 2 ? `${missed} times` : 'twice'}. You didn’t come.”`, why: 'When I send for a man, he comes. You didn’t, more than once. Now you know what it costs.', record: `${g.name} had you beaten for not coming when he sent for you.` });
           } else {
             p.kickRate = Math.min(0.35, p.kickRate + 0.05);
-            addFact(w, { kind: 'discipline', actor: g.id, victim: p.id, text: `${g.name} raised ${p.name}'s share for ignoring him.`, district: p.district }, { witnesses: [p.id] });
+            addFact(w, { kind: 'discipline', actor: g.id, victim: p.id, text: `${g.name} raised ${p.name}'s share for ignoring him.`, district: p.district }, { witnesses: [] }); // (he hears it from the man himself: imposed)
             imposed(w, p, g, { title: `${g.name.split(' ')[0]} raised your share`, said: `Word comes from ${g.name.split(' ')[0]}: from this Sunday you pass up ${Math.round(p.kickRate * 100)} percent. “He sent for you ${missed > 2 ? `${missed} times` : 'twice'}. A man who can’t find the time to come can find the money.”`, why: 'I sent for you and you didn’t come. Twice. A man who has no time for me can pay for the privilege.', record: `${g.name} raised your share to ${Math.round(p.kickRate * 100)} percent for not coming when he sent for you.` });
           }
         }

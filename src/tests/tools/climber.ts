@@ -17,6 +17,13 @@ const seed = Number(process.argv[2] ?? 3), days = Number(process.argv[3] ?? 120)
 const w = createWorld(seed, 'Tony Marino'), p = w.chars[w.playerId!];
 const say = (id: string, re: RegExp) => { const v = begin(w, id); (p.intro ??= {})[id] ??= w.now; for (let i = 0; i < 4 && !v.ended; i++) { const c = [...v.choices, ...everything(w, v)].find((x) => re.test(x.id) || re.test(x.label)); if (!c) break; choose(w, v, c.amount ? `${c.id}:${c.amount.value}` : c.id); } return v; };
 const log: string[] = [];
+// (DBG3: everything that reached the player each week, as he would see it: approaches, offers, and what he came to know)
+const seenE = new Set<string>(), seenJ = new Set<string>(), seenF = new Set<string>();
+const reached = () => { const out: string[] = [];
+  for (const e of w.enc) if (!seenE.has(e.id)) { seenE.add(e.id); out.push('  approach: ' + e.title); }
+  for (const j of w.jobs) if (j.assignee === p.id && !seenJ.has(j.id)) { seenJ.add(j.id); out.push(`  offer: ${j.title} (${w.chars[j.giver ?? '']?.name ?? 'tip'})`); }
+  for (const [id, k] of Object.entries(p.known)) if (!seenF.has(id)) { seenF.add(id); const f = w.facts[id]; if (f && !f.minor && k.from !== 'self') out.push('  heard: ' + f.text.slice(0, 110)); }
+  return out; };
 let lastWeek = -1, made = -1;
 for (let d = 0; d < days && p.alive; d++) {
   const day0 = d * DAY;
@@ -47,6 +54,7 @@ for (let d = 0; d < days && p.alive; d++) {
     const pi = pathInfo(w, p);
     if (process.env.DBG2) log.push('   made men trust: ' + Object.values(w.chars).filter((c) => c.alive && !c.isPlayer && c.familyId === p.familyId && ['soldier','capo','underboss'].includes(c.rank)).map((c) => `${c.name.split(' ')[1]} ${(c.rels[p.id]?.trust ?? 0).toFixed(2)}`).join(', ') + ' | peer jobs ' + w.jobs.filter((j) => j.assignee === p.id && j.via === 'tip' && w.chars[j.giver ?? '']?.familyId === p.familyId).map((j) => j.status).join(','));
     if (process.env.DBG) log.push(`   hold=${w.path?.hold} wait=${w.path?.seatWait} promo=${JSON.stringify(w.promo ?? null)?.slice(0,160)} induct=${p.cooldown.induct} summons=${w.jobs.filter((j) => j.kind === 'summons').map((j) => j.meeting + ':' + j.status).join(',')} encs=${w.enc.filter((e) => e.status === 'open').map((e) => e.kind + ':' + (e.data?.stage ?? '')).join(',')}`);
+    if (process.env.DBG3) log.push(...reached());
     log.push(`week ${wk}: ${p.rank} $${Math.round(p.cash)} standing ${Math.round(p.standing)} | ${pi ? pi.goals.map((g) => `${g.key} ${Math.round(g.frac * 100)}%`).join(', ') : 'top'} | shops ${Object.values(w.biz).filter((b) => b.protection?.collectorId === p.id).length} | done ${p.career?.done ?? 0}`);
   }
   if (p.rank !== 'associate' && made < 0) { made = d; log.push(`MADE on day ${d}`); }

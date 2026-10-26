@@ -25,7 +25,9 @@ const first = (c: Character) => c.name.split(' ')[0];
 const pick = <T,>(w: World, l: T[]): T => l[w.rng.int(0, l.length - 1)];
 const gigOf = (j: Job) => String(j.extra?.gig ?? '') as GigKind;
 export const isGig = (j: Job) => j.kind === 'gig';
-const open = (w: World, g: GigKind) => w.jobs.some((j) => j.kind === 'gig' && gigOf(j) === g && (j.status === 'offered' || j.status === 'active'));
+// (a kind of gig is not offered while one is open, nor again within twelve days of the last: the same errand every few days is a
+// chore, not an opportunity)
+const open = (w: World, g: GigKind) => w.jobs.some((j) => j.kind === 'gig' && gigOf(j) === g && (j.status === 'offered' || j.status === 'active' || w.now - j.created < 12 * DAY));
 const GOODS: Record<string, string> = { bar: 'liquor', restaurant: 'meat and wine', deli: 'cured meat and cheese', grocer: 'produce and canned goods', butcher: 'sides of beef', fish: 'a morning’s catch', jeweller: 'a case of watches', pharmacy: 'prescription stock', hardware: 'power tools', garage: 'car parts', candy: 'cigarettes and candy', newsstand: 'cartons of cigarettes', cafe: 'coffee and pastries', bakery: 'flour and sugar' };
 const WEEKDAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 // the night a truck runs: nine in the evening of that day (a job named for a night happens that night, not whenever it is taken up)
