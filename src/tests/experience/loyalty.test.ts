@@ -74,7 +74,7 @@ describe('a man of another family puts a job to the player', { tags: ['scenario'
   });
   ok('done quietly, it is the world’s own burglary, and it can come out weeks later, told by his captain himself', () => {
     let caught = false;
-    for (const seed of [3, 7, 11, 13, 17, 19, 23]) {
+    for (const seed of [3, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43]) { // (a few chances in each world: twelve worlds, so missing it everywhere is a statistical freak, not a reading)
       const g = deal(seed);
       if (!g) continue;
       g.cap.traits.caution = 1; if (g.p.familyId && g.x.familyId) g.w.fam[g.p.familyId].tension[g.x.familyId] = 2.5; // (the likeliest to come out)

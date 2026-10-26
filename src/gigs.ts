@@ -214,6 +214,7 @@ export function gigResolve(w: World, j: Job, doer: Character, code: string): Res
       } else {
         bump(doer, 0.06);
         lines.push(`${t.name} refuses and says things about ${first(giver)}’s mother. ${lean ? 'You don’t take it further than you were paid to.' : 'You were told to say nothing, so you say nothing, and leave.'}`);
+        lines.push(`Out on the street ${first(giver)} doesn’t look at you. He doesn’t pay a man for standing there. "Next time," he says, which means there may not be one.`);
         feel(w, giver, doer.id, 'trust', -0.04);
       }
       return res();

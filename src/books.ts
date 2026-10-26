@@ -70,7 +70,10 @@ export function envelopeText(w: World, p: Character): string {
   const e = envelopeSum(w, p);
   const pct = Math.round(e.rate * 100);
   if (e.due <= 0) return 'You’re square with him. Nothing to hand over.';
-  return `Last week you made ${money(e.own)} and your crew handed you ${money(e.crew)}. ${pct}% of ${money(e.own + e.crew)} is ${money(e.weekDue)}${e.overdue ? `, plus ${money(e.overdue)} you still owe from before` : ''}. Total ${money(e.due)}.`;
+  // (said as a man would put it to himself: what he owes, and what it is his share of; never the arithmetic)
+  const share = pct === 20 ? 'a fifth' : pct === 25 ? 'a quarter' : pct === 10 ? 'a tenth' : pct === 50 ? 'half' : `${pct}%`;
+  const made = e.crew > 0 ? `the ${money(e.own + e.crew)} you and your men brought in` : `the ${money(e.own)} you made`;
+  return `${money(e.due)}: ${share} of ${made} last week${e.overdue ? `, and ${money(e.overdue)} still owed from before` : ''}.`;
 }
 export function envelopeDue(w: World, p: Character): number {
   const boss = p.bossId ? w.chars[p.bossId] : undefined;

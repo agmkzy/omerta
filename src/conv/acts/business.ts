@@ -498,7 +498,7 @@ const envelopeWait: Act = {
 // ---------------------------------------------------------------- the boss's envelope, and money over and above it
 const envelope: Act = {
   base: 'b_envelope', pane: 'business',
-  offers: (c) => { const due = envelopeDue(c.w, c.h); return isBoss(c) && kickWindow(c.w, c.h) && !crewEnvelopesWaiting(c.w, c.h) && due >= 20 && c.h.cash >= 20 && !asked(c, 'b_envelope') ? [{ ...offer(c, 'b_envelope', `Hand him your envelope (${money(due)})`, 'Last week’s share, in person.'), kind: 'his' }] : []; },
+  offers: (c) => { const due = envelopeDue(c.w, c.h); return isBoss(c) && kickWindow(c.w, c.h) && !crewEnvelopesWaiting(c.w, c.h) && due > 0 && c.h.cash >= Math.min(due, 20) && !asked(c, 'b_envelope') ? [{ ...offer(c, 'b_envelope', `Hand him your envelope (${money(due)})`, 'Last week’s share, in person.'), kind: 'his' }] : []; },
   run: (c) => {
     const x = T(c), { w, p, t } = x; ask(c, 'b_envelope');
     const due = envelopeDue(w, p);

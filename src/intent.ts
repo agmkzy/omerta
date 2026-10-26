@@ -110,13 +110,17 @@ export function intentsOf(w: World, c: Character): Intent[] {
   // robbed), and he has heard of it: he takes him to task.
   if (menOf(w, c).length && !cool(w, c, 'confront')) {
     const mine = new Set(menOf(w, c).map((m) => m.id));
-    const f = Object.entries(c.known).map(([id, k]) => ({ f: w.facts[id], k })).find(({ f, k }) => f && k.knowsActor && ['beating', 'vandalism', 'robbery'].includes(f.kind) && w.now - f.t < 14 * DAY && !!f.actor && mine.has(f.actor) && concerns(w, f, c.familyId!) && !c.cooldown['conf:' + f.id]);
+    const f = Object.entries(c.known).map(([id, k]) => ({ f: w.facts[id], k })).find(({ f, k }) => f && k.knowsActor && ['beating', 'vandalism', 'robbery'].includes(f.kind) && w.now - f.t < 14 * DAY && !!f.actor && mine.has(f.actor) && concerns(w, f, c.familyId!) && !c.cooldown['conf:' + f.id]
+      // (not a place that only came to pay the family after it, nor a man pressing his own protection pitch, which may be the work his
+      // captain sent him to do: that is how a place comes under the family, not an injury to it)
+      && !(f.business && (w.biz[f.business]?.protection?.since ?? -Infinity) > f.t)
+      && !(f.story?.startsWith('sit:') && (w.situations ?? []).some((s) => 'sit:' + s.id === f.story && s.ak === 'protect' && s.terms?.by === f.actor)));
     const m = f ? w.chars[f.f.actor!] : undefined;
     if (f && m?.alive) out.push({ kind: 'confront', to: m, why: `${m.name} hurt the family's own earnings`, score: 0.5 + tp.pride * 0.2 + tp.volatility * 0.1, act: () => {
       c.cooldown['int:confront'] = w.now + 7 * DAY; c.cooldown['conf:' + f.f.id] = w.now + 60 * DAY;
       const e = addFact(w, { kind: 'discipline', actor: c.id, victim: m.id, cause: f.f.id, text: `${c.name} took ${m.name} to task over what happened: ${f.f.text}`, district: m.district }, { witnesses: [c.id, m.id] });
       // (to the player, to his face: what he did, why it matters to the man above him, and the chance to answer it)
-      if (m.isPlayer) imposed(w, m, c, { title: `${c.name.split(' ')[0]} took you to task`, said: `${c.name.split(' ')[0]} has you come to him. “${f.f.text.replace(new RegExp(m.name, 'g'), 'You').replace(/^You (\w+)/, (_x, v: string) => 'You ' + v)} That place pays this family. You hurt it, you hurt us. Don’t do it again.”`, why: 'A shop that pays us is ours to look after. A man of mine who smashes it up is taking money out of my pocket and the family’s.', record: `${c.name} took you to task over what happened.` });
+      if (m.isPlayer) imposed(w, m, c, { title: `${c.name.split(' ')[0]} took you to task`, said: `${c.name.split(' ')[0]} has you come to him. “${((t) => t.charAt(0).toUpperCase() + t.slice(1))(f.f.text.replace(new RegExp(m.name + '[’\']s', 'g'), 'your').replace(new RegExp(m.name, 'g'), 'you'))} That place pays this family. You hurt it, you hurt us. Don’t do it again.”`, why: 'A shop that pays us is ours to look after. A man of mine who smashes it up is taking money out of my pocket and the family’s.', record: `${c.name} took you to task over what happened.` });
       feel(w, c, m.id, 'trust', -0.06, e);
       if (temper(m).pride > 0.6) bear(w, m, c.id, 0.08, e); // a proud man resents being dressed down
       else feel(w, m, c.id, 'respect', 0.02);

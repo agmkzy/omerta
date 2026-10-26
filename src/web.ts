@@ -149,7 +149,7 @@ function collectNews(since: number): string[] {
   const picked = scored
     .filter((x) => x.r.level > 0 && (x.f.kind === 'report' || !x.f.minor))
     .sort((a, b) => b.r.level - a.r.level || b.k.t - a.k.t)
-    .filter((x) => { const key = `${x.f.kind}|${x.f.actor ?? ''}|${x.f.victim ?? ''}|${x.f.business ?? ''}`; if (seen.has(key)) { S.routine++; return false; } seen.add(key); return true; })
+    .filter((x) => { const key = `${x.f.kind}|${x.f.actor ?? ''}|${x.f.victim ?? ''}|${x.f.business ?? ''}`, said = 't:' + factText(x.f, x.k.knowsActor).slice(0, 44).toLowerCase(); if (seen.has(key) || seen.has(said)) { S.routine++; return false; } seen.add(key); seen.add(said); return true; })
     .slice(0, 5);
   return picked.map(({ id, k, f, r }) => {
     const body = lk(f.kind === 'report' ? f.text : factText(f, k.knowsActor));
@@ -487,8 +487,11 @@ function handle(a: string, v: string) {
       const o = waitChoices(true)[Number(v)];
       if (!o) return;
       if (!o.event) {
+        const t0 = w.now;
         doAction({ kind: 'wait', actor: w.playerId!, hours: o.mins / 60, label: 'wait', score: 0 });
-        // (the hours, said as they go by, when nothing else came of them)
+        // (the hours, said as they go by, when nothing else came of them; days, when it was days)
+        const gone = Math.floor(W().now / DAY) - Math.floor(t0 / DAY);
+        if (!S.log.length && gone >= 2) S.log = [`${['', '', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven'][Math.min(7, gone)]} days go by. The city gets on with its business without you.`];
         if (!S.log.length) { const h = Math.floor((W().now % DAY) / 60), k = Math.floor(W().now / 60); const say = (xs: string[]) => xs[k % xs.length];
           S.log = [h >= 17 || h < 4 ? say(['The afternoon drains away. The lights come on along Mulberry Street.', 'Evening. The cafés fill up and the shutters come down on the shops that close.', 'The day goes quiet the way it does around six, and then the night starts.']) : say(['You sleep. The city doesn’t.', 'Morning. Bread, coffee, the Daily News, and the street already awake under the window.', 'A night goes by. Somewhere in it, other men were busy.'])]; }
         return;
@@ -898,7 +901,10 @@ function handle(a: string, v: string) {
       const m = t?.alive ? openAsks(w).find((x) => x.terms?.by === P().id && x.terms?.of === t.id && Number(x.m?.at ?? -1) >= w.now - r.minutes - 1) : undefined;
       // (the matter is new: what follows is the first exchange, said as one, not a return to it: business.ts matterA reads m.fresh)
       if (t && m) { m.m = { ...(m.m ?? {}), fresh: w.now }; const v0 = beginVisit(w, t.id), pick = [...v0.choices, ...everythingVisit(w, v0)].find((c) => c.id === 'a:m:' + m.id), r2 = pick ? chooseVisit(w, v0, pick.id) : undefined; return pass(r.minutes + (r2?.minutes ?? 0), r.lines, { t: 'talk2', v: r2?.v ?? v0 }); }
-      return pass(r.minutes, r.lines);
+      pass(r.minutes, r.lines);
+      // (how it came out, said plainly beside what happened: a job that fell through says so)
+      if (j.status === 'failed') S.chips.unshift({ t: 'It fell through', tone: 'bad' });
+      return;
     }
     case 'talkm': { // go and see him about a particular matter (from its page): the conversation opens on it
       const [id, sid] = args;
