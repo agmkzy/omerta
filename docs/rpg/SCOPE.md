@@ -47,10 +47,35 @@ test: the number of meaningful things that can happen because of what everyone d
   - **Underground casinos:** card games, after-hours clubs and a floating dice game, extending today's blackjack and gambling clubs.
   - **The family's Las Vegas interest** (the skim) as an asset the player hears about and may one day touch.
   - Greyhound racing was not legal in New York in 1970, so there is no dog track.
+- **Scores you play, not a menu.** Today a job is one choice and one roll. A score becomes a short played sequence:
+  - **The tip,** whose source matters: the driver in on it, or a setup.
+  - **Preparation,** optional and each step costing time or money: case it, get an insider, choose who comes, arrange the buyer,
+    find out whose it is.
+  - **The moment:** three or four ways in, their odds told as the player would judge them, open or closed by what was prepared.
+  - **Something sideways, sometimes:** a patrol car, a hero, a partner who freezes. Abort, push or improvise, with what preparation
+    makes possible.
+  - **After:** the fence, the split (straight or short), what witnesses tell the police, the owner's protectors, the captain's end.
+  - For truck hijacks, warehouses, card-game stick-ups, fixed races, insurance arson, the bank messenger. One engine, many scores,
+    all through the world's records (ledger, facts, knowledge, heat, regard).
+- **Rackets as businesses you run.** Each racket gets staff, weekly decisions, problems, competitors and police attention:
+  - the book (lay off or hold; a winner you can't pay);
+  - loans (how hard to collect, whom to trust);
+  - numbers (a runner skimming, a big hit);
+  - fencing (what to take, from whom);
+  - protection (who pays, who won't);
+  - later the union local, carting, cargo.
+  
+  This is where a soldier's and a captain's mid-game lives. The player's businesses and rackets get their own screen: what each
+  earns, who works it, what's wrong.
 - **Jail balance as a stopgap:** arrest odds, sentence lengths, how clearly heat is shown. A careful player should rarely be inside.
   Replaced by the police faction in Phase 3.
 - **A soldier's season:** associates ask to run with you; your captain hands you a shop or a man; crew management that matters.
 - **The road to captain,** measured and tuned like the road to soldier.
+- **Who the player is.**
+  - Backgrounds that change how play starts and how men treat him.
+  - A reputation for what kind of man he is (fair, cruel, greedy, loyal), separate from standing.
+  - His own dreams, as NPCs have theirs.
+- **Death, failure and carrying on:** a clear end when the player is killed or put away for decades, before Phase 4's endings exist.
 - **Captains with work to give:** they pass down their own needs instead of "nothing now".
 - **Variety of tips and gigs;** fewer repeats.
 - **Pacing:** decide the target rhythm of quiet and busy weeks and tune to it across many worlds.
@@ -90,6 +115,29 @@ test: the number of meaningful things that can happen because of what everyone d
   splitting; ambition that sometimes succeeds.
 - **Men who adapt:** repeated failure changes tactics; reputation changes how people respond.
 - **Information as currency:** sell, hold, trade or plant what you know; rumours spread and distort.
+- **The Feds and RICO** (the Organized Crime Control Act, October 1970). The FBI as its own institution:
+  - long patient cases, wiretaps and bugs in clubs and cars;
+  - informants cultivated for years;
+  - pressure on families as organisations, not just individuals.
+- **The rackets that made the money:** unions and labour (the docks, construction, Teamsters trucking), garbage carting, the
+  Fulton Fish Market, the garment district, JFK cargo, concrete and city contracts. These are where families cooperate and
+  compete, and where politics comes in.
+- **Politics and the courts:** judges, district attorneys, councilmen, ward bosses, elections. A fixed case, a zoning favour, a
+  contract: corruption above the cop on the beat.
+- **The rest of the underworld:** the Irish Westies in Hell's Kitchen, Harlem's numbers bankers and the heroin trade, Jewish and
+  Puerto Rican organisations, Chinatown's tongs, alongside the street gangs (Phase 4). Territory and alliances beyond five families.
+- **The neighbourhood as a public:**
+  - the feast of San Gennaro, the priest, charity;
+  - the neighbour who sees things;
+  - a street that protects you or gives you up;
+  - Joe Colombo's Italian-American Civil Rights League (1970) as a public-image story.
+
+## Phase 3b: Playing at the top
+Becoming boss opens a new phase rather than ending the game.
+- **Captain:** run a crew, assign work, settle his men's quarrels, answer for them upstairs, recruit and propose men.
+- **Underboss:** the family's day-to-day, its disputes and its money.
+- **Boss:** family policy, the Commission seat, war and peace, the treasury, the pad, choosing captains and a successor; plots
+  against him.
 
 ## Phase 4: A Life (V92)
 - **Prison as a playable episode:**
@@ -132,3 +180,22 @@ Set pieces built on knowledge and relationships:
 - Seasons, feasts and weather.
 - A relationship web as the player knows it.
 - Onboarding past the first week; phone layout polish.
+- In-game help for the world's terms (*made*, *the book*, *a piece*).
+- Multiple save slots; exporting a story to share.
+- The city's ordinary people in their 1970 mix (Irish, Jewish, Black, Puerto Rican, Chinese neighbours), and women beyond wives:
+  shopkeepers, bookkeepers, widows who run things.
+- Sound, if ever.
+
+## Throughout: how we know it got better
+- **The scorecard.** Every phase is accepted against your five playtest questions, measured with the long-run harness
+  (src/tests/tools/longrun.ts, docs/baseline/) and player-driven playtests, compared to the previous baseline:
+  - memorable NPCs;
+  - unexpected developments;
+  - delayed consequences of the player's choices;
+  - the world changing without the player;
+  - dead stretches.
+- **Writing at scale:** voice sheets for every new line in all eight voices, the walker and repetition checks extended to each new
+  system, and no line shown twice in a conversation.
+- **A performance budget:** save size, simulation speed and phone performance over a multi-year run. The day-60 save failure is the
+  first warning.
+- **Determinism and save compatibility:** a migration and a fixture whenever the save schema changes.
