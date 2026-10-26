@@ -1,4 +1,5 @@
 import { knowsProtection } from '../acquaint';
+import { streetMap } from './streetmap';
 import { sundayDue } from './sunday';
 import { acts, btn, choices, context, h, kv, meter, note, quiet, rows, title, type KV, type Pick, type Row } from './kit';
 import type { Character, World } from '../types';
@@ -361,7 +362,7 @@ export function placesView(home = false): string {
     return mine.length > 1 ? `${first.name} and ${mine.length - 1} more you know` : `${first.name} is in`;
   };
   const kickOf = (x: Spot) => [x.kind === 'club' ? `The ${w.fam[x.famId!]?.name ?? ''} club` : '', x.on ?? ''].filter(Boolean).join(' · ');
-  let out = (home ? '' : back()) + title(SLICE, home ? 'Pick a place to see who’s in, and what you can do there.' : '');
+  let out = (home ? '' : back()) + title(SLICE) + (home ? streetMap() : '');
   const pub = all.filter((x) => x.kind !== 'biz');
   if (openAt(TRACK, w.now)) pub.push(TRACK);
   out += rows(pub.map((x): Row => ({ kick: kickOf(x), title: esc(x.name), sub: esc(inside(x)), end: esc(hours(x)), mark: openAt(x, w.now) ? (x.kind === 'club' && x.famId === p.familyId ? 'red' : 'amber') : 'dead', tone: openAt(x, w.now) ? '' : 'dim', a: `place:${x.id}` })));
