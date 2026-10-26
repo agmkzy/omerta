@@ -149,7 +149,7 @@ describe('Gate 4 parity, Stage B: money and business', () => {
     { name: 'what is owed, with a debtor', who: (x) => x.fam, setup: (x, t) => { owes(x, t, 1); }, old: 'earn', node: 'business' },
     { name: 'a smaller share', who: (x) => x.boss, old: 'rate_ask', node: 'business' },
     { name: 'a chop shop', who: garage, old: 'partner_chop', node: 'business', both: true },
-    { name: 'moving goods', who: pawn, old: 'partner_fence', node: 'business' },
+    { name: 'moving goods', who: pawn, old: 'partner_fence', node: 'business', differs: { why: 'a pawnbroker who puts a tip the player’s way rests three weeks before the next (the compelling-RPG stage, found in play: one man brought three in a row)', holds: (w) => Object.values(w.chars).some((c) => (c.cooldown['tip:burgle'] ?? 0) > w.now) || !w.jobs.some((j) => j.kind === 'burgle' && j.via === 'opportunity') } },
     { name: 'cutting his fee', who: (x) => x.shop, setup: (x, t) => { shopFor(x, t); }, old: 'terms_cut', node: 'business' },
     { name: 'raising his fee', who: (x) => x.shop, setup: (x, t) => { shopFor(x, t); }, old: 'terms_raise', node: 'business' },
     { name: 'the haggle: nothing for it', who: (x) => x.shop, setup: (x, t) => { shopFor(x, t); }, old: 'deal:nothing', node: 'follow' },

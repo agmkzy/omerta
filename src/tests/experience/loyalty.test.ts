@@ -15,6 +15,7 @@ function setUp(seed: number) {
   const w = worldFor(seed), p = P(w), cap = captain(w);
   const x = familyMen(w, 'capo').find((c) => c.id !== cap.id)!;
   rel(x, cap.id).grudge = 0.4; p.standing = 45; p.career = { done: 3, failed: 0, log: [] };
+  cap.traits.caution = 1; // (a careful captain: the likeliest to find out, so the test is of what happens when he does, not of the odds)
   return { w, p, cap, x };
 }
 
@@ -76,6 +77,7 @@ describe('a man of another family puts a job to the player', { tags: ['scenario'
     for (const seed of [3, 7, 11, 13, 17, 19, 23]) {
       const g = deal(seed);
       if (!g) continue;
+      g.cap.traits.caution = 1; if (g.p.familyId && g.x.familyId) g.w.fam[g.p.familyId].tension[g.x.familyId] = 2.5; // (the likeliest to come out)
       answerDeal(g.w, g.p, g.e, 'quiet');
       const j = g.w.jobs.find((q) => q.kind === 'burgle' && q.assignee === g.p.id && q.giver === g.x.id && q.status === 'active');
       assert.ok(j, 'the job is in his work');
