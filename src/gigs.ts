@@ -39,7 +39,10 @@ const when = (w: World, days: number) => WEEKDAY[Math.floor((w.now + days * DAY)
 // ---------------------------------------------------------------- offers
 export function gigOffer(w: World): boolean {
   const p = PL(w);
-  const bag: (() => boolean)[] = [() => muscleGig(w, p), () => shipmentGig(w, p), () => escortGig(w, p), () => courierGig(w, p), () => inspectorGig(w, p)];
+  // (a truck to hit is now a score played through (score.ts), with selling the warning one of its choices; the old one-step truck stays
+  // only so an old save's offer still resolves)
+  const bag: (() => boolean)[] = [() => muscleGig(w, p), () => escortGig(w, p), () => courierGig(w, p), () => inspectorGig(w, p)];
+  void shipmentGig;
   for (let i = 0; i < 6 && bag.length; i++) if (bag.splice(w.rng.int(0, bag.length - 1), 1)[0]()) return true;
   return false;
 }

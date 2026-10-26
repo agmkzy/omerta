@@ -5,7 +5,7 @@
 // driver's, heat, an arrest, what the driver tells the police, and a protector who wants to know who robbed his client. It is all
 // one encounter that moves through its stages (kind 'score', data.stage), and writes only through the world's doors.
 import { addFact, clamp, feel, money, notifyProtector, peek, repute, transfer, writeDown } from './core';
-import { addEnc } from './encounters';
+import { addEnc, addFavour } from './encounters';
 import { aptitude } from './people';
 import { jail } from './jobs';
 import { temper } from './temper';
@@ -56,6 +56,9 @@ function prepOpts(w: World, p: Character, e: Enc): EncOpt[] {
   if (!flag(e, 'cased')) o.push({ code: 'case', label: 'Case the route yourself', hint: 'Two hours in a parked car. You learn where he stops and who else is on the road.' });
   if (!flag(e, 'driver')) o.push({ code: 'driver', label: 'Have a word with the driver', hint: e.data?.src === 'owes' ? 'The cousin. He may give it up for a cut, and then it’s easy.' : 'A driver who gives it up is the safest way. A driver who says no may say so to somebody else.' });
   if (!e.data?.whose) o.push({ code: 'whose', label: 'Find out whose load it is', hint: 'Robbing a store that pays a family is robbing the family.' });
+  // (knowing whose it is, there is another way to make money from it: tell the men who protect the place)
+  const b = w.biz[String(e.data?.biz ?? '')], prot = b?.protection ? w.chars[b.protection.collectorId] : undefined;
+  if (e.data?.whose && e.data.whose !== 'none' && prot?.alive && prot.id !== p.id) o.push({ code: 'warn', label: `Sell the warning to ${prot.name}`, hint: `He pays for it, and owes you. ${e.data?.src === 'owes' ? 'The man who gave you the tip won’t thank you if he hears.' : 'Your own man gave you this. He may not see it your way.'}` });
   const fence = fenceFor(w, p);
   if (!e.data?.fence && fence) o.push({ code: 'fence', label: `Set it up with ${first(fence)} first`, hint: 'A fence who knows it’s coming pays better and faster.' });
   const men = menOf(w, e).map((m) => m.id), free = crewOf(w, p).filter((c) => !men.includes(c.id));
@@ -104,6 +107,15 @@ export function scoreChoose(w: World, p: Character, e: Enc, code: string): { lin
       const fam = b?.protection ? w.fam[b.protection.familyId] : undefined;
       const whose = !b?.protection ? 'none' : b.protection.familyId === p.familyId ? 'ours' : 'theirs';
       return stay([!fam ? `${b?.name ?? 'The store'} pays nobody. Nobody will come looking but the police.` : whose === 'ours' ? `${b!.name} pays our own family. Robbing it is robbing ${w.chars[b!.protection!.collectorId]?.name ?? 'one of ours'}.` : `${b!.name} pays the ${fam.name} family. They will want to know who did it.`], 30, null, { whose });
+    }
+    if (code === 'warn') {
+      const prot = b?.protection ? w.chars[b.protection.collectorId] : undefined;
+      e.status = 'done';
+      if (!prot?.alive) return { lines: ['There is nobody to sell it to.'], minutes: 10 };
+      const fee = transfer(w, prot, p, Math.max(100, Math.round(Number(e.data?.value ?? 2000) * 0.12 / 10) * 10), 'earn', `warning about ${what}`);
+      addFavour(w, p.id, prot.id, 1, `the warning about ${what}`); feel(w, prot, p.id, 'trust', 0.1);
+      if (giver?.alive && w.rng.chance(0.35)) { feel(w, giver, p.id, 'trust', -0.1); addFact(w, { kind: 'report', actor: giver.id, minor: true, text: `${giver.name} found out ${p.name} sold his tip to ${prot.name}.`, district: p.district }, { witnesses: [giver.id] }); }
+      return { lines: [`${prot.name} listens without interrupting. “Nobody tells me anything for free. You did.” He counts out ${money(fee)}. Thursday night, the truck has company.`], minutes: 60 };
     }
     if (code === 'fence') { const f = fenceFor(w, p); return stay([f ? `${f.name} says he’ll take the lot at forty cents on the dollar, Friday morning, no questions.` : 'Nobody will commit before they see it.'], 40, null, { fence: f?.id ?? '' }); }
     if (code.startsWith('man:')) { const m = w.chars[code.slice(4)]; const men = [...menOf(w, e).map((x) => x.id), m.id]; return stay([`${first(m)} is in.`], 10, null, { men: men.join(',') }); }

@@ -61,4 +61,20 @@ describe('a truck, played', { tags: ['scenario'] }, () => {
     }
     assert.fail('the diner never came off in six worlds');
   });
+  ok('knowing whose it is, he can sell the warning to the men who protect the place instead: paid, and a favour owed', () => {
+    for (const seed of [3, 7, 11, 13, 17, 19, 23, 29]) {
+      const { w, p, e } = tipped(seed);
+      const t = scoreTip(w, p)!; makeScore(w, p, t.giver, t.src);
+      scoreChoose(w, p, e(), 'plan'); scoreChoose(w, p, e(), 'whose');
+      if (!codes(e()).includes('warn')) continue;
+      const b = w.biz[String(e().data?.biz)], prot = w.chars[b.protection!.collectorId];
+      const c0 = p.cash, m0 = moneyTotal(w);
+      scoreChoose(w, p, e(), 'warn');
+      assert.ok(p.cash > c0, 'paid');
+      assert.equal(moneyTotal(w), m0);
+      assert.ok(w.favours.some((f) => f.from === p.id && f.to === prot.id), 'he owes it');
+      return;
+    }
+    assert.fail('no protected load in eight worlds');
+  });
 });

@@ -254,3 +254,14 @@ family), the negotiation with its owner, a rival family's job, the club on Sunda
 - Validation: a debt matter is looked at again the moment its debt defaults (a player-negotiated one checked back only after 30
   days, so the audit found it open after the default; surfaced when the run shifted). The "nobody asked twice" check counts both
   ways a man going to someone is recorded ("asks X to take up his trouble", "going to X came to nothing").
+- Playthrough, weeks two to five (including a passive month, to see what the world does with a player who does little): the
+  tavern's owner ran late, then his place was robbed; unpaid envelopes became arrears and then a summons about the money. Fixed:
+  - answering something a man came about by doing it ("Go, with a modest envelope") is told by what happens, not shown as a line of
+    the player's speech;
+  - one truck system: the old one-step "A truck to hit" is retired for new offers (its offers in old saves still resolve), and
+    its good idea, selling the warning to the men who protect the place, is now a choice in the played truck once he knows whose it
+    is (paid by the protector, a favour owed; the tipster may hear of it);
+  - a pawnbroker or garage owner brings the same kind of tip at most every three weeks (one man had brought three burglary tips in a
+    row);
+  - a man asking the player to help get somebody out of jail asks about one of his own (his man, a friend, his blood), not
+    whichever man in the city happened to be inside (it had come weekly, about strangers).

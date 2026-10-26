@@ -1,3 +1,4 @@
+import { kinTie } from './kin';
 import { answerImposed } from './imposed';
 import { answerCourting, courter, makeCourting } from './loyalty';
 import { answerDeal, dealer, makeDeal } from './crossdeal';
@@ -108,13 +109,15 @@ function favourAsk(w: World, p: Character): Cand[] {
   const out: Cand[] = [];
   if ((p.cooldown.favask ?? 0) > w.now) return out;
   const pool = Object.values(w.chars).filter((c) => c.alive && c.id !== p.id && c.rank !== 'civilian' && c.rank !== 'boss' && (c.rels[p.id]?.trust ?? 0) >= 0.3 && (c.rels[p.id]?.respect ?? 0) >= 0.3 && !pending(w, 'favour_ask', c.id));
-  const jailed = Object.values(w.chars).filter((x) => x.alive && x.jailedUntil > w.now && x.familyId !== p.familyId);
+  const jailed = Object.values(w.chars).filter((x) => x.alive && x.jailedUntil > w.now && !x.isPlayer);
   for (const c of pool.slice(0, 3)) {
     const boss = c.bossId ? w.chars[c.bossId] : undefined;
     if (boss && boss.id !== p.id && p.rank !== 'associate') out.push({ weight: 1, key: 'word', make: () => makeWord(w, p, c, boss) });
     const deed = Object.values(w.facts).filter((f) => f.actor === c.id && !f.minor && ['beating', 'robbery', 'theft', 'burglary', 'vandalism', 'scam', 'poach'].includes(f.kind) && w.now - f.t < 12 * DAY && !f.victim?.startsWith?.('zz')).sort((a, b) => b.t - a.t)[0];
     if (deed) out.push({ weight: 0.7, key: 'alibi', make: () => makeCover(w, p, c, deed) });
-    if (jailed.length) out.push({ weight: 0.5, key: 'release', make: () => makeRelease(w, p, c, jailed[0]) });
+    // (the man inside is one of his: his own man, a friend, or his blood; nobody asks about a stranger)
+    const his = jailed.find((x) => x.id !== c.id && (x.bossId === c.id || (c.rels[x.id]?.affection ?? 0) >= 0.35 || !!kinTie(w, c, x)));
+    if (his) out.push({ weight: 0.5, key: 'release', make: () => makeRelease(w, p, c, his) });
   }
   return out;
 }

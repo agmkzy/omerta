@@ -270,17 +270,20 @@ function contractOffer(w: World): boolean {
 
 function garageJob(w: World, b: { id: Id; ownerId: Id; name: string; district: string }): boolean {
   const o = w.chars[b.ownerId];
-  if (!o?.alive || hasOpenFrom(w, o.id, 'boost')) return false;
+  // (one man doesn't bring the player the same kind of tip week after week: three weeks between)
+  if (!o?.alive || hasOpenFrom(w, o.id, 'boost') || (o.cooldown['tip:boost'] ?? 0) > w.now) return false;
+  o.cooldown['tip:boost'] = w.now + 21 * DAY;
   mkJob(w, { kind: 'boost', title: `${o.name} needs cars`, brief: `${o.name} at ${b.name} (${b.district}) is short of stock and asks no questions. He'll pay ${money(650)} a car, cash, no paperwork.`, giver: o.id, via: 'opportunity', assignee: PL(w).id, biz: b.id, pay: 650 });
   return true;
 }
 function pawnJob(w: World, pb: { id: Id; ownerId: Id }): boolean {
   const p = PL(w);
   const o = w.chars[pb.ownerId];
-  if (!o?.alive || hasOpenFrom(w, o.id, 'burgle')) return false;
+  if (!o?.alive || hasOpenFrom(w, o.id, 'burgle') || (o.cooldown['tip:burgle'] ?? 0) > w.now) return false;
   const vics = Object.values(w.biz).filter((b) => b.open && b.kind !== 'casino' && b.id !== pb.id && b.protection?.familyId !== p.familyId && w.chars[b.ownerId]?.alive);
   if (!vics.length) return false;
   const v = w.rng.pick(vics);
+  o.cooldown['tip:burgle'] = w.now + 21 * DAY;
   mkJob(w, { kind: 'burgle', title: `A tip on ${v.name}`, brief: `${o.name} hears ${v.name} (${v.district}) keeps good stock out the back. He'll take whatever you bring at 55% of its value and won't ask where it came from.`, giver: o.id, via: 'opportunity', assignee: p.id, biz: v.id, pay: 0 });
   return true;
 }
