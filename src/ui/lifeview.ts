@@ -64,6 +64,17 @@ export function agoWord(now: number, t: number): string {
 const sect = (title: string, aside = '') => h(title, aside);
 const first = (c: Character) => c.name.split(' ')[0];
 
+// Story › Your road: the rank you hold and the steps to the next, the line for the next seat, what you are after, and what your rank
+// lets you do (folded: a list to consult, not to read).
+export function roadRoom(): string {
+  const w = W(), p = P();
+  let out = standing(w, p);
+  if (p.familyId) out += queueView();
+  out += ambitionCard();
+  const pc = powersCard();
+  if (pc) out += `<details class="lf-fold"><summary>What being ${p.rank === 'associate' ? 'an' : 'a'} ${esc(p.rank === 'capo' ? 'captain' : p.rank)} lets you do</summary>${pc}</details>`;
+  return out;
+}
 export function youRoom(): string {
   const w = W(), p = P();
   const bgx = p.bg ? bgLabel(p.bg) : undefined;
@@ -71,12 +82,10 @@ export function youRoom(): string {
   if (p.jailedUntil > w.now) out += `<p class="ui-callout is-bad">You’re locked up. The world goes on without you for now.</p>`;
   else if (p.hurtUntil > w.now) out += `<p class="ui-callout is-bad">You’re hurt. Take it easy until you mend.</p>`;
 
-  // where you stand, and the road ahead: one account of it, not two
-  out += standing(w, p);
   // V90: who you have shown yourself to be, in words, from what you have done (never chosen, never a score)
   out += `<div class="ui-card"><h2>The man you’ve shown them</h2>${characterWords(p).map((x) => `<p>${esc(x)}</p>`).join('')}<p class="muted">Each man sees you through what he has seen and heard himself.</p></div>`;
-  if (p.familyId) out += queueView();
-  out += ambitionCard();
+  const says = repLines(w, p);
+  if (says.length) out += sect('What they say about you') + says.map((l) => `<p class="say">${esc(l)}</p>`).join('');
   out += h('Home') + loveBlock(w, p);
 
   // what you are known for: the four reputations, said once; skills beside them
@@ -87,27 +96,13 @@ export function youRoom(): string {
     ? `<ul class="ui-list">${specs.map((s) => `<li><span>${SPEC_LABEL[s]}${tierOf(sc[s]) >= 2 ? `<small class="lf-perk">${esc(SPEC_PERK[s])}</small>` : ''}</span><span class="v ${tierOf(sc[s]) >= 2 ? 'good' : ''}">${TIER_WORD[tierOf(sc[s])]}</span></li>`).join('')}</ul>`
     : quiet('Nothing yet. A name is made by what you do: earn, run something, talk a man round, or put one down, and people start to say it of you.');
   out += `<details class="lf-fold"><summary>What you’re good at</summary>${skillBars(p)}</details>`;
-  { const pc = powersCard(); if (pc) out += `<details class="lf-fold"><summary>What your rank lets you do</summary>${pc}</details>`; }
-  // (milestones, honest work and the saves live in More)
+  // (your road, rank and powers are Your road; milestones, honest work and the saves live in More)
 
-  // beside it: how the street sees you, who is around you, and what you have going
-  let side = `<div class="lf-side">${sect('What they say about you')}${repLines(w, p).map((l) => `<p class="say">${esc(l)}</p>`).join('')}</div>`;
+  // beside it: who is around you
+  let side = '';
   const patron = p.bossId ? w.chars[p.bossId] : undefined;
   const men = crewList().length;
   side += `<div class="lf-side">${sect('Around you')}<ul class="ui-list">${patron ? `<li><span>You answer to</span><span class="v">${pl(patron)}</span></li>` : ''}${p.sponsor && w.chars[p.sponsor] ? `<li><span>Speaks for you</span><span class="v">${pl(w.chars[p.sponsor])}</span></li>` : ''}${p.backer && w.chars[p.backer] ? `<li><span>Backs you</span><span class="v">${pl(w.chars[p.backer])}</span></li>` : ''}<li class="lf-phone"><span>Your name</span><span class="v">${esc(standingWord(p.standing))}</span></li><li class="lf-phone"><span>Your pull</span><span class="v">${esc(influenceWord(influence(w, p)))}</span></li>${men ? `<li><span>Men under you</span><span class="v">${men}</span></li>` : ''}</ul></div>`;
-  const shops = Object.values(w.biz).filter((b) => b.protection?.collectorId === p.id);
-  const rows: string[] = [];
-  const row = (k: string, v: string, tone = '') => rows.push(`<li><span>${k}</span><span class="v ${tone}">${v}</span></li>`);
-  if (p.weekIncome) row('Made last week', money(p.weekIncome));
-  if (shops.length) row('Shops paying you', `${shops.length}, ${money(shops.reduce((a, b) => a + (b.protection?.fee ?? 0), 0))} a week`);
-  if (p.lifetimeKick) row('Passed up, all told', money(p.lifetimeKick));
-  const owedYou = w.debts.filter((d) => d.status === 'active' && d.creditor === p.id).reduce((a, d) => a + d.balance, 0);
-  const youOwe = w.debts.filter((d) => d.status === 'active' && d.debtor === p.id).reduce((a, d) => a + d.balance, 0);
-  if (owedYou) row('Owed to you', money(owedYou), 'good');
-  if (youOwe) row('You owe', money(youOwe), 'warn');
-  if (p.career && p.career.done + p.career.failed) row('Jobs', `${p.career.done} done${p.career.failed ? `, ${p.career.failed} botched` : ''}`);
-  if (p.rep && p.rep.kept + p.rep.broken) row('Your word', `kept ${p.rep.kept}${p.rep.broken ? `, broken ${p.rep.broken}` : ''}`, p.rep.broken > p.rep.kept ? 'warn' : '');
-  side += `<div class="lf-side">${sect('What you have going')}${rows.length ? `<ul class="ui-list">${rows.join('')}</ul>` : quiet("Nothing on the books yet. Nobody pays you, nobody owes you, nobody works for you. Make yourself useful and that changes.")}<button class="ui-btn ui-btn--quiet" data-a="lsub:business">The money &rsaquo;</button></div>`;
   toSide(side);
   return out;
 }
@@ -216,19 +211,21 @@ function partnerBlock(w: World, p: Character, pr: NonNullable<NonNullable<World[
   const g = w.chars[pr.id];
   const months = pr.due ? Math.max(1, Math.ceil((pr.due - w.now) / DAY / 30)) : 0;
   let out = `<div class="lf-her"><div class="lf-her__head">${avatar(g)}<div><h3>${pl(g)}</h3><p>${esc(cap(stageWord[pr.stage]))}. She is ${({ devoted: 'devoted to you', close: 'close to you', friendly: 'warm toward you', cooling: 'cooling on you', distant: 'distant with you' } as Record<string, string>)[warmthWord(pr.warmth)] ?? warmthWord(pr.warmth)}. ${pr.dates} evening${pr.dates === 1 ? '' : 's'} together.${pr.due ? ` She is expecting: ${months} month${months > 1 ? 's' : ''} to go.` : ''}</p></div></div>`;
-  out += h('An evening with her') + choices(DATES.map((d) => ({ a: `dateplan:${d.code}`, label: `${d.label} ($${d.cost})`, hint: d.hint })), 'An evening with her');
+  out += `<details class="pp-more"><summary>An evening with her</summary>${choices(DATES.map((d) => ({ a: `dateplan:${d.code}`, label: `${d.label} ($${d.cost})`, hint: d.hint })), 'An evening with her')}</details>`;
   const next: Pick[] = [];
   if (pr.stage === 'seeing') next.push({ a: 'steady:', label: 'Ask her to be your girl', hint: pr.dates >= 3 && pr.warmth >= 0.5 ? 'She might say yes.' : 'Too early. A few more evenings first.' });
   if (pr.stage === 'steady') next.push({ a: 'marryask:', label: 'Ask her to marry you ($400 ring)', hint: pr.dates >= 8 && pr.warmth >= 0.7 ? 'You are both ready.' : 'She isn’t there yet. More time, more evenings.' });
   if (pr.stage === 'engaged') next.push({ a: 'wed:', label: 'Hold the wedding ($1,500)', hint: 'The whole family will come. They will bring envelopes.' });
   if (pr.stage === 'married') next.push({ a: 'baby:', label: pr.due ? 'She is expecting' : 'Talk about having a baby', hint: pr.due ? 'Nothing to do but be there.' : 'A child changes what is at stake.' });
   if (pr.stage !== 'married') next.push({ a: 'breakoff:', label: 'End it', hint: 'It is kinder done properly.', kind: 'danger' });
-  out += h('Where this goes') + choices(next, 'Where this goes');
+  out += `<details class="pp-more"><summary>Where this goes</summary>${choices(next, 'Where this goes')}</details>`;
   return out + `</div>`;
 }
 
 // =================================================================== Business
-export function businessRoom(): string {
+// Business (the redesign): one page. The week in a line; what you run; Sunday's envelope; money owed; and one way into starting
+// something new. The week in full and the ways to earn are a tap away (ui/business.ts puts the page together).
+export function weekFull(): string {
   const w = W(), p = P();
   const b = p.books;
   const boss = p.bossId ? w.chars[p.bossId] : undefined;
@@ -236,7 +233,7 @@ export function businessRoom(): string {
   let out = '';
   // the week: what comes in, what goes out, and how far into it you are (ui/money.ts, the one account every screen reads)
   out += h('Your week', wk.inTotal || wk.outTotal ? `${money(wk.inTotal)} in · ${money(wk.outTotal)} out` : '');
-  if (!wk.comingIn.length && !wk.goingOut.length) out += quiet('Nothing comes in yet beyond what’s in your pocket. Rackets is where the money starts.') + acts(btn('sub:business.rackets', 'Ways to earn'));
+  if (!wk.comingIn.length && !wk.goingOut.length) out += quiet('Nothing comes in yet beyond what’s in your pocket. Rackets is where the money starts.') + acts(btn('sub:business.new', 'Start something'));
   else out += rows([
     ...wk.comingIn.map((f): Row => ({ title: esc(f.label), sub: f.note ? esc(f.note) : '', end: `<span class="fig">+${esc(money(f.amt))}</span> <small>a week</small>`, tone: 'good', a: f.a })),
     ...wk.goingOut.map((f): Row => ({ title: esc(f.label), sub: f.note ? esc(f.note) : '', end: `<span class="fig">−${esc(money(f.amt))}</span> <small>a week</small>`, tone: 'warn', a: f.a })),
@@ -245,25 +242,6 @@ export function businessRoom(): string {
     ['This week so far', wk.soFar ? `<span class="fig">${esc(money(wk.soFar))}</span>` : 'nothing yet: it comes in on Sunday evening'],
     ...(wk.last ? [['Last week', `earned <span class="fig">${esc(money(wk.last.earned))}</span>${wk.last.due ? `, handed up <span class="fig">${esc(money(wk.last.handed))}</span> of ${esc(money(wk.last.due))}` : ''}`, wk.last.due && wk.last.handed < wk.last.due ? 'warn' : ''] as KV] : []),
   ]);
-  if (boss) {
-    const st = b.stance ?? 'honest';
-    const seg = (id: string, label: string) => `<button class="ui-seg__b${st === id ? ' is-on' : ''}" data-a="stance:${id}" aria-pressed="${st === id}">${label}</button>`;
-    out += h('The envelope', 'every Sunday');
-    out += `<p>${pl(boss)} takes <b>${Math.round(effectiveRate(w, p) * 100)}%</b> of what you declare.${b.arrears > 0 ? ` You are behind by <b class="hurt">${money(b.arrears)}</b>.` : ''}</p>`;
-    out += `<div class="ui-seg" role="group" aria-label="How straight you are with him">${seg('honest', 'Straight')}${seg('shave', 'Shave 30%')}${seg('stall', 'Stall')}</div>`;
-    out += `<p class="ui-note">${st === 'honest' ? 'You declare everything. It builds your name.' : st === 'shave' ? 'You under-report. He may notice, and if he does, you’ll hear about it.' : 'You pay nothing this week. He’ll notice.'}</p>`;
-  }
-  // money owed either way (favours and promises are kept in the Journal, under Your word)
-  const debts = w.debts.filter((d) => d.status === 'active' && (d.creditor === p.id || d.debtor === p.id));
-  out += h('Money owed', debts.length ? String(debts.length) : '');
-  out += debts.length ? rows(debts.filter((d) => w.chars[d.creditor === p.id ? d.debtor : d.creditor]).map((d): Row => {
-    const other = w.chars[d.creditor === p.id ? d.debtor : d.creditor], mine = d.creditor === p.id;
-    return { face: avatar(other), title: mine ? `${esc(other.name)} owes you` : `You owe ${esc(other.name)}`, sub: `${esc(money(d.weeklyPayment))} a week${d.missed ? `, ${d.missed} missed` : ''} · ${mine ? 'see him about it' : 'talk terms'}`, end: `<span class="fig">${esc(money(d.balance))}</span>`, tone: mine ? (d.missed ? 'warn' : '') : 'warn', a: `talk:${other.id}|tk:debt:${d.id}` };
-  })) : quiet('Nobody owes you money and you owe nobody. That won’t last.');
-  const fav = owedTo(w, p.id).length + owing(w, p.id).length;
-  if (fav) out += acts(btn('sub:journal.word', `Favours either way (${fav})`, 'quiet'));
-  out += lendingCard();
-
   // beside it: the Sundays past
   const cur = Math.floor(w.now / (7 * DAY));
   const hist = b.history.slice(-6).reverse();
@@ -274,6 +252,41 @@ export function businessRoom(): string {
   toSide(side);
   return out;
 }
+export function envelopeBlock(): string {
+  const w = W(), p = P();
+  const b = p.books;
+  const boss = p.bossId ? w.chars[p.bossId] : undefined;
+  const wk = week(w, p);
+  let out = '';
+  if (boss) {
+    const st = b.stance ?? 'honest';
+    const seg = (id: string, label: string) => `<button class="ui-seg__b${st === id ? ' is-on' : ''}" data-a="stance:${id}" aria-pressed="${st === id}">${label}</button>`;
+    out += h('The envelope', 'every Sunday');
+    out += `<p>${pl(boss)} takes <b>${Math.round(effectiveRate(w, p) * 100)}%</b> of what you declare.${b.arrears > 0 ? ` You are behind by <b class="hurt">${money(b.arrears)}</b>.` : ''}</p>`;
+    out += `<div class="ui-seg" role="group" aria-label="How straight you are with him">${seg('honest', 'Straight')}${seg('shave', 'Shave 30%')}${seg('stall', 'Stall')}</div>`;
+    out += `<p class="ui-note">${st === 'honest' ? 'You declare everything. It builds your name.' : st === 'shave' ? 'You under-report. He may notice, and if he does, you’ll hear about it.' : 'You pay nothing this week. He’ll notice.'}</p>`;
+  }
+  return out;
+}
+export function owedBlock(): string {
+  const w = W(), p = P();
+  const b = p.books;
+  const boss = p.bossId ? w.chars[p.bossId] : undefined;
+  const wk = week(w, p);
+  let out = '';
+  // money owed either way (favours and promises are kept in the Journal, under Your word)
+  const debts = w.debts.filter((d) => d.status === 'active' && (d.creditor === p.id || d.debtor === p.id));
+  out += h('Money owed', debts.length ? String(debts.length) : '');
+  out += debts.length ? rows(debts.filter((d) => w.chars[d.creditor === p.id ? d.debtor : d.creditor]).map((d): Row => {
+    const other = w.chars[d.creditor === p.id ? d.debtor : d.creditor], mine = d.creditor === p.id;
+    return { face: avatar(other), title: mine ? `${esc(other.name)} owes you` : `You owe ${esc(other.name)}`, sub: `${esc(money(d.weeklyPayment))} a week${d.missed ? `, ${d.missed} missed` : ''} · ${mine ? 'see him about it' : 'talk terms'}`, end: `<span class="fig">${esc(money(d.balance))}</span>`, tone: mine ? (d.missed ? 'warn' : '') : 'warn', a: `talk:${other.id}|tk:debt:${d.id}` };
+  })) : quiet('Nobody owes you money and you owe nobody. That won’t last.');
+  const fav = owedTo(w, p.id).length + owing(w, p.id).length;
+  if (fav) out += acts(btn('sub:story.word', `Favours either way (${fav})`, 'quiet'));
+  return out;
+}
+export { lendingCard };
+
 
 function lendingCard(): string {
   const w = W(), p = P();

@@ -22,14 +22,24 @@ export function wordRoom(): string {
   let out = '';
   const work = of('work');
   if (work.length) out += h('Work you took on', String(work.length)) + rows(work.map((r) => row(w, r))) + '<p class="ui-note">It is done when what it asks for is done, however you go about it.</p>';
+  // favours, one row a man: how many either way, the latest of them, the largest
   const owed = of('owed'), owe = of('owing');
-  out += h('Favours', owed.length + owe.length ? `${owed.length} owed you · ${owe.length} you owe` : '');
-  if (!owed.length && !owe.length) out += quiet('Nobody owes you a favour, and you owe nobody. Do a man a good turn and he will remember it.');
-  out += rows([...owed.map((r) => row(w, r, `${w.chars[r.with].name} owes you`)), ...owe.map((r) => row(w, r, `You owe ${w.chars[r.with].name}`))]);
-  const group = (title: string, note: string, xs: Commitment[], empty: string) => h(title, xs.length ? String(xs.length) : '') + (xs.length ? rows(xs.map((r) => row(w, r))) : quiet(empty)) + (note && xs.length ? `<p class="ui-note">${note}</p>` : '');
-  out += group('What you promised', 'A promise kept is remembered; one broken is remembered longer.', of('mine'), 'You have given nobody your word on anything still to do.');
-  out += group('What you were promised', '', of('theirs'), 'Nobody has promised you anything that is still to come.');
-  out += group('Agreed terms', '', of('terms'), 'No arrangements on record.');
-  out += group('Hard words', 'What was said in anger stays said.', of('threat'), 'No threats or warnings between you and anyone.');
+  const by = new Map<string, Commitment[]>();
+  for (const r of [...owed, ...owe]) by.set(r.with, [...(by.get(r.with) ?? []), r]);
+  const N = (k: number) => ['no', 'a', 'two', 'three', 'four', 'five', 'six', 'seven'][k] ?? String(k);
+  const favRows = [...by].filter(([id]) => w.chars[id]).sort((a, b) => b[1].length - a[1].length).map(([id, xs]): Row => {
+    const c = w.chars[id], them = xs.filter((r) => r.kind === 'owed'), you = xs.filter((r) => r.kind === 'owing');
+    const latest = xs.sort((a, b) => b.since - a.since)[0];
+    const big = Math.max(...xs.map((r) => w.favours.find((f) => f.id === r.ref)?.size ?? 0));
+    const fv = (k: number) => `${N(k)} favour${k > 1 ? 's' : ''}`;
+    const t = them.length ? `${c.name} owes you ${fv(them.length)}${you.length ? `; you owe him ${you.length === 1 ? 'one' : N(you.length)}` : ''}` : `You owe ${c.name} ${fv(you.length)}`;
+    return { face: avatar(c), title: esc(t), sub: `Latest: ${esc(latest.text)}, ${esc(agoWord(w.now, latest.since))}`, end: big ? esc(favourWord(big)) : '', tone: you.length && !them.length ? 'warn' : 'good', a: `ent:${c.id}` };
+  });
+  out += h('Favours', favRows.length ? `${owed.length} owed you · ${owe.length} you owe` : '');
+  out += favRows.length ? rows(favRows) : quiet('Nobody owes you a favour, and you owe nobody. Do a man a good turn and he will remember it.');
+  // the rest only when there is any
+  const group = (title: string, note: string, xs: Commitment[]) => (xs.length ? h(title, String(xs.length)) + rows(xs.map((r) => row(w, r))) + (note ? `<p class="ui-note">${note}</p>` : '') : '');
+  const more = group('What you promised', 'A promise kept is remembered; one broken is remembered longer.', of('mine')) + group('What you were promised', '', of('theirs')) + group('Agreed terms', '', of('terms')) + group('Hard words', 'What was said in anger stays said.', of('threat'));
+  out += more || `<p class="ui-note">No promises, terms or hard words outstanding either way.</p>`;
   return out;
 }

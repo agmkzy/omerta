@@ -215,48 +215,50 @@ export function crewView(): string {
   const w = W();
   const p = P();
   const crew = crewList();
-  let out = crewOverview(w, p, crew);
-  out += h('Your men', String(crew.length));
-  if (!crew.length) out += quiet('Nobody takes your orders. Yet.');
-  // each man: what he is doing, how he pays, what is wrong; and what you would do about him, under his name
-  out += crew.map((c) => {
-    const fl_ = p.books.flags[c.id];
-    const act = activityOf(w, c);
-    const st = statusOf(w, c);
-    const last = c.books.history.at(-1);
-    const flags: string[] = [];
+  if (!crew.length) return quiet('Nobody takes your orders. Yet.') + recruitRows(w, p);
+  // the week, in a sentence: what they brought you on Sunday, what they owe, how many have nothing from you
+  const last = crew.map((c) => c.books.history.at(-1)).filter(Boolean) as NonNullable<Character['books']['history'][number]>[];
+  const brought = last.reduce((a, x) => a + x.paid, 0), owed = crew.reduce((a, c) => a + c.books.arrears, 0);
+  const idle = crew.filter((c) => !activityOf(w, c)).length;
+  let out = `<p class="cr-week">${last.length ? `Last Sunday your men brought you <b>${esc(money(brought))}</b>.` : 'No Sunday has come round yet.'}${owed ? ` They owe you <b class="hurt">${esc(money(owed))}</b>.` : ''} ${idle ? (idle === crew.length ? (crew.length === 1 ? 'He has no work from you.' : 'None of them has work from you.') : `${idle} of ${crew.length} have no work from you.`) : 'Every man has something to do.'}</p>`;
+  // what is wrong, first: short money, a man not himself
+  const trouble: Row[] = [];
+  const cards: Row[] = [];
+  for (const c of crew) {
+    const fl_ = p.books.flags[c.id], act = activityOf(w, c), lastC = c.books.history.at(-1);
+    const wrong = c.books.arrears > 0 ? `owes you ${money(c.books.arrears)}` : c.books.missed >= 2 ? `${c.books.missed} short Sundays running` : (fl_?.amt ?? 0) > 0 ? `${money(Math.round(fl_!.amt))} unaccounted for` : c.problem?.revealed ? PROBLEM_LABEL[c.problem.kind] : c.problem && c.problem.sev > 0.45 ? 'isn’t himself' : '';
+    if (wrong) trouble.push({ face: avatar(c), title: esc(c.name), sub: esc(cap1(wrong)), tone: 'warn', a: wrong.startsWith('owes') || wrong.includes('Sunday') || wrong.includes('unaccounted') ? `talk:${c.id}|tk:earn` : `ent:${c.id}` });
     const tr = crewTrend(c);
-    if (tr) flags.push(tr);
-    if (c.books.arrears > 0) flags.push(`owes ${money(c.books.arrears)}`);
-    if (c.books.missed >= 2) flags.push(`${c.books.missed} short weeks running`);
-    if (fl_ && fl_.amt > 0) flags.push(`${money(Math.round(fl_.amt))} unaccounted`);
-    if (c.problem && c.problem.revealed) flags.push(PROBLEM_LABEL[c.problem.kind]);
-    else if (c.problem && c.problem.sev > 0.45) flags.push('not himself');
-    const env = !last ? '' : last.due <= 0 ? 'nothing due' : last.paid <= 0 ? `nothing of ${money(last.due)}` : last.paid < last.due * 0.92 ? `${money(last.paid)} of ${money(last.due)}` : money(last.paid);
-    const tone = !last || last.due <= 0 ? '' : last.paid <= 0 ? 'bad' : last.paid < last.due * 0.92 ? 'warn' : 'good';
-    const short = c.books.arrears > 0 || c.books.missed > 0 || (fl_?.amt ?? 0) > 0;
-    const row: Row = { face: avatar(c), title: esc(c.name), sub: `${esc(act ? act.why : st.word === 'free' ? 'free' : st.word)} · ${esc(skillLine(c))} · passes up ${Math.round(effectiveRate(w, c) * 100)}%${flags.length ? `<br><b class="cr-flag">${esc(flags.join(' · '))}</b>` : ''}`, end: env ? `last Sunday<br><span class="fig">${esc(env)}</span>` : '', tone: tone as Row['tone'], a: `ent:${c.id}` };
-    return `<div class="cr-man">${rows([row])}${acts(btn(short ? `talk:${c.id}|tk:earn` : `talk:${c.id}`, short ? 'His money' : 'See him', 'quiet'), btn(`books:${c.id}`, 'His books', 'quiet'), btn(`orders:${c.id}`, 'Give him work', 'quiet'))}</div>`;
-  }).join('');
-  // running the crew: one list of what you can do with them all
+    const sunday = !lastC ? 'nothing yet' : lastC.due <= 0 ? 'nothing due on Sunday' : lastC.paid <= 0 ? 'brought nothing' : `brought ${money(lastC.paid)}`;
+    cards.push({ face: avatar(c), title: esc(c.name), sub: `${esc(act ? act.why : 'no work from you')} · ${esc(sunday)}${tr ? ` · ${esc(tr)}` : ''}`, end: esc(reliabWord(c)), a: `ent:${c.id}` });
+  }
+  if (trouble.length) out += h('Needs a word', String(trouble.length)) + rows(trouble);
+  out += h('Your men', String(crew.length)) + rows(cards);
+  // running the crew: numbered, like every decision
   const ps = prospects(w, p).length;
-  out += h('Run the crew') + rows([
-    { title: 'Give orders', sub: 'Send a man out on a job.', a: 'orders:' },
-    { title: 'Crew meeting', sub: 'The week, complaints, work.', a: 'meet:crew' },
-    { title: 'Host a dinner', sub: 'Bring people together at your table.', a: 'meet:dinner' },
-    { title: 'Take on a man', sub: ps ? `${ps} looking for a start.` : 'Nobody is looking for a start right now.', a: 'recruit:' },
-  ]);
   const moves = crewMoves(w, p);
   S.moves = moves;
-  if (moves.length) out += rows(moves.map((m, i): Row => ({ title: esc(m.label), a: `cmove:${i}` })));
-  const rc = recommendable(w, p);
-  const rk = recruitable(w, p);
-  if (rc.length || rk.length) out += h('Build your crew') + rows([
+  out += h('Run the crew') + choices([
+    { a: 'orders:', label: 'Give orders', hint: idle ? `${idle} ${idle === 1 ? 'man is' : 'men are'} free.` : 'Send a man out on a job.' },
+    { a: 'meet:crew', label: 'Call a crew meeting', hint: 'The week, complaints, work.' },
+    { a: 'meet:dinner', label: 'Host a dinner', hint: 'Bring people together at your table.' },
+    ...(ps ? [{ a: 'recruit:', label: 'Take on a man', hint: `${ps} looking for a start.` }] : []),
+    ...moves.map((m, i) => ({ a: `cmove:${i}`, label: m.label })),
+  ], 'Run the crew');
+  out += recruitRows(w, p);
+  out += crewOverview(w, p, crew);
+  return out;
+}
+function recruitRows(w: World, p: Character): string {
+  const rc = recommendable(w, p), rk = recruitable(w, p);
+  if (!rc.length && !rk.length) return '';
+  return h('Build your crew') + rows([
     ...rc.map((c): Row => ({ face: avatar(c), title: `Put ${esc(c.name)} forward`, sub: 'Your name goes with his.', a: `rec:${c.id}` })),
     ...rk.map((c): Row => ({ face: avatar(c), title: `Take on ${esc(c.name)}`, sub: `${esc(c.district)}. He likes you and he wants in.`, a: `recr:${c.id}` })),
   ]);
-  return out;
 }
+// How a man pays, in a word (from the same record as the figures table)
+const reliabWord = (c: Character) => ({ Solid: 'pays solid', Mostly: 'mostly pays', Patchy: 'patchy', Poor: 'poor payer' } as Record<string, string>)[reliab(c)] ?? '';
 
 export function recruitView(): string {
   const w = W();
@@ -346,14 +348,28 @@ const chipText = (id: Id) => {
 // know are in, and every shop on the street; Saturday afternoons, the track. The old rooms stand for everywhere else.
 export function placesView(home = false): string {
   const w = W(), p = P();
-  const known = (id: string) => whoIsAt(w, id).filter((c) => (c.rels[p.id]?.known ?? 0) > 0 || c.familyId === p.familyId).length;
-  const all = spots(w), shut = (x: Spot) => (openAt(x, w.now) ? '' : ' · shut right now');
-  let out = (home ? '' : back()) + title(home ? 'The street' : 'Around town', esc(SLICE));
+  const all = spots(w);
+  // when a place keeps its hours, and who is in it, in a phrase: the first man you know by name, and how many more
+  const hours = (x: Spot) => { const o = x.open[0] % 24, c = x.open[1] % 24, hh = (n: number) => `${n}:00`; return openAt(x, w.now) ? `Open till ${hh(c)}` : x.kind === 'track' ? 'Saturday afternoons' : `Shut · opens ${hh(o)}`; };
+  const inside = (x: Spot) => {
+    if (!openAt(x, w.now)) return '';
+    const here = whoIsAt(w, x.id), mine = here.filter((c) => (c.rels[p.id]?.known ?? 0) > 0 || c.familyId === p.familyId);
+    if (!mine.length) return here.length ? 'nobody you know' : 'quiet';
+    const first = mine.sort((a2, b2) => (b2.rels[p.id]?.trust ?? 0) - (a2.rels[p.id]?.trust ?? 0))[0];
+    return `${first.name}${mine.length > 1 ? `, and ${mine.length - 1} more you know` : ' is in'}`;
+  };
+  let out = (home ? '' : back()) + title(SLICE, home ? 'Where you go. Pick a place to see who’s in, and what you can do there.' : '');
   const pub = all.filter((x) => x.kind !== 'biz');
   if (openAt(TRACK, w.now)) pub.push(TRACK);
-  out += choices(pub.map((x) => ({ a: `place:${x.id}`, label: x.name, hint: `${x.kind === 'club' && x.famId !== p.familyId ? 'Another family’s club. ' : ''}${openAt(x, w.now) ? (known(x.id) ? `${known(x.id)} you know in.` : 'Open.') : 'Shut right now.'}${x.kind === 'track' ? ' Fifty minutes out to Queens.' : ''}` })), 'Where you go');
-  const shops = all.filter((x) => x.kind === 'biz');
-  if (shops.length) out += h('The shops on the street', String(shops.length)) + rows(shops.map((x): Row => { const b = w.biz[x.biz!], o = w.chars[b.ownerId]; return { title: esc(x.name), sub: `${o ? esc(o.name) : ''}${knowsProtection(w, p, b) && b.protection && b.protection.collectorId !== b.ownerId ? ` · pays ${b.protection.collectorId === p.id ? 'you' : esc(w.chars[b.protection.collectorId]?.name ?? 'somebody')}` : ''}${shut(x)}`, a: `place:${x.id}` }; }));
+  out += choices(pub.map((x) => ({ a: `place:${x.id}`, label: x.name, hint: [x.kind === 'club' && x.famId !== p.familyId ? 'Another family’s club' : '', hours(x), inside(x), x.kind === 'track' ? 'fifty minutes out to Queens' : ''].filter(Boolean).join(' · ') })), 'Where you go');
+  // the shops: the ones that pay you first, then your men's, then the rest, folded
+  const shops = all.filter((x) => x.kind === 'biz').map((x) => ({ x, b: w.biz[x.biz!] }));
+  const payer = (b: (typeof shops)[number]['b']) => (knowsProtection(w, p, b) && b.protection && b.protection.collectorId !== b.ownerId ? b.protection.collectorId : '');
+  const shopRow = ({ x, b }: (typeof shops)[number]): Row => { const o = w.chars[b.ownerId], who = payer(b); return { title: esc(x.name), sub: `${o ? esc(o.name) : ''}${who && who !== p.id && w.chars[who]?.bossId !== p.id ? ` · pays ${esc(w.chars[who]?.name ?? 'somebody')}` : ''} · ${esc(hours(x).toLowerCase())}`, a: `place:${x.id}` }; };
+  const yours = shops.filter((s2) => payer(s2.b) === p.id), mens = shops.filter((s2) => payer(s2.b) && w.chars[payer(s2.b)]?.bossId === p.id), rest = shops.filter((s2) => !yours.includes(s2) && !mens.includes(s2));
+  if (yours.length) out += h('Paying you', String(yours.length)) + rows(yours.map(shopRow));
+  if (mens.length) out += h('Paying your men', String(mens.length)) + rows(mens.map(shopRow));
+  if (rest.length) out += `<details class="pp-more"${yours.length + mens.length ? '' : ' open'}><summary>${yours.length + mens.length ? 'The other shops' : 'The shops'} (${rest.length})</summary>${rows(rest.map(shopRow))}</details>`;
   // (the old rooms, for everywhere else; the family's own club is on the street above when it stands in this district)
   out += h('Elsewhere') + choices([...(home ? [{ a: 'bj:', label: 'A card table', hint: 'Blackjack at the family casinos. The house usually wins.' }] : []), ...PLACES.filter((pl_) => !(pl_.id === 'club' && all.some((x) => x.kind === 'club' && x.famId === p.familyId))).map((pl_) => ({ a: `place:${pl_.id}`, label: pl_.name, hint: `${pl_.blurb} ${isOpen(w, pl_.id) ? 'Open.' : 'Shut right now.'}` }))], 'Elsewhere');
   return out;
@@ -476,11 +492,14 @@ export function familyTab(): string {
     { title: 'Your place in line', sub: 'Where you stand for the next rank, and what is holding you back.', a: 'career:' },
     ...(sundayDue() ? [{ title: 'Sunday at the social club', sub: 'The envelopes are coming in.', a: 'sunday:', mark: 'amber' } as Row] : []),
   ]);
-  let side = orgCard(fid);
-  const shops = Object.values(w.biz).filter((b) => b.open).sort((a, b) => Number(b.district === p.district) - Number(a.district === p.district) || a.district.localeCompare(b.district)).slice(0, S.open['shops'] ? 60 : 8);
-  side += h('Shops and places', String(Object.keys(w.biz).length)) + rows(shops.map((b): Row => ({ title: esc(b.name), sub: esc(b.district), end: !knowsProtection(w, p, b) ? '' : b.protection ? esc(w.fam[b.protection.familyId].name) : 'unprotected', a: `biz:${b.id}` }))) + (S.open['shops'] ? '' : acts(btn('tog:shops', 'Show all', 'quiet')));
-  toSide(side);
+  toSide(orgCard(fid));
   return out;
+}
+// The city's shops and who holds them, as far as you know (in More: reference, not play)
+export function cityShops(): string {
+  const w = W(), p = P();
+  const shops = Object.values(w.biz).filter((b) => b.open).sort((a, b) => Number(b.district === p.district) - Number(a.district === p.district) || a.district.localeCompare(b.district) || a.name.localeCompare(b.name));
+  return title('The city’s shops', 'Who holds each, as far as you know.') + rows(shops.slice(0, S.open['shops'] ? 200 : 25).map((b): Row => ({ title: esc(b.name), sub: esc(b.district), end: !knowsProtection(w, p, b) ? '' : b.protection ? esc(w.fam[b.protection.familyId].name) : 'nobody', a: `biz:${b.id}` }))) + (shops.length > 25 && !S.open['shops'] ? acts(btn('tog:shops', `All ${shops.length}`, 'quiet')) : '');
 }
 
 
@@ -563,7 +582,8 @@ function crewOverview(w: World, p: Character, crew: Character[]): string {
   const ops = w.ops.filter((o) => (o.state === 'running' || o.state === 'out') && (crew.some((c) => c.id === o.runner) || o.owner === p.id)).length;
   const working = crew.filter((c) => activityOf(w, c)).length;
   const stat = (k: string, v: string) => `<div class="cst"><b>${v}</b><span>${k}</span></div>`;
-  let out = `<div class="ui-card"><h2>The crew this week<small>what they tell you</small></h2><div class="cstats">${stat('Reported', money(reported))}${stat('Kicked up', money(kicks))}${stat('Outstanding', money(owed))}${stat('Rackets running', String(ops))}${stat('Busy', `${working} of ${crew.length}`)}</div></div>`;
+  void stat; void reported; void kicks; void owed; void ops; void working;
+  let out = '';
   const rows = crew.map((c) => {
     const h = wk(c);
     const act = activityOf(w, c);
@@ -571,6 +591,6 @@ function crewOverview(w: World, p: Character, crew: Character[]): string {
     const line = lineOf(w, c) ? ((lineOf(w, c)!.level ?? 1) > 1 ? 'a growing business' : 'a line of his own') : '';
     return `<tr><td><a href="#" class="nm" data-a="ent:${c.id}" style="text-decoration:none">${esc(c.name)}</a><small>${c.nick ? '“' + esc(c.nick) + '” · ' : ''}${act ? esc(act.why) : 'free'}</small></td><td>${h.length ? money(h.at(-1)!.declared) : '–'}</td><td>${h.length ? money(avg(h.map((x) => x.declared))) : '–'}</td><td>${h.length ? money(h.at(-1)!.paid) : '–'}</td><td>${reliab(c)}</td><td>${c.career && c.career.done + c.career.failed > 0 ? `${c.career.done}/${c.career.done + c.career.failed}` : '–'}</td><td title="${esc(line)}">${opsN}</td></tr>`;
   }).join('');
-  out += `<h2 class="ui-h">Side by side<small>declared figures</small></h2><div class="ui-card tbl"><table class="crewt"><thead><tr><th>Man</th><th>Week</th><th>4-wk avg</th><th>Kick-up</th><th>Pays</th><th>Jobs</th><th>Lines</th></tr></thead><tbody>${rows}</tbody></table><p class="muted" style="margin:8px 0 0;font-size:12.5px">These are the numbers they hand you. Tap a name for the full picture.</p></div>`;
+  out += `<details class="pp-more"><summary>The figures, side by side</summary><div class="ui-card tbl"><table class="crewt"><thead><tr><th>Man</th><th>Week</th><th>4-wk avg</th><th>Kick-up</th><th>Pays</th><th>Jobs</th><th>Lines</th></tr></thead><tbody>${rows}</tbody></table><p class="muted" style="margin:8px 0 0;font-size:12.5px">These are the numbers they hand you. Tap a name for the full picture.</p></div></details>`;
   return out;
 }

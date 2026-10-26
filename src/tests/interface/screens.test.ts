@@ -6,7 +6,8 @@ import { addFact, createDebt } from '../../core';
 import { addFavour } from '../../encounters';
 import { memo } from '../../deeds';
 import { week, weekLine } from '../../ui/money';
-import { businessRoom } from '../../ui/lifeview';
+
+import { businessRoom } from '../../ui/business';
 import { wordRoom } from '../../ui/word';
 import { factView, personView, todayView } from '../../ui/views_a';
 import { crewView, waitView } from '../../ui/views_b';

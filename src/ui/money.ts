@@ -28,7 +28,7 @@ export function week(w: World, p: Character): Week {
   const shops = Object.values(w.biz).filter((b) => b.open && b.protection?.collectorId === p.id);
   if (shops.length) {
     const behind = shops.reduce((a, b) => a + owedOf(b), 0);
-    comingIn.push({ label: 'Protection', amt: shops.reduce((a, b) => a + (b.protection?.fee ?? 0), 0), note: `${plural(shops.length, 'shop')}${behind ? `, ${money(behind)} behind` : ''}`, a: 'sub:business.rackets' });
+    comingIn.push({ label: 'Protection', amt: shops.reduce((a, b) => a + (b.protection?.fee ?? 0), 0), note: `${plural(shops.length, 'shop')}${behind ? `, ${money(behind)} behind` : ''}`, a: 'sub:business.home' });
   }
   // rackets you own: what each took last week
   for (const o of w.ops.filter((x) => x.owner === p.id && (x.state === 'running' || x.state === 'out'))) {
@@ -40,7 +40,7 @@ export function week(w: World, p: Character): Week {
   if (lent.length) comingIn.push({ label: 'Loans', amt: lent.reduce((a, d) => a + d.weeklyPayment, 0), note: `${plural(lent.length, 'man', 'men')} paying back`, a: 'sub:business.money' });
   // what your men brought last Sunday
   const recv = p.books.history.at(-1)?.received ?? 0;
-  if (recv > 0) comingIn.push({ label: 'Your men’s envelopes', amt: Math.round(recv), note: 'last Sunday', a: 'sub:family.men' });
+  if (recv > 0) comingIn.push({ label: 'Your men’s envelopes', amt: Math.round(recv), note: 'last Sunday', a: 'sub:people.men' });
   if (p.books.side) comingIn.push({ label: 'Side deal', amt: Math.round(p.books.side), note: 'off the books' });
   // a share in another man's trade: what it pays out of his till each week (econ.payStake), as things stand
   const stakes = stakesOf(w, p.id).filter(({ b }) => b.open);

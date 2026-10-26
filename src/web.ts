@@ -63,7 +63,7 @@ import { startingLines } from './background';
 import { draftBg, draftDone, draftName, forgetSummary, openingAct, openingView, typed } from './ui/opening';
 import { fullName } from './names';
 import { sundayView, sKey } from './ui/sunday';
-import { racketsView, wayView } from './ui/views_c';
+import { wayView } from './ui/views_c';
 
 
 // ------------------------------------------------------------------ storage
@@ -406,7 +406,7 @@ function handle(a: string, v: string) {
     case 'tab': return tab(v as Tab);
     // (leaving the new conversation by the top button is leaving it: whatever he came to you about goes unanswered, as it would)
     case 'back': if (S.view.t === 'talk2' && !S.view.v.ended) chooseVisit(w, S.view.v, 'leave'); return pop();
-    case 'career': return tab('life');
+    case 'career': S.sub.story = 'road'; tab('story'); S.view = { t: 'tab', name: 'story' }; S.stack = []; return;
     case 'paper': S.paperAt = Number(v); return;
     case 'tog': S.open[v] = !S.open[v]; return;
     case 'ent': return go({ t: 'person', id: v });
@@ -414,13 +414,6 @@ function handle(a: string, v: string) {
     case 'fact': return go({ t: 'fact', id: v });
     case 'tree': S.treeFam = v || undefined; if (S.view.t === 'tab' && S.view.name === 'family') return; return go({ t: 'tree', fam: v || P().familyId! });
     // (the four rooms of the old Life tab now live in the sections: you on your page, people, the money under Business, what you know in the Journal)
-    case 'lsub': {
-      const r = roomOf(v);
-      if (r === 'people' && W().life) { datingPool(W(), P()); save(); }
-      if (r === 'business') S.sub.business = 'money';
-      if (r === 'known') S.sub.journal = 'known';
-      return tab(r === 'you' ? 'life' : r === 'people' ? 'people' : r === 'business' ? 'business' : 'journal');
-    }
     case 'sub': { const [sec, room] = v.split('.'); if (S.view.t !== 'tab' || S.view.name !== sec) { tab(sec as Tab); S.view = { t: 'tab', name: sec as Tab }; S.stack = []; } S.sub[sec] = room; return; }
     case 'pf': S.worldFilter = v; return;
     case 'place': return go({ t: 'place', id: v });

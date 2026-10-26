@@ -103,7 +103,8 @@ const rowOf = (way: Way, st: Status) =>
   `<button class="way compact ${st.tone}" data-a="way:${way.id}"><span class="ico ${way.tone}">${svg(way.icon)}</span><span class="wt"><b>${esc(way.name)}</b><span class="wl">${esc(st.line)}</span></span><svg class="go" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>`;
 
 // ---------------------------------------------------------------- the page
-export function racketsView(): string {
+// Business, in parts (the redesign): what is running, the ways to earn, and the money nobody else counts.
+export function runningBlock(): string {
   const w = W();
   const p = P();
   const b = bucket(w);
@@ -112,11 +113,20 @@ export function racketsView(): string {
   // what is running
   const live = WAYS.filter((x) => sts.get(x.id)!.tone === 'run');
   const jobsOut = w.jobs.filter((j) => j.status === 'active' && crew(w).some((c) => c.id === j.assignee));
-  out += `<h2 class="ui-h">Your rackets<small>${live.length ? live.length + ' running' : 'nothing running'}</small></h2>`;
-  if (!live.length && !jobsOut.length) out += `<p class="muted pad">Nothing is running yet. Pick a way to earn below and set it in motion.</p>`;
+  out += h('What you run', live.length ? `${live.length} running` : '');
+  if (!live.length && !jobsOut.length) out += quiet('Nothing is running yet. Start something, and it pays you every week.');
   out += live.map((x) => cardOf(x, sts.get(x.id)!)).join('');
   if (jobsOut.length) out += h('Crew out on jobs', String(jobsOut.length)) + rows(jobsOut.map((j): Row => ({ face: avatar(w.chars[j.assignee]), title: esc(j.title), sub: `${esc(w.chars[j.assignee].name)}${j.orders ? ' · ' + (j.orders === 'hard' ? 'by any means' : 'quietly') : ''}`, a: `job:${j.id}` })));
 
+  return out;
+}
+export function waysBlock(): string {
+  const w = W();
+  const p = P();
+  const b = bucket(w);
+  const sts = new Map(WAYS.map((x) => [x.id, statusOf(w, x, b)] as const));
+  let out = '';
+  const live = WAYS.filter((x) => sts.get(x.id)!.tone === 'run'); void live;
   // the catalogue: what you could start now, by kind; what is not open to you yet, folded away
   const ready = WAYS.filter((x) => sts.get(x.id)!.tone === 'ok');
   const locked = WAYS.filter((x) => sts.get(x.id)!.tone === 'lock');
@@ -127,19 +137,19 @@ export function racketsView(): string {
   }
   if (locked.length) out += `<details class="fold g-locked"><summary class="ui-btn ui-btn--quiet">Not open to you yet (${locked.length}) &rsaquo;</summary><div class="g-ways">${locked.map((x) => rowOf(x, sts.get(x.id)!)).join('')}</div></details>`;
 
-  // beside it: the week's money (ui/money.ts, the same account Business › Money shows), and the money nobody else counts
-  { const wk = week(w, p);
-    let side = h('Your week') + `<p class="ui-note">${esc(weekLine(wk))}</p>`;
-    side += rows(wk.comingIn.slice(0, 5).map((f): Row => ({ title: esc(f.label), sub: f.note ? esc(f.note) : '', end: `<span class="fig">+${esc(money(f.amt))}</span>`, tone: 'good' })));
-    side += acts(btn('sub:business.money', 'The whole week', 'quiet'));
-    const sideAmt = p.books.side ?? 0, known = !!p.books.sideKnown;
-    const sidearr = powerOptions(w, p).find((o) => o.code === 'sidearr');
-    side += h('Hidden racket', sideAmt ? `${money(Math.round(sideAmt))} a week` : 'none yet');
-    side += `<p class="ui-note">${sideAmt ? `Side deals pay you about <b>${money(Math.round(sideAmt))}</b> a week, straight into your pocket and never into your envelope. ${known ? '<b>Your boss knows about it now.</b>' : 'Nobody upstairs knows. Each week there’s a small chance somebody finds out.'}` : 'A deal outside the family’s books: $800 in, about $120 a week out. It never counts in your envelope, and if your boss finds it you will have to explain.'}</p>`;
-    if (sidearr && !sideAmt) side += sidearr.off ? `<p class="ui-note">${esc(sidearr.hint)}</p>` : acts(btn('power:sidearr', 'Make a side arrangement ($800)'));
-    toSide(side); }
   return out;
 }
+export function hiddenBlock(): string {
+  const w = W();
+  const p = P();
+    const sideAmt = p.books.side ?? 0, known = !!p.books.sideKnown;
+    const sidearr = powerOptions(w, p).find((o) => o.code === 'sidearr');
+    let side = h('Hidden racket', sideAmt ? `${money(Math.round(sideAmt))} a week` : 'none yet');
+    side += `<p class="ui-note">${sideAmt ? `Side deals pay you about <b>${money(Math.round(sideAmt))}</b> a week, straight into your pocket and never into your envelope. ${known ? '<b>Your boss knows about it now.</b>' : 'Nobody upstairs knows. Each week there’s a small chance somebody finds out.'}` : 'A deal outside the family’s books: $800 in, about $120 a week out. It never counts in your envelope, and if your boss finds it you will have to explain.'}</p>`;
+    if (sidearr && !sideAmt) side += sidearr.off ? `<p class="ui-note">${esc(sidearr.hint)}</p>` : acts(btn('power:sidearr', 'Make a side arrangement ($800)'));
+  return side;
+}
+
 
 // ---------------------------------------------------------------- one way
 export function wayView(id: string, lines: string[] = []): string {

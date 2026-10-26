@@ -10,7 +10,8 @@ import { giveWork, needsOf } from '../../work';
 import { S } from '../../ui/state';
 import { bizView } from '../../ui/views_a';
 import { crewView, reportView } from '../../ui/views_b';
-import { businessRoom } from '../../ui/lifeview';
+
+import { businessRoom } from '../../ui/business';
 import type { Character, World } from '../../types';
 import { newWorld, P } from '../helpers';
 
