@@ -455,9 +455,6 @@ a.story { font-size: .85em; white-space: nowrap; color: var(--c-gold-2); }
 .td-next { margin: 8px 0 0; font: 400 14px var(--f-ui); color: var(--c-cream-2); }
 .td-next span { font: 600 10.5px var(--f-ui); letter-spacing: .14em; text-transform: uppercase; color: var(--c-gold); margin-right: 6px; }
 .td-calm { margin: var(--s-4) 0; font: italic 400 19px var(--f-display); color: var(--c-cream-2); }
-.td-paper { display: flex; flex-direction: column; gap: 4px; width: 100%; margin: var(--s-5) 0 var(--s-2); padding: var(--s-3) var(--s-4); background: var(--c-raise); border: 1px solid var(--c-line); border-left: 2px solid var(--c-gold-line); border-radius: var(--radius); text-align: left; color: var(--c-cream); font: 500 18px/1.3 var(--f-display); cursor: pointer; transition: background var(--t-fast); }
-.td-paper:hover { background: var(--c-raise-2); }
-.td-paper span { font: 600 10.5px var(--f-ui); letter-spacing: .14em; text-transform: uppercase; color: var(--c-gold); }
 /* The guide, lighter: one step and one button; the list and the way out are small links beside it. */
 .g-guide__acts .ui-btn--primary { width: auto; }
 .g-guide__acts .ui-btn--quiet { width: auto; min-height: 40px; padding: 6px 0; font-size: 11px; color: var(--c-muted); }
@@ -544,3 +541,75 @@ a.story { font-size: .85em; white-space: nowrap; color: var(--c-gold-2); }
 .sunall .ui-btn { width: auto; }
 .op-said { margin: var(--s-4) 0; padding-left: var(--s-4); border-left: 2px solid var(--c-gold-line); }
 .op-said p { margin: 0 0 8px; font: 400 17px/1.45 var(--f-display); color: var(--c-cream-2); }
+
+/* Today (27 October): the man and the hour, time beneath them, one list of opportunities that open, the crew as faces, the paper */
+.td-hero { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--s-4); align-items: center; margin: var(--s-4) 0 var(--s-3); }
+.td-hero__me { border: 0; padding: 0; background: none; border-radius: 50%; cursor: pointer; }
+.td-hero__me .avatar.pt { width: 84px; height: 84px; box-shadow: 0 0 0 3px var(--c-ground), 0 0 0 4px var(--c-gold-line); transition: box-shadow var(--t-fast); }
+.td-hero__me:hover .avatar.pt { box-shadow: 0 0 0 3px var(--c-ground), 0 0 0 4px var(--c-gold); }
+.td-hero__t p { margin: 0; }
+.td-hero__day { font: 600 11px/1.3 var(--f-ui); letter-spacing: var(--track); text-transform: uppercase; color: var(--c-gold); }
+.td-hero__clock { font: 500 50px/1 var(--f-display); color: var(--c-cream); font-variant-numeric: lining-nums tabular-nums; letter-spacing: .01em; margin: 4px 0 6px !important; }
+.td-hero__who { font: 400 13.5px/1.4 var(--f-ui); color: var(--c-muted); }
+.td-hero__who b { display: block; font: 500 19px/1.25 var(--f-display); color: var(--c-cream-2); letter-spacing: .01em; }
+
+.td-time { --top-h: calc(51px + max(10px, env(safe-area-inset-top, 0px))); position: sticky; top: var(--top-h); z-index: 12; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: var(--s-3) -16px var(--s-2); padding: 8px 16px; background: rgba(13, 12, 11, .94); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border-bottom: 1px solid var(--c-line); }
+.td-time button { display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: var(--tap); padding: 7px 2px; background: transparent; border: 1px solid var(--c-line-2); border-left-width: 0; color: var(--c-cream); cursor: pointer; transition: background var(--t-fast), border-color var(--t-fast); }
+.td-time button:first-child { border-left-width: 1px; border-radius: var(--radius) 0 0 var(--radius); }
+.td-time button:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
+.td-time button:hover { background: var(--c-gold-soft); }
+.td-time button:active { background: var(--c-gold-soft); border-color: var(--c-gold-line); }
+.td-time b { font: 600 11px/1.2 var(--f-ui); letter-spacing: .12em; text-transform: uppercase; }
+.td-time span { font: 400 12px/1.2 var(--f-fig); color: var(--c-muted); white-space: nowrap; }
+
+.td-ops { border-top: 1px solid var(--c-line); }
+.td-op { border-bottom: 1px solid var(--c-line); }
+.td-op > summary { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto 14px; align-items: center; gap: var(--s-3); min-height: 56px; padding: 10px 2px; cursor: pointer; list-style: none; }
+.td-op > summary::-webkit-details-marker { display: none; }
+.td-op > summary::after { content: "›"; color: var(--c-dim); font-size: 18px; transition: transform var(--t-fast); justify-self: end; }
+.td-op[open] > summary::after { transform: rotate(90deg); color: var(--c-gold); }
+.td-op > summary:hover { background: rgba(255, 255, 255, .02); }
+.td-op__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c-dim); }
+.td-op.now .td-op__dot { background: var(--c-danger); box-shadow: 0 0 0 3px var(--c-danger-soft); }
+.td-op.soon .td-op__dot { background: var(--c-gold); }
+.td-op__t { display: flex; flex-direction: column; font: 500 18px/1.25 var(--f-display); color: var(--c-cream); }
+.td-op__t small { font: 600 10px/1.4 var(--f-ui); letter-spacing: .14em; text-transform: uppercase; color: var(--c-muted); }
+.td-op__v { font: 400 13px var(--f-fig); color: var(--c-cream-2); white-space: nowrap; }
+.td-op.now .td-op__v { color: var(--c-danger); }
+.td-op__body { padding: 0 2px var(--s-4) calc(10px + var(--s-3)); }
+.td-op__sub { margin: 0 0 var(--s-2); color: var(--c-cream-2); font-size: 14px; line-height: 1.5; }
+.td-op__body .ui-btn { margin-top: var(--s-3); }
+.td-ops__more > summary { padding: 12px 2px; color: var(--c-gold-2); font: 500 13px var(--f-ui); cursor: pointer; list-style: none; }
+.td-ops__more > summary::-webkit-details-marker { display: none; }
+.td-ops__more[open] > summary { color: var(--c-muted); border-bottom: 1px solid var(--c-line); }
+
+.td-crew { display: flex; gap: var(--s-4); overflow-x: auto; scrollbar-width: none; padding: 6px 2px 4px; }
+.td-crew::-webkit-scrollbar { display: none; }
+.td-man { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 64px; padding: 0; background: none; border: 0; color: var(--c-cream); cursor: pointer; }
+.td-man .avatar.pt { width: 52px; height: 52px; margin-bottom: 4px; box-shadow: 0 0 0 2px var(--c-ground), 0 0 0 3px var(--c-line-2); transition: box-shadow var(--t-fast); }
+.td-man:hover .avatar.pt { box-shadow: 0 0 0 2px var(--c-ground), 0 0 0 3px var(--c-gold); }
+.td-man.bad .avatar.pt { box-shadow: 0 0 0 2px var(--c-ground), 0 0 0 3px var(--c-danger); }
+.td-man b { font: 500 13px/1.2 var(--f-ui); }
+.td-man span { font: 400 11px/1.2 var(--f-ui); color: var(--c-muted); white-space: nowrap; }
+.td-man.bad span { color: var(--c-danger); }
+.td-man.idle span { color: var(--c-gold-2); }
+.td-man--orders i { display: flex; align-items: center; justify-content: center; width: 52px; height: 52px; margin-bottom: 4px; border-radius: 50%; border: 1px dashed var(--c-gold-line); color: var(--c-gold); font: 400 24px var(--f-display); font-style: normal; }
+.td-man--orders:hover i { border-style: solid; background: var(--c-gold-soft); }
+
+.td-paper { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%; margin: var(--s-6) 0 var(--s-3); padding: var(--s-4) var(--s-4) var(--s-5); background: var(--c-raise); border: 0; border-top: 3px double var(--c-line-2); border-bottom: 1px solid var(--c-line-2); border-left: 0; border-radius: 0; text-align: center; color: var(--c-cream); cursor: pointer; transition: background var(--t-fast); }
+.td-paper:hover { background: var(--c-raise-2); }
+.td-paper__mast { font: 400 30px/1 var(--f-brand); letter-spacing: .02em; text-transform: none; color: var(--c-cream); }
+.td-paper__date { padding: 4px 0 10px; width: 100%; border-bottom: 1px solid var(--c-line); font: 600 10px var(--f-ui); letter-spacing: var(--track); text-transform: uppercase; color: var(--c-muted); }
+.td-paper__date b { color: var(--c-gold); }
+.td-paper__lead { margin-top: 12px; font: 500 23px/1.2 var(--f-display); color: var(--c-cream); text-wrap: balance; }
+@media (min-width: 900px) {
+  .td-time { --top-h: 0px; margin-left: 0; margin-right: 0; padding-left: 0; padding-right: 0; }
+  .td-hero__me .avatar.pt { width: 96px; height: 96px; }
+}
+/* on Today the man and the hour are the page's own head: the bar keeps the money, the street and More */
+body.g-today .g-top__me, body.g-today .g-when { display: none; }
+.td-op__facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px var(--s-4); margin: 0; font: 400 14px/1.4 var(--f-ui); }
+.td-op__facts dt { color: var(--c-muted); }
+.td-op__facts dd { margin: 0; color: var(--c-cream-2); }
+/* on a phone, Today ends with the paper: where you stand has its page under Story */
+@media (max-width: 899px) { body.g-today .g-side { display: none; } }

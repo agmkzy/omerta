@@ -16,19 +16,18 @@ import { queueOf, queueView } from './family';
 import { pathCard, powersCard } from './pathview';
 import { pathInfo } from '../path';
 import { capOf, careerLines, isRunner, members, promoSteps, seats, standingTable, vacancy } from '../career';
-import { factText, famName, fmtTime, money, ownerBiz, shortTime } from '../core';
-import { KIND_LABEL, playerSide, standingWord, staleReason } from '../jobs';
+import { factText, famName, money, ownerBiz, shortTime } from '../core';
+import { activityOf, KIND_LABEL, playerSide, standingWord, staleReason } from '../jobs';
 import { GIG_LABEL } from '../gigs';
 import { lateOf, PROBLEM_LABEL } from '../people';
 import { Character, DAY, Enc, Id, World } from '../types';
-import { salience, sourceOf, versionOf } from '../rumour';
 import { isOpen } from '../situ';
 import { arch } from '../voice';
 import { isMade, sanctioned } from '../politics';
 import { isFemale, isPartner, kinOf, kinWord, stageWord, warmthWord } from '../life';
 import { dangerLevel, LADDER_WORDS } from '../danger';
 import { favourWord, owedTo, owing } from '../encounters';
-import { timeBar } from './views_b';
+import { crewList, waitChoices } from './views_b';
 import { myDisputes, playerMoved } from './views_c';
 import { storiesTab, storiesOf, storyKnown, type Story } from './stories';
 import { ambitionCard } from './ambview';
@@ -62,6 +61,9 @@ export interface Need {
   k?: string;
   who?: Id;
   when?: string;
+  pay?: number; // (what it pays, when it is work on offer)
+  from?: Id; // (who it comes from, when that is not a man waiting on you)
+  due?: number; // (when it runs out)
 }
 export const isAttn = (n: Need) => n.dot === 'red' || n.dot === 'amber' || n.a === 'sunday:';
 export const attentionCount = () => needs().filter(isAttn).length;
@@ -147,7 +149,7 @@ export function needs(): Need[] {
     out.push({ dot: r.late ? 'red' : 'amber', k: 'Your word', title: `What you told ${c.name}`, sub: `${r.text} ${isFemale(c) ? 'She' : 'He'} ${r.late ? 'expected it done by now.' : `expects it done ${byWhen(w.now, r.due!)}.`}`, a: `talk:${c.id}`, who: c.id });
   }
   for (const j of w.jobs.filter((x) => x.status === 'offered' && playerSide(w, x) && !staleReason(w, x)).sort((a, b) => Number(b.kind === 'summons') - Number(a.kind === 'summons') || Number(b.via === 'boss') - Number(a.via === 'boss'))) {
-    out.push({ dot: j.kind === 'summons' || j.via === 'boss' ? 'amber' : j.via === 'tip' || j.kind === 'gig' ? 'green' : 'green', k: j.kind === 'gig' ? GIG_LABEL[String(j.extra?.gig) as keyof typeof GIG_LABEL] ?? 'Opportunity' : KIND_LABEL[j.kind], title: j.title, sub: `${j.meeting === 'accounts' && p.books.arrears >= 20 ? `You owe him ${money(Math.round(p.books.arrears))}. ` : ''}${j.giver ? 'From ' + w.chars[j.giver]?.name : 'A tip'}${j.pay > 0 ? ', about ' + money(j.pay) : ''}. It won’t wait past ${byWhen(w.now, j.expires).replace(/^by /, '')}.`, when: byWhen(w.now, j.expires).replace(/^by /, ''), a: `job:${j.id}` });
+    out.push({ dot: j.kind === 'summons' || j.via === 'boss' ? 'amber' : j.via === 'tip' || j.kind === 'gig' ? 'green' : 'green', k: j.kind === 'gig' ? GIG_LABEL[String(j.extra?.gig) as keyof typeof GIG_LABEL] ?? 'Opportunity' : KIND_LABEL[j.kind], title: j.title, sub: `${j.meeting === 'accounts' && p.books.arrears >= 20 ? `You owe him ${money(Math.round(p.books.arrears))}. ` : ''}${j.giver ? 'From ' + w.chars[j.giver]?.name : 'A tip'}${j.pay > 0 ? ', about ' + money(j.pay) : ''}. It won’t wait past ${byWhen(w.now, j.expires).replace(/^by /, '')}.`, when: byWhen(w.now, j.expires).replace(/^by /, ''), a: `job:${j.id}`, pay: j.pay, from: j.giver ?? undefined, due: j.expires });
   }
   // work he has taken on and not finished: his, wherever he said yes to it, until it is done (doing what it asks, his own way, does it)
   for (const j of w.jobs.filter((x) => x.status === 'active' && x.assignee === p.id && x.kind !== 'summons' && x.giver !== p.id)) {
@@ -184,23 +186,6 @@ export function needRow(n: Need): Row {
   // (a label that the title already says is left off: "A quarrel" over "A quarrel: Sammy and Gino")
   const k = n.k && !plain(n.title).toLowerCase().startsWith(n.k.toLowerCase()) ? n.k : '';
   return { face: c ? avatar(c) : undefined, mark: c ? undefined : n.dot === 'blue' ? 'blue' : n.dot, kick: c ? `${c.name}${k ? ' · ' + k : ''}` : k, title: plain(n.title), sub: plain(n.sub), tone: n.dot === 'red' ? 'bad' : '', a: n.a };
-}
-
-// A quiet line or two of what has reached him lately: his version of it, and where he had it from.
-function heardLately(): string {
-  const w = W(), p = P();
-  const xs = Object.entries(p.known)
-    .map(([id, k]) => ({ f: w.facts[id], k }))
-    .filter(({ f, k }) => f && !f.minor && k.from !== 'self' && k.from !== 'witness' && w.now - k.t < 7 * DAY && f.actor !== p.id && !['gambling_loss', 'report', 'trouble'].includes(f.kind) && salience(w, p, f) >= 0.35)
-    .sort((a, b) => b.k.t - a.k.t)
-    .slice(0, 2);
-  if (!xs.length) return '';
-  const day = (t: number) => { const d = Math.floor(w.now / DAY) - Math.floor(t / DAY); return d <= 0 ? 'Today' : d === 1 ? 'Yesterday' : `${d} days ago`; };
-  return h('Lately you’ve heard') + rows(xs.map(({ f, k }): Row => {
-    const to = f.story && storyKnown(w, f.story) ? `story:${f.story}` : `fact:${f.id}`;
-    const src = sourceOf(w, p, f);
-    return { title: `<i>${lk(versionOf(w, p, f)).replace(/<a [^>]*>(.*?)<\/a>/g, '$1')}</i>`, sub: `${esc(day(k.t))}${src ? ` · ${esc(src.charAt(0).toUpperCase() + src.slice(1))}` : ''}${to.startsWith('story:') ? ' · <b>follow it</b>' : ''}`, a: to };
-  }));
 }
 
 // ------------------------------------------------------------------ the first week
@@ -273,43 +258,37 @@ export function todayView(): string {
       + (e.glad.length ? `<p>${esc(e.glad.map((c) => c.name).join(', '))} ${e.glad.length === 1 ? 'was' : 'were'} not sorry.</p>` : '')
       + h('The Herald') + `<p class="herald-line">${esc(e.herald)}</p>` + acts(btn('reset:go', 'Start a new life', 'primary'));
   }
-  // Today (owner, 26 October): the present, and nothing that has a home elsewhere. Your situation in a line; what needs you; what
-  // has reached you; what you could do next; and time. Places are the Street, men are People, money is Business, the record is Story.
+  // Today (owner, 27 October): the man and the hour first, with time in reach beneath them; what is waiting on him; the
+  // opportunities as one list, each opening to what it is; his crew as faces; the Herald's headline. The rest has its own section.
+  out += todayHead(w, p) + timeStrip();
   const dg = dangerLevel(w);
   if (dg.level > 0 && dg.who) out += context([`<b>Watch your back.</b> ${lk(dg.who.name)} is after you: ${esc(LADDER_WORDS[dg.level])}. It won’t stop by itself.`], true);
   // out from inside: the account of it, once, before anything else (inside.ts)
   if (p.inside?.done && !p.inside.seen && p.inside.account?.length) out += `<section class="wd-inside ui-card" aria-label="Inside"><h2>Back on the street</h2>${p.inside.account.map((l, i) => `<p${i ? '' : ' class="lead"'}>${lk(esc(l))}</p>`).join('')}${acts(btn('insideok:', 'Get back to it', 'primary'))}</section>`;
   // what just happened, and what it changed
   out += justNow();
-  // ---- your situation: who you are today, and what is coming due
-  const cu = comingUp()[0];
-  out += `<header class="td-now"><p class="td-when">${esc(fmtTime(w.now))}</p><p class="td-who">${esc(situationLine(w, p))}</p>${cu ? `<p class="td-next"><span>Coming up</span> ${esc(shortTime(cu.t))} · ${esc(cu.text)}</p>` : ''}</header>`;
-  // ---- what needs you: one card per matter, the most pressing first
+  // ---- waiting on you: one card per matter, the most pressing first
   const ns = needs();
   // (the same thing twice is one card: "Tell Sal Gallo how it went" for three jobs is one visit)
   const seen = new Set<string>();
   const attn = ns.filter(isAttn), opps = ns.filter((n) => !attn.includes(n) && !seen.has(n.title) && !!seen.add(n.title));
   if (attn.length) {
-    out += h('Needs you', String(attn.length)) + rows((S.open.needs ? attn : attn.slice(0, 3)).map(needRow));
+    out += h('Waiting on you', String(attn.length)) + rows((S.open.needs ? attn : attn.slice(0, 3)).map(needRow));
     if (attn.length > 3) out += acts(btn('tog:needs', S.open.needs ? 'Show fewer' : `${attn.length - 3} more`, 'quiet'));
   } else out += `<p class="td-calm">Nothing is pressing. The day is yours.</p>`;
   out += guideCard();
-  // ---- what has reached you: the word while time passed, then what you've heard lately
+  // ---- what reached you while time passed
   const word = S.news.slice(0, 3);
   if (word.length) out += h('Word reaches you') + `<ul class="wd-news">${word.map((n) => `<li>${n}</li>`).join('')}</ul>`;
-  else out += heardLately();
-  // ---- what you could do: the offers in front of you, then what your position puts in reach
-  const could: Row[] = (S.open.opps ? opps : opps.slice(0, 3)).map(needRow);
-  for (const x of couldDo(w, p)) could.push(x);
-  if (could.length) out += h('What you could do') + rows(could);
-  if (opps.length > 3) out += acts(btn('tog:opps', S.open.opps ? 'Show fewer' : `${opps.length - 3} more offers`, 'quiet'));
-  // ---- time
-  out += h('Let time pass') + timeBar();
-  // ---- the paper, one line
+  // ---- opportunities: one list, each a line that opens
+  out += oppList(w, [...opps, ...couldDo(w, p)]);
+  // ---- your crew, as faces
+  out += crewStrip(w, p);
+  // ---- the paper: its headline
   const paper = (w.papers ?? []).at(-1);
-  if (paper) { const fresh = (S.seenBrief ?? 0) < paper.t; out += `<button class="td-paper" data-a="brief:"><span>The Herald${fresh ? ' · new' : ''}</span>${esc(paper.lead)}</button>`; }
+  if (paper) { const fresh = (S.seenBrief ?? 0) < paper.t; out += `<button class="td-paper" data-a="brief:"><span class="td-paper__mast">The Herald</span><span class="td-paper__date">${esc(longDate(paper.t))}${fresh ? ' · <b>new</b>' : ''}</span><span class="td-paper__lead">${esc(paper.lead)}</span></button>`; }
 
-  // ---- beside it (desktop), or after it (phone): where you stand, briefly
+  // ---- beside it (desktop): where you stand, briefly
   const steps = promoSteps(w, p), a_ = p.ambition, amb = a_ ? AMBS.find((x) => x.kind === a_.kind) : undefined;
   const now = steps ? `being considered: ${steps.filter((x) => x.state === 'done').length} of ${steps.length} steps` : pathInfo(w, p) ? 'on the path' : `reputation ${standingWord(p.standing)}`;
   let side = `<button class="ui-card g-career" data-a="career:"><h2>Your road<small>&rsaquo;</small></h2><p><b class="g-cap">${esc(p.rank)}</b> · ${esc(now)}</p>${amb ? `<p class="muted">Ambition: ${esc(amb.label)}${a_?.done ? ' (done)' : ''}</p>` : ''}</button>`;
@@ -319,32 +298,75 @@ export function todayView(): string {
   return out;
 }
 
-// Who you are today, in a sentence that changes with rank: an associate has a captain; a soldier has a captain and maybe men; a
-// captain has a crew; above that, the family.
-function situationLine(w: World, p: Character): string {
-  const boss = p.bossId ? w.chars[p.bossId] : undefined, fam = p.familyId ? famName(w, p) : '';
-  const men = Object.values(w.chars).filter((c) => c.alive && c.bossId === p.id).length;
-  const crew = boss ? `${boss.name}’s crew` : `the ${fam} family`;
-  if (p.jailedUntil > w.now) return 'Inside, and counting the days.';
-  if (p.rank === 'associate') return `An associate with ${crew}${promoSteps(w, p) ? '. Your name is up to be made' : ''}.`;
-  if (p.rank === 'soldier') return `A made man in ${crew}${men ? `, with ${men} ${men === 1 ? 'man' : 'men'} of your own` : ''}.`;
-  if (p.rank === 'capo') return `Captain of your own crew: ${men} ${men === 1 ? 'man' : 'men'}.`;
-  if (p.rank === 'underboss') return `Underboss of the ${fam} family.`;
-  if (p.rank === 'boss') return `Boss of the ${fam} family.`;
-  return 'Nobody’s man yet.';
+// What your position puts in reach today, as opportunities with no deadline: never what another section already offers as a matter
+// of course (the heat is in the top bar, the crew has its own row).
+function couldDo(w: World, p: Character): Need[] {
+  const out: Need[] = [];
+  if (p.job) { const done = p.job.last === Math.floor(w.now / DAY); if (!done) out.push({ dot: 'blue', k: 'Honest work', title: 'Work a shift', sub: `${p.job.kind} at ${p.job.biz ? w.biz[p.job.biz].name : w.chars[p.job.boss].name}. Honest money, and cover.`, a: 'shift:' }); }
+  else if (p.rank === 'associate' && w.now < 21 * DAY && !w.goals?.done['g:club']) { const cl = spots(w).find((x) => x.kind === 'club' && x.famId === p.familyId); out.push({ dot: 'blue', k: 'Be seen', title: 'Go down to the club', sub: 'The men who matter drink their coffee there, and work goes to the faces it sees.', a: cl ? `spot:${cl.id}` : 'tab:street' }); }
+  const hint = grudgeHint();
+  if (!/^no\b|nobody|nothing/i.test(hint)) out.push({ dot: 'blue', k: 'A score to settle', title: 'Settle a score', sub: hint.charAt(0).toUpperCase() + hint.slice(1) + '.', a: 'grudges:' });
+  return out;
 }
 
-// What your position puts in reach today, at most three: never what another section already offers as a matter of course.
-function couldDo(w: World, p: Character): Row[] {
-  const out: Row[] = [];
-  const men = Object.values(w.chars).filter((c) => c.alive && c.bossId === p.id);
-  if (p.heat > 0.15) out.push({ mark: 'amber', title: 'Lay low', sub: 'The heat is on you. Let it fade before you do anything loud.', a: 'cat:work' });
-  if (men.length) { const idle = men.filter((c) => !Object.values(w.jobs).some((j) => j.assignee === c.id && j.status === 'active')).length; out.push({ mark: 'blue', title: 'Put your men to work', sub: idle ? `${idle} of ${men.length} have nothing from you.` : 'Every man has something from you.', a: 'orders:' }); }
-  if (p.job) { const done = p.job.last === Math.floor(w.now / DAY); if (!done) out.push({ mark: 'blue', title: 'Work a shift', sub: `${p.job.kind} at ${p.job.biz ? w.biz[p.job.biz].name : w.chars[p.job.boss].name}. Honest money, and cover.`, a: 'shift:' }); }
-  else if (p.rank === 'associate' && w.now < 21 * DAY && !w.goals?.done['g:club']) { const cl = spots(w).find((x) => x.kind === 'club' && x.famId === p.familyId); out.push({ mark: 'blue', title: 'Go down to the club', sub: 'Be seen. The men who matter drink their coffee there, and work goes to the faces it knows.', a: cl ? `place:${cl.id}` : 'place:club' }); }
-  const hint = grudgeHint();
-  if (!/^no\b|nobody|nothing/i.test(hint)) out.push({ mark: 'red', title: 'Settle a score', sub: hint.charAt(0).toUpperCase() + hint.slice(1) + '.', a: 'grudges:' });
-  return out.slice(0, 3);
+const WEEKDAY = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const MONTH = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const hhmm = (t: number) => `${String(Math.floor((t % DAY) / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+// (the world's minute 0 is Monday 2 March 1970, 00:00)
+export function longDate(t: number): string { const d = new Date(Date.UTC(1970, 2, 2) + t * 60000); return `${WEEKDAY[Math.floor(t / DAY) % 7]} ${d.getUTCDate()} ${MONTH[d.getUTCMonth()]}`; }
+
+// The man and the hour: his face, the day and the time as the clock says it, and where he stands in a line.
+function todayHead(w: World, p: Character): string {
+  const boss = p.bossId ? w.chars[p.bossId] : undefined;
+  const men = Object.values(w.chars).filter((c) => c.alive && c.bossId === p.id).length;
+  const rank = p.jailedUntil > w.now ? 'Inside' : ({ civilian: 'Nobody’s man yet', associate: 'Associate', soldier: 'Made man', capo: 'Captain', underboss: 'Underboss', boss: 'Boss' } as Record<string, string>)[p.rank] ?? p.rank;
+  const where = [rank, p.rank === 'underboss' || p.rank === 'boss' ? `the ${famName(w, p)} family` : boss ? `${boss.name.split(' ').at(-1)}’s crew` : p.familyId ? `the ${famName(w, p)} family` : '', men ? `${men} ${men === 1 ? 'man' : 'men'} of your own` : ''].filter(Boolean).join(' · ');
+  return `<header class="td-hero"><button class="td-hero__me" data-a="ent:${p.id}" aria-label="Your page">${avatar(p)}</button><div class="td-hero__t"><p class="td-hero__day">${esc(longDate(w.now))} 1970</p><p class="td-hero__clock">${hhmm(w.now)}</p><p class="td-hero__who"><b>${esc(p.name)}</b> ${esc(where)}</p></div></header>`;
+}
+
+// Time, in reach under the clock: where each choice takes him, by the clock.
+function timeStrip(): string {
+  const w = W(), today = Math.floor(w.now / DAY);
+  const day = (t: number) => WEEKDAY[Math.floor(t / DAY) % 7].slice(0, 3);
+  return `<nav class="td-time" aria-label="Let time pass">${waitChoices().map((o, i) => {
+    const at = w.now + o.mins;
+    const sub = o.event ? 'or sooner' : Math.floor(at / DAY) === today || o.label === 'Sunday' ? hhmm(at) : `${day(at)} ${hhmm(at)}`;
+    return `<button data-a="waitgo:${i}"><b>${esc(o.label === 'Next week' ? 'A week' : o.label)}</b><span>${esc(sub)}</span></button>`;
+  }).join('')}</nav>`;
+}
+
+// The opportunities: one list, each line what it is and what it pays, opening to who it is from, until when, and the way in.
+function oppList(w: World, xs: Need[]): string {
+  if (!xs.length) return '';
+  const today = Math.floor(w.now / DAY);
+  const tone = (x: Need) => x.due !== undefined ? (Math.floor(x.due / DAY) <= today ? 'now' : Math.floor(x.due / DAY) - today < 3 ? 'soon' : 'later') : x.dot === 'red' ? 'now' : x.dot === 'amber' ? 'soon' : 'later';
+  const plain = (x: string) => lk(x).replace(/<a [^>]*>(.*?)<\/a>/g, '$1');
+  const order = { now: 0, soon: 1, later: 2 } as const;
+  const sorted = xs.slice().sort((a, b) => order[tone(a)] - order[tone(b)] || (a.due ?? 1e12) - (b.due ?? 1e12));
+  const item = (x: Need) => {
+    const c = x.from ? w.chars[x.from] : x.who ? w.chars[x.who] : undefined, tn = tone(x);
+    const facts: KV[] = [];
+    if (c) facts.push(['From', pl(c)]);
+    if (x.pay) facts.push(['Pays', `about ${money(x.pay)}`]);
+    if (x.due !== undefined) facts.push(['Until', esc(Math.floor(x.due / DAY) <= today ? `today, ${hhmm(x.due)}` : `${longDate(x.due)}`)]);
+    const about = x.due !== undefined && x.pay !== undefined ? '' : `<p class="td-op__sub">${plain(x.sub)}</p>`;
+    return `<details class="td-op ${tn}"><summary><i class="td-op__dot" aria-hidden="true"></i><span class="td-op__t"><small>${esc(x.k ?? '')}</small>${plain(x.title)}</span><span class="td-op__v">${x.pay ? money(x.pay) : tn === 'now' ? 'today' : esc(x.when ?? '')}</span></summary><div class="td-op__body">${about}${facts.length ? `<dl class="td-op__facts">${facts.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join('')}</dl>` : ''}<button class="ui-btn ui-btn--primary" data-a="${esc(x.a)}">Look into it</button></div></details>`;
+  };
+  const top = sorted.slice(0, 5), rest = sorted.slice(5);
+  return h('Opportunities', String(xs.length)) + `<div class="td-ops">${top.map(item).join('')}${rest.length ? `<details class="td-ops__more"><summary>${rest.length} more</summary>${rest.map(item).join('')}</details>` : ''}</div>`;
+}
+
+// His crew as faces: what each is doing, in a word, and a man in trouble marked.
+function crewStrip(w: World, p: Character): string {
+  const men = crewList();
+  if (!men.length) return '';
+  const state = (c: Character): [string, string] => {
+    const st = statusOf(w, c);
+    if (st.dot === 'red') return [st.word, 'bad'];
+    if (c.books.arrears > 0) return [`owes ${money(Math.round(c.books.arrears))}`, 'bad'];
+    return activityOf(w, c) ? ['working', ''] : ['free', 'idle'];
+  };
+  return h('Your crew', String(men.length)) + `<div class="td-crew">${men.map((c) => { const [word, tn] = state(c); return `<button class="td-man ${tn}" data-a="ent:${c.id}">${avatar(c)}<b>${esc(c.name.split(' ')[0])}</b><span>${esc(word)}</span></button>`; }).join('')}<button class="td-man td-man--orders" data-a="orders:"><i aria-hidden="true">›</i><b>Orders</b><span>${men.filter((c) => !activityOf(w, c) && statusOf(w, c).dot !== 'red').length} free</span></button></div>`;
 }
 
 function grudgeHint(): string {

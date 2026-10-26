@@ -331,6 +331,7 @@ function render() {
   // Scenes (a conversation, a meeting, an encounter, the card table) take the whole phone: the tabs step aside until you leave.
   document.body.classList.toggle('g-scene', !!S.w && ['meeting', 'enc', 'bj', 'sunday', 'approach', 'settle', 'talk2'].includes(S.view.t));
   document.body.classList.toggle('g-talk', !!S.w && S.view.t === 'talk2');
+  document.body.classList.toggle('g-today', !!S.w && S.view.t === 'tab' && S.view.name === 'today');
   takeSide();
   if (!S.w) {
     app.innerHTML = openingView(S.notice, hasSave());
