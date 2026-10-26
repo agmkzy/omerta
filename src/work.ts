@@ -233,9 +233,12 @@ export function workWeek(w: World) {
     delegate(w, g);
     let men = menOf(w, g);
     const hard = temper(g).volatility > 0.6 ? 'hard' : 'quiet';
+    let asked = false;
     for (const n of needsOf(w, g)) {
+      // (the work an associate does to get known: now and then the made man gives it to the player he knows rather than to his own)
+      if (!asked && (!men.length || w.rng.chance(0.35)) && askPlayer(w, g, n)) { asked = true; continue; }
       const m = men.length ? pickMan(w, g, n, men) : undefined;
-      if (!m) { if (askPlayer(w, g, n)) break; continue; }
+      if (!m) continue;
       men = men.filter((x) => x !== m);
       giveWork(w, g, m, n, hard);
     }

@@ -193,7 +193,8 @@ const encRows = (c: Ctx, id: string): Offer[] => { const e = asksOf(c.w, c.n).fi
 const encOpen: Act = {
   base: 'enc_open', pane: 'business', opens: true,
   offersFor: encRows,
-  offers: (c) => asksOf(c.w, c.n).slice(0, 3).map((e, i) => ({ code: 'enc_open:' + e.id, label: `About what he asked: ${e.title}`, says: 'You wanted to ask me something?', note: i ? 'He is waiting on your answer.' : e.lines.at(-1)?.replace(/^[^“"]*(?=[“"])/, ''), kind: (i ? 'between' : 'his') as Offer['kind'] })),
+  // (a title written from the world's side names the player: to him it is "you", "A loan to you")
+  offers: (c) => asksOf(c.w, c.n).slice(0, 3).map((e, i) => ({ code: 'enc_open:' + e.id, label: `About what he asked: ${e.title.replace(new RegExp(`\\b(${c.h.name}|${c.h.name.split(' ')[0]})(’s|'s)?\\b`, 'g'), (_m: string, _n: string, pos?: string) => (pos ? 'your' : 'you'))}`, says: 'You wanted to ask me something?', note: i ? 'He is waiting on your answer.' : e.lines.at(-1)?.replace(/^[^“"]*(?=[“"])/, ''), kind: (i ? 'between' : 'his') as Offer['kind'] })),
   run: (c, code) => { const x = T(c), id = code.split(':')[1], e = asksOf(x.w, x.t).find((q) => q.id === id); if (!e) { line(x, 'He lets it go.'); return out(2); } c.v.th.raised.push(e.id); c.v.topic = 'enc:' + e.id; const l = e.lines.at(-1); if (l) line(x, l); return { minutes: 2, next: encRows(c, id) }; },
 };
 const enc: Act = {

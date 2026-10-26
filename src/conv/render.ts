@@ -273,7 +273,7 @@ const B: Record<string, Entry> = {
   'refuse.wordNotEnough': { _: ['“Everybody’s good for it, until they’re not. I don’t know you.”'], jovial: ['“Sure you are. They all are. Ask me again when I know you.”'], cold: ['“Anyone can say that.”'] },
   // (a loan negotiation: each argument gets its own answer; the last, when nothing is left to argue, closes it)
   'refuse.loan.cannotSpare.terms': { _: ['“It isn’t the terms. I haven’t got it, that’s all.”', '“Whatever you offer, it isn’t there to lend.”'], proud: ['“Terms don’t come into it. It isn’t there.”'] },
-  'refuse.loan.notClose': { _: ['“We know each other to nod to. That isn’t lending money.”', '“I know your face. I don’t know you well enough for that.”'], jovial: ['“We’ve had a drink or two. That’s not the same thing as five hundred dollars, friend.”'] },
+  'refuse.loan.notClose': { _: ['“We nod when we pass. That isn’t lending money.”', '“I know your face. I don’t know you well enough for that.”'], jovial: ['“We’ve had a drink or two. That’s not the same thing as five hundred dollars, friend.”'] },
   'refuse.loan.rateNotEnough': { _: ['“It isn’t the vig. It’s whether I ever see the money again.”', '“A higher rate on money I never get back is nothing.”'], cold: ['“The rate isn’t the problem.”'], schemer: ['“Eight percent of nothing is nothing.”'] },
   'refuse.loan.promiseNotEnough': { _: ['“Your word. I don’t know yet what your word is worth.”', '“A promise is a promise. It isn’t collateral.”'], cold: ['“Everyone gives me their word.”'], jovial: ['“The end of the month, he says. I’ve heard that one before, friend.”'] },
   'refuse.loan.promiseBroken': { _: ['“Your word? I’ve heard what your word is worth.”', '“You gave a man your word not long ago. Ask him how that went.”'] },

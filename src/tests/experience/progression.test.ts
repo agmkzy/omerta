@@ -30,7 +30,7 @@ describe('made men have work of their own, and doing it is how they come to trus
     const w = worldFor(7), p = P(w);
     const men = familyMen(w, 'soldier').slice(0, 4);
     for (const [i, m] of men.entries()) { for (const b of freeShops(w).slice(i * 2, i * 2 + 2)) b.protection = { collectorId: m.id, familyId: m.familyId!, fee: 50, since: w.now } as never; standWith(w, m, { trust: 0.35, known: 0.5 }); }
-    advance(w, w.now + 21 * DAY);
-    assert.ok(w.jobs.some((j) => j.assignee === p.id && j.via === 'tip' && men.some((m) => m.id === j.giver)), 'nobody asked him in three weeks');
+    advance(w, w.now + 35 * DAY);
+    assert.ok(w.jobs.some((j) => j.assignee === p.id && j.via === 'tip' && men.some((m) => m.id === j.giver)), 'nobody asked him in five weeks');
   });
 });

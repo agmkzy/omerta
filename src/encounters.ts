@@ -1,4 +1,5 @@
 import { answerImposed } from './imposed';
+import { answerCourting, courter, makeCourting } from './loyalty';
 import { answerAsk, answerWord, callFavour, putToPlayer } from './asks';
 import { answerMatter } from './matters';
 // People come to you. Each approach is a small scene in the man's own voice, with choices that carry weight:
@@ -397,7 +398,9 @@ function shopHelp(w: World, p: Character): Cand[] {
   return out;
 }
 
-const GENERATORS = [favourAsk, mediate, shopBegs, tipSale, callIn, witnessTell, shopHelp]; // (Stage 5: a man in trouble, or behind with a creditor, comes for his own reasons: intent.ts)
+// (a captain with bad blood towards the player's own, courting him: loyalty.ts)
+const courting = (w: World, p: Character): Cand[] => { const c = courter(w, p); return c ? [{ weight: 0.6, key: 'courting', make: () => makeCourting(w, p, c.x, c.cap) }] : []; };
+const GENERATORS = [favourAsk, mediate, shopBegs, tipSale, callIn, witnessTell, shopHelp, courting]; // (Stage 5: a man in trouble, or behind with a creditor, comes for his own reasons: intent.ts)
 
 // ------------------------------------------------------------ the tick
 
@@ -507,7 +510,8 @@ export function choose(w: World, p: Character, e: Enc, code: string): { lines: s
   if (e.kind === 'ask') return answerAsk(w, p, e, code); // V89: the player answering an ask (matters.ts)
   if (e.kind === 'word') return answerWord(w, p, e, code); // V89: a superior's word about trouble
   if (e.kind === 'matter') return answerMatter(w, p, e, code); // V89: someone in a matter wants the player's answer
-  if (e.kind === 'imposed') return answerImposed(w, p, e, code); // a decision made over his head: taken, asked about, or objected to
+  if (e.kind === 'imposed') return answerImposed(w, p, e, code);
+  if (e.kind === 'courting') return answerCourting(w, p, e, code); // a captain asking him to inform on his own: loyalty.ts // a decision made over his head: taken, asked about, or objected to
   if (e.kind === 'crew') { lines.push(...crewChoose(w, p, e, code)); return { lines, minutes: 25 }; }
   if (e.kind === 'loan' && c) return loan(w, p, e, c, code, lines, done, keep);
   if (e.kind === 'favour_ask' && c) return favourReply(w, p, e, c, code, lines, done, keep);
