@@ -10,7 +10,7 @@
 // Each man weighs his intentions once a week, on his own day: nothing here runs everyone every day, and nothing is made up.
 import { imposed } from './imposed';
 import { temper } from './temper';
-import { addFact, bear, feel, learn, ownerBiz, rel } from './core';
+import { addFact, bear, feel, learn, ownerBiz, rel, wontBorrowFrom } from './core';
 import { askBetween, move, openAsk } from './asks';
 import { menOf, needsOf, giveWork, pickMan } from './work';
 import { activityOf } from './jobs';
@@ -70,7 +70,7 @@ export function intentsOf(w: World, c: Character): Intent[] {
   const short = b && b.open ? b.distress >= 2 && b.cash < b.expense : c.cash < (LIVING[c.rank] ?? 100) * 0.5;
   if (short && !cool(w, c, 'help') && !w.debts.some((d) => d.status === 'active' && d.debtor === c.id && d.missed >= 2)) {
     const need = Math.max(200, Math.round((b ? b.expense * 2 - b.cash : (LIVING[c.rank] ?? 100) * 3) / 50) * 50);
-    const helper = Object.values(w.chars).filter((x) => x.alive && x.id !== c.id && x.jailedUntil <= w.now && x.cash >= need * 1.5 && (c.rels[x.id]?.trust ?? 0) >= 0.3 && !w.debts.some((d) => d.status === 'active' && d.creditor === x.id && d.debtor === c.id))
+    const helper = Object.values(w.chars).filter((x) => x.alive && x.id !== c.id && x.jailedUntil <= w.now && x.cash >= need * 1.5 && !wontBorrowFrom(c, x) && (c.rels[x.id]?.trust ?? 0) >= 0.3 && !w.debts.some((d) => d.status === 'active' && d.creditor === x.id && d.debtor === c.id))
       .map((x) => ({ x, s: (c.rels[x.id]?.trust ?? 0) + (c.rels[x.id]?.affection ?? 0) * 0.5 + (x.id === c.bossId ? 0.2 : 0) - (c.rels[x.id]?.grudge ?? 0) }))
       .sort((p, q) => q.s - p.s || byId(p.x, q.x))[0]?.x;
     if (helper) out.push({ kind: 'help', to: helper, why: b ? `${b.name} is going under` : 'his pockets are empty', score: 0.55 - tp.pride * 0.3 + tp.caution * 0.1, act: () => {

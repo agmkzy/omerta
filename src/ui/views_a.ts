@@ -1,4 +1,5 @@
 import { epilogue } from '../epilogue';
+import { tradeOf } from './streetmap';
 import { fallingDue } from '../commitments';
 import { knowsProtection } from '../acquaint';
 import { enterpriseLine, lineOf } from '../rackets';
@@ -459,7 +460,7 @@ export function bizView(id: Id): string {
   const prot = b.protection;
   let out = back();
   const state = [b.open ? 'open' : 'closed', b.damaged > 0 ? 'recovering' : '', prot && lateOf(b) > 0 ? 'late with the money' : ''].filter(Boolean).join(' · ');
-  out += `<header class="pp-head"><div class="bz-mark" aria-hidden="true">${esc(b.name[0])}</div><div class="pp-id">${title(b.name, `${esc(b.kind)} · ${esc(b.district)}`)}<p class="pp-tags"><span class="ui-mark ${b.open ? (prot && lateOf(b) > 0 ? 'amber' : 'green') : 'red'}" aria-hidden="true"></span>${esc(state)}</p></div></header>`;
+  out += `<header class="pp-head"><div class="bz-mark" aria-hidden="true">${esc(b.name[0])}</div><div class="pp-id">${title(b.name, `${esc(tradeOf(b.kind))} · ${esc(b.district)}`)}<p class="pp-tags"><span class="ui-mark ${b.open ? (prot && lateOf(b) > 0 ? 'amber' : 'green') : 'red'}" aria-hidden="true"></span>${esc(state)}</p></div></header>`;
   // the place leads to its owner first, and to the business you could do with him there: buying in, lending, protection
   out += acts(btn(`talk:${o.id}`, whereIs(w, p, o).kind === 'shop' ? `Walk in and talk to ${o.name.split(' ')[0]}` : `Find ${o.name.split(' ')[0]}`, 'primary'),
     o.id !== p.id && o.alive ? btn(`talk:${o.id}|g:business`, `Talk business with ${o.name.split(' ')[0]}`) : '',

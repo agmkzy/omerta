@@ -239,3 +239,4 @@ export function work(w: World, spec: Parameters<typeof mkJob>[1]): Job { return 
 export function questionAgain(w: World, j: Job): string[] { return questionReport(w, j); }
 // an offer of amends that comes with money: what is on the table is at least that
 export function raiseTerms(s: Situation, amt: number): void { if (s.terms) s.terms.amt = Math.max(s.terms.amt ?? 0, amt); }
+export { wontBorrowFrom } from '../core'; // (a man does not borrow from his own subordinates)

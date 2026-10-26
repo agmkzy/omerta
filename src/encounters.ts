@@ -15,7 +15,7 @@ import { helpMan, lateOf, PROBLEM_LABEL } from './people';
 import { bizMove, clearArrears, evidence, giveTime, owedOf, takeFromBiz } from './econ';
 import { sitdownChoose, callSitdown } from './disputes';
 import { investChoose } from './reports';
-import { addFact, bear, bearOn, bondFor, clamp, createDebt, earn, factText, feel, feelOn, feelTo, learn, money, newId, ownerBiz, payDebt, rel, repute, shortTime } from './core';
+import { wontBorrowFrom, addFact, bear, bearOn, bondFor, clamp, createDebt, earn, factText, feel, feelOn, feelTo, learn, money, newId, ownerBiz, payDebt, rel, repute, shortTime } from './core';
 import { DAY, Character, Enc, EncOpt, Fact, Favour, Id, LifeEvent, ProblemKind, World } from './types';
 import { Arch, arch, hash, pick } from './voice';
 
@@ -71,6 +71,7 @@ const ADMIT: Record<ProblemKind, string> = {
 // A man in trouble comes to the player for money (Stage 5: intent.ts decides whom he goes to; when it is the player, this is how it
 // reaches him). What he says it is for may not be what it is for: the player can ask.
 export function makeLoan(w: World, p: Character, c: Character, need?: number) {
+  if (wontBorrowFrom(c, p)) return; // (a man does not come to his own subordinate for money)
   const amt = Math.round((need ?? (c.rank === 'civilian' ? w.rng.int(200, 700) : w.rng.int(250, 900))) / 50) * 50;
   const pr = c.problem?.kind;
   // (each a whole sentence in his own mouth, so it reads however it is put)

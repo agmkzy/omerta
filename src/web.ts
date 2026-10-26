@@ -162,6 +162,7 @@ function collectNews(since: number): string[] {
 // -------------------------------------------------------------- navigation
 const same = (a: View, b: View) => a.t === b.t && JSON.stringify(a, (k, v) => (k === 'm' || k === 'convo' ? undefined : v)) === JSON.stringify(b, (k, v) => (k === 'm' || k === 'convo' ? undefined : v));
 function go(v: View) {
+  if (v.t === 'talk2' && S.view.t !== 'talk2') S.talkFrom = S.view;
   if (!same(S.view, v)) S.stack.push(S.view);
   if (S.stack.length > 30) S.stack.shift();
   S.view = v;
@@ -187,6 +188,8 @@ function viewAlive(v: View): boolean {
   return true;
 }
 function pop() {
+  // (out of a conversation: straight back to where you were when it began)
+  if (S.view.t === 'talk2' && !S.stack.length && S.talkFrom) { S.view = S.talkFrom; S.talkFrom = undefined; return; }
   const prev = S.stack.pop();
   S.view = prev ?? { t: 'tab', name: 'today' };
   // do not return into a dead conversation or meeting
@@ -222,6 +225,7 @@ function pass(minutes: number, lines: string[], next: View = { t: 'tab', name: '
   if (dk > 0) S.chips.push({ t: `${dk} new thing${dk > 1 ? 's' : ''} learned`, tone: '' });
   if (pn.rank !== snap.rank) S.chips.push({ t: `Now ${pn.rank}`, tone: 'good' });
   S.stack = [];
+  if (next.t === 'talk2' && S.view.t !== 'talk2') S.talkFrom = S.view;
   S.view = next;
   save();
 }
@@ -506,6 +510,8 @@ function handle(a: string, v: string) {
       if (r.meeting) { advance(w, w.now + r.minutes); S.view = { t: 'meeting', m: r.meeting, lines: r.v.lines.slice(-3).map((l) => l.text) }; save(); return; }
       // (settled another way: the existing "take action against him" screen)
       if (r.settle && w.chars[r.settle]?.alive) return pass(r.minutes, [], { t: 'settle', id: r.settle, lines: [] });
+      // (leaving: away at once, back to where you were; his name is there to tap if you want to look into him)
+      if (v === 'leave' && r.v.ended) { const from = S.talkFrom ?? { t: 'tab', name: 'today' } as View; S.talkFrom = undefined; return pass(r.minutes, [], from); }
       return pass(r.minutes, [], { t: 'talk2', v: r.v });
     }
     case 't2amt': { // a figure named for a choice: the amount (and for a loan the weekly rate) goes with it

@@ -6,7 +6,7 @@
 // about what their men are doing and have views. The player and the NPCs use exactly the same moves; NPCs choose theirs from who
 // they are. Each kind of ask only says what is being asked, what it is worth to the man asked, and what yes does in the real world.
 import { ASKS } from './askkinds'; // first: the registry must exist before anything below can reach matters.ts
-import { addFact, bear, bearOn, clamp, createDebt, transfer, restructure, ease, easeOn, famName, feel, feelOn, money, notifyProtector, ownerBiz, payDebt, peek, regard, rel, repute, witnessesAt } from './core';
+import { wontBorrowFrom, addFact, bear, bearOn, clamp, createDebt, transfer, restructure, ease, easeOn, famName, feel, feelOn, money, notifyProtector, ownerBiz, payDebt, peek, regard, rel, repute, witnessesAt } from './core';
 import { loanPosition } from './negotiate';
 import { say as vsay } from './voicesheet';
 import { bizMove, changedSince, giveTime, noteRefusal, priceOf, sellerFloor, sellTo, setCollector, stakeRoom } from './econ';
@@ -797,7 +797,7 @@ ASKS.borrow = {
   id: 'borrow', sev: 0.15, roles: ['borrower', 'lender'], cool: 2,
   moves: ['take', 'ask', 'sweeten', 'persuade', 'leverage', 'wait', 'drop'], sweeten: (amt) => `Ask for ${money(amt)} instead`,
   title: (w, s) => { const t = askee(w, s); return t ? `A loan from ${first(t)}` : 'A loan'; },
-  valid: (w, s) => !!askee(w, s) && !!asker(w, s),
+  valid: (w, s) => !!askee(w, s) && !!asker(w, s) && !wontBorrowFrom(asker(w, s)!, askee(w, s)!),
   lean: (w, s, a, t) => {
     const amt = s.terms?.amt ?? 0, pos = loanPosition(w, t, a, amt);
     const family = kinTie(w, t, a) ? 0.2 : 0;

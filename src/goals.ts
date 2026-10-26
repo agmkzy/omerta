@@ -7,7 +7,7 @@
 // (his boss, his crew, his family), so it travels by gossip like anything else. A plan that needs another man goes through the
 // shared asks engine (asks.ts: borrow, lend, join), so men negotiate instead of rolling once; and when the player is plausibly the
 // man to ask (his boss, his creditor, kin, a trusted friend, someone who knows the owner), the man comes to the player, rarely.
-import { addFact, bear, bearOn, clamp, createDebt, feel, feelAtLeast, feelAtLeastOn, feelOn, learn, money, ownerBiz, payDebt, rel, repute, restructure } from './core';
+import { wontBorrowFrom, addFact, bear, bearOn, clamp, createDebt, feel, feelAtLeast, feelAtLeastOn, feelOn, learn, money, ownerBiz, payDebt, rel, repute, restructure } from './core';
 import { INVEST_CAP, addStake, bizMove, priceOf, sellerFloor, sellTo, stakeRoom, transferBusiness, trade } from './econ';
 import { LADDER, leaveCrew } from './rank';
 import { isRunner, members, readiness, recommend } from './career';
@@ -525,7 +525,7 @@ function businessStep(w: World, g: Goal, c: Character) {
     const need = Math.max(0, (g.offer ?? price) - (c.cash - RESERVE));
     if (need <= 0) { g.stage = 'close'; return later(w, g, 0.2); }
     if (t.ambition > 0.7 && t.violence > 0.6 && g.tries > 0) return endGoal(w, g, 'dropped', 'would not share it with anyone');
-    const cand = Object.values(w.chars).filter((x) => x.alive && !x.isPlayer && x.id !== c.id && x.id !== o.id && x.jailedUntil <= w.now && x.cash >= need * 2.2 + RESERVE && (x.familyId === c.familyId || (c.rels[x.id]?.trust ?? 0) >= 0.35) && (c.rels[x.id]?.trust ?? 0) >= 0.2 && !g.asked?.includes(x.id))
+    const cand = Object.values(w.chars).filter((x) => x.alive && !x.isPlayer && x.id !== c.id && x.id !== o.id && x.jailedUntil <= w.now && x.cash >= need * 2.2 + RESERVE && !wontBorrowFrom(c, x) && (x.familyId === c.familyId || (c.rels[x.id]?.trust ?? 0) >= 0.35) && (c.rels[x.id]?.trust ?? 0) >= 0.2 && !g.asked?.includes(x.id))
       .sort((p, q) => (c.rels[q.id]?.trust ?? 0) - (c.rels[p.id]?.trust ?? 0));
     const plr = nearPlayer(w, c);
     if (plr && !g.asked?.includes(plr.id) && askOk(w)) {
@@ -540,7 +540,7 @@ function businessStep(w: World, g: Goal, c: Character) {
         g.with = plr.id; g.share = amt;
         const e = surface(w, g, c, 'finance', `${first(c)} offers you a piece`, [`${c.name} is buying ${b.name} off ${o.name}, and he is putting the money together.`, `"You've been good to me. ${money(amt)} and you have a piece of it, a share of what it makes every week. I'm offering it to you before anybody."`], [{ code: 'yes', label: `Put in ${money(amt)}`, hint: 'You get a share of the place, if the deal goes through.' }, { code: 'no', label: 'Say you’ll pass', hint: 'He’ll find the money somewhere else. He may remember who didn’t step up.' }]);
         if (e) return;
-      } else if (need <= 2500 && plr.cash >= need + 200) {
+      } else if (need <= 2500 && plr.cash >= need + 200 && !wontBorrowFrom(c, plr)) {
         const amt = Math.round(need / 10) * 10;
         if (putAsk(w, g, c, 'borrow', plr, { amt, why: `${c.name} needs money to buy ${b.name}`, line: `${c.name} comes to see you. He has found a place, ${b.name}, and ${o.name} will sell. He is ${money(amt)} short.` })) return;
       }
@@ -815,8 +815,8 @@ function debtStep(w: World, g: Goal, c: Character) {
   // behind, and short: borrow from someone who would lend to him (family, a friend, the player if he is one of those) to pay it down
   const amt = Math.round(Math.min(d.balance, Math.max(d.weeklyPayment * 3, 150), 1500) / 10) * 10;
   const pl = d.missed > 0 && spare < 100 && cr?.id !== w.playerId ? nearPlayer(w, c) : undefined;
-  const friend = d.missed > 0 && spare < 100 ? Object.values(w.chars).filter((x) => x.alive && !x.isPlayer && x.id !== c.id && x.id !== d.creditor && x.jailedUntil <= w.now && x.cash >= amt * 2 + RESERVE && !g.asked?.includes(x.id) && ((c.rels[x.id]?.trust ?? 0) >= 0.35 || (kinTie(w, c, x) && closeKin(w, c, x)))).sort((p, q) => (c.rels[q.id]?.trust ?? 0) - (c.rels[p.id]?.trust ?? 0))[0] : undefined;
-  const lender = pl && pl.cash >= amt + 200 && !g.asked?.includes(pl.id) && askOk(w) ? pl : friend;
+  const friend = d.missed > 0 && spare < 100 ? Object.values(w.chars).filter((x) => x.alive && !x.isPlayer && x.id !== c.id && x.id !== d.creditor && x.jailedUntil <= w.now && x.cash >= amt * 2 + RESERVE && !wontBorrowFrom(c, x) && !g.asked?.includes(x.id) && ((c.rels[x.id]?.trust ?? 0) >= 0.35 || (kinTie(w, c, x) && closeKin(w, c, x)))).sort((p, q) => (c.rels[q.id]?.trust ?? 0) - (c.rels[p.id]?.trust ?? 0))[0] : undefined;
+  const lender = pl && pl.cash >= amt + 200 && !wontBorrowFrom(c, pl) && !g.asked?.includes(pl.id) && askOk(w) ? pl : friend;
   if (lender && amt >= 100) opts.push({ k: 'borrow', s: 0.35 + t.caution * 0.2 + (d.missed > 1 ? 0.15 : 0) });
   if (!opts.length) { g.tries++; if (g.tries >= 5) return endGoal(w, g, 'dropped', 'nothing left to try'); return later(w, g, 1.5); }
   const pick = opts.map((o) => ({ ...o, s: o.s * w.rng.range(0.6, 1.4) })).sort((x, y) => y.s - x.s)[0].k;

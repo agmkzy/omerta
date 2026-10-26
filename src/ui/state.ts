@@ -63,6 +63,7 @@ export const S = {
   opts: [] as Action[],
   planOpts: [] as OrderOpt[],
   last: {} as Record<string, { view: View; stack: View[] }>, // where you were in each section, so going back to it picks up there
+  talkFrom: undefined as View | undefined, // where you were when a conversation began: leaving it takes you back there
   streetSel: undefined as string | undefined, // the place picked on the map (desktop: it opens beside the map)
   sub: {} as Record<string, string>, // which room of each section is open (family: men/org, business: rackets/money, journal: stories/known)
   worldFilter: 'all',

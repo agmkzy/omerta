@@ -469,6 +469,12 @@ export function witnessesAt(w: World, district: string, exclude: Id[], max = 3):
 
 // ------------------------------------------------------------------- debts
 
+// A man does not borrow from his own subordinates: a captain from his soldiers, the boss from anyone under him (owner, 26 October).
+// Higher rank in the same family is enough; a civilian lender, or a man of another family, is a different matter.
+const LADDER_ALL = ['civilian', 'associate', 'soldier', 'capo', 'underboss', 'boss'];
+export const wontBorrowFrom = (borrower: Character, lender: Character): boolean =>
+  !!borrower.familyId && borrower.familyId === lender.familyId && LADDER_ALL.indexOf(borrower.rank) > LADDER_ALL.indexOf(lender.rank);
+
 export function createDebt(
   w: World,
   creditor: Id,

@@ -41,3 +41,20 @@ describe('debts', { tags: ['scenario'] }, () => {
     assert.ok(writeDown(w, d, 5000), 'written off entirely, it is cleared'); assert.equal(d.status, 'paid');
   });
 });
+
+describe('nobody borrows from his own subordinates', { tags: ['unit'] }, () => {
+  ok('a captain does not come to his soldier for money, nor ask a man beneath him; a soldier may still ask his captain', async () => {
+    const { wontBorrowFrom } = await import('../../core');
+    const { makeLoan } = await import('../../encounters');
+    const w = newWorld(7), p = w.chars[w.playerId!];
+    const cap = w.chars[p.bossId!];
+    p.rank = 'soldier';
+    assert.ok(wontBorrowFrom(cap, p), 'a captain above the player in his own family');
+    assert.ok(!wontBorrowFrom(p, cap), 'the player may still go to his captain');
+    const other = Object.values(w.chars).find((c) => c.alive && c.familyId && c.familyId !== p.familyId && c.rank === 'capo')!;
+    assert.ok(!wontBorrowFrom(other, p), 'another family’s captain is a different matter');
+    const before = w.enc.length;
+    makeLoan(w, p, cap, 400);
+    assert.equal(w.enc.length, before, 'no request for money from the man he answers to');
+  });
+});

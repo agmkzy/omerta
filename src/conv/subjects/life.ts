@@ -140,7 +140,7 @@ function trouble(x: X): Subject | undefined {
     const amt = T.need?.(x) ?? 0;
     const cs: Choice[] = [];
     const owes = w.debts.some((d) => d.status === 'active' && d.creditor === p.id && d.debtor === t.id);
-    if (amt && p.cash >= amt) { cs.push(ch('trouble', 'gift', `“Here. ${money(amt)}. No strings.”`, 'He will owe you, and he will know it.', true)); if (!owes) cs.push(ch('trouble', 'lend', `“I can lend you ${money(amt)}.”`, 'Four percent a week. A friend’s rate, and a debt all the same.', true)); }
+    if (amt && p.cash >= amt) { cs.push(ch('trouble', 'gift', `“Here. ${money(amt)}. No strings.”`, 'He will owe you, and he will know it.', true)); if (!owes && !door.wontBorrowFrom(t, p)) cs.push(ch('trouble', 'lend', `“I can lend you ${money(amt)}.”`, 'Four percent a week. A friend’s rate, and a debt all the same.', true)); }
     if (pr.kind === 'family' && t.bossId === p.id) cs.push(ch('trouble', 'time', '“Take a week. Sort it out.”', 'He earns nothing for you while he is gone. He will remember it.'));
     // (not said up the ladder: an associate does not tell his captain to straighten himself out)
     const R = ['civilian', 'associate', 'soldier', 'capo', 'underboss', 'boss'], upward = t.id === p.bossId || (!!p.familyId && t.familyId === p.familyId && R.indexOf(t.rank) > R.indexOf(p.rank));

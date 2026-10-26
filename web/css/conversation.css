@@ -116,3 +116,14 @@
   .cx-know { display: grid; grid-template-columns: 1fr 1fr; column-gap: var(--s-5); margin-top: var(--s-4); padding: var(--s-3) 0 0; border-left: 0; border-top: 1px solid var(--c-line); }
   .cx-know__part + .cx-know__part { margin-top: 0; padding-top: 0; border-top: 0; }
 }
+
+/* ------------------------------------------------------------------ desktop: fixed in place, like the phone (owner, 26 October)
+   The man at the top, the dialogue box the same height every turn (scrolling on its own, the newest exchange in view), and the
+   choices in their own region below it, scrolling on their own. Nothing on the screen moves when a line is said. */
+@media (min-width: 900px) {
+  body.g-talk { overflow: hidden; }
+  body.g-talk .g-main { height: 100vh; padding-bottom: 0; box-sizing: border-box; overflow: hidden; }
+  body.g-talk .cx { display: grid; grid-template-rows: auto clamp(170px, 32vh, 340px) minmax(0, 1fr); height: calc(100vh - 28px); }
+  body.g-talk .cx-read { max-height: none; min-height: 0; margin: var(--s-5) 0 var(--s-3); padding: var(--s-3) var(--s-4) var(--s-3) var(--s-5); border: 1px solid var(--c-line); border-left: 2px solid var(--c-gold-line); border-radius: var(--radius); background: rgba(22, 20, 18, .45); overscroll-behavior: contain; }
+  body.g-talk .cx-act { min-height: 0; overflow-y: auto; padding: var(--s-2) var(--s-2) var(--s-5) 0; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--c-line-2) transparent; }
+}

@@ -5,7 +5,7 @@ import { temper } from './temper';
 import { noteDeal } from './orgs';
 import { inductPlayer, sponsorOf, turnedDown } from './career';
 import { RULINGS, effectiveRate, influence, react, rule, subordinates } from './books';
-import { addFact, bear, bearOn, clamp, createDebt, ease, famName, feel, feelOn, isAwake, learn, money, recordCareer, rel, repute, shortTime } from './core';
+import { wontBorrowFrom, addFact, bear, bearOn, clamp, createDebt, ease, famName, feel, feelOn, isAwake, learn, money, recordCareer, rel, repute, shortTime } from './core';
 import { mkJob, tipFrom, traitWords } from './jobs';
 import { share } from './actions';
 import { enterpriseLine, lineOf } from './rackets';
@@ -409,7 +409,7 @@ export function openGathering(w: World, p: Character, guestIds: Id[], what: 'din
     const [a, b] = w.rng.pick(feuds);
     items.push(mkItem('incident', `${a.name} and ${b.name}`, [`Across the table ${a.name} and ${b.name} start in on each other. Voices rise.`], [{ code: 'step_in', label: 'Step in and calm it down', hint: 'Depends on how much they listen to you.' }, { code: 'ignore', label: 'Let it play out' }], { a: a.id, b: b.id }));
   }
-  const askers = here.filter((c) => c.cash < 200 && rel(c, p.id).trust > 0.3);
+  const askers = here.filter((c) => c.cash < 200 && rel(c, p.id).trust > 0.3 && !wontBorrowFrom(c, p));
   if (askers.length && w.rng.chance(0.5)) {
     const c = w.rng.pick(askers);
     items.push(mkItem('request', `${c.name} has a favour to ask`, [`Later, ${c.name} takes you aside. "I’m short. Could you put me on to three hundred?"`], [{ code: 'lend', label: 'Lend him $300 (5% a week)' }, { code: 'no', label: 'Tell him you can’t' }], { who: c.id }));

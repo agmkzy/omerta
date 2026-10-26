@@ -1,5 +1,5 @@
 import { knowsProtection } from '../acquaint';
-import { districtBar, narrow, streetMap } from './streetmap';
+import { districtBar, narrow, streetMap, tradeOf } from './streetmap';
 import { sundayDue } from './sunday';
 import { acts, btn, choices, context, h, kv, meter, note, quiet, rows, title, type KV, type Pick, type Row } from './kit';
 import type { Business, Character, World } from '../types';
@@ -378,7 +378,7 @@ export function placesView(home = false): string {
   const slice = dist === SLICE;
   const shops = Object.values(w.biz).filter((b) => b.district === dist && b.open).map((b) => ({ b, x: slice ? spots(w).find((x) => x.biz === b.id) : undefined }));
   const payer = (b: Business) => (knowsProtection(w, p, b) && b.protection && b.protection.collectorId !== b.ownerId ? b.protection.collectorId : '');
-  const shopRow = ({ x, b }: (typeof shops)[number]): Row => { const o = w.chars[b.ownerId], who = payer(b); return { title: esc(b.name), sub: `${o ? esc(o.name) : ''}${who && who !== p.id && w.chars[who]?.bossId !== p.id ? ` · pays ${esc(w.chars[who]?.name ?? 'somebody')}` : ''}`, end: x ? esc(openAt(x, w.now) ? hours(x) : 'Shut') : '', tone: x && !openAt(x, w.now) ? 'dim' : '', a: x ? act(x.id) : home ? `spot:biz:${b.id}` : `biz:${b.id}` }; };
+  const shopRow = ({ x, b }: (typeof shops)[number]): Row => { const o = w.chars[b.ownerId], who = payer(b); return { title: esc(b.name), sub: `${esc(tradeOf(b.kind))}${o ? ` · ${esc(o.name)}` : ''}${who && who !== p.id && w.chars[who]?.bossId !== p.id ? ` · pays ${esc(w.chars[who]?.name ?? 'somebody')}` : ''}`, end: x ? esc(openAt(x, w.now) ? hours(x) : 'Shut') : '', tone: x && !openAt(x, w.now) ? 'dim' : '', a: x ? act(x.id) : home ? `spot:biz:${b.id}` : `biz:${b.id}` }; };
   const yours = shops.filter((s2) => payer(s2.b) === p.id), mens = shops.filter((s2) => payer(s2.b) && w.chars[payer(s2.b)]?.bossId === p.id), rest = shops.filter((s2) => !yours.includes(s2) && !mens.includes(s2));
   if (yours.length) out += h('Paying you', String(yours.length)) + rows(yours.map(shopRow));
   if (mens.length) out += h('Paying your men', String(mens.length)) + rows(mens.map(shopRow));
@@ -425,7 +425,7 @@ function spotView(sp: Spot): string {
   const b = sp.biz ? w.biz[sp.biz] : undefined, owner = b ? w.chars[b.ownerId] : undefined;
   const open = openAt(sp, w.now);
   const pays = b && knowsProtection(w, p, b) && b.protection && b.protection.collectorId !== b.ownerId ? (b.protection.collectorId === p.id ? 'pays you' : `pays ${w.chars[b.protection.collectorId]?.name ?? 'somebody'}`) : '';
-  const kick = [sp.kind === 'club' ? `The ${w.fam[sp.famId!]?.name ?? ''} club` : '', sp.on ?? (b ? b.district : ''), open ? `open till ${sp.open[1] % 24}:00` : 'shut'].filter(Boolean).join(' · ');
+  const kick = [sp.kind === 'club' ? `The ${w.fam[sp.famId!]?.name ?? ''} club` : b ? tradeOf(b.kind) : '', sp.on ?? (b ? b.district : ''), open ? `open till ${sp.open[1] % 24}:00` : 'shut'].filter(Boolean).join(' · ');
   const blurb = b ? `${owner ? `${owner.name}’s place` : 'A shop'}${pays ? `. It ${pays}` : ''}.` : sp.blurb;
   let out = back() + placeHead(kick, sp.name, blurb);
   const waits = sp.kind === 'biz' ? [] : waitPicks(w, p, sp.id);
