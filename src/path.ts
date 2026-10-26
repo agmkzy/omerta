@@ -20,7 +20,7 @@ import { Character, DAY, Enc, Id, PathState, Rank, World } from './types';
 // associate passes up about $2,000 (the best $10,000), a soldier about $8,000, a captain about $11,000; a superior hands a man below
 // him a piece of work every few months.
 export const ROAD: Record<string, { kick: number; work: number; hard: number; standing: number }> = {
-  soldier: { kick: 3000, work: 2, hard: 0, standing: 30 },
+  soldier: { kick: 1500, work: 3, hard: 0, standing: 30 }, // (compelling-RPG stage: a committed associate can be made in a season of play, not two years)
   capo: { kick: 10000, work: 3, hard: 0, standing: 40 },
   underboss: { kick: 20000, work: 6, hard: 1, standing: 50 },
   boss: { kick: 0, work: 0, hard: 0, standing: 0 },
@@ -166,7 +166,15 @@ export function pathTick(w: World) {
   }
   if ((p.cooldown.induct ?? 0) > w.now) return;
   if (w.jobs.some((j) => j.kind === 'summons' && j.meeting === 'induction' && j.status === 'offered')) return;
-  if (to !== 'underboss' && !vacancy(w, p.familyId, to)) return; // he waits for a seat, like any man whose road is done (career.noticeTick)
+  // he waits for a seat, like any man whose road is done (career.noticeTick); but not for ever: three weeks on, the boss opens the
+  // books for a man who has earned it, and says so, rather than let him rot waiting on somebody's funeral
+  if (to !== 'underboss' && !vacancy(w, p.familyId, to)) {
+    st.seatWait ??= w.now;
+    if (w.now - st.seatWait < 21 * DAY) return;
+    const f = w.fam[p.familyId]; f.capBonus = { ...(f.capBonus ?? {}), [to]: (f.capBonus?.[to] ?? 0) + 1 };
+    addFact(w, { kind: 'report', actor: boss.id, victim: p.id, minor: false, text: `${boss.name} has opened the books. There will be a place for one more ${to === 'soldier' ? 'made man' : to}, and your name has been put forward for it.`, district: p.district }, { witnesses: [p.id] });
+  }
+  delete st.seatWait;
   if (to === 'underboss' && !canSeatUnderboss(w, boss, p)) return;
   st.hold = to;
   makeRoom(w, p, boss, to);

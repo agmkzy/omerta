@@ -408,7 +408,9 @@ export function promoTick(w: World) {
   if (win) {
     pc.result = 'chosen';
     p.cooldown['induct'] = w.now + 3 * DAY;
-    mkJob(w, { kind: 'summons', meeting: 'induction', extra: { to }, giver: boss.id, via: 'boss', assignee: p.id, pay: 0, days: 7, title: to === 'soldier' ? 'You’re being proposed' : to === 'capo' ? 'They want to make you a captain' : 'The boss wants you beside him', brief: `${sp.name} has put your name forward and ${boss.name} has agreed.${rv ? ` ${rv.name} was also considered.` : ''} ${to === 'soldier' ? 'There will be a ceremony. You don’t get a second one.' : to === 'capo' ? 'You’ll have your own crew and answer for it.' : 'You’ll be the second man in the family. Every captain will answer to you.'}` });
+    // (a ceremony is held on a night, at a place: the second night from now, at nine; going to it before then is waiting for it)
+    const at = (Math.floor(w.now / DAY) + 2) * DAY + 21 * 60, day = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][Math.floor(at / DAY) % 7];
+    mkJob(w, { kind: 'summons', meeting: 'induction', extra: { to, at }, giver: boss.id, via: 'boss', assignee: p.id, pay: 0, days: 7, title: to === 'soldier' ? 'You’re being proposed' : to === 'capo' ? 'They want to make you a captain' : 'The boss wants you beside him', brief: `${sp.name} has put your name forward and ${boss.name} has agreed.${rv ? ` ${rv.name} was also considered.` : ''} ${to === 'soldier' ? `There will be a ceremony, ${day} night at nine. You don’t get a second one.` : to === 'capo' ? `${day} night at nine. You’ll have your own crew and answer for it.` : `${day} night at nine. You’ll be the second man in the family. Every captain will answer to you.`}` });
   } else {
     pc.result = 'passed';
     p.cooldown['induct'] = w.now + 10 * DAY;

@@ -741,6 +741,8 @@ function handle(a: string, v: string) {
     case 'attend': {
       const j = job(v)!;
       const p = P();
+      // (a summons set for an hour is attended at that hour: the time until then passes first)
+      { const at = Number(j.extra?.at ?? 0); if (at > w.now) advance(w, at); }
       // (coffee with the man who sent for you is a word with him, at the club: the conversation, with whatever he has on his mind)
       if (j.meeting === 'social') {
         const g = j.giver ? w.chars[j.giver] : undefined;

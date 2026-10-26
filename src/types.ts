@@ -580,7 +580,8 @@ export interface Coup {
   back: { plotter: Id[]; boss: Id[] };
 }
 
-export interface PathState { deeds: number; counted: Id[]; trial: Record<string, 'open' | 'passed'>; retry: Record<string, number>; hold?: Rank; latch?: Record<string, boolean>; fails?: Record<string, number>; kills?: number; turf?: string[]; book?: number; guar?: { who: Id; amt: number; due: number }[];
+export interface PathState { deeds: number; counted: Id[]; trial: Record<string, 'open' | 'passed'>; retry: Record<string, number>; hold?: Rank; seatWait?: number; // (since when his road has been done and he waits for a seat)
+  latch?: Record<string, boolean>; fails?: Record<string, number>; kills?: number; turf?: string[]; book?: number; guar?: { who: Id; amt: number; due: number }[];
   ledger?: { t: number; kind: 'sponsor' | 'made' | 'chair' | 'backer'; who: Id; text: string }[];
   origin?: Id[]; // the men you started with
   life?: { home: number; car: number; hq: boolean; driver: boolean };

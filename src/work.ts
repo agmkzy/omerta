@@ -20,7 +20,7 @@ import { OPS } from './rackets';
 import { opSkimNoticed } from './situ';
 import { Character, DAY, Id, Job, JobKind, World } from './types';
 
-export interface Need { kind: JobKind; title: string; brief: string; target?: Id; biz?: Id; debt?: Id; cause?: Id; pay: number; why: string; weight: number }
+export interface Need { kind: JobKind; title: string; brief: string; target?: Id; biz?: Id; debt?: Id; cause?: Id; pay: number; why: string; weight: number; cool?: string }
 
 const byId = (a: { id: string }, b: { id: string }) => (a.id < b.id ? -1 : 1);
 const open = (w: World, n: Pick<Need, 'kind' | 'target' | 'biz'>) => !inHand(w, n) && !w.jobs.some((q) => q.status === 'offered' && q.kind === n.kind && q.target === n.target && q.biz === n.biz);
@@ -78,6 +78,28 @@ export function needsOf(w: World, g: Character): Need[] {
     const n = { kind: 'guard' as const, biz: b.id };
     if (open(w, n)) out.push({ ...n, title: `Guard ${b.name}`, brief: `${b.name} has had trouble. Be seen there for a week.`, pay: 0, why: 'A week of being seen. Quiets trouble.', weight: 0.3 });
   }
+  // ---- the ordinary work of a man in the life (the compelling-RPG stage): what a soldier or a captain needs done every week, read from
+  // his affairs, so there is always honest work for the men under him and the men around him, and doing it is how they come to know you
+  if (['soldier', 'capo', 'underboss'].includes(g.rank) || (g.isPlayer && g.rank !== 'associate')) {
+    // his envelopes carried to the man above him: the pickup an associate does for a made man
+    const book = Object.values(w.biz).filter((b) => b.open && b.protection?.collectorId === g.id);
+    const up = g.bossId ? w.chars[g.bossId] : undefined;
+    if (book.length && up?.alive && !up.isPlayer && (g.cooldown['need:pickup'] ?? 0) <= w.now)
+      out.push({ kind: 'deliver', target: up.id, title: `Carry ${first(g)}’s envelopes to ${first(up)}`, brief: `${g.name} has ${book.length === 1 ? 'a shop' : `${book.length} shops`} paying him. The week’s envelopes go up to ${up.name}, in one piece and unopened.`, pay: 25 + book.length * 10, why: 'A pickup. Trusted work, and he sees who does it.', weight: 0.22, cool: 'need:pickup' });
+    // a man of another family who has been leaning on his ground: told to stay off it
+    const ground = crewGround(w, g);
+    const intruder = Object.values(w.facts).filter((f) => ['protection_started', 'poach', 'threat', 'protection_refused'].includes(f.kind) && w.now - f.t < 14 * DAY && ground.has(f.district) && !!f.actor && g.known[f.id]).map((f) => w.chars[f.kind === 'protection_refused' ? f.victim ?? '' : f.actor!]).find((x) => x?.alive && !x.isPlayer && x.familyId && x.familyId !== g.familyId && x.rank !== 'boss' && x.rank !== 'underboss');
+    if (intruder && (g.cooldown['need:msg:' + intruder.id] ?? 0) <= w.now) {
+      const n = { kind: 'message' as const, target: intruder.id };
+      if (open(w, n)) out.push({ ...n, title: `Tell ${intruder.name} to stay off ${first(g)}’s ground`, brief: `${intruder.name} of the ${w.fam[intruder.familyId!].name} family has been seen working shops in ${g.name}’s ground. ${first(g)} wants it said to his face, once, politely, before it has to be said another way.`, pay: 40, why: 'A message to another family. Say it right, say it once.', weight: 0.3, cool: 'need:msg:' + intruder.id });
+    }
+    // a man he holds something against: watched, so he knows what he's dealing with
+    const sore = Object.entries(g.rels).filter(([id, r]) => r.grudge >= 0.35 && w.chars[id]?.alive && !w.chars[id].isPlayer && w.chars[id].rank !== 'civilian').sort((a, b) => b[1].grudge - a[1].grudge || (a[0] < b[0] ? -1 : 1))[0];
+    if (sore && (g.cooldown['need:watch:' + sore[0]] ?? 0) <= w.now) {
+      const t = w.chars[sore[0]], n = { kind: 'watch' as const, target: t.id };
+      if (open(w, n)) out.push({ ...n, title: `Keep an eye on ${t.name} for ${first(g)}`, brief: `${g.name} doesn’t trust ${t.name}. He wants to know who he sees and where he goes, and he wants it from somebody ${t.name} won’t notice.`, pay: 60, why: 'A day of following a man. Patience, and not being seen.', weight: 0.25, cool: 'need:watch:' + t.id });
+    }
+  }
   return out.sort((a, b) => b.weight - a.weight);
 }
 
@@ -104,7 +126,9 @@ function refuses(w: World, g: Character, m: Character, n: Need): boolean {
 // screen); an NPC weighs it on the spot.
 export function giveWork(w: World, g: Character, m: Character, n: Need, orders: 'quiet' | 'hard' = 'quiet'): Job | string {
   const base = { kind: n.kind, title: n.title, brief: n.brief, target: n.target, biz: n.biz, debt: n.debt, cause: n.cause, pay: n.pay };
-  if (m.isPlayer) return mkJob(w, { ...base, giver: g.id, via: 'boss', assignee: m.id, days: 5 });
+  if (n.cool) g.cooldown[n.cool] = w.now + 7 * DAY; // (the week's pickup, a message, a watch: handed out once, not every day)
+  // (to the player: from the man above him, orders; from a made man he doesn't answer to, a favour asked of him)
+  if (m.isPlayer) { let up = m.bossId ? w.chars[m.bossId] : undefined, mine = false; for (let i = 0; i < 6 && up; i++) { if (up.id === g.id) { mine = true; break; } up = up.bossId ? w.chars[up.bossId] : undefined; } return mkJob(w, { ...base, giver: g.id, via: mine ? 'boss' : 'tip', assignee: m.id, days: 5 }); }
   const busy = activityOf(w, m);
   if (busy) return `${m.name} is ${busy.why}. Pick someone else.`;
   if (refuses(w, g, m, n)) {
@@ -192,17 +216,26 @@ export function noteWork(w: World, j: Job, ok: boolean) {
 
 // Each week every NPC superior looks at what needs doing and hands it out to whichever of his men are free. Nothing is handed out
 // that isn't needed, and no more than he has men for.
+// A made man of the player's family who has come to know him a little, with something that wants doing and nobody of his own free to
+// do it, asks him: the way an associate gets known by the men who will one day speak for him. At most two such asks open at once.
+function askPlayer(w: World, g: Character, n: Need) {
+  const p = w.playerId ? w.chars[w.playerId] : undefined;
+  if (!p?.alive || p.jailedUntil > w.now || p.familyId !== g.familyId || g.id === p.id || n.target === p.id) return false;
+  if (rel(g, p.id).trust < 0.2 || (g.cooldown['ask:player'] ?? 0) > w.now) return false;
+  if (w.jobs.filter((j) => j.status === 'offered' && j.assignee === p.id && j.via === 'tip' && w.chars[j.giver ?? '']?.familyId === p.familyId).length >= 2) return false;
+  if (!w.rng.chance(0.4)) return false;
+  g.cooldown['ask:player'] = w.now + 10 * DAY;
+  return typeof giveWork(w, g, p, n) !== 'string';
+}
 export function workWeek(w: World) {
   const supers = Object.values(w.chars).filter((g) => g.alive && !g.isPlayer && g.familyId && g.jailedUntil <= w.now && ['soldier', 'capo', 'underboss', 'boss'].includes(g.rank)).sort(byId);
   for (const g of supers) {
     delegate(w, g);
     let men = menOf(w, g);
-    if (!men.length) continue;
     const hard = temper(g).volatility > 0.6 ? 'hard' : 'quiet';
     for (const n of needsOf(w, g)) {
-      if (!men.length) break;
-      const m = pickMan(w, g, n, men);
-      if (!m) continue;
+      const m = men.length ? pickMan(w, g, n, men) : undefined;
+      if (!m) { if (askPlayer(w, g, n)) break; continue; }
       men = men.filter((x) => x !== m);
       giveWork(w, g, m, n, hard);
     }

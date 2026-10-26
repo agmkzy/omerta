@@ -216,7 +216,7 @@ describe('Gate 4 parity, Stage C: the family', () => {
   const trouble = (t: Character, revealed = false) => { t.problem = { kind: 'gambling', sev: 0.5, since: 0, revealed } as never; };
   const light = (t: Character) => { t.books.arrears = 120; t.books.missed = 2; };
   const C: Case[] = [
-    { name: 'is there work (a man of the family)', who: (x) => x.fam, old: 'work', node: 'orders', both: true },
+    { name: 'is there work (a man of the family)', who: (x) => x.fam, old: 'work', node: 'orders', both: true, differs: { why: 'a made man of the family puts his own affairs the player’s way (work.needsOf: his pickups, a message to another family, a man he wants watched), not a tip from his acquaintances (the compelling-RPG stage: shared work is how made men come to speak for an associate)', holds: (w) => w.jobs.every((j) => j.status !== 'offered' || !w.chars[j.giver ?? '']?.familyId || ['deliver', 'message', 'watch', 'collect', 'shake', 'handle', 'lean', 'guard', 'fix'].includes(j.kind)) } },
     { name: 'is there work (his boss)', who: (x) => x.boss, old: 'work', node: 'orders' },
     { name: 'what he needs done', who: (x) => x.boss, old: 'b_need', node: 'myboss' },
     { name: 'a bigger piece', who: (x) => x.boss, old: 'b_more', node: 'myboss', both: true },

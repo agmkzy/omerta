@@ -52,6 +52,8 @@ const work: Act = {
   run: (c) => {
     const x = T(c), { w, p, t } = x, n0 = w.jobs.length;
     if (t.id === p.bossId) door.bossWork(w);
+    // (a made man of the family has his own affairs, and what they need is what he puts the player's way: work.needsOf)
+    else if (inFamily(p, t) && ['soldier', 'capo', 'underboss'].includes(t.rank)) door.peerWork(w, t, p);
     else { const d = chance(w, t.id, 'puts something your way', 'has nothing', [term('base', 0.35), term('his trust in you × 0.5', R(x).trust * 0.5)]); if (d.yes) door.offerWork(w, t, false, true); }
     line(x, voice(x, w.jobs.length > n0 ? 'work_some' : t.id === p.bossId ? 'work_boss_none' : 'work_none'));
     // (work he has just put to the player is answered now, to his face: take it or not)
@@ -62,7 +64,7 @@ const work: Act = {
 const bNeed: Act = {
   base: 'b_need', pane: 'business',
   offers: (c) => (isBoss(c) && !asked(c, 'b_need') ? [offer(c, 'b_need', 'Ask what he needs done', 'It could be anything.')] : []),
-  run: (c) => { const x = T(c), { w, t } = x, n0 = w.jobs.length; ask(c, 'b_need'); const held = inHandFrom(c); if (held) { line(x, `"You’ve still got ${held.title.length <= 48 ? `‘${held.title}’` : 'what I gave you'}. Finish that first."`); return out(5); } if (door.bossWork(w) || w.jobs.length > n0) { const j = w.jobs.at(-1)!; c.v.lines.push({ who: 'narr', text: `${t.name} thinks a moment.` }); line(x, jobSaid(j)); c.v.th.raised.push('job:' + j.id); return { minutes: 15, next: jobOffer.offersFor!(c, j.id) }; } else line(x, `${t.name} waves a hand. "Nothing now. Don’t look for work. It finds you."`); return out(15); },
+  run: (c) => { const x = T(c), { w, t } = x, n0 = w.jobs.length; ask(c, 'b_need'); const held = inHandFrom(c); if (held) { line(x, `"You’ve still got ${held.title.length <= 48 ? `‘${held.title}’` : 'what I gave you'}. Finish that first."`); return out(5); } if (door.bossWork(w) || w.jobs.length > n0) { const j = [...w.jobs].reverse().find((q) => q.giver === t.id && q.status === 'offered' && q.assignee === x.p.id) ?? w.jobs.at(-1)!; /* (his work: the job may be one already on the books, not the newest record) */ c.v.lines.push({ who: 'narr', text: `${t.name} thinks a moment.` }); line(x, jobSaid(j)); c.v.th.raised.push('job:' + j.id); return { minutes: 15, next: jobOffer.offersFor!(c, j.id) }; } else line(x, `${t.name} waves a hand. "Nothing now. Don’t look for work. It finds you."`); return out(15); },
 };
 const bMore: Act = {
   base: 'b_more', pane: 'business',

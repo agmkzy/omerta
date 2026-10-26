@@ -881,7 +881,7 @@ export function openInduction(w: World, p: Character, job: Job): Meeting | strin
   const boss = to === 'boss' ? p : w.chars[fam.bossId];
   const sp = to === 'boss' ? boss : sponsorOf(w, p) ?? boss;
   if (!boss?.alive || !sp) return 'The people who would stand for you aren’t available. It will have to wait.';
-  if (to !== 'boss' && (!available(w, boss) || !available(w, sp))) return 'Your sponsor and the boss both have to be there, awake and on their feet. Not now.';
+  if (to !== 'boss' && (!available(w, boss) || !available(w, sp))) return !available(w, boss) ? notNowWhy(w, boss) : notNowWhy(w, sp);
   const witnesses = Object.values(w.chars).filter((c) => c.alive && c.familyId === p.familyId && ['capo', 'underboss'].includes(c.rank) && available(w, c) && c.id !== boss.id && c.id !== sp.id && c.id !== p.id).slice(0, 4);
   const mk = (id: string, title: string, text: string[], opts: Opt[]): Item => ({ id, kind: 'induction', title, text, opts, data: {} });
   const capNames = witnesses.map((c) => c.name.split(' ')[0]).join(', ') || 'the captains';

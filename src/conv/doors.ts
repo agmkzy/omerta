@@ -5,6 +5,7 @@ import { addFact, bear, clamp, compat, ease as coreEase, feel, feelAtLeast, feel
 import * as deeds from '../deeds';
 import { share, confide as tellAbout } from '../actions';
 import { handOver as booksHandOver, react as booksReact } from '../books';
+import { giveWork, needsOf } from '../work';
 import { attendedJob, bossOffer, declineJob, mkJob, oppFrom, reached, takeJob, tipFrom } from '../jobs';
 import { choose as encChoose } from '../encounters';
 import { askAbout as sitAskAbout, helpWith as sitHelpWith } from '../situations';
@@ -158,6 +159,8 @@ export function tension(w: World, a: Character, b: Character, d: number, floor =
 // ---- work
 export function offerWork(w: World, from: Character, boss: boolean, chance: boolean): boolean { return boss ? bossOffer(w, true) : chance ? tipFrom(w, from) || oppFrom(w, from) : false; }
 export function bossWork(w: World): boolean { return bossOffer(w, true); }
+// a made man's own affairs, put the player's way when he asks (work.needsOf, handed out through work.giveWork, the one door for it)
+export function peerWork(w: World, from: Character, p: Character): boolean { const n = needsOf(w, from).find((x) => x.target !== p.id); return !!n && typeof giveWork(w, from, p, n) !== 'string'; }
 export function fenceWork(w: World, t: Character): boolean { return oppFrom(w, t); }
 export function takeWork(w: World, j: Job): void { takeJob(w, j); }
 // a summons answered by going to him (coffee he asked the player to: the visit is the meeting)
