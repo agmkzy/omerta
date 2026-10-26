@@ -28,6 +28,7 @@ import { isFemale, isPartner, kinOf, kinWord, stageWord, warmthWord } from '../l
 import { dangerLevel, LADDER_WORDS } from '../danger';
 import { favourWord, owedTo, owing } from '../encounters';
 import { crewList, waitChoices } from './views_b';
+import { prospects } from '../orders';
 import { myDisputes, playerMoved } from './views_c';
 import { storiesTab, storiesOf, storyKnown, type Story } from './stories';
 import { ambitionCard } from './ambview';
@@ -273,8 +274,8 @@ export function todayView(): string {
   const seen = new Set<string>();
   const attn = ns.filter(isAttn), opps = ns.filter((n) => !attn.includes(n) && !seen.has(n.title) && !!seen.add(n.title));
   if (attn.length) {
-    out += h('Waiting on you', String(attn.length)) + rows((S.open.needs ? attn : attn.slice(0, 3)).map(needRow));
-    if (attn.length > 3) out += acts(btn('tog:needs', S.open.needs ? 'Show fewer' : `${attn.length - 3} more`, 'quiet'));
+    const first = attn[0], c0 = first.who ? w.chars[first.who] : undefined;
+    out += fold('wait', 'Waiting on you', attn.length, esc(stripLinks(first.title)) + (attn.length > 1 ? ` <i>and ${attn.length - 1} more</i>` : ''), rows(attn.map(needRow)), true, c0 ? [c0] : [], attn.some((n) => n.dot === 'red'));
   } else out += `<p class="td-calm">Nothing is pressing. The day is yours.</p>`;
   out += guideCard();
   // ---- what reached you while time passed
@@ -353,20 +354,34 @@ function oppList(w: World, xs: Need[]): string {
     return `<details class="td-op ${tn}"><summary><i class="td-op__dot" aria-hidden="true"></i><span class="td-op__t"><small>${esc(x.k ?? '')}</small>${plain(x.title)}</span><span class="td-op__v">${x.pay ? money(x.pay) : tn === 'now' ? 'today' : esc(x.when ?? '')}</span></summary><div class="td-op__body">${about}${facts.length ? `<dl class="td-op__facts">${facts.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join('')}</dl>` : ''}<button class="ui-btn ui-btn--primary" data-a="${esc(x.a)}">Look into it</button></div></details>`;
   };
   const top = sorted.slice(0, 5), rest = sorted.slice(5);
-  return h('Opportunities', String(xs.length)) + `<div class="td-ops">${top.map(item).join('')}${rest.length ? `<details class="td-ops__more"><summary>${rest.length} more</summary>${rest.map(item).join('')}</details>` : ''}</div>`;
+  const nToday = sorted.filter((x) => tone(x) === 'now').length, onOffer = sorted.reduce((a, x) => a + (x.pay ?? 0), 0);
+  const line = [nToday ? `<em>${nToday} today</em>` : '', onOffer ? `${money(onOffer)} on offer` : '', !nToday && !onOffer ? esc(stripLinks(sorted[0].title)) : ''].filter(Boolean).join(' · ');
+  return fold('ops', 'Opportunities', xs.length, line, `<div class="td-ops">${top.map(item).join('')}${rest.length ? `<details class="td-ops__more"><summary>${rest.length} more</summary>${rest.map(item).join('')}</details>` : ''}</div>`);
+}
+
+const stripLinks = (x: string) => lk(x).replace(/<[^>]+>/g, '');
+// A section of Today folded to one line: what it is, how many, and the gist (with faces where it is about men); open, the whole of
+// it. Remembered while you play (S.open); what is waiting on you starts open, the rest closed.
+function fold(key: string, label: string, n: number, line: string, body: string, startOpen = false, faces: Character[] = [], hot = false): string {
+  const k = `td:${key}${startOpen ? ':shut' : ''}`, open = startOpen ? !S.open[k] : !!S.open[k];
+  const fs = faces.length ? `<span class="td-fold__faces">${faces.map((c) => avatar(c)).join('')}</span>` : '';
+  return `<section class="td-fold${open ? ' open' : ''}${hot ? ' hot' : ''}"><button class="td-fold__h" data-a="tog:${k}" aria-expanded="${open}"><span class="td-fold__l">${esc(label)}${n ? `<b>${n}</b>` : ''}</span>${fs}<span class="td-fold__s">${line}</span><i class="td-fold__c" aria-hidden="true">›</i></button>${open ? `<div class="td-fold__b">${body}</div>` : ''}</section>`;
 }
 
 // His crew as faces: what each is doing, in a word, and a man in trouble marked.
 function crewStrip(w: World, p: Character): string {
   const men = crewList();
-  if (!men.length) return '';
+  // (before the first man: the crew is still there, as what a man builds)
+  if (!men.length) return fold('crew', 'Your crew', 0, 'Nobody yet', `<p class="td-fold__p">Nobody takes your orders yet. A man of your own brings you an envelope every Sunday and does what you send him to do.</p>${acts(prospects(w, p).length ? btn('recruit:', 'Take on a man', 'primary') : btn('sub:people.men', 'Your men'))}`);
   const state = (c: Character): [string, string] => {
     const st = statusOf(w, c);
     if (st.dot === 'red') return [st.word, 'bad'];
     if (c.books.arrears > 0) return [`owes ${money(Math.round(c.books.arrears))}`, 'bad'];
     return activityOf(w, c) ? ['working', ''] : ['free', 'idle'];
   };
-  return h('Your crew', String(men.length)) + `<div class="td-crew">${men.map((c) => { const [word, tn] = state(c); return `<button class="td-man ${tn}" data-a="ent:${c.id}">${avatar(c)}<b>${esc(c.name.split(' ')[0])}</b><span>${esc(word)}</span></button>`; }).join('')}<button class="td-man td-man--orders" data-a="orders:"><i aria-hidden="true">›</i><b>Orders</b><span>${men.filter((c) => !activityOf(w, c) && statusOf(w, c).dot !== 'red').length} free</span></button></div>`;
+  const trouble = men.filter((c) => state(c)[1] === 'bad').length, free = men.filter((c) => state(c)[1] === 'idle').length;
+  const line = [trouble ? `<em>${trouble} in trouble</em>` : '', free ? `${free} free` : 'all working'].filter(Boolean).join(' · ');
+  return fold('crew', 'Your crew', men.length, line, `<div class="td-crew">${men.map((c) => { const [word, tn] = state(c); return `<button class="td-man ${tn}" data-a="ent:${c.id}">${avatar(c)}<b>${esc(c.name.split(' ')[0])}</b><span>${esc(word)}</span></button>`; }).join('')}<button class="td-man td-man--orders" data-a="orders:"><i aria-hidden="true">›</i><b>Orders</b><span>${free} free</span></button></div>`, false, men.slice(0, 4), trouble > 0);
 }
 
 function grudgeHint(): string {
