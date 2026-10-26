@@ -105,10 +105,13 @@ function turn(x: X, key: string, code: string, L: ReturnType<typeof lightOf>, fl
       const op = lineOf(w, t);
       const named: string[] = [];
       for (const b of shops.slice(0, 3)) { const late = b.protection?.late ?? 0; if (late > 0 || guilty || b.distress > 0) named.push(`${b.name}${late > 0 ? `, ${late} week${late > 1 ? 's' : ''} behind with me` : b.distress > 0 ? ', barely open' : ', quiet'}`); }
-      if (op) named.push(`the ${OPS[op.kind as keyof typeof OPS]?.label.toLowerCase() ?? 'business'} in ${op.district}${op.cause ? `: ${op.cause}` : ''}`);
+      // (his trade, with the reason he gives for it being slow: a bad week's cause, never a good one he would be giving himself away with)
+      const badWeek = op?.cause && (OPS[op.kind as keyof typeof OPS] as { bad?: string[] } | undefined)?.bad?.includes(op.cause) ? op.cause : '';
+      if (op) named.push(`the ${OPS[op.kind as keyof typeof OPS]?.label.toLowerCase() ?? 'business'} in ${op.district}${badWeek ? `: ${badWeek}` : ', nothing coming in'}`);
       if (!named.length) return again([q(t, 'Nothing I can point to. Some weeks are thin.')]);
       note(p, t, `He said these were slow: ${named.map((s) => s.split(',')[0].split(':')[0]).join('; ')}.`);
-      return again([q(t, named.length > 1 ? `${named.slice(0, -1).join('. ')}. And ${named.at(-1)}.` : `${named[0]}.`)]);
+      const cap1 = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
+      return again([q(t, named.length > 1 ? `${named.slice(0, -1).map(cap1).join('. ')}. And ${named.at(-1)}.` : `${cap1(named[0])}.`)]);
     }
     case 'missing': {
       // what you can see doesn't add up. A guilty man breaks or digs in (his nerve, his care for you, how plain it is); an honest one

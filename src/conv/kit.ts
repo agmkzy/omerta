@@ -137,7 +137,7 @@ export function says(c: Ctx, text: string, d?: Decision) {
   const t = unattributed(speechFor(c.w, c.h, c.n, text), c.n).replace(/"([^"]*)"/g, '“$1”').replace(new RegExp(`^(${c.n.name}|${first(c.n.name)}): (?=“)`), '');
   c.v.mem.said.push(t);
   const m = memOf(c.w, c.n.id); m.heard.push(t); if (m.heard.length > 12) m.heard.shift();
-  c.v.lines.push({ who: /^“/.test(t) || new RegExp(`^(He|His|${first(c.n.name)}|${c.n.name})\\b[^“]{0,80}“`).test(t) ? 'him' : 'narr', text: t.replace(new RegExp(`^${c.n.name} `), 'He '), trace: d ? traceOf(d) : undefined });
+  c.v.lines.push({ who: /^“/.test(t) || new RegExp(`^(He|His|${first(c.n.name)}|${c.n.name})\\b[^“]{0,80}“`).test(t) ? 'him' : 'narr', text: t.replace(new RegExp(`^${c.n.name} (?=(at|of|in|from|and|with|for|on|over|behind)\\b)`), `${first(c.n.name)} `).replace(new RegExp(`^${c.n.name} `), 'He '), /* ("He at the shop" is no sentence: his name, then, as men use it) */ trace: d ? traceOf(d) : undefined });
 }
 export const traceOf = (d: Decision) => [...(d.constraints.length ? [`constraints: ${d.constraints.map((x) => x.kind + ' (' + x.source + ')').join('; ')}`] : []), ...[...d.candidates].sort((a, b) => b.value - a.value).filter((x) => x.value > -9).map((x) => `${x.move === d.chosen ? '▶' : ' '} ${x.move} ${x.value}: ${x.terms.map((t) => `${t.name} ${t.value >= 0 ? '+' : ''}${t.value}`).join(', ')}`), ...(d.aim ? [`aim: ${d.aim}`] : [])];
 export const newThread = (): Thread => ({ asked: [], raised: [], spoken: [] });

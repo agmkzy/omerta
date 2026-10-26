@@ -320,7 +320,7 @@ function subjectsNow(c: Ctx, k: Pane, all: boolean): Choice[] {
     out.push(...pending.slice(0, 2));
     // (a man who has turned cold on the player is in no mood for small talk: what is between them, and that is all)
     if (!c.v.mem.points.includes('news') && !c.v.th.cold) out.push({ id: 'news', label: line(c, 'ask.news'), group: 'social' });
-    if (!c.v.mem.points.includes('spend') && !c.v.th.cold) out.push({ id: 'spend', label: line(c, acquainted(w, h, n) ? 'spend.time.' + partOfDay(w.now) : 'introduce.self'), group: 'social' });
+    if (!c.v.mem.points.includes('spend') && !c.v.th.cold) out.push({ id: 'spend', label: line(c, acquainted(w, h, n) ? 'spend.time.' + partOfDay(w.now) : 'introduce.self'), note: acquainted(w, h, n) ? 'An evening with him. That’s the rest of the visit.' : undefined, group: 'social' });
     out.push(...pending.slice(2));
     // something the player knows that bears on this man: trouble on his street, or by his people
     for (const f of Object.values(w.facts).filter((f) => h.known[f.id] && !n.known[f.id] && !f.minor && HOSTILE.has(f.kind) && f.business && w.now - f.t < 21 * DAY && (f.district === (ownerBiz(w, n.id)?.district ?? n.district) || offender(f) === n.id || w.chars[offender(f) ?? '']?.bossId === n.id || crewGround(w, n).has(f.district))).sort((a, b) => b.t - a.t).slice(0, 1)) out.push({ id: 'tell:' + f.id, label: line(c, 'tell.news', { topic: w.biz[f.business!].name }), group: 'matter' });
@@ -362,7 +362,7 @@ function general(c: Ctx) { c.memo.clear(); if (c.v.pane) pane(c, c.v.pane); else
 export function everything(w: World, v: Visit): Choice[] {
   const c = ctx(w, v), out: Choice[] = v.waiting ? [{ id: 'answer', label: `Answer him: ${v.waiting.q}`, group: 'reply' }] : [];
   for (const k of PANES) out.push(...subjects(c, k, true));
-  if (!v.th.cold && !v.th.shut) out.push({ id: 'news', label: line(c, 'ask.news'), group: 'social' }, { id: 'spend', label: line(c, 'spend.time.' + partOfDay(w.now)), group: 'social' });
+  if (!v.th.cold && !v.th.shut) out.push({ id: 'news', label: line(c, 'ask.news'), group: 'social' }, { id: 'spend', label: line(c, acquainted(w, c.h, c.n) ? 'spend.time.' + partOfDay(w.now) : 'introduce.self'), note: acquainted(w, c.h, c.n) ? 'An evening with him. That’s the rest of the visit.' : undefined, group: 'social' }); // (a man you haven't met is met first)
   out.push({ id: 'home', label: 'Never mind', group: 'more' }, { id: 'leave', label: 'Leave', group: 'leave' });
   return out.filter((x, i) => out.findIndex((y) => y.id === x.id) === i);
 }
@@ -443,6 +443,8 @@ function jobNews(c: Ctx) {
   for (const j of xs.slice(-2)) {
     // (work the player took on and that stopped being needed is not work he turned his nose up at: he knows it was taken)
     const key = j.status === 'done' ? (j.reported ? 'job.ack.thanks' : 'job.ack.done') : j.status === 'failed' ? 'job.ack.failed' : j.accepted ? 'job.ack.moot' : j.status === 'declined' ? 'job.ack.declined' : 'job.ack.ignored';
+    // (a man who has never met the player, whose work came to him by word of mouth, doesn't reproach him for it to his face)
+    if (!acquainted(w, h, n) && /ignored|declined|moot/.test(key)) { remember(w, n.id, 'job:' + j.id, j.status); continue; }
     him(c, plain(n.id, key, { job: jobPhrase(w, j) }, j.status === 'done' ? 'warm' : 'cold'));
     remember(w, n.id, 'job:' + j.id, j.status);
     // (he has asked how it went: the answer is what the player can say first)
@@ -470,6 +472,8 @@ const mkey = (ob: Obligation) => 'intervene:' + (ob.matter?.for ?? '') + ':' + (
 const interveneSig = (c: Ctx, ob: Obligation) => { const a = ob.matter?.against ?? '', k = captaincyOf(c.w, c.n, c.w.chars[ob.matter?.for ?? ''] ?? c.n, c.w.chars[a] ?? c.n); return `${Object.values(c.w.facts).filter((f) => c.h.known[f.id] && HOSTILE.has(f.kind) && offender(f) === a).length}:${k.knowsTrouble ? 1 : 0}`; };
 
 // ---------------------------------------------------------------- choosing
+// a choice that is a thing done, not said: told as what he does
+const DEED = /^(Walk over|Ask around|Ask \w+ to |Ask to |Ask whether|Ask if|Offer to |Offer him |Offer a |Call in |Propose |Suggest |Remind him|Hand back|Hand him|Give him time|Halve |Forgive |Write off|Settle it|Put him |Make him |Say you’ll|Tell him (you|he|that|the|it)|Wreck |Send |Lean on|Bring in|Congratulate him|Welcome him|Find out|Check )/;
 export function choose(w: World, v: Visit, id: string): { v: Visit; minutes: number; meeting?: Meeting; settle?: Id } {
   // (what the player has chosen in this visit: only a choice made before is "again"; moving between the headings is not saying anything)
   const picked = (v.th.picked ??= []), again = picked.includes(id), said = !/^(u|all):|^(home|more|back|leave)$/.test(id);
@@ -488,8 +492,11 @@ export function choose(w: World, v: Visit, id: string): { v: Visit; minutes: num
       else { const c = ctx(w, v), alr = unattributed(vsay(w, c.n, c.h, 'already'), c.n); v.lines.push(prev.has(alr) ? { who: 'narr', text: 'He has nothing more to say on it.' } : { who: 'him', text: alr }); }
     }
   }
+  for (const l of r.v.lines.slice(from)) if (l.who === 'him') l.text = oneSpeech(l.text);
   return { ...r, v: notNow(w, r.v) };
 }
+// (his words in one breath: two quotations side by side are one speech, "“I wasn’t there.” “Not my business.”" read as two voices)
+const oneSpeech = (t: string) => t.replace(/([.!?…—])”\s+“/g, '$1 ');
 // While a man who came with something is still waiting on an answer, the way out is an answer: "Not now", said, not a silent exit
 // (it puts him off: his request lapses, as it would unanswered, and he knows he was put off). Leaving otherwise is just leaving.
 function notNow(w: World, v: Visit): Visit {
@@ -516,7 +523,16 @@ function chooseIn(w: World, v: Visit, id: string): { v: Visit; minutes: number; 
   const ak = fig ? openAsks(w).find((q) => q.id === base!.id.split(':')[2])?.ak : undefined;
   const figSaid = fig ? `“${money(fig[0])}${fig[1] !== undefined ? `, at ${Math.round(fig[1] * 100)} percent a week` : ak === 'protect' || ak === 'rate' ? ' a week' : ''}.”` : undefined;
   // (answering something he came about by doing it, "Go, with a modest envelope", is an act, told by what follows, not a line of speech)
-  if (label && kind === 'a') { if ((a1 !== 'enc' || base?.says) && !/:force$/.test(id)) you(c, figSaid ?? base?.says ?? label); /* (a thing done, not said: its own narration tells it) */ return { v, ...doAct(c, id.slice(2), label) }; }
+  if (label && kind === 'a') {
+    // what the player says, or, when the choice is a thing he does ("Walk over and say who you are", "Offer to lend him money"), what he
+    // does, told as such; and not at all when the doing tells itself ("You walk over, give your name…")
+    const spoken = figSaid ?? base?.says ?? label, at = v.lines.length;
+    const deed = !figSaid && !base?.says && !/^[“"‘]/.test(label) && DEED.test(label);
+    if ((a1 !== 'enc' || base?.says) && !/:force$/.test(id)) { if (deed) v.lines.push({ who: 'narr', text: `You ${label.charAt(0).toLowerCase()}${label.slice(1)}${/[.!?]$/.test(label) ? '' : '.'}` }); else you(c, spoken); }
+    const r = doAct(c, id.slice(2), label);
+    if (deed && v.lines[at]?.who === 'narr' && v.lines[at + 1]?.who === 'narr' && /^You /.test(v.lines[at + 1].text)) v.lines.splice(at, 1);
+    return { v, ...r };
+  }
   // (an approach is chosen by name and said in words: what the player says is the line it stands for)
   const spoken = base?.says ?? label;
   if (id === 'leave') {

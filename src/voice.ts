@@ -42,7 +42,7 @@ export function fp(text: string, who: { name: string }): string {
     .replace(new RegExp(`^${n}(?= )`), 'I')
     // (V90: at the start of a clause he is "I": "after I refused", not "after me refused")
     .replace(new RegExp(`(\\b(?:after|before|when|because|until|since|if|that|while|and|but|so) )${n}(?= [a-z])`, 'g'), '$1I')
-    .replace(new RegExp(`${n}'s`, 'g'), 'my')
+    .replace(new RegExp(`${n}[’']s`, 'g'), 'my')
     .replace(new RegExp(`\\b${n}\\b`, 'g'), 'me')
     .replace(/\bme (was|had|has|got|took|made|came|went|did|said|knew|owed|lent|paid)\b/g, 'I $1')
     .replace(/^me\b/, 'I');

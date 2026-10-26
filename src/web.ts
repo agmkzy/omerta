@@ -248,6 +248,9 @@ function talkTo(id: string, about?: string) {
   if (!x?.alive) return;
   const wh = whereIs(w, p, x);
   if (wh?.kind === 'jail') return pass(5, [`${x.name} is locked up. Nothing to do but wait.`]);
+  // (your mother, your brother, the girl you're seeing: not a sit-down with a man of the life; their page has what you do with them,
+  // an hour together, an evening out)
+  if (((w.life?.kin ?? []).some((k) => k.id === id) && x.rank === 'civilian') || (w.life?.partner?.id === id && w.life.partner.stage !== 'split')) return go({ t: 'person', id });
   let v = beginVisit(w, id), minutes = wh?.mins ?? 15;
   // (a link that names a way in rather than a matter, as older pages do: business, catching up, asking, the family, settling things,
   // opens the heading it belongs under)

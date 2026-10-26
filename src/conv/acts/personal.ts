@@ -217,7 +217,10 @@ const about: Act = {
     if (!y) return out(3);
     const q = t.rels[y.id], nm = first(y), tw = traitWords(y);
     const rel0 = !q ? 'I hardly know him' : q.grudge >= 0.55 ? 'I can’t stand him' : q.grudge >= 0.3 ? 'He and I have our differences' : q.trust > 0.7 ? 'I’d trust him with anything' : q.trust > 0.45 ? 'We get on' : q.trust > 0.25 ? 'I keep an eye on him' : 'I don’t trust him';
-    line(x, `“${nm}? ${rel0}.${tw ? ` ${tw[0].toUpperCase() + tw.slice(1)}, I’d say.` : ''}”`);
+    // (what he is, said as a man sums another up: "Violent, and reckless. That’s Mario.", not a list of qualities)
+    const ws = tw ? tw.split(/,\s*/).filter(Boolean).slice(0, 2) : [];
+    const sum = ws.length ? `${ws[0][0].toUpperCase() + ws[0].slice(1)}${ws[1] ? `, and ${ws[1]}` : ''}. That’s ${nm}.` : '';
+    line(x, `“${nm}? ${rel0}.”${sum ? ` He thinks about it. “${sum}”` : ''}`);
     const f = Object.values(w.facts).filter((g) => !g.minor && g.actor === y.id && t.known[g.id] && !p.known[g.id] && !BORING.has(g.kind)).sort((a, b) => b.t - a.t)[0];
     if (f && R(x).trust >= 0.35) {
       line(x, `${voice(x, 'gossip')} ${told(w, t, f, t.known[f.id].knowsActor)}`, settled(t.id, 'tells', 'he trusts you enough (≥ 0.35)'));

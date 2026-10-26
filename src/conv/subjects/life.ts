@@ -9,6 +9,7 @@
 // loan, a favour owed, a promise you will be held to, an introduction, an offer for his shop, a rival made by a careless word.
 // He remembers how it went, and the next time you raise it he picks up where you left off.
 import { lineOf } from '../../rackets';
+import { fp } from '../../voice';
 import { FEMALE } from '../../names';
 import { temper } from '../../temper';
 import { askBetween, mayAsk, openAsks } from '../../asks';
@@ -395,7 +396,7 @@ function opinion(x: X): Subject | undefined {
         if (!p.intro?.[o.id] && peek(p, o.id).trust < 0.3) cs.push(ch(key, 'intro', `“Could you introduce me to ${first(o)}?”`, 'A friend of a friend starts better than a stranger.'));
         cs.push(done(key));
         const n = first(o), tp = temper(t);
-        const pool = tp.agreeable + tp.empathy > 1.15 ? [`${n}? Salt of the earth. I’d trust him with my sister.`, `${n} looked after me when nobody else would.`, `I’d go through a door for ${n}.`]
+        const pool = tp.agreeable + tp.empathy > 1.15 ? [`${n}’s salt of the earth. I’d trust him with my sister.`, `${n} looked after me when nobody else would.`, `I’d go through a door for ${n}.`]
           : tp.caution > 0.6 ? [`${n} does what he says. There aren’t many.`, `${n}’s careful. I like careful.`, `You can count on ${n}. That’s rare.`]
           : tp.pride > 0.6 ? [`${n}’s one of the few I’d call an equal.`, `You want to learn something, watch ${n}.`, `${n} has never once let me down.`]
           : [`${n} is a good man. One of the few.`, `${n}’s straight. You can’t say that about many.`, `I’ve got a lot of time for ${n}.`];
@@ -405,7 +406,7 @@ function opinion(x: X): Subject | undefined {
       const cs: Choice[] = [ch(key, 'agree', `“I never liked ${first(o)} either.”`, `He will warm to you. ${first(o)} may hear of it.`), ch(key, 'defend', `“${first(o)}’s all right. Give him a chance.”`, 'He may respect it. He may not.')];
       if (wrong || pick.r.grudge > 0.45) cs.push(ch(key, 'more', '“What’s really between you two?”', 'There’s a story. You might do something about it.'));
       cs.push(done(key));
-      return { lines: [q(t, by(t, { hothead: `${first(o)}? I’d like to break his face.${why}`, bitter: `${first(o)} smiles at you and counts your pockets.${why}`, cold: `I don’t think about ${first(o)}. When I do, it isn’t kindly.${why}`, frightened: `I keep away from ${first(o)}. That’s all I’ll say.`, _: `I’ve no use for ${first(o)}.${why}` }))], choices: cs };
+      return { lines: [q(t, by(t, { hothead: `I’d like to break ${first(o)}’s face.${why}`, bitter: `${first(o)} smiles at you and counts your pockets.${why}`, cold: `I don’t think about ${first(o)}. When I do, it isn’t kindly.${why}`, frightened: `I keep away from ${first(o)}. That’s all I’ll say.`, _: `I’ve no use for ${first(o)}.${why}` }))], choices: cs };
     },
     reply: (x, code) => {
       said(w, t, key, code);
@@ -431,7 +432,7 @@ function opinion(x: X): Subject | undefined {
       }
       if (code === 'more') {
         if (wrong && t.known[wrong.id]) door.learnFrom(w, p, wrong, t.id, t.known[wrong.id].knowsActor);
-        return { lines: [q(t, wrong ? wrong.text.replace(t.name, 'me').replace(/\.$/, '. I haven’t forgotten.') : `Years of it. Little things. They add up.`)], choices: [], go: { node: 'subject', subject: o.id } };
+        return { lines: [q(t, wrong ? fp(wrong.text, t).replace(/\.$/, '. I haven’t forgotten.') : `Years of it. Little things. They add up.`)], choices: [], go: { node: 'subject', subject: o.id } };
       }
       return { lines: [], choices: [] };
     },

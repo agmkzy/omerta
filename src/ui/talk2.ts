@@ -82,7 +82,7 @@ put('personal', 'how old_times spend rv_drink congrats welcome ask_want ask_hist
 put('settle', 'demand confront amends word_make accuse rv_warn cr_drop cr_thin cr_look challenge refuse');
 // the entries several options share: one row (the fitting wording, when only one may be said), or the choice of them when there are more
 const ENTRY: { key: string; name: string; codes: string[]; one?: boolean }[] = [
-  { key: 'work', name: 'Ask for work', codes: ['b_more', 'b_need', 'work'], one: true },
+  { key: 'work', name: 'Ask for work', codes: ['b_need', 'work', 'b_more'] }, // (every one reachable: alone, it is said as itself; several, they open)
   { key: 'standing', name: 'Your standing', codes: ['earn', 'tk:earn', 'b_stand', 'ask_rep', 'promo', 'recommend', 'rk_back', 'rk_back_ask'] },
   { key: 'money', name: 'Money between you', codes: ['borrow', 'loan', 'offer_loan', 'help_loan', 'favcall', 'b_tribute', 'rate_ask'] },
   { key: 'debt', name: 'A debt', codes: ['d_time', 'd_half', 'd_favour', 'd_forgive', 'd_pay', 'd_all', 'd_ask', 'd_remind'] },

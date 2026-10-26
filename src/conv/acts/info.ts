@@ -342,7 +342,9 @@ function subjectQs(c: Ctx): Offer[] {
   const theirs = Object.values(w.facts).find((f) => f.actor === s.id && p.known[f.id]?.knowsActor && !t.known[f.id]?.knowsActor && !BORING.has(f.kind));
   if (theirs) o.push({ code: 'tell:' + theirs.id, label: said(c, 'tell', `Tell him what you know about ${s.name}`) });
   const exon = Object.values(w.facts).find((f) => f.actor && f.actor !== s.id && p.known[f.id]?.knowsActor && f.victim === t.id && t.rels[s.id]?.grudge >= 0.3);
-  if (exon) o.push({ code: 'exon:' + exon.id, label: said(c, 'exon', `Tell him it wasn’t ${s.name}`), note: 'You know who it was.' });
+  // (only when you know of nothing he did to him: vouching for a man you know is guilty is not clearing him)
+  const guilty = Object.values(w.facts).some((f) => f.actor === s.id && f.victim === t.id && p.known[f.id]?.knowsActor);
+  if (exon && !guilty) o.push({ code: 'exon:' + exon.id, label: said(c, 'exon', `Tell him it wasn’t ${s.name}`), note: `You know it was ${w.chars[exon.actor!]?.name ?? 'somebody else'}.` });
   if (!asked(c, 'handle') && s.rank !== 'boss' && s.rank !== 'underboss' && s.familyId !== p.familyId) o.push({ code: 'handle', label: said(c, 'handle', `Offer to deal with ${s.name}`) });
   if (!asked(c, 'mediate')) o.push({ code: 'mediate2', label: said(c, 'mediate2', 'Offer to mediate') });
   return o;
