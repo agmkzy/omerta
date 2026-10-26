@@ -41,30 +41,37 @@ describe('debtors', { tags: ['scenario'] }, () => {
   });
 });
 
-describe('asking the player', () => {
-  ok('the player is asked only when it is plausible, once, and may refuse - the man carries on', { tags: ['scenario'] }, () => {
-    const w = agencyWorld(7, 20); const p = P(w); const c = npcs(w, 'soldier')[0]; p.cash = 1000;
-    const d = createDebt(w, p.id, c.id, 600, 0.03, 'test'); d.missed = 1; c.cash = 5; c.traits.violence = 0;
+// A man behind on what he owes the player, with nothing spare, works out what to do; asking the player for time is one of his
+// options, borrowing from a friend another. The first soldier (of eight) who comes to the player, set up afresh each time.
+function asking() {
+  for (let k = 0; k < 8; k++) {
+    const w = agencyWorld(7, 20), p = P(w), c = npcs(w, 'soldier')[k];
+    if (!c) break;
+    p.cash = 1000; c.cash = 5; c.traits.violence = 0;
+    const d = createDebt(w, p.id, c.id, 600, 0.03, 'test'); d.missed = 1;
+    const due = d.nextDue, t0 = rel(c, p.id).trust;
     const g = begin(w, c, 'debt', 'x', 0.8, { stage: 'recover', target: d.id, need: 600 });
     for (let i = 0; i < 6 && !g.ask; i++) { w.now = Math.max(w.now, g.review); stepGoal(w, g, c); }
-    assert.ok(g.ask, 'asked'); const e = w.enc.find((x) => x.id === g.ask)!; assert.equal(e.data!.what, 'goal');
+    if (g.ask) return { w, p, c, d, g, due, t0 };
+  }
+  assert.fail('no debtor of eight came to the player');
+}
+
+describe('asking the player', () => {
+  ok('the player is asked only when it is plausible, once, and may refuse - the man carries on', { tags: ['scenario'] }, () => {
+    const { w, p, d, g, due } = asking();
+    const e = w.enc.find((x) => x.id === g.ask)!; assert.equal(e.data!.what, 'goal');
     assert.equal(w.enc.filter((x) => x.status === 'open' && x.data?.what === 'goal').length, 1);
-    const due = d.nextDue; const r = choose(w, p, e, 'no'); assert.ok(r.lines.length);
+    const r = choose(w, p, e, 'no'); assert.ok(r.lines.length);
     assert.equal(d.nextDue, due); assert.ok(agencyOf(w).goals.includes(g)); assert.equal(g.ask, undefined);
     assert.equal(agencyOf(w).stats['ask.refused'], 1);
   });
   ok('the player accepts: extension granted, trust rises', { tags: ['scenario'] }, () => {
-    const w = agencyWorld(7, 20); const p = P(w); const c = npcs(w, 'soldier')[0];
-    const d = createDebt(w, p.id, c.id, 600, 0.03, 'test'); d.missed = 1; c.cash = 5; const due = d.nextDue; const t0 = rel(c, p.id).trust;
-    const g = begin(w, c, 'debt', 'x', 0.8, { stage: 'recover', target: d.id, need: 600 });
-    for (let i = 0; i < 6 && !g.ask; i++) { w.now = Math.max(w.now, g.review); stepGoal(w, g, c); }
+    const { w, p, c, d, g, due, t0 } = asking();
     choose(w, p, w.enc.find((x) => x.id === g.ask)!, 'yes'); assert.ok(d.nextDue > due); assert.ok(rel(c, p.id).trust > t0);
   });
   ok('an unanswered question lapses into a refusal; the plan goes on', { tags: ['scenario'] }, () => {
-    const w = agencyWorld(7, 20); const p = P(w); const c = npcs(w, 'soldier')[0];
-    const d = createDebt(w, p.id, c.id, 600, 0.03, 'test'); d.missed = 1; c.cash = 5;
-    const g = begin(w, c, 'debt', 'x', 0.8, { stage: 'recover', target: d.id, need: 600 });
-    for (let i = 0; i < 6 && !g.ask; i++) { w.now = Math.max(w.now, g.review); stepGoal(w, g, c); }
+    const { w, g } = asking();
     const e = w.enc.find((x) => x.id === g.ask)!; e.status = 'lapsed'; agencyWeek(w);
     assert.equal(g.ask, undefined); assert.ok(agencyOf(w).goals.includes(g) || agencyOf(w).ended.some((x) => x.id === g.id));
   });

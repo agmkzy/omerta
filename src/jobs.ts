@@ -901,7 +901,8 @@ export function daily(w: World) {
             imposed(w, p, g, { title: `${g.name.split(' ')[0]} raised your share`, said: `Word comes from ${g.name.split(' ')[0]}: from this Sunday you pass up ${Math.round(p.kickRate * 100)} percent. “He sent for you ${missed > 2 ? `${missed} times` : 'twice'}. A man who can’t find the time to come can find the money.”`, why: 'I sent for you and you didn’t come. Twice. A man who has no time for me can pay for the privilege.', record: `${g.name} raised your share to ${Math.round(p.kickRate * 100)} percent for not coming when he sent for you.` });
           }
         }
-      } else if (g) feel(w, g, p.id, 'trust', -0.03);
+      // (a favour asked and let lapse costs a little; a word about a mark is only information, and passing on it costs nothing)
+      } else if (g && j.via !== 'opportunity') feel(w, g, p.id, 'trust', -0.03);
     }
   }
   for (const j of w.jobs) if (j.status === 'active' && j.due !== undefined && j.due <= w.now && j.assignee !== p.id) autoResolve(w, j);

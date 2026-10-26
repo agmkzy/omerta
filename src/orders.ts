@@ -260,7 +260,7 @@ export function resolveErrand(w: World, j: Job, doer: Character, code: string): 
     case 'deliver': {
       const minutes = 150;
       // a little taken off the top of a made man's envelopes: money in the pocket, and a chance he counts
-      if (code === 'skim') {
+      if (code === 'skim' && doer.isPlayer) {
         const g = j.giver ? w.chars[j.giver] : undefined, take = g ? transfer(w, g, doer, Math.max(10, Math.round((j.pay || 30) * 1.2)), 'earn', 'off the top of his envelopes') : 0;
         if (g && rng.chance(clamp(0.3 + temper(g).caution * 0.35, 0.2, 0.75))) {
           feel(w, g, doer.id, 'trust', -0.18); bear(w, g, doer.id, 0.25, `${doer.name} was into his envelopes`);
@@ -286,7 +286,7 @@ export function resolveErrand(w: World, j: Job, doer: Character, code: string): 
       const minutes = travelTime(doer.district, t.district) + 90;
       doer.district = t.district;
       // said so he remembers it: he backs off, or he takes it as an insult to his family, as the man he is
-      if (code === 'hard') {
+      if (code === 'hard' && doer.isPlayer) {
         const g = j.giver ? w.chars[j.giver] : undefined, tp = temper(t), backs = rng.chance(clamp(0.55 - tp.pride * 0.35 - tp.courage * 0.25 + (apt - 0.5) * 0.3, 0.1, 0.85));
         addFact(w, { kind: 'threat', actor: doer.id, victim: t.id, minor: false, text: `${doer.name} warned ${t.name} off ${g ? g.name + '’s' : 'the family’s'} ground, and made sure he’d remember it.`, district: t.district }, { witnesses: [doer.id, t.id] });
         if (backs) { feel(w, t, doer.id, 'fear', 0.15); lines.push(`${t.name} goes a shade paler than he’d like. "All right. I heard you." He means it, for now.`); if (g) feel(w, g, doer.id, 'respect', 0.04); return { lines, minutes, ok: true, money: j.pay }; }

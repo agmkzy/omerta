@@ -271,7 +271,7 @@ function lifeOffer(w: World, p: Character) {
     const c = rng.pick(friends);
     addEnc(w, {
       kind: 'crew', from: c.id, title: `${first(c)}’s daughter is getting married`, days: 6,
-      lines: [`${c.name} stops you outside the club with a cream-coloured card.`, `"Saturday. St. Anthony’s, then the hall. It would mean a lot if you came."`],
+      lines: [`${c.name} stops you outside the club, embarrassed, with a cream-coloured card.`, `"The reception’s tonight, at the hall. My wife thought you’d been asked weeks ago. It would mean a lot if you came."`],
       opts: [
         { code: 'big', label: 'Go, with a fat envelope ($300)', hint: 'The whole family sees it. He won’t forget it.' },
         { code: 'go', label: 'Go, with a modest envelope ($100)', hint: 'Correct and unremarkable.' },

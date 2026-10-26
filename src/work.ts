@@ -223,7 +223,7 @@ function askPlayer(w: World, g: Character, n: Need) {
   if (!p?.alive || p.jailedUntil > w.now || p.familyId !== g.familyId || g.id === p.id || n.target === p.id) return false;
   if (rel(g, p.id).trust < 0.2 || (g.cooldown['ask:player'] ?? 0) > w.now) return false;
   if (w.jobs.filter((j) => j.status === 'offered' && j.assignee === p.id && j.via === 'tip' && w.chars[j.giver ?? '']?.familyId === p.familyId).length >= 2) return false;
-  if (!w.rng.chance(0.4)) return false;
+  if (!w.rng.chance(0.6)) return false;
   g.cooldown['ask:player'] = w.now + 10 * DAY;
   return typeof giveWork(w, g, p, n) !== 'string';
 }
