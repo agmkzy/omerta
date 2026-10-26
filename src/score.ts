@@ -4,7 +4,7 @@
 // sometimes it goes sideways and he decides there and then; and the after is the world's: the fence's money, his men's cut and the
 // driver's, heat, an arrest, what the driver tells the police, and a protector who wants to know who robbed his client. It is all
 // one encounter that moves through its stages (kind 'score', data.stage), and writes only through the world's doors.
-import { addFact, clamp, feel, money, notifyProtector, peek, repute, transfer } from './core';
+import { addFact, clamp, feel, money, notifyProtector, peek, repute, transfer, writeDown } from './core';
 import { addEnc } from './encounters';
 import { aptitude } from './people';
 import { jail } from './jobs';
@@ -158,7 +158,7 @@ function finish(w: World, p: Character, e: Enc, how: string, ok: boolean, giver:
   else { p.goods += value; lines.push(`It’s in a garage in Canarsie, worth ${money(value)} to somebody. You still have to move it.`); }
   if (flag(e, 'driver') === 1 && how === 'giveup' && giver?.alive) { const cut = transfer(w, p, giver, Math.round(Math.max(cash, value * 0.3) * 0.15), 'gift', 'the driver’s end'); lines.push(`The driver’s end, ${money(cut)}, goes through his cousin.`); }
   for (const m of men) { const cut = transfer(w, p, m, Math.round(Math.max(cash, value * 0.3) * 0.1), 'gift', 'his end of the truck'); feel(w, m, p.id, 'trust', 0.05); if (cut) lines.push(`${first(m)} gets his end: ${money(cut)}.`); }
-  if (giver?.alive && e.data?.src === 'owes') { const d = w.debts.find((x) => x.status === 'active' && x.creditor === p.id && x.debtor === giver.id); if (d) { d.balance = Math.max(0, d.balance - Math.round(value * 0.1)); if (d.balance === 0) d.status = 'paid'; lines.push(`What ${first(giver)} owes you comes down for the tip.`); } }
+  if (giver?.alive && e.data?.src === 'owes') { const d = w.debts.find((x) => x.status === 'active' && x.creditor === p.id && x.debtor === giver.id); if (d) { writeDown(w, d, Math.round(value * 0.1)); lines.push(`What ${first(giver)} owes you comes down for the tip.`); } }
   if (how === 'road') addFact(w, { kind: 'report', actor: p.id, minor: true, hiddenActor: true, text: `The driver gave the police a description of the men who stopped him.`, textHidden: `The driver gave the police a description of the men who stopped him.`, district: p.district }, { witnesses: [] });
   repute(w, p, 1, 'good work');
   lines.unshift(how === 'giveup' ? 'The driver hands you the keys, and you tie him to the steering wheel the way he asked.' : how === 'diner' ? 'He’s halfway through his eggs when the truck pulls away from the kerb.' : how === 'road' ? 'You box him in at a light on Flatbush. He doesn’t argue with what’s in your hand.' : 'The depot’s night man is asleep. You take two trailers instead of one.');
