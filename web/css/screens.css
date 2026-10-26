@@ -482,3 +482,8 @@ a.story { font-size: .85em; white-space: nowrap; color: var(--c-gold-2); }
 .bz-week__fig { font: 500 24px/1.2 var(--f-display); }
 .bz-week__fig b { font-weight: 600; color: var(--c-good); }
 .bz-week__s { font: 400 13px var(--f-ui); color: var(--c-muted); }
+/* A place: where it is and its hours, the name, a line of what it's like. */
+.pl-head { margin: var(--s-2) 0 var(--s-4); padding-bottom: var(--s-4); border-bottom: 1px solid var(--c-line); }
+.pl-kick { display: block; font: 600 10.5px var(--f-ui); letter-spacing: .16em; text-transform: uppercase; color: var(--c-gold); }
+.pl-head .ui-title { margin: 6px 0 4px; }
+.pl-blurb { margin: 0; font: italic 400 18px/1.4 var(--f-display); color: var(--c-cream-2); }

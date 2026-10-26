@@ -3,6 +3,8 @@ import { clubOf, clubOpen, clubPresent, topicsFor, waiting } from '../club';
 import { fmtTime } from '../core';
 import { sundayDue } from './sunday';
 import { avatar, back } from './common';
+import { choices, h, quiet, rows, type Pick, type Row } from './kit';
+import { placeHead, waitPicks } from './views_b';
 import { esc, lk, P, W } from './links';
 
 // an hour as a man says it: '11 in the morning', '2 at night'
@@ -10,20 +12,22 @@ const clock = (h0: number) => { const h = h0 % 24; return h === 0 ? 'midnight' :
 export function clubView(): string {
   const w = W(), p = P();
   const cl = clubOf(w, p.familyId);
-  if (!cl) return back() + `<p class="muted pad">Your family has no club.</p>`;
-  const owner = w.chars[cl.ownerId];
-  let out = back() + `<div class="ui-card"><h2>${esc(cl.name)}</h2><p class="muted">${esc(cl.district)} &middot; run by ${owner ? esc(owner.name) : 'nobody now'}. Open ${clock(cl.open[0])} until ${clock(cl.open[1])}.</p></div>`;
-  if (!clubOpen(w, cl)) return out + `<p class="muted pad">The shutters are down. ${owner ? esc(owner.name.split(' ')[0]) + ' opens' : 'It opens'} at ${cl.open[0]}:00.</p>`;
-
+  if (!cl) return back() + quiet('Your family has no club.');
+  const owner = w.chars[cl.ownerId], open = clubOpen(w, cl), sid = 'li:club:' + p.familyId;
+  const fam = p.familyId ? w.fam[p.familyId]?.name ?? '' : '';
+  let out = back() + placeHead(`The ${fam} club · ${open ? `open till ${clock(cl.open[1])}` : 'shut'}`, cl.name, `Espresso, a card table in the back, and the men who matter.${owner ? ` ${owner.name} runs it.` : ''}`);
+  const waits = waitPicks(w, p, sid);
+  if (!open) return out + quiet(`The shutters are down. ${owner ? esc(owner.name.split(' ')[0]) + ' opens' : 'It opens'} at ${cl.open[0]}:00.`) + (waits.length ? h('Who comes in') + choices(waits, 'Who comes in') : '');
   const here = clubPresent(w, cl);
-  if (sundayDue()) out += `<button class="need" data-a="sunday:"><span class="dot blue"></span><span><span class="t">Sunday</span><span class="s" style="display:block">Your men are bringing their envelopes in.</span></span></button>`;
-  if (!here.length) return out + `<p class="muted pad">Nobody you know is in right now.</p>`;
   const wait = waiting(w, p, cl, here);
-  if (wait.length) {
-    out += `<h2 class="ui-h">Wants a word</h2>` + wait.map(({ c, t }) => `<button class="need" data-a="cscene:${c.id}"><span class="dot amber"></span><span><span class="t">${esc(c.name)}</span><span class="s" style="display:block">${esc(c.rank)} &middot; ${esc(t.cue)}</span></span></button>`).join('');
-  }
-  const others = here.filter((h) => !wait.some((x) => x.c.id === h.c.id));
-  if (others.length) out += `<h2 class="ui-h">In the room<small>${here.length}</small></h2>` + others.map((h) => `<button class="need" data-a="cscene:${h.c.id}"><span class="dot"></span><span><span class="t">${esc(h.c.name)}</span><span class="s" style="display:block">${esc(h.c.rank)} &middot; ${esc(h.doing)}</span></span></button>`).join('');
-  void topicsFor;
+  if (wait.length) out += h('Wants a word') + rows(wait.map(({ c, t }): Row => ({ face: avatar(c), title: esc(c.name), sub: esc(t.cue), tone: 'warn', a: `cscene:${c.id}` })));
+  const others = here.filter((x) => !wait.some((y) => y.c.id === x.c.id));
+  if (others.length) out += h('In the room', String(here.length)) + rows(others.map((x): Row => ({ face: avatar(x.c), title: esc(x.c.name), sub: `${esc(x.c.rank === 'capo' ? 'captain' : x.c.rank)} · ${esc(x.doing)}`, a: `cscene:${x.c.id}` })));
+  else if (!wait.length) out += quiet('Nobody you know is in right now.');
+  const doing: Pick[] = [];
+  if (sundayDue()) doing.push({ a: 'sunday:', label: 'Take your men’s envelopes', hint: 'Sunday. They are bringing them in.' });
+  doing.push({ a: 'club:sit', label: 'Sit and listen', hint: 'An hour or two. Things find you here.' }, ...waits);
+  out += h('What you do') + choices(doing, 'What you do');
+  void topicsFor; void fmtTime; void lk;
   return out;
 }
