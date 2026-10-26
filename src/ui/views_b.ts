@@ -225,7 +225,13 @@ export function crewView(): string {
   const w = W();
   const p = P();
   const crew = crewList();
-  if (!crew.length) return quiet('Nobody takes your orders. Yet.') + recruitRows(w, p);
+  // (no men yet: the room still stands, and says how a crew starts, so the player knows it is there to be built)
+  if (!crew.length) {
+    const ps = prospects(w, p).length;
+    return `<p class="cr-week">Nobody takes your orders. Yet. A man who works for you brings you an envelope every Sunday, does what you send him to do, and what he does goes against your name.</p>`
+      + (ps ? h('Build your crew') + choices([{ a: 'recruit:', label: 'Take on a man', hint: `${ps} looking for a start. It costs ${money(RECRUIT_COST)} to bring one on.` }], 'Build your crew') : quiet('Nobody is looking for a start just now. Young men who want in turn up around the neighbourhoods; get known, and they come to you.'))
+      + recruitRows(w, p);
+  }
   // the week, in a sentence: what they brought you on Sunday, what they owe, how many have nothing from you
   const last = crew.map((c) => c.books.history.at(-1)).filter(Boolean) as NonNullable<Character['books']['history'][number]>[];
   const brought = last.reduce((a, x) => a + x.paid, 0), owed = crew.reduce((a, c) => a + c.books.arrears, 0);

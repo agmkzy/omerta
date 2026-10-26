@@ -35,8 +35,8 @@ export function openSection(name: Tab): Tab {
 
 // A section's first room: in People, your men when you have any, otherwise the family you belong to, otherwise everyone; the rest
 // open on their first.
-// (a room with nothing in it yet stays out of the way: no men, no "Your men")
-const roomsOf = (name: Tab) => (ROOMS[name] ?? []).filter((r) => !(r[0] === 'men' && !crewList().length));
+// (Your men is always there, even before the first man: it is where a crew is started)
+const roomsOf = (name: Tab) => ROOMS[name] ?? [];
 function roomIn(name: Tab): Room | undefined {
   const rs = roomsOf(name);
   if (!rs.length) return undefined;
