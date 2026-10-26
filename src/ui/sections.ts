@@ -13,6 +13,7 @@ import { P, S } from './links';
 import { wordRoom } from './word';
 import { moreView } from './more';
 import type { Tab } from './state';
+import { SECTIONS } from './layout';
 
 type Room = [id: string, label: string, view: () => string];
 const ROOMS: Partial<Record<Tab, Room[]>> = {
@@ -53,4 +54,18 @@ export function sectionView(raw: Tab): string {
   const rs = roomsOf(name), cur = roomIn(name)!;
   const nav = `<nav class="lf-nav" aria-label="${name}">${rs.map(([id, label]) => `<button class="${cur[0] === id ? 'on' : ''}" data-a="sub:${name}.${id}" aria-current="${cur[0] === id ? 'page' : 'false'}">${label}</button>`).join('')}</nav>`;
   return nav + cur[2]();
+}
+
+// One continuous swipe on a phone (owner, 26 October): across the rooms of a section, and past its last room on into the next
+// section, in the order of the bottom bar. Coming in backwards lands on that section's last room. Only from a section's own page.
+export function swipeTo(dir: 1 | -1): string | undefined {
+  if (S.view.t !== 'tab') return undefined;
+  const sec = LEGACY[S.view.name]?.[0] ?? S.view.name, i = SECTIONS.indexOf(sec);
+  if (i < 0) return undefined;
+  const rs = roomsOf(sec), cur = roomIn(sec), j = cur ? rs.indexOf(cur) + dir : -1;
+  if (cur && j >= 0 && j < rs.length) return `sub:${sec}.${rs[j][0]}`;
+  const next = SECTIONS[i + dir];
+  if (!next) return undefined;
+  const nr = roomsOf(next);
+  return nr.length ? `sub:${next}.${nr[dir > 0 ? 0 : nr.length - 1][0]}` : `tab:${next}`;
 }

@@ -101,3 +101,11 @@ body.g-scene .tabs { display: none; }
 .g-top__more { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; margin-right: -8px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--c-cream-2); }
 .g-top__more.on { color: var(--c-gold-2); background: var(--c-raise-2); }
 .g-nav__more { margin-top: var(--s-3); font-size: 15px; color: var(--c-muted); }
+
+/* a swipe between rooms and sections: the new page slides in from the side it came from */
+@keyframes g-swl { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+@keyframes g-swr { from { opacity: 0; transform: translateX(-24px); } to { opacity: 1; transform: none; } }
+#app.g-swl .g-main { animation: g-swl .18s ease-out; }
+#app.g-swr .g-main { animation: g-swr .18s ease-out; }
+@media (prefers-reduced-motion: reduce) { #app.g-swl .g-main, #app.g-swr .g-main { animation: none; } }
+#app.g-swl, #app.g-swr { overflow-x: clip; }

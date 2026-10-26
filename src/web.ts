@@ -59,7 +59,7 @@ import { onSaved, openSaves, saveBox, storageNote } from './savestore';
 import { briefView } from './ui/brief';
 import { bottomTabs, rail, sectionOf, takeSide, topBar } from './ui/layout';
 import { roomOf } from './ui/lifeview';
-import { openSection, sectionView } from './ui/sections';
+import { openSection, sectionView, swipeTo } from './ui/sections';
 import { startingLines } from './background';
 import { draftBg, draftDone, draftName, forgetSummary, openingAct, openingView, typed } from './ui/opening';
 import { fullName } from './names';
@@ -993,6 +993,40 @@ function settle(byKeyboard: boolean) {
 }
 
 window.addEventListener('resize', () => settle(false));
+
+// A swipe across a section's page, on a phone: the next room, and past the last one the next section (sections.swipeTo). Not where
+// the finger starts on something that scrolls sideways itself, or in a field; a mostly vertical stroke is a scroll, not a swipe.
+const sideways = (el: HTMLElement | null): boolean => {
+  for (; el && el !== document.body; el = el.parentElement) {
+    if (el.matches('input, textarea, select, [contenteditable]')) return true;
+    const ox = getComputedStyle(el).overflowX;
+    if ((ox === 'auto' || ox === 'scroll') && el.scrollWidth > el.clientWidth + 2) return true;
+  }
+  return false;
+};
+let touch: { x: number; y: number; t: number } | undefined;
+document.addEventListener('touchstart', (e) => {
+  const t = e.touches[0];
+  touch = e.touches.length === 1 && !sideways(e.target as HTMLElement) ? { x: t.clientX, y: t.clientY, t: Date.now() } : undefined;
+}, { passive: true });
+document.addEventListener('touchend', (e) => {
+  const s = touch;
+  touch = undefined;
+  if (!s || !S.w || S.view.t !== 'tab') return;
+  const t = e.changedTouches[0], dx = t.clientX - s.x, dy = t.clientY - s.y;
+  if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 2 || Date.now() - s.t > 700) return;
+  const to = swipeTo(dx < 0 ? 1 : -1);
+  if (!to) return;
+  const [a, v] = [to.slice(0, to.indexOf(':')), to.slice(to.indexOf(':') + 1)];
+  // (a swipe lands on the section's own page, never on a man's page remembered from before)
+  if (a === 'tab') { tab(v as Tab); if (S.view.t !== 'tab') { S.view = { t: 'tab', name: v as Tab }; S.stack = []; } } else handle(a, v);
+  render();
+  window.scrollTo(0, 0);
+  const app = document.getElementById('app')!;
+  app.classList.remove('g-swl', 'g-swr');
+  void app.offsetWidth;
+  app.classList.add(dx < 0 ? 'g-swl' : 'g-swr');
+}, { passive: true });
 
 // The keyboard, wherever a screen offers numbered choices: 1–9 pick (and 10 onwards, typed as two digits), Escape takes the way out,
 // the arrows move between choices.

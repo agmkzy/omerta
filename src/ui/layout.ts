@@ -31,7 +31,7 @@ const IC: Partial<Record<Tab, string>> = {
 };
 const LABEL: Partial<Record<Tab, string>> = { street: 'Street', people: 'People', today: 'Today', business: 'Business', story: 'Story', more: 'More' };
 // The world you deal with on the left of Today, the life you're building on the right.
-const SECTIONS: Tab[] = ['street', 'people', 'today', 'business', 'story'];
+export const SECTIONS: Tab[] = ['street', 'people', 'today', 'business', 'story'];
 const icon = (t: Tab, size = 22) => `<svg class="ti" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[t]}</svg>`;
 
 // Which section each screen belongs to, so the right one is lit and a phone's tabs say where you are. Every screen is listed: a
