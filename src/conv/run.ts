@@ -129,7 +129,7 @@ export function perform(c: Ctx, code: string, label: string): Done {
   }
   act.conduct?.(c, before);
   // now and then he mentions something that really happened between them, before his answer (not in the middle of a matter)
-  if (!dull && !inSubject && !/^(enc|x|mv|mt|nm|favcall|confront|tk|apx|jobtake|jobpass|m|mt_open|job|enc_open)(:|$)/.test(code) && !['biz_none', 'sit', 'amends', 'think'].includes(code) && v.lines.length > from) {
+  if (!dull && !inSubject && !/^(enc|x|mv|mt|nm|favcall|confront|tk|apx|jobtake|jobpass|m|mt_open|job|enc_open)(:|$)/.test(code) && !['biz_none', 'sit', 'amends', 'think', 'b_envelope'].includes(code) && v.lines.length > from) {
     const m = door.recall(w, p, t);
     if (m) v.lines.splice(from, 0, { who: 'him', text: m.line });
   }

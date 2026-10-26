@@ -75,3 +75,15 @@ Arrests from heat are still the largest drag on a careful player too (1–3 spel
 - Open pacing question: the share of quiet weeks (nothing serious reaches the player) measured 13, 8, 12 and 5 of 28 over seeds 8,
   9, 10, 12. The old test floor (40%) held in its one seed only; it is now set where that seed sits (35%), with the numbers in the test.
 - A test counting "nobody asked twice" counted across different askers; it now keys on who asked whom.
+
+## Stage D1: conversations read as talk (played on the dev build)
+- A man holding back who did something told it with the name anyway (records with no nameless wording), and the player was then
+  offered "Who have you heard it was?". He now tells it without the name ("Somebody wrecked Neri's Pawn."), so asking is real.
+- The captain's progress answer: "Worse than 2 weeks ago, not better: the work." → "You were further along when you asked me two weeks
+  ago. Look at the work." Times in speech are words ("three days ago", "two weeks ago", "a month ago"); a {What} slot capitalises.
+- A made man who isn't the player's captain named "your envelope, every Sunday" as what he'd need to see; envelopes go to the captain.
+  He now names the work he puts the player's way and what he hears from the captain (the memo says the same).
+- A man's remark about the player (memory.ts) came out as `Name: "..."` in the middle of speech, and could interrupt the envelope
+  being handed over with a second piece of praise; it is now his speech, and handing over the envelope is left to itself.
+- Pressing a man on his trouble after he named it ("Cards. Horses.") offered "Something's wrong. I can see it."; the follow-up now
+  answers what he said ("It's more than a few bad nights, isn't it?").

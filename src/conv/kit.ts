@@ -73,7 +73,9 @@ export const talks = (w: World) => (social(w).talks ??= {});
 export function memOf(w: World, id: Id): TalkMemory { return (talks(w)[id] ??= { visits: 0, last: -1e9, topics: [], heard: [] }); }
 export function remember(w: World, id: Id, k: string, out: string, sig?: string) { const m = memOf(w, id); m.topics.push({ k, t: w.now, out, sig }); if (m.topics.length > 24) m.topics.splice(0, m.topics.length - 24); } // (enough to hold a refusal and what has been said since)
 export const lastOf = (w: World, id: Id, k: string) => [...memOf(w, id).topics].reverse().find((x) => x.k === k);
-export const agoWords = (now: number, t: number) => { const d = Math.floor(now / DAY) - Math.floor(t / DAY); return d <= 0 ? 'today' : d === 1 ? 'yesterday' : d < 7 ? `${d} days ago` : d < 14 ? 'last week' : `${Math.round(d / 7)} weeks ago`; };
+// (said, so in words: 'three days ago', 'a month ago')
+const NUM = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'];
+export const agoWords = (now: number, t: number) => { const d = Math.floor(now / DAY) - Math.floor(t / DAY), wk = Math.round(d / 7); return d <= 0 ? 'today' : d === 1 ? 'yesterday' : d < 7 ? `${NUM[d]} days ago` : d < 14 ? 'last week' : wk < 4 ? `${NUM[wk]} weeks ago` : d < 45 ? 'a month ago' : d < 75 ? 'a couple of months ago' : 'months ago'; };
 
 // ---------------------------------------------------------------- context
 export interface Ctx { w: World; h: Character; n: Character; v: Visit; s: Session; pn: () => Perception; ph: () => Perception; memo: Map<string, unknown> }

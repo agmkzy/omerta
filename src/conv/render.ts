@@ -30,9 +30,10 @@ const B: Record<string, Entry> = {
   'advance.notMe': { _: ['“I’m hardly the man to ask. I don’t decide that.”'], jovial: ['“Me? Ask somebody who sits at the table.”'] },
   'advance.top': { _: ['“There’s only one chair above you. Think carefully about what you’re asking.”'] },
   'advance.open': { _: ['“You’re not there. Right now people call you {standing}.”', '“Not yet. People call you {standing}, from what I hear.”'], jovial: ['“Ambitious! Good. Right now people call you {standing}.”'], proud: ['“So does every man here. Right now I’d call you {standing}.”'] },
-  'advance.same': { _: ['“Same as when you asked me {ago}. Nothing’s moved.”', '“You asked me {ago}. The answer hasn’t changed.”'], cold: ['“{ago}, you asked. Same answer.”'] },
-  'advance.better': { _: ['“You’ve come on since {ago}: {what}, for one.”', '“Better than {ago}. I’ve noticed {what}.”'] },
-  'advance.worse': { _: ['“You’ve gone backwards since {ago}: {what}.”', '“Worse than {ago}, not better: {what}.”'], cold: ['“You’ve slipped since {ago}. {what}.”'] },
+  'advance.same': { _: ['“Same as when you asked me {ago}. Nothing’s moved.”', '“You asked me {ago}. The answer hasn’t changed.”'], cold: ['“You asked {ago}. Same answer.”'] },
+  // ({what} is a thing he has seen move, said as a noun: 'the money you pass up', 'what people say of you')
+  'advance.better': { _: ['“You’ve come on since you asked me {ago}. {What}, for one.”', '“Better than when you asked me {ago}. I’ve noticed {what}.”'] },
+  'advance.worse': { _: ['“You were further along when you asked me {ago}. Look at {what}.”', '“You’ve gone backwards since you asked me {ago}, and it’s {what} that’s slipped.”'], cold: ['“You’ve slipped since you asked. Look at {what}.”'] },
   'advance.ready': { _: ['“You’ve done what was asked. It’s with the people above me now. Be patient, and be seen.”'] },
   'advance.noSeat': { _: ['“You’re ready. There’s no chair. Somebody has to die, retire or go away first. Be ready when it happens.”'] },
   // (what he still needs to see, said as a man says it: how far off, never the family's own tally)
@@ -444,7 +445,9 @@ const N: Record<string, Entry> = {
   'outcome.metOnly': { _: ['You’ve met {listenerFirst}.'] },
 };
 
-const fill = (s: string, slots: Record<string, string>) => s.replace(/\{(\w+)\}/g, (_m, k) => slots[k] ?? `{${k}}`);
+// ({What} is {what} at the start of a sentence)
+const slot = (slots: Record<string, string>, k: string) => slots[k] ?? (/^[A-Z]/.test(k) && slots[k[0].toLowerCase() + k.slice(1)] ? slots[k[0].toLowerCase() + k.slice(1)].replace(/^./, (c) => c.toUpperCase()) : undefined);
+const fill = (s: string, slots: Record<string, string>) => s.replace(/\{(\w+)\}/g, (_m, k) => slot(slots, k) ?? `{${k}}`);
 
 // How a line was found: the bank level it came from (for the generalisation report). 'specific' = written for this request and
 // reason; 'reason' = the general line for this kind of answer and reason; 'kind' = the line for the request with no reason;
@@ -459,7 +462,7 @@ export function render(m: Meaning, speakerId: string, arch: Arch, spoken: Set<st
   const slots = m.slots ?? {};
   // a line may be used only if everything it names is known: a slot the decision could not fill from the speaker's perception
   // (empty or absent) rules the line out, so he never says a particular he has no basis for
-  const usable = (l: string) => [...l.matchAll(/\{(\w+)\}/g)].every(([, k]) => !!slots[k]);
+  const usable = (l: string) => [...l.matchAll(/\{(\w+)\}/g)].every(([, k]) => !!slot(slots, k));
   const level = (k: string): RenderInfo['level'] => !k ? 'missing' : k === m.key && !m.grounds ? (k.includes('.') ? 'specific' : 'verb') : k.startsWith(m.key + '.') ? 'specific' : k === m.key ? 'kind' : k === verb ? 'verb' : 'reason';
   for (const k of keys) {
     const entry = B[k] ?? N[k];

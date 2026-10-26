@@ -67,12 +67,13 @@ export const notesOf = (p: Character, t: Character) => (p.insight?.[t.id] ?? [])
 const knowsPlayer = (w: World, a: Character, b: Character) => !!a.rels[b.id] || !!b.intro?.[a.id];
 
 // ================================================================== his troubles
-const TROUBLE: Record<string, { hidden: string; told: (x: X) => string; need?: (x: X) => number }> = {
-  gambling: { hidden: 'Cards. Horses. You know how it goes.', told: (x) => by(x.t, { proud: 'I’m into a book for more than I make in a month. I’ll win it back. I always do.', frightened: 'I owe the book. A lot. They’ve stopped being polite about it.', jovial: 'The horses hate me. I keep going back anyway. It’s getting expensive.', _: 'I’m behind with the book. Further than I like.' }), need: (x) => Math.round((200 + x.t.problem!.sev * 500) / 50) * 50 },
-  debt: { hidden: 'Money. Everybody’s got money trouble.', told: (x) => by(x.t, { frightened: 'I borrowed from the wrong man, and he wants it back faster than I can earn it.', proud: 'I took money from somebody I shouldn’t have. I’ll handle it.', _: 'I owe the wrong people. They know where I live.' }), need: (x) => Math.round((300 + x.t.problem!.sev * 600) / 50) * 50 },
-  family: { hidden: 'Home. Never mind.', told: (x) => by(x.t, { earnest: 'My wife’s mother is sick, and my wife is with her, and the kids are with me. I haven’t slept.', cold: 'Things at home are bad. That’s all.', _: 'It’s my family. Somebody’s sick, and I’m stretched thin.' }) },
+// (hidden: what he says when he won't say; press: what the player says back to that, when it named something rather than denied it)
+const TROUBLE: Record<string, { hidden: string; press?: string; told: (x: X) => string; need?: (x: X) => number }> = {
+  gambling: { hidden: 'Cards. Horses. You know how it goes.', press: '“It’s more than a few bad nights, isn’t it?”', told: (x) => by(x.t, { proud: 'I’m into a book for more than I make in a month. I’ll win it back. I always do.', frightened: 'I owe the book. A lot. They’ve stopped being polite about it.', jovial: 'The horses hate me. I keep going back anyway. It’s getting expensive.', _: 'I’m behind with the book. Further than I like.' }), need: (x) => Math.round((200 + x.t.problem!.sev * 500) / 50) * 50 },
+  debt: { hidden: 'Money. Everybody’s got money trouble.', press: '“Not everybody looks the way you do about it.”', told: (x) => by(x.t, { frightened: 'I borrowed from the wrong man, and he wants it back faster than I can earn it.', proud: 'I took money from somebody I shouldn’t have. I’ll handle it.', _: 'I owe the wrong people. They know where I live.' }), need: (x) => Math.round((300 + x.t.problem!.sev * 600) / 50) * 50 },
+  family: { hidden: 'Home. Never mind.', press: '“What’s happening at home?”', told: (x) => by(x.t, { earnest: 'My wife’s mother is sick, and my wife is with her, and the kids are with me. I haven’t slept.', cold: 'Things at home are bad. That’s all.', _: 'It’s my family. Somebody’s sick, and I’m stretched thin.' }) },
   drink: { hidden: 'I’m fine. A little tired.', told: (x) => by(x.t, { proud: 'I drink a little more than I should. I can stop when I want.', bitter: 'A man has to get through the night somehow.', _: 'I’ve been drinking too much. I know it.' }) },
-  house: { hidden: 'Plans. Just plans.', told: (x) => by(x.t, { schemer: 'I’m putting money aside. A house out of the city, a different life. Don’t repeat it.', _: 'I want a house in Jersey. A yard. I’m saving every dollar.' }) },
+  house: { hidden: 'Plans. Just plans.', press: '“Plans for what?”', told: (x) => by(x.t, { schemer: 'I’m putting money aside. A house out of the city, a different life. Don’t repeat it.', _: 'I want a house in Jersey. A yard. I’m saving every dollar.' }) },
   resentment: { hidden: 'Nothing. Forget it.', told: (x) => { const b = live(x.w, x.t.bossId); return by(x.t, { bitter: `I carry more than my share and somebody else counts it. ${b ? first(b) + ' knows what I mean.' : ''}`, hothead: 'I’m sick of being the one who does the work while other men get the credit.', _: 'I don’t get what I’m worth. That’s the long and the short of it.' }); } },
   woman: { hidden: 'Don’t ask.', told: (x) => by(x.t, { jovial: 'There’s a girl. She’s not my wife. She’s expensive and she’s worth it, mostly.', frightened: 'There’s a woman, and if my wife finds out I’m finished.', _: 'There’s a woman I shouldn’t be seeing. It costs.' }), need: () => 250 },
 };
@@ -92,7 +93,7 @@ function trouble(x: X): Subject | undefined {
     nudge: pr.sev > 0.55 && trust(x) >= 0.4 ? by(t, { frightened: `${first(t)} keeps looking at the door.`, proud: `${first(t)} is trying hard to look like a man with nothing on his mind.`, _: `${first(t)} looks like he hasn’t slept.` }) : undefined,
     open: (x) => {
       if (before && before.sig === sig && helped) return { lines: [q(t, helped === 'gift' || helped === 'lend' ? 'Still the same. But what you did helped. I haven’t forgotten it.' : helped === 'straighten' ? 'I’m trying. Like you said.' : 'Same as it was.')], choices: [done(key)], minutes: 10 };
-      if (!pr.revealed && trust(x) < 0.45) return { lines: [q(t, T.hidden)], choices: [ch(key, 'press', '“Something’s wrong. I can see it.”', 'He may open up. He may resent being pushed.'), done(key)] };
+      if (!pr.revealed && trust(x) < 0.45) return { lines: [q(t, T.hidden)], choices: [ch(key, 'press', T.press ?? '“Something’s wrong. I can see it.”', 'He may open up. He may resent being pushed.'), done(key)] };
       return reveal(x);
     },
     reply: (x, code) => {

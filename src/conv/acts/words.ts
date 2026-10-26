@@ -2,7 +2,7 @@
 // speak to, what he will and will not say of them and to whom, how a fact sounds in his mouth, and the small ways a man talks (his own
 // name as "I", the men he mentions by first name). Nothing here decides or changes anything.
 import { flavour, isResolved, ownerBiz } from '../../core';
-import { arch } from '../../voice';
+import { arch, told as voiceTold } from '../../voice';
 import { temper } from '../../temper';
 import { introduced } from '../../acquaint';
 import { DAY, type Character, type Fact, type Id, type World } from '../../types';
@@ -185,7 +185,11 @@ export function openness(w: World, t: Character, p: Character): 'open' | 'partia
 
 // A fact as the man who knows it would say it. The record's own wording is for the news and the log; across a table he says "I" for
 // himself, he doesn't read out a headline, and an arrangement he made is "taken on", not "put on the books".
+const NAMELESS = new Set(['beating', 'vandalism', 'robbery', 'poach', 'murder', 'scam', 'burglary', 'theft']);
 export function told(w: World, t: Character, f: Fact, knows: boolean): string {
+  // (a man who doesn't know, or won't say, who did it tells it without the name, even where the record has no nameless wording)
+  const doer = f.actor ? w.chars[f.actor] : undefined;
+  if (!knows && !f.textHidden && doer && doer.id !== t.id && f.text.includes(doer.name) && NAMELESS.has(f.kind)) { const s = voiceTold(w, f, t, false); return s.charAt(0).toUpperCase() + s.slice(1) + '.'; }
   const raw = knows || !f.textHidden ? f.text : f.textHidden;
   const n = [...f.id].reduce((a, ch) => a + ch.charCodeAt(0), 0);
   let m = /^(.+) now collects (\$[\d,]+) a week from (.+)\.$/.exec(raw);
