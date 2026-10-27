@@ -3,9 +3,11 @@
 import { knownRoom, savesFold } from './lifeview';
 import { cityShops } from './views_b';
 import { rows, title, type Row } from './kit';
-import { P, S, W } from './links';
+import { esc, P, S, W } from './links';
 
 const group = (name: string, rs: Row[]) => `<h2 class="ui-h">${name}</h2>` + rows(rs);
+
+declare const __BUILT__: string | undefined; // (set by vite.config.ts at build time; undefined under tests)
 
 export function moreView(): string {
   if (S.sub.more === 'known') return `<button class="ui-back" data-a="sub:more.menu">‹ More</button>` + knownRoom();
@@ -30,5 +32,7 @@ export function moreView(): string {
   out += group('The game', [
     { title: 'Saves and backups', sub: 'Save, download a copy, go back a day, or start a new life.', a: 'sub:more.saves' },
   ]);
+  // (which build this is: a phone can keep an old copy of the page for a while)
+  out += `<p class="muted" style="margin-top:var(--s-6);font-size:12px">Version ${esc(typeof __BUILT__ === 'string' ? __BUILT__ : 'dev')}</p>`;
   return out;
 }

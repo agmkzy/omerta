@@ -54,8 +54,12 @@ function previewAtRoot(): Plugin {
   };
 }
 
+// The build's own date and time, shown under More, so a player can tell which version a phone has kept.
+const BUILT = new Date().toISOString().slice(0, 16).replace('T', ' ');
+
 export default defineConfig({
   root: 'web',
+  define: { __BUILT__: JSON.stringify(BUILT + ' UTC') },
   build: {
     outDir: '../dist',
     emptyOutDir: true,

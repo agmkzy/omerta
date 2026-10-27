@@ -1013,9 +1013,19 @@ document.addEventListener('touchstart', (e) => {
 document.addEventListener('touchend', (e) => {
   const s = touch;
   touch = undefined;
-  if (!s || !S.w || S.view.t !== 'tab') return;
+  if (!s || !S.w) return;
   const t = e.changedTouches[0], dx = t.clientX - s.x, dy = t.clientY - s.y;
   if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 2 || Date.now() - s.t > 700) return;
+  // (on a page with a way back, a swipe the way its arrow points, to the right, goes back; never out of a scene, where leaving is a
+  // decision: a conversation, a meeting, a man at your door, the table on Sunday)
+  if (S.view.t !== 'tab') {
+    if (dx < 0 || SCENES.has(S.view.t) || !document.querySelector('.ui-back, [data-a="back:"]')) return;
+    handle('back', '');
+    render();
+    window.scrollTo(0, 0);
+    slide('g-swr');
+    return;
+  }
   const to = swipeTo(dx < 0 ? 1 : -1);
   if (!to) return;
   const [a, v] = [to.slice(0, to.indexOf(':')), to.slice(to.indexOf(':') + 1)];
@@ -1023,11 +1033,15 @@ document.addEventListener('touchend', (e) => {
   if (a === 'tab') { tab(v as Tab); if (S.view.t !== 'tab') { S.view = { t: 'tab', name: v as Tab }; S.stack = []; } } else handle(a, v);
   render();
   window.scrollTo(0, 0);
+  slide(dx < 0 ? 'g-swl' : 'g-swr');
+}, { passive: true });
+const SCENES = new Set<View['t']>(['talk2', 'meeting', 'enc', 'approach', 'settle', 'sunday', 'bj', 'sendorder']);
+function slide(cls: 'g-swl' | 'g-swr') {
   const app = document.getElementById('app')!;
   app.classList.remove('g-swl', 'g-swr');
   void app.offsetWidth;
-  app.classList.add(dx < 0 ? 'g-swl' : 'g-swr');
-}, { passive: true });
+  app.classList.add(cls);
+}
 
 // The keyboard, wherever a screen offers numbered choices: 1–9 pick (and 10 onwards, typed as two digits), Escape takes the way out,
 // the arrows move between choices.

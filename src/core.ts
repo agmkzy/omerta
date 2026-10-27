@@ -14,17 +14,11 @@ export const travelTime = (a: string, b: string) => (a === b ? 10 : 35);
 export const dayNo = (t: number) => Math.floor(t / DAY) + 1;
 
 // Day 0 is Monday 2 March 1970.
+// ("Sat, 7 Mar 1970, 02:05", built by hand: browsers word a locale date differently, and Safari's "at 02:05" broke every screen that
+// reads it)
 export function fmtTime(t: number): string {
-  const d = new Date(Date.UTC(1970, 2, 2) + t * 60000);
-  return d.toLocaleString('en-GB', {
-    timeZone: 'UTC',
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const d = new Date(Date.UTC(1970, 2, 2) + t * 60000), m = ((t % DAY) + DAY) % DAY;
+  return `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getUTCDay()]}, ${d.getUTCDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getUTCMonth()]} ${d.getUTCFullYear()}, ${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 }
 // (one way of saying a date everywhere: "Mon 2 Mar, 09:00", the calendar of 1970, never "Day 70")
 const WD = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], MO = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
