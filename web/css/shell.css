@@ -109,3 +109,7 @@ body.g-scene .tabs { display: none; }
 #app.g-swr .g-main { animation: g-swr .18s ease-out; }
 @media (prefers-reduced-motion: reduce) { #app.g-swl .g-main, #app.g-swr .g-main { animation: none; } }
 #app.g-swl, #app.g-swr { overflow-x: clip; }
+/* the page never moves sideways: nothing wider than the screen can be panned to, and Safari's sideways bounce is off (a tap that
+   drifted a little used to pan the page, and the redraw after the choice snapped it back: a jolt) */
+html, body { overflow-x: clip; overscroll-behavior-x: none; }
+.cx { touch-action: pan-y pinch-zoom; overscroll-behavior: contain; }
