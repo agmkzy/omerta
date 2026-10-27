@@ -11,6 +11,9 @@
 import { addFact, bear, clamp, createDebt, earn, feel, learn, money, ownerBiz, rel, transfer } from './core';
 import { addEnc, addFavour } from './encounters';
 import { aptitude, grow } from './people';
+import { mkJob } from './jobs';
+import { motives, pressed, toldOf } from './establishments';
+import { isFemale } from './life';
 import { temper } from './temper';
 import { arch } from './voice';
 import { DAY, WEEK, type Business, type Car, type Character, type Enc, type Id, type Op, type OpLink, type OpRole, type World } from './types';
@@ -59,12 +62,14 @@ function pickModel(w: World, fury = false): Model {
 }
 // A car taken off the street by `thief` for `op`: whose it was is the world's (most are nobody the player will ever meet; now and then
 // it is a made man's, or the police department's).
-export function stealCar(w: World, op: Op, thief: Character | undefined): Car {
+export function stealCar(w: World, op: Op, thief: Character | undefined, want?: string): Car {
   const yr = gameYear(w.now);
   const roll = w.rng.next();
-  const police = roll < 0.012;
-  const m = pickModel(w, police);
-  const year = Math.max(m.from, yr - Math.floor(w.rng.next() ** 2 * 9));
+  const wanted = want ? MODELS.find((x) => `${x.make}|${x.model}` === want) : undefined;
+  const police = !wanted && roll < 0.012;
+  const m = wanted ?? pickModel(w, police);
+  // (a car to order is the year he asked for: two years old at most)
+  const year = Math.max(m.from, wanted ? yr - Math.floor(w.rng.next() * 3) : yr - Math.floor(w.rng.next() ** 2 * 9));
   const cond = (['rough', 'fair', 'clean', 'mint'] as const)[Math.min(3, Math.floor(w.rng.next() * 4 * (year >= yr - 1 ? 1.3 : 1)))];
   const value = Math.round(m.value * Math.max(0.35, 1 - 0.07 * (yr - year)) * COND[cond] / 10) * 10;
   const car: Car = { id: 'car' + w.nextId++, make: m.make, model: m.model, year, cond, value, thief: thief?.id, op: op.id, t: w.now, status: 'stock' };
@@ -112,10 +117,16 @@ function candidates(w: World, op: Op, role: OpRole): (Character | Business)[] {
     const held = new Set(w.ops.filter((o) => o !== op && o.kind === 'numbers' && o.state !== 'closed').flatMap((o) => linksOf(o, 'spot').map((l) => l.id)));
     return Object.values(w.biz).filter((b) => b.open && SPOT_KINDS.has(b.kind) && b.district === op.district && !taken.has(b.id) && !held.has(b.id)).sort(byId);
   }
-  const men = Object.values(w.chars).filter((c) => ok(w, c) && !c.isPlayer && c.id !== op.owner && c.id !== op.runner && !taken.has(c.id) && c.rank !== 'boss' && c.rank !== 'underboss').sort(byId);
-  if (role === 'thief') return men.filter((c) => (c.rank === 'civilian' && !ownerBiz(w, c.id) || c.rank === 'associate') && near(c.district) && c.traits.violence + c.skills.nerve + c.traits.greed > 1.1)
+  // (a runner works for one bank; a thief brings what he takes to two outfits at most, a gambler bets with two books)
+  const busy = new Map<Id, number>();
+  for (const o of w.ops) if (o !== op && o.state !== 'closed') for (const l of o.links ?? []) if (l.role === role) busy.set(l.id, (busy.get(l.id) ?? 0) + 1);
+  const free = (c: Character) => (busy.get(c.id) ?? 0) < (role === 'runner' ? 1 : role === 'buyer' ? 3 : 2);
+  const men = Object.values(w.chars).filter((c) => ok(w, c) && !c.isPlayer && c.id !== op.owner && c.id !== op.runner && !taken.has(c.id) && c.rank !== 'boss' && c.rank !== 'underboss' && free(c)).sort(byId);
+  // (men who steal and carry slips for a racket are its owner's own people or nobody's: another family's associate works for his own)
+  const ours = (c: Character) => !c.familyId || c.familyId === owner?.familyId;
+  if (role === 'thief') return men.filter((c) => ours(c) && !isFemale(c) && (c.rank === 'civilian' && !ownerBiz(w, c.id) || c.rank === 'associate') && near(c.district) && c.traits.violence + c.skills.nerve + c.traits.greed > 0.95)
     .sort((a, b) => Number(b.bossId === op.owner) - Number(a.bossId === op.owner) || debtTo(w, b) - debtTo(w, a) || byId(a, b));
-  if (role === 'runner') return men.filter((c) => (c.rank === 'civilian' && !ownerBiz(w, c.id) || c.rank === 'associate') && near(c.district) && c.traits.sociability > 0.35)
+  if (role === 'runner') return men.filter((c) => ours(c) && (c.rank === 'civilian' && !ownerBiz(w, c.id) || c.rank === 'associate') && near(c.district) && c.traits.sociability > 0.35)
     .sort((a, b) => Number(b.bossId === op.owner) - Number(a.bossId === op.owner) || byId(a, b));
   if (role === 'regular') return men.filter((c) => c.traits.vice >= 0.5 && near(c.district) && c.id !== op.runner);
   // buyers: a man with a trade that can use what comes through, or a man in the life with an outlet of his own
@@ -157,6 +168,7 @@ export function staff(w: World, op: Op) {
       if (!x) break;
       (op.links ??= []).push({ id: x.id, role, since: w.now });
       have++;
+      if ('rels' in x && owner) { const a = rel(x, owner.id), b = rel(owner, x.id); a.known = Math.max(a.known ?? 0, 0.3); b.known = Math.max(b.known ?? 0, 0.3); a.lastMet = b.lastMet = w.now; if (owner.isPlayer) (owner.intro ??= {})[x.id] ??= w.now; }
       if (op.weeks > 1 && owner?.isPlayer) opNote(w, op, joinLine(w, op, role, x), x.id);
     }
   }
@@ -175,6 +187,8 @@ function joinLine(w: World, op: Op, role: OpRole, x: Character | Business): stri
 // family's directive, whose ground it is, how crowded the trade is), as rackets.ts works it out for every enterprise.
 export function pilotWeek(w: World, op: Op, owner: Character, doer: Character, mult: number): { take: number; cause: string } | undefined {
   staff(w, op);
+  // (the men who do its work see the man whose it is, and he them: a little more known each week, a little more trusted by an honest one)
+  for (const l of op.links ?? []) { const c = w.chars[l.id]; if (!c?.alive || l.role === 'spot') continue; const r = rel(c, owner.id); r.known = Math.min(1, (r.known ?? 0) + 0.02); if (r.grudge < 0.2) feel(w, c, owner.id, 'trust', 0.004); }
   if (op.kind === 'chop') return chopWeek(w, op, owner, doer, mult);
   if (op.kind === 'numbers') return numbersWeek(w, op, owner, doer, mult);
   if (op.kind === 'fencing') return fenceWeek(w, op, owner, doer, mult);
@@ -212,7 +226,7 @@ function chopWeek(w: World, op: Op, owner: Character, doer: Character, mult: num
   const cap = 2 + lvl + (op.base ? 1 : 0);
   const buyers = linksOf(op, 'buyer').map((l) => w.chars[l.id]).filter((c): c is Character => ok(w, c));
   let done = 0;
-  for (const car of stock().filter((c) => !c.hot || c.hot === 'police' && (op.cool?.['car:' + c.id] ?? 0) < w.now).slice(0, cap)) {
+  for (const car of stock().filter((c) => !c.hot).slice(0, cap)) {
     // (a buyer of its own pays properly; without one, the scrap men under the expressway take parts at their price)
     const b = buyers.length ? buyers[done % buyers.length] : undefined;
     // (a crowded trade pays a little less a car: every shop on the ground is selling the same fenders)
@@ -271,7 +285,7 @@ function fenceWeek(w: World, op: Op, owner: Character, doer: Character, mult: nu
     if (!ok(w, t)) continue;
     let value = 0;
     if (t.goods > 0) { value = t.goods; t.goods = 0; }
-    else if (w.rng.chance(0.5 + aptitude(t, 'burgle') * 0.3)) value = Math.round(w.rng.int(300, 1100) / 50) * 50;
+    else if (w.rng.chance(0.6 + aptitude(t, 'burgle') * 0.3)) value = Math.round(w.rng.int(400, 1300) / 50) * 50;
     if (!value) continue;
     // (what he brings from a job the world knows of: a burglary of his, lately)
     const job = Object.values(w.facts).filter((f) => f.kind === 'burglary' && f.actor === t.id && w.now - f.t < 14 * DAY && !(op.cool?.['lot:' + f.id])).sort((a, b) => b.t - a.t)[0];
@@ -287,7 +301,7 @@ function fenceWeek(w: World, op: Op, owner: Character, doer: Character, mult: nu
   if (op.held) { bought += op.held; n++; op.held = 0; }
   if (!bought) return { take: 0, cause: 'nothing came in this week' };
   // (buyers of its own pay a little over half; without them, the pawnbrokers who ask no questions pay what they like)
-  const sold = Math.round(bought * (buyers.length ? 0.5 + aptitude(doer, 'scam') * 0.15 : 0.38) * mult);
+  const sold = Math.round(bought * (buyers.length ? 0.5 + aptitude(doer, 'scam') * 0.15 : 0.38) * (0.7 + 0.3 * mult));
   for (const [i, b] of buyers.entries()) { const bl = (op.links ?? []).find((l) => l.id === b.id && l.role === 'buyer'); if (bl) bl.n = (bl.n ?? 0) + Math.round(sold / buyers.length); if (i === 0) feel(w, b, owner.id, 'trust', 0.005); }
   return { take: sold - paid, cause: `${n} ${n === 1 ? 'load' : 'loads'} in and moved on` };
 }
@@ -359,7 +373,7 @@ function hotCar(w: World, op: Op, owner: Character, car: Car, thief: Character) 
   });
 }
 // The man whose car it was learns where it went (the thief's name, the shop's).
-function carFound(w: World, op: Op, owner: Character, car: Car, thief: Character) {
+export function carFound(w: World, op: Op, owner: Character, car: Car, thief: Character) {
   const o = car.owner ? w.chars[car.owner] : undefined;
   if (!o?.alive) return;
   bear(w, o, owner.id, 0.25, `his ${car.make} went through ${owner.name}’s chop shop`);
@@ -372,11 +386,12 @@ function carFound(w: World, op: Op, owner: Character, car: Car, thief: Character
 }
 
 // The number everybody played came in, and the bank hasn't got it.
-function bigHit(w: World, op: Op, owner: Character, loss: number) {
+export function bigHit(w: World, op: Op, owner: Character, loss: number) {
   opNote(w, op, `The number everybody played came in. The bank is ${money(loss)} short of the hits.`);
   if (!mine(w, op)) {
     // an NPC banker covers what he can and owes the rest to his own superior, or welshes
     const boss = owner.bossId ? w.chars[owner.bossId] : undefined;
+    if (boss?.alive && boss.isPlayer) { coverAsk(w, op, owner, loss, boss); return; }
     if (boss?.alive && !boss.isPlayer && boss.cash > loss) { transfer(w, boss, owner, loss, 'loan', 'covering the bank'); createDebt(w, boss.id, owner.id, loss, 0, 'covering the numbers bank'); }
     else { op.bad = (op.bad ?? 0) + 2; addFact(w, { kind: 'report', actor: owner.id, minor: true, text: `${owner.name}’s numbers bank couldn’t pay its hits in full.`, district: op.district }, { witnesses: [owner.id] }); }
     return;
@@ -436,8 +451,13 @@ function wantsMore(w: World, op: Op, owner: Character) {
   const r = op.runner ? w.chars[op.runner] : undefined;
   if (!ok(w, r) || r!.isPlayer || !coolOk(w, op, 'more') || hasOpen(w, op, 'more')) return;
   const cut = op.cut ?? 0, earned = (op.hist ?? []).length >= 0 ? op.total : 0;
-  if (op.weeks < 8 || earned < 2500 || cut >= 0.25 || r!.traits.ambition + r!.traits.greed < 1 || op.last <= 0) return;
+  if (op.weeks < 8 || earned < 2500 || cut >= 0.25 || op.last <= 0) return;
+  // (he asks because something presses on him: a debt, a want of his own, a grudge, or a nature that always wants more; a contented
+  // man paid fairly doesn't, however well the racket does)
+  const ms = motives(w, r!, owner);
+  if (pressed(ms) + cut * -2 < 0.55) return;
   cool(w, op, 'more', 60);
+  const why = owner.isPlayer ? toldOf(motives(w, r!, owner, owner)) : undefined;
   const ask = Math.round((cut + 0.05) * 100);
   if (!mine(w, op)) {
     if (w.rng.chance(0.5 + rel(owner, r!.id).trust * 0.3)) op.cut = ask / 100; else bear(w, r!, owner.id, 0.1, `${owner.name} wouldn’t give him a bigger cut`);
@@ -445,7 +465,7 @@ function wantsMore(w: World, op: Op, owner: Character) {
   }
   addEnc(w, {
     kind: 'ent', from: r!.id, title: `${first(r!)} wants a bigger cut`, days: 5, data: { k: 'more', op: op.id, to: ask },
-    lines: [`${first(r!)} catches you alone. “I’ve run it ${op.weeks} weeks. It’s made you ${money(op.total)}. I’m the one out on the street with it.”`, `“${ask}%. That’s all I’m asking. ${cut ? `${Math.round(cut * 100)} isn’t enough for what I do.` : 'Right now I get nothing but my envelope.'}”`],
+    lines: [`${first(r!)} catches you alone. “I’ve run it ${op.weeks} weeks. It’s made you ${money(op.total)}. I’m the one out on the street with it.”`, `“${ask}%. That’s all I’m asking. ${cut ? `${Math.round(cut * 100)} isn’t enough for what I do.` : 'Right now I get nothing but my envelope.'}”`, ...(why ? [why] : [])],
     opts: [
       { code: 'yes', label: `Give him ${ask}%`, hint: 'Less for you every week. A man who feels paid fairly stays honest longer.' },
       { code: 'half', label: `Meet him halfway: ${Math.round((cut + 0.025) * 100)}%`, hint: 'He may take it. He may think you’re cheap.' },
@@ -457,14 +477,15 @@ function wantsMore(w: World, op: Op, owner: Character) {
 // His captain has noticed how well it is doing, and wants a piece of it on top of the envelope.
 function captainWants(w: World, op: Op, owner: Character) {
   const cap = owner.bossId ? w.chars[owner.bossId] : undefined;
-  if (!ok(w, cap) || cap!.isPlayer || !coolOk(w, op, 'tribute') || hasOpen(w, op, 'tribute')) return;
+  if (!ok(w, cap) || cap!.isPlayer || !coolOk(w, op, 'tribute') || hasOpen(w, op, 'tribute') || (owner.cooldown['tribute:' + cap!.id] ?? 0) > w.now) return;
   if ((op.stakes ?? []).some((s) => s.holder === cap!.id)) return;
   const recent = op.last;
   // (he hears what it makes from what he can see of it, and he wants more when he is greedy or short)
   if (op.weeks < 10 || recent < 350 || (op.level ?? 1) < 2 && op.total < 5000) return;
   if (cap!.traits.greed + (cap!.cash < 1500 ? 0.3 : 0) + w.rng.next() * 0.3 < 0.85) { cool(w, op, 'tribute', 30); return; }
-  cool(w, op, 'tribute', 120);
+  cool(w, op, 'tribute', 120); owner.cooldown['tribute:' + cap!.id] = w.now + 45 * DAY;
   const share = cap!.traits.greed > 0.75 ? 0.15 : 0.1;
+  const capWhy = cap!.cash < 1500 ? 'Word is he’s short himself this season.' : cap!.traits.greed > 0.75 ? 'He has always liked a piece of what men under him build.' : (cap!.bossId && w.chars[cap!.bossId]?.alive ? `${first(w.chars[cap!.bossId])} has been leaning on him for more.` : '');
   if (!mine(w, op)) {
     if (temper(owner).caution > 0.4 || rel(owner, cap!.id).trust > 0.5) (op.stakes ??= []).push({ holder: cap!.id, share, since: w.now, how: 'his captain asked for it' });
     else bear(w, cap!, owner.id, 0.15, `${owner.name} wouldn’t give him a piece of his ${op.kind}`);
@@ -472,7 +493,7 @@ function captainWants(w: World, op: Op, owner: Character) {
   }
   addEnc(w, {
     kind: 'ent', from: cap!.id, title: `${first(cap!)} wants a piece of it`, days: 6, data: { k: 'tribute', op: op.id, share },
-    lines: [`${first(cap!)} has heard how well your ${labelOf(op)} is doing. He says so, and lets it sit.`, `“${Math.round(share * 100)}%. Off the top, every week, on top of your envelope. It’s my ground it runs on.”`],
+    lines: [`${first(cap!)} has heard how well your ${labelOf(op)} is doing. He says so, and lets it sit.`, `“${Math.round(share * 100)}%. Off the top, every week, on top of your envelope. It’s my ground it runs on.”`, ...(capWhy ? [capWhy] : [])],
     opts: [
       { code: 'yes', label: `Give him ${Math.round(share * 100)}%`, hint: 'It costs you every week. A captain who eats from your plate looks after the plate.' },
       { code: 'less', label: `Offer him ${Math.round(share * 50)}%`, hint: 'He may take it. He may take it as an insult.' },
@@ -487,6 +508,7 @@ function poach(w: World, op: Op, owner: Character) {
   const rivals = w.ops.filter((o) => o !== op && o.kind === op.kind && o.district === op.district && o.state === 'running' && o.owner !== op.owner && w.chars[o.owner]?.alive).sort(byId);
   if (!rivals.length) return;
   const ro = rivals[w.rng.int(0, rivals.length - 1)], rival = w.chars[ro.owner];
+  if (pressed(motives(w, rival, owner)) < 0.35) return;
   const role: OpRole = op.kind === 'numbers' ? 'spot' : op.kind === 'bookie' ? 'regular' : 'buyer';
   const ls = linksOf(op, role);
   if (ls.length < 2 || !w.rng.chance(0.06 + (ro.level ?? 1) * 0.03)) return;
@@ -497,6 +519,7 @@ function poach(w: World, op: Op, owner: Character) {
   op.links = (op.links ?? []).filter((x) => x !== l);
   (ro.links ??= []).push({ id: l.id, role, since: w.now });
   opNote(w, op, `${who} has gone over to ${rival.name}.`, l.id);
+  { const cap = owner.bossId ? w.chars[owner.bossId] : undefined; if (cap?.isPlayer && rival.bossId === cap.id && !owner.isPlayer) { quarrelAsk(w, op, ro, owner, rival, l.id, role); return; } }
   if (!mine(w, op)) { if (temper(owner).volatility > 0.6) bear(w, owner, rival.id, 0.15, `${rival.name} took one of his ${role === 'spot' ? 'spots' : 'people'}`); return; }
   const theirs = rival.familyId && rival.familyId !== owner.familyId;
   addEnc(w, {
@@ -517,6 +540,8 @@ export function developments(w: World, op: Op) {
   const owner = w.chars[op.owner];
   if (!owner?.alive) return;
   for (const l of linksOf(op, 'buyer')) { const b = w.chars[l.id]; if (b?.alive && b.jailedUntil > w.now && (l.off ?? 0) < b.jailedUntil - 60 * DAY && (l.off ?? -1) < w.now - 30 * DAY) buyerTaken(w, op, owner, b, l); }
+  buyerWants(w, op, owner);
+  goesOwnWay(w, op, owner);
   wantsMore(w, op, owner);
   captainWants(w, op, owner);
   poach(w, op, owner);
@@ -551,6 +576,10 @@ export function opsChangeHands(w: World) {
     if (!PILOT.has(op.kind) || (op.state !== 'running' && op.state !== 'raided')) continue;
     const o = w.chars[op.owner];
     if (!o) continue;
+    // (one of the player's own men: the player, as his captain, says who has it now)
+    const capP = o.bossId ? w.chars[o.bossId] : undefined;
+    if (capP?.isPlayer && capP.alive && (!o.alive || o.jailedUntil > w.now + 45 * DAY) && (op.cool?.['assign'] ?? 0) < w.now) { (op.cool ??= {}).assign = w.now + 365 * DAY; assignAsk(w, op, o, capP); continue; }
+    if (w.enc.some((e) => e.status === 'open' && e.kind === 'ent' && e.data?.k === 'assign' && e.data?.op === op.id)) continue;
     if (!o.alive) { const h = heirOf(w, op, o); if (h) transferOp(w, op, h.id, `${o.name} is dead, and ${h.rank === 'capo' ? 'his captain took it' : 'it went to the man who would keep it going'}`); else op.state = 'closed'; continue; }
     // a long stretch inside: his captain won't leave a racket without a man; the player's goes the same way, and he hears why
     if (o.jailedUntil > w.now + 45 * DAY && (op.cool?.['inside'] ?? 0) < o.jailedUntil) {
@@ -635,6 +664,9 @@ export function entChoose(w: World, p: Character, e: Enc, code: string): { lines
     opNote(w, op, `You told ${cap.name} the envelope is what he gets.`);
     return { lines: [`${first(cap)} smiles with half his face. “The envelope. Sure.”`], minutes: 15 };
   }
+  if (k === 'own') return ownWayChoose(w, p, op, e, code);
+  if (k === 'cover' || k === 'quarrel') return captainChoose(w, p, op, e, code);
+  if (k === 'assign') return assignChoose(w, p, op, code);
   if (k === 'poach') {
     const ro = w.ops.find((o) => o.id === e.data?.rop), rival = ro ? w.chars[ro.owner] : undefined, role = String(e.data?.role) as OpRole, id = String(e.data?.link);
     if (code === 'win') {
@@ -728,7 +760,8 @@ export function onPaper(w: World, p: Character): { clean: number; dirty: number;
   let clean = 0, dirty = 0;
   for (const x of hs) for (const [k, v] of Object.entries(x.sources ?? {})) { if (CLEAN.has(k)) clean += v; else dirty += v; }
   const since = w.now - Math.max(1, hs.length) * WEEK;
-  clean += (w.txns ?? []).filter((t) => t.k === 'draw' && t.who === p.id && t.t >= since).reduce((a, t) => a - t.d, 0);
+  void since;
+  for (const b of Object.values(w.biz)) if (b.ownerId === p.id) clean += (b.acct ?? []).slice(-hs.length).reduce((a, x) => a + Math.abs(x.drawn ?? 0), 0);
   const n = Math.max(1, hs.length);
   return { clean: Math.round(clean / n), dirty: Math.round(dirty / n), weeks: hs.length };
 }
@@ -761,4 +794,178 @@ export function paperWeek(w: World) {
   if (!p?.alive) return;
   const x = onPaper(w, p);
   if (x.weeks >= 4 && p.cash > 5000 && x.dirty > x.clean * 3 + 300) p.heat = clamp(p.heat + 0.01, 0, 1.5);
+}
+
+// ------------------------------------------------------------------------------------------------ a car to order
+// A buyer the shop has dealt with long enough, who trusts it, wants one car in particular: that is work, offered to the man whose shop
+// it is (he can take it himself or send one of his men), and it pays better than a car off the street.
+const LIKED = ['Cadillac|Coupe de Ville', 'Lincoln|Continental', 'Buick|Electra 225', 'Pontiac|GTO', 'Dodge|Charger', 'Oldsmobile|Toronado', 'Chevrolet|Chevelle SS', 'Ford|Mustang'];
+function buyerWants(w: World, op: Op, owner: Character) {
+  if (op.kind !== 'chop' || !owner.isPlayer || !coolOk(w, op, 'order')) return;
+  const bl = linksOf(op, 'buyer').filter((l) => (l.n ?? 0) >= 4 && ok(w, w.chars[l.id]) && rel(w.chars[l.id], owner.id).trust >= 0.02).sort((a, b) => (b.n ?? 0) - (a.n ?? 0))[0];
+  if (!bl || w.jobs.some((j) => j.status !== 'done' && j.status !== 'failed' && j.extra?.op === op.id && j.extra?.want)) return;
+  if (!w.rng.chance(0.25)) { cool(w, op, 'order', 10); return; }
+  cool(w, op, 'order', 40);
+  const b = w.chars[bl.id], want = bl.want ?? LIKED[w.rng.int(0, LIKED.length - 1)];
+  bl.want = want;
+  const m = MODELS.find((x) => `${x.make}|${x.model}` === want)!, yr = gameYear(w.now);
+  const pay = Math.round(m.value * 0.75 / 50) * 50;
+  const why = ownerBiz(w, b.id) ? `a customer of his wants one, no paperwork` : 'he has a man in Jersey asking';
+  mkJob(w, { kind: 'boost', title: `${first(b)} wants ${/^[AEIOU]/.test(m.make) ? 'an' : 'a'} ${m.make}`, brief: `${b.name} wants ${/^[AEIOU]/.test(m.make) ? 'an' : 'a'} ${m.make} ${m.model}, ${yr - 2} or newer, by the end of the week: ${why}. ${money(pay)} for the right car, through your shop. Take it yourself or send one of your men.`, giver: b.id, via: 'opportunity', assignee: owner.id, pay, days: 6, extra: { want, op: op.id } });
+  opNote(w, op, `${b.name} asked for ${/^[AEIOU]/.test(m.make) ? 'an' : 'a'} ${m.make} ${m.model}.`, b.id);
+}
+// The car he asked for, taken: it goes through the shop to him, and the shop keeps the record of it.
+export function carToOrder(w: World, opId: string | number | undefined, want: string, thief: Character, buyer: Character, price: number): Car | undefined {
+  const op = w.ops.find((o) => o.id === opId);
+  if (!op) return undefined;
+  const car = stealCar(w, op, thief, want);
+  car.status = 'sold'; car.buyer = buyer.id; car.price = price; car.out = w.now;
+  const bl = (op.links ?? []).find((l) => l.id === buyer.id && l.role === 'buyer'); if (bl) { bl.n = (bl.n ?? 0) + 1; bl.want = undefined; }
+  feel(w, buyer, op.owner, 'trust', 0.04);
+  opNote(w, op, `${thief.isPlayer ? 'You' : thief.name} took the ${carName(car)} ${buyer.name} asked for${car.whose ? `, from ${car.whose}` : car.owner ? `. It was ${w.chars[car.owner].name}’s` : ''}.`, thief.id);
+  if (car.owner && car.hot) { const o = w.chars[car.owner]; const f = addFact(w, { kind: 'theft', actor: thief.id, victim: o.id, hiddenActor: true, text: `${thief.name} stole ${o.name}’s ${carName(car)}.`, textHidden: `${o.name}’s ${carName(car)} was stolen.`, district: op.district }, { witnesses: [thief.id] }); car.fact = f.id; if (w.rng.chance(0.35)) carFound(w, op, w.chars[op.owner], car, thief); }
+  return car;
+}
+
+// ------------------------------------------------------------------------------------------------ the man who goes his own way
+// The man running it has the people's trust and a reason to leave: he holds something against the owner (a cut refused, a public
+// humiliation), he wants something of his own, and the owner isn't there to stop him (inside, laid up) or isn't a man he fears. He sets
+// up the same trade on the same ground and takes with him whoever trusts him more than the owner.
+function goesOwnWay(w: World, op: Op, owner: Character) {
+  const r = op.runner ? w.chars[op.runner] : undefined;
+  if (!ok(w, r) || r!.isPlayer || op.weeks < 12 || !coolOk(w, op, 'own') || hasOpen(w, op, 'own')) return;
+  const ms = motives(w, r!, owner), grudge = ms.find((m) => m.kind === 'grudge')?.weight ?? 0;
+  const away = owner.jailedUntil > w.now || owner.hurtUntil > w.now;
+  const fear = (r!.rels[owner.id]?.fear ?? 0) + (RANK_I(owner) - RANK_I(r!)) * 0.1;
+  const reason = grudge * 1.2 + (r!.want?.kind === 'independent' || r!.want?.kind === 'rich' ? 0.35 : 0) + r!.traits.ambition * 0.4 + (away ? 0.3 : 0) - fear - rel(r!, owner.id).trust * 0.6;
+  if (reason < 0.75 || !w.rng.chance(0.25)) return;
+  cool(w, op, 'own', 120);
+  // whom he takes: the people who trust him more than the man whose racket it is
+  const going = (op.links ?? []).filter((l) => l.role !== 'spot' && w.chars[l.id] && rel(w.chars[l.id], r!.id).trust > rel(w.chars[l.id], owner.id).trust + 0.05).concat((op.links ?? []).filter((l) => l.role === 'spot').slice(0, 1));
+  const own: Op = { id: 'op' + w.nextId++, kind: op.kind, owner: r!.id, runner: null, district: op.district, since: w.now, state: 'running', last: 0, total: 0, skimmed: 0, weeks: 0, links: going.map((l) => ({ ...l, since: w.now })) };
+  w.ops.push(own);
+  op.links = (op.links ?? []).filter((l) => !going.includes(l));
+  op.runner = null; op.cut = undefined;
+  const why = ms.find((m) => m.kind === 'grudge') ? (r!.rels[owner.id]?.why?.text ?? 'what was between them') : r!.want?.kind === 'independent' ? 'he wanted something of his own' : 'he thought he could';
+  opNote(w, op, `${r!.name} walked out and set up on his own${going.length ? `, and took ${going.length === 1 ? 'one of its people' : `${going.length} of its people`} with him` : ''}.`, r!.id);
+  opNote(w, own, `${r!.name} set it up himself, out of ${owner.name}’s ${labelOf(op)}.`, r!.id);
+  addFact(w, { kind: 'report', actor: r!.id, victim: owner.id, text: `${r!.name} walked out on ${owner.name}’s ${labelOf(op)} in ${op.district} and set up the same trade himself.`, district: op.district }, { witnesses: [r!.id, owner.id, ...(owner.bossId ? [owner.bossId] : []), ...going.map((l) => l.id).filter((id) => !!w.chars[id])] });
+  bear(w, owner, r!.id, 0.3, `${r!.name} walked out on him and took his people`);
+  if (!owner.isPlayer) return;
+  const cap = owner.bossId ? w.chars[owner.bossId] : undefined;
+  addEnc(w, {
+    kind: 'ent', from: r!.id, title: `${first(r!)} has gone his own way`, days: 7, data: { k: 'own', op: op.id, rop: own.id },
+    lines: [`${r!.name}, who ran your ${labelOf(op)}, has set up the same trade on the same streets${going.length ? `, and ${going.length === 1 ? 'one of your people has' : `${going.length} of your people have`} gone with him` : ''}.`, `${away ? 'He waited until you weren’t there to stop him. ' : ''}As far as anyone can tell, ${why.replace(/[.!?]?$/, '')}.`],
+    opts: [
+      ...(cap?.alive && !cap.isPlayer ? [{ code: 'cap', label: `Take it to ${first(cap)}`, hint: `Let your captain rule on it. He’ll weigh you against him.` }] : []),
+      { code: 'lean', label: `Lean on ${first(r!)}`, hint: 'He may fold. He may not, and then it’s a matter between you.' },
+      { code: 'let', label: 'Let him go', hint: 'There are other men. People will say you let one walk.' },
+    ],
+  });
+}
+const RANK_I = (c: Character) => ['civilian', 'associate', 'soldier', 'capo', 'underboss', 'boss'].indexOf(c.rank);
+// the player's answer to a man who went his own way
+export function ownWayChoose(w: World, p: Character, op: Op, e: Enc, code: string): { lines: string[]; minutes: number } {
+  const ro = w.ops.find((o) => o.id === e.data?.rop), r = e.from ? w.chars[e.from] : undefined;
+  if (!ro || !r?.alive || ro.state === 'closed') return { lines: ['It has settled itself.'], minutes: 5 };
+  const back = () => { op.links = [...(op.links ?? []), ...(ro.links ?? []).map((l) => ({ ...l, since: w.now }))]; ro.state = 'closed'; };
+  if (code === 'let') { feel(w, p, p.id, 'respect', 0); return { lines: [`You let him go. On the street they say ${first(r)} walked out on you and nothing happened.`], minutes: 5 }; }
+  if (code === 'cap') {
+    const cap = w.chars[p.bossId!];
+    const forYou = rel(cap, p.id).trust + rel(cap, p.id).respect - rel(cap, r.id).trust - rel(cap, r.id).respect + (RANK_I(p) - RANK_I(r)) * 0.15;
+    if (forYou > 0) { back(); bear(w, r, p.id, 0.2, `${p.name} took it to ${cap.name}`); feel(w, cap, p.id, 'respect', 0.02); opNote(w, op, `${cap.name} ruled for you: ${r.name} closed up.`, cap.id); return { lines: [`${first(cap)} hears you both out, and rules for you. ${first(r)} closes up and his people come back. He doesn’t look at you on the way out.`], minutes: 60 }; }
+    bear(w, p, cap.id, 0.1, `${cap.name} let ${r.name} keep what he took`); opNote(w, op, `${cap.name} let ${r.name} keep it.`, cap.id);
+    return { lines: [`${first(cap)} shrugs. “He built it as much as you did. Let him have it.” That’s the end of it, as far as he’s concerned.`], minutes: 60 };
+  }
+  if (temper(r).caution > 0.55 || (r.rels[p.id]?.fear ?? 0) > 0.3) { back(); bear(w, r, p.id, 0.2, `${p.name} leaned on him`); return { lines: [`${first(r)} hears you out and folds. His people are back by the end of the week.`], minutes: 40 }; }
+  bear(w, r, p.id, 0.3, `${p.name} leaned on him`);
+  addFact(w, { kind: 'threat', actor: p.id, victim: r.id, text: `${p.name} leaned on ${r.name} to close up the trade he took from him. ${r.name} didn’t.`, district: op.district }, { witnesses: [p.id, r.id, ...(r.bossId ? [r.bossId] : [])] });
+  return { lines: [`${first(r)} listens, and doesn’t move. “It’s a free country.” It’s a matter between you now.`], minutes: 40 };
+}
+
+// ------------------------------------------------------------------------------------------------ when the player is the captain
+// His men's rackets are theirs, but he is who they come to: for the money when the bank can't cover its hits, and for a ruling when two of
+// his own men are fighting over the same trade. And, as any captain may, he can ask a man for a piece of what he has built.
+function coverAsk(w: World, op: Op, owner: Character, loss: number, cap: Character) {
+  addEnc(w, {
+    kind: 'ent', from: owner.id, title: `${first(owner)} needs ${money(loss)} for his hits`, days: 3, data: { k: 'cover', op: op.id, amt: loss },
+    lines: [`${owner.name}’s numbers bank got caught: the number everybody played came in. He is ${money(loss)} short of what the winners are owed.`, `He has come to you because you are his captain. If the bank doesn’t pay, it has no name left.`],
+    opts: [
+      { code: 'lend', label: `Lend it to him`, hint: 'He pays you back out of the bank, every week. He owes you more than the money.' },
+      { code: 'gift', label: `Cover it, and forget it`, hint: 'It costs you. A man you carried through a bad week doesn’t forget it.' },
+      { code: 'no', label: 'Tell him it’s his bank', hint: 'He has to find it, or welsh. Either way it was your man who couldn’t pay.' },
+    ],
+  });
+  void cap;
+}
+function quarrelAsk(w: World, op: Op, ro: Op, owner: Character, rival: Character, id: Id, role: OpRole) {
+  const who = role === 'spot' ? w.biz[id]?.name : w.chars[id]?.name;
+  addEnc(w, {
+    kind: 'ent', from: owner.id, about: rival.id, title: `${first(owner)} and ${first(rival)}: ${who}`, days: 6, data: { k: 'quarrel', op: op.id, rop: ro.id, link: id, role },
+    lines: [`${owner.name} comes to you about ${rival.name}. Both are yours. ${who} ${role === 'spot' ? 'took slips for ' + first(owner) + '’s bank' : 'dealt with ' + first(owner)}, and now deals with ${first(rival)}.`, `${first(owner)} says ${first(rival)} went behind his back. He wants you to say so.`],
+    opts: [
+      { code: 'owner', label: `Rule for ${first(owner)}: it goes back to him`, hint: `${first(rival)} won’t like it.` },
+      { code: 'rival', label: `Rule for ${first(rival)}: he keeps it`, hint: `${first(owner)} came to you for nothing.` },
+      { code: 'both', label: 'Tell them both to stop fighting over scraps', hint: 'Nobody wins. Nobody loses face either.' },
+    ],
+  });
+}
+// The captain asks one of his men for a piece of a racket: the man weighs what he owes him, what he fears, and what he can spare.
+export function askPiece(w: World, p: Character, op: Op): string[] {
+  const o = w.chars[op.owner];
+  if (!o?.alive || o.bossId !== p.id || (op.stakes ?? []).some((s) => s.holder === p.id)) return ['That isn’t yours to ask for.'];
+  const lean = rel(o, p.id).trust * 0.6 + (o.rels[p.id]?.fear ?? 0) * 0.6 + temper(o).caution * 0.3 - o.traits.greed * 0.4 - (pressed(motives(w, o, p)) * 0.2);
+  if (lean > 0.15) {
+    (op.stakes ??= []).push({ holder: p.id, share: 0.1, since: w.now, how: 'his captain asked for it' });
+    opNote(w, op, `${p.name} takes 10% of it, every week.`, p.id);
+    feel(w, o, p.id, 'trust', -0.02);
+    return [`${first(o)} doesn’t argue. “Ten percent. It’s your ground.” You’ll see it every week, off the top.`];
+  }
+  bear(w, o, p.id, 0.15, `${p.name} wanted a piece of what he built`);
+  return [`${first(o)} looks at you a long time. “With respect, it’s mine. I built it.” He’s refused his captain, and you both know what that means.`];
+}
+export function captainChoose(w: World, p: Character, op: Op, e: Enc, code: string): { lines: string[]; minutes: number } {
+  const k = String(e.data?.k), o = e.from ? w.chars[e.from] : undefined;
+  if (!o?.alive) return { lines: ['It has settled itself.'], minutes: 5 };
+  if (k === 'cover') {
+    const amt = Number(e.data?.amt ?? 0);
+    if (code === 'lend') { const x = transfer(w, p, o, amt, 'loan', 'covering his bank'); if (x) createDebt(w, p.id, o.id, x, 0, 'covering his numbers bank'); feel(w, o, p.id, 'trust', 0.08); return { lines: [`You count it out. ${first(o)} pays his winners by noon, and you by the month.`], minutes: 30 }; }
+    if (code === 'gift') { transfer(w, p, o, amt, 'gift', 'covering his bank'); feel(w, o, p.id, 'trust', 0.15); feel(w, o, p.id, 'affection', 0.08); addFavour(w, p.id, o.id, 2, 'covering his bank when it couldn’t pay'); return { lines: [`“Forget it,” you tell him. He won’t. Nobody who hears about it will either.`], minutes: 30 }; }
+    op.bad = (op.bad ?? 0) + 2; bear(w, o, p.id, 0.1, `${p.name} let his bank go under`);
+    addFact(w, { kind: 'report', actor: o.id, minor: false, text: `${o.name}’s numbers bank couldn’t pay its hits, and his captain ${p.name} didn’t cover it.`, district: op.district }, { witnesses: [o.id, p.id, ...(p.bossId ? [p.bossId] : [])] });
+    return { lines: [`${first(o)} goes back to his bank empty-handed. By the end of the week the street knows it welshed.`], minutes: 15 };
+  }
+  // the quarrel between two of his men
+  const ro = w.ops.find((x) => x.id === e.data?.rop), r = e.about ? w.chars[e.about] : undefined, id = String(e.data?.link), role = String(e.data?.role) as OpRole;
+  if (code === 'owner' && ro && r) { ro.links = (ro.links ?? []).filter((x) => x.id !== id); (op.links ??= []).push({ id, role, since: w.now }); bear(w, r, p.id, 0.12, `${p.name} ruled against him`); feel(w, o, p.id, 'trust', 0.06); return { lines: [`You rule for ${first(o)}. ${first(r)} takes it, because you’re his captain.`], minutes: 30 }; }
+  if (code === 'rival' && r) { bear(w, o, p.id, 0.12, `${p.name} ruled against him`); feel(w, r, p.id, 'trust', 0.06); return { lines: [`You rule for ${first(r)}. ${first(o)} came to you and got nothing.`], minutes: 30 }; }
+  if (r) { feel(w, o, p.id, 'respect', 0.02); feel(w, r, p.id, 'respect', 0.02); }
+  return { lines: ['You tell them both you have better things to do than referee over a candy store. They shut up about it, for now.'], minutes: 20 };
+}
+
+// One of his men is dead, or inside for a long stretch: his racket needs a man, and the player, his captain, decides who.
+function assignAsk(w: World, op: Op, o: Character, cap: Character) {
+  const r = op.runner ? w.chars[op.runner] : undefined;
+  const men = Object.values(w.chars).filter((c) => ok(w, c) && c.bossId === cap.id && c.id !== o.id && c.id !== r?.id).sort((a, b) => rel(cap, b.id).trust - rel(cap, a.id).trust || byId(a, b)).slice(0, 2);
+  addEnc(w, {
+    kind: 'ent', from: null, about: o.id, title: `${first(o)}’s ${labelOf(op)} needs a man`, days: 7, data: { k: 'assign', op: op.id },
+    lines: [`${o.name} is ${o.alive ? 'inside, and won’t be out for a long time' : 'dead'}. His ${labelOf(op)} in ${op.district} is still running, for now, on habit.`, 'It’s yours to say who has it. Whoever you choose will know you chose him, and so will the men you didn’t.'],
+    opts: [
+      ...(ok(w, r) && !r!.isPlayer ? [{ code: 'g:' + r!.id, label: `Give it to ${r!.name}, who has been running it`, hint: 'He knows the people. He’ll be grateful.' }] : []),
+      ...men.map((c) => ({ code: 'g:' + c.id, label: `Give it to ${c.name}`, hint: 'One of your own. The others will notice whom you favoured.' })),
+      { code: 'me', label: 'Take it yourself', hint: 'More money for you. Your men will see what you did.' },
+      ...(o.alive ? [{ code: 'hold', label: `Keep it going for ${first(o)} until he’s out`, hint: 'He’ll remember it. His runner keeps it in the meantime.' }] : []),
+    ],
+  });
+}
+export function assignChoose(w: World, p: Character, op: Op, code: string): { lines: string[]; minutes: number } {
+  const o = w.chars[op.owner];
+  if (code === 'hold' && o) { feel(w, o, p.id, 'trust', 0.12); feel(w, o, p.id, 'affection', 0.06); opNote(w, op, `${p.name} kept it for ${o.name} while he was inside.`, p.id); return { lines: [`You let it be known: it’s ${first(o)}’s, and it will be his when he comes out. Word gets to him inside.`], minutes: 20 }; }
+  const to = code === 'me' ? p : w.chars[code.slice(2)];
+  if (!to) return { lines: [], minutes: 5 };
+  transferOp(w, op, to.id, `${p.name} gave it to ${to.isPlayer ? 'himself' : to.name}`);
+  if (!to.isPlayer) { feel(w, to, p.id, 'trust', 0.1); feel(w, to, p.id, 'respect', 0.04); }
+  for (const c of Object.values(w.chars).filter((x) => x.alive && x.bossId === p.id && x.id !== to.id && x.id !== o?.id)) if (to.isPlayer) bear(w, c, p.id, 0.03, `${p.name} kept ${o?.name ?? 'a man'}’s racket for himself`);
+  if (o?.alive && o.id !== to.id) bear(w, o, p.id, 0.25, `${p.name} gave his ${labelOf(op)} away while he was inside`);
+  return { lines: [to.isPlayer ? `You take it into your own hands. Your men see it, and say nothing, which is its own kind of saying.` : `${to.name} has it now. He shakes your hand like a man who knows what he’s been given.`], minutes: 20 };
 }

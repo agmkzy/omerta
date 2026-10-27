@@ -1,6 +1,6 @@
 import { LIVING } from './engine';
 import { pathState } from './path';
-import { setRunner } from './enterprise';
+import { askPiece, setRunner } from './enterprise';
 import { standingReasons } from './core';
 import { doMove } from './sitmoves';
 import { matterAct } from './matters';
@@ -515,7 +515,7 @@ function handle(a: string, v: string) {
       }
       // (what stopped the clock, said as what it was: picked up, something wanting him, or new work on offer; "nothing stirs" only if so)
       const jailed = P().alive && P().jailedUntil > w.now, more = needs().length - attentionCount() - offers0;
-      return pass(0, [jailed ? '' : stopped ? `${agoSpan(w.now - t0)}, and then something wants you. It’s at the top of the list.` : more > 0 ? `A week goes by. ${more === 1 ? 'Something new is on offer' : `${more} new things are on offer`}, under What you could do.` : 'A long week. Nothing stirs.'].filter(Boolean), undefined, t0);
+      return pass(0, [jailed ? '' : stopped ? `${agoSpan(w.now - t0)}, and then something wants you. It’s at the top of the list.` : more > 0 ? `A week goes by. ${more === 1 ? 'Something new is on offer' : `${more} new things are on offer`}, under Opportunities.` : 'A long week. Nothing stirs.'].filter(Boolean), undefined, t0);
     }
     case 'cat': {
       const kind = v as Kind;
@@ -684,6 +684,14 @@ function handle(a: string, v: string) {
       const op = w.ops.find((o) => o.id === args[0])!;
       const lines = opRule(w, P(), op, args[1], Number(args[2]));
       S.view = { t: 'op', id: args[0], lines };
+      save();
+      return;
+    }
+    case 'oppiece': {
+      const op = w.ops.find((o) => o.id === v)!;
+      const lines = askPiece(w, P(), op);
+      advance(w, w.now + 30);
+      S.view = { t: 'op', id: v, lines };
       save();
       return;
     }

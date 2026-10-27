@@ -4,6 +4,7 @@
 import { money } from '../core';
 import { stakesOf } from '../econ';
 import { enterpriseLabel } from '../enterprise';
+import { placeWord } from '../establishments';
 import { OPS } from '../rackets';
 import type { Op, World } from '../types';
 import { avatar } from './common';
@@ -46,9 +47,12 @@ export function holdingsBlock(): string {
   const rs: Row[] = [
     ...forOthers.map((o): Row => { const ow = w.chars[o.owner]; return { face: ow ? avatar(ow) : undefined, kick: `You run it · ${OPS[o.kind as keyof typeof OPS]?.label ?? ''}`, title: esc(`${ow?.name ?? 'Somebody'}’s ${enterpriseLabel(o)}`), sub: esc(`${o.district} · ${Math.round((o.cut ?? 0) * 100)}% of the take is yours`), a: `op:${o.id}` }; }),
     ...pieces.map((o): Row => { const ow = w.chars[o.owner], s = o.stakes!.find((x) => x.holder === p.id)!; return { face: ow ? avatar(ow) : undefined, kick: `A share · ${OPS[o.kind as keyof typeof OPS]?.label ?? ''}`, title: esc(`${Math.round(s.share * 100)}% of ${ow?.name ?? 'somebody'}’s ${enterpriseLabel(o)}`), sub: esc(`${o.district} · ${s.how}`), a: `op:${o.id}` }; }),
-    ...mine.map((b): Row => ({ kick: `Yours · ${b.district}`, title: esc(b.name), sub: esc(b.managerId && w.chars[b.managerId] ? `${w.chars[b.managerId].name} manages it` : 'You run it'), a: `biz:${b.id}` })),
+    ...mine.map((b): Row => { const a = b.acct?.at(-1); return { kick: `Yours · ${b.district}`, title: esc(b.name), sub: esc(`${b.managerId && w.chars[b.managerId] ? `${w.chars[b.managerId].name} manages it` : 'You run it'} · ${placeWord(w, b)}`), end: a ? `<span class="fig">${esc(money(a.net))}</span>` : undefined, tone: a && a.net < 0 ? 'warn' : '', a: `biz:${b.id}` }; }),
     ...bizStakes.map(({ b, s }): Row => ({ kick: `A share · ${b.district}`, title: esc(`${Math.round(s.share * 100)}% of ${b.name}`), sub: esc(s.how), a: `biz:${b.id}` })),
   ];
   if (rs.length) out += h('Your interests', String(rs.length)) + rows(rs);
+  // your men's own rackets: theirs to run, and yours to watch over
+  const theirs = w.ops.filter((o) => live(o) && o.kind !== 'hijack' && w.chars[o.owner]?.bossId === p.id && w.chars[o.owner]?.alive).sort((a, b) => b.total - a.total);
+  if (theirs.length) out += h('Your men’s rackets', String(theirs.length)) + rows(theirs.map((o): Row => { const ow = w.chars[o.owner]; const piece = (o.stakes ?? []).find((s) => s.holder === p.id); return { face: avatar(ow), kick: `${OPS[o.kind as keyof typeof OPS]?.label ?? ''} · ${o.district}`, title: esc(`${ow.name}’s`), sub: esc(`${trend(o)}${piece ? ` · ${Math.round(piece.share * 100)}% of it is yours` : ''}`), end: `<span class="fig">${esc(money(o.last))}</span>`, a: `op:${o.id}` }; }));
   return out;
 }

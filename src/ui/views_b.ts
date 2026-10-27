@@ -160,7 +160,7 @@ export function jobView(j: Job): string {
   let out = back();
   const kind = j.kind === 'gig' ? GIG_LABEL[String(j.extra?.gig) as keyof typeof GIG_LABEL] ?? 'Opportunity' : KIND_LABEL[j.kind];
   out += `<p class="ui-label">${esc(kind)} · ${esc(VIA[j.via])}</p>${title(j.title)}<p class="jb-brief">${lk(j.brief)}</p>`;
-  const help = j.kind === 'gig' ? GIG_HELP[String(j.extra?.gig) as keyof typeof GIG_HELP] ?? '' : KIND_HELP[j.kind] ?? '';
+  const help = j.kind === 'gig' ? GIG_HELP[String(j.extra?.gig) as keyof typeof GIG_HELP] ?? '' : j.extra?.want ? '' : KIND_HELP[j.kind] ?? '';
   if (help) out += note(esc(help));
   const facts: KV[] = [];
   if (g && g.id !== p.id) facts.push(['From', who(g)]);
@@ -594,6 +594,8 @@ export function opView(id: Id, lines: string[], found?: number): string {
   if (said.length) out += `<div class="op-said">${said.map((x) => `<p>${esc(x)}</p>`).join('')}</div>`;
   if (lines.length) out += `<div class="sc-said">${lines.map((l) => `<p class="sc-narr">${lk(l)}</p>`).join('')}</div>`;
   out += opPeople(w, op) + opCars(w, op) + opHistory(op);
+  // one of your own men's: his to run, yours to ask a piece of, as a captain does
+  if (op.state !== 'closed' && owner && !owner.isPlayer && owner.bossId === p.id && !(op.stakes ?? []).some((s) => s.holder === p.id)) return out + h('What you do') + choices([{ a: `talk:${owner.id}`, label: `Talk to ${owner.name.split(' ')[0]} about it`, hint: 'It’s his racket. You’re his captain.' }, { a: `oppiece:${op.id}`, label: 'Ask him for a piece of it: 10%', hint: 'Captains do. He may give it, or remind you he built it.' }], 'What you do');
   if (op.state === 'closed' || !owner?.isPlayer) return out;
   const picks: Pick[] = [];
   if (r?.alive && !r.isPlayer) picks.push({ a: `talk:${r.id}|tk:earn`, label: `Talk to ${r.name.split(' ')[0]} about the take`, hint: 'He runs it. Ask him how it’s going, face to face.' });
@@ -702,5 +704,5 @@ function opCars(w: World, op: import('../types').Op): string {
 function opHistory(op: import('../types').Op): string {
   const hs = (op.hist ?? []).slice(-8).reverse();
   if (!hs.length) return '';
-  return h('Its story') + `<ul class="op-hist">${hs.map((x) => `<li><span>${esc(shortTime(x.t).replace(/,? \d\d:\d\d$/, ''))}</span>${lk(x.text)}</li>`).join('')}</ul>`;
+  return h('Its story') + `<ul class="op-hist">${hs.map((x) => `<li><span>${esc(shortTime(x.t).replace(/,? \d\d:\d\d$/, ''))}</span><div>${lk(x.text)}</div></li>`).join('')}</ul>`;
 }

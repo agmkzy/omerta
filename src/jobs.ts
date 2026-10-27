@@ -10,7 +10,7 @@ import { arch, bossWhy, dodge, injury, pitch, whyOf } from './voice';
 import { confide, perform, share, tension } from './actions';
 import { afterClient, afterKilling } from './consequences';
 import { addFact, bear, clamp, concealedGap, earn, factText, feel, feelOn, handleDeath, money, newId, nextAwake, notifyProtector, ownerBiz, recordCareer, regard, rel, repute, shortTime, transfer, travelTime, witnessesAt } from './core';
-import { carName, chopOf, deliverCars, deliverGoods, fenceOf, openChopShop } from './enterprise';
+import { carName, carToOrder, chopOf, deliverCars, deliverGoods, fenceOf, openChopShop } from './enterprise';
 import { askBetween, move as askMove, openAsk } from './asks';
 import { isOpen } from './situ';
 import { gigApproaches, gigTick, gigOffer, gigResolve, gigStale, GIG_HELP, GIG_LABEL } from './gigs';
@@ -449,6 +449,19 @@ export function approaches(w: World, j: Job): Approach[] {
         { code: 'self', label: 'Do it yourself', hint: 'You keep the full fee and carry all the heat and risk.' },
       ];
     case 'boost':
+      // a car to order (enterprise.buyerWants): one particular car, and the moment it comes to
+      if (j.extra?.want) {
+        const mk = String(j.extra.want).split('|');
+        if (j.extra.moment === 'owner') return [
+          { code: 'm_drive', label: 'Start it and go', hint: 'You have the car. He has a good look at the man driving it.' },
+          { code: 'm_talk', label: `Tell him you’re from the garage, come to collect it`, hint: 'If he believes you, nobody calls anybody. If he doesn’t, he calls the police.' },
+          { code: 'm_walk', label: 'Walk away from it', hint: 'No car, no money. Nobody saw anything worth telling.' },
+        ];
+        return [
+          { code: 'w_garage', label: `Take a ${mk[0]} out of a private garage in Bay Ridge`, hint: 'Quiet streets, good cars, careful owners. Slower.' },
+          { code: 'w_street', label: `Lift one off the street outside a restaurant`, hint: 'Quicker. Somebody is always looking out of a window.' },
+        ];
+      }
       return [
         { code: 'lot', label: 'Quiet lot at night', hint: '1-2 cars. Low risk.' },
         { code: 'street', label: 'Lift them off the street', hint: '2-3 cars. Medium risk.' },
@@ -712,6 +725,39 @@ export function resolve(w: World, j: Job, code: string): Result {
     }
 
     case 'boost': {
+      if (j.extra?.want) {
+        const want = String(j.extra.want), mk = want.split('|');
+        // the moment: he came out onto the stoop
+        if (code.startsWith('m_')) {
+          delete j.extra.moment;
+          minutes = 30;
+          if (code === 'm_walk') { lines.push(`You leave the door open and walk to the corner as if you lived there. Behind you, he stands on the stoop a long time.`); return fail(`No ${mk[0]} tonight.`); }
+          const talked = code === 'm_talk' && rng.chance(clamp(0.3 + doer.skills.charm * 0.6, 0.15, 0.85));
+          if (code === 'm_talk' && !talked) { bump(doer, 0.25); lines.push(`“Which garage?” He doesn’t wait for the answer. He’s inside dialing before you’re at the corner.`); return fail('The police are round the block in five minutes. You’re not.'); }
+          bump(doer, code === 'm_drive' ? 0.3 : 0.1);
+          if (code === 'm_drive') { lines.push(`You pull out with him shouting from the steps. He’ll remember the face behind the wheel.`); addFact(w, { kind: 'theft', actor: doer.id, hiddenActor: false, text: `${doer.name} drove off in a stranger’s ${mk[0]} with the owner shouting from the stoop.`, district: doer.district }, { witnesses: [doer.id] }); }
+          else lines.push(`He scratches his head, says he doesn’t remember calling anyone, and goes back inside. You drive away at the speed limit.`);
+        } else {
+          minutes = rng.int(90, 200);
+          const risk = clamp((code === 'w_garage' ? 0.12 : 0.22) + (0.5 - doer.traits.caution) * 0.15 - adj * 0.25, 0.05, 0.6);
+          if (rng.chance(risk)) { bump(doer, 0.15); lines.push(code === 'w_garage' ? 'A dog, and then lights, and then the whole street awake. You never get near it.' : 'A patrol car parks across the street and stays there. You give it up.'); return fail(`No ${mk[0]} tonight.`); }
+          // (the owner comes out: that is the moment, and it is the player's to play; a man sent does what his nature says)
+          if (rng.chance(0.4)) {
+            if (doer.isPlayer) { (j.extra ??= {}).moment = 'owner'; lines.push(`You have the door open and the wires in your hand when the porch light comes on. The owner is out on the stoop in his undershirt, looking straight at you.`); return { lines, minutes: 40, ok: false, moment: true }; }
+            if (doer.traits.violence > 0.6) bump(doer, 0.3); else if (temper(doer).caution > 0.6) return fail('The owner came out. He walked away from it.');
+          }
+          bump(doer, 0.12);
+          lines.push(code === 'w_garage' ? `The garage door lifts without a sound. Ten minutes later you’re on the Belt Parkway in somebody’s ${mk[0]}.` : `It’s parked with the window down. You’re three blocks away before the waiter brings the man his coffee.`);
+        }
+        const buyer = giver;
+        if (!buyer?.alive) return fail('The man who wanted it is gone. You leave it on a side street.');
+        const car = carToOrder(w, j.extra.op, want, doer, buyer, j.pay);
+        gained = paid(w, doer, j.pay, buyer, 'boost', boss);
+        ok = true;
+        lines.push(`${buyer.name.split(' ')[0]} looks it over${car ? ` (a ${car.cond} ${carName(car)})` : ''} and pays ${money(gained)}.`);
+        note = car ? `${carName(car)} for ${buyer.name}.` : undefined;
+        break;
+      }
       const cfg = ({ lot: { n: [1, 2], risk: 0.15, heat: 0.1 }, street: { n: [2, 3], risk: 0.3, heat: 0.2 }, showroom: { n: [3, 5], risk: 0.5, heat: 0.35 } } as Record<string, { n: number[]; risk: number; heat: number }>)[code];
       minutes = rng.int(150, 300);
       const risk = clamp(cfg.risk + (0.5 - doer.traits.caution) * 0.2 - adj * 0.3, 0.05, 0.8);
@@ -728,7 +774,11 @@ export function resolve(w: World, j: Job, code: string): Result {
           gained = paid(w, doer, n * j.pay, giver, 'boost', boss);
           doer.cars -= n;
           lines.push(`${giver.name} takes them for ${money(gained)}.`);
-        } else lines.push('They need selling. Try a garage or a chop shop.');
+        } else {
+          const shop = doer.isPlayer ? chopOf(w, doer) : undefined;
+          if (shop) { doer.cars -= n; const cs = deliverCars(w, shop, n, doer); lines.push(`They go straight into your bay: ${cs.map(carName).join(', ')}.`); }
+          else lines.push('They need selling. Try a garage or a chop shop.');
+        }
         note = `${n} cars boosted.`;
       } else {
         bump(doer, cfg.heat * 1.5);

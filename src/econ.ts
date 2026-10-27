@@ -13,7 +13,8 @@
 //
 // Nothing here knows about the screen. Only the simulation knows why a payment was short (`protection.why`); everyone else works
 // it out from evidence() - what a visitor could actually see.
-import { addFact, clamp, earn, money, ownersChanged, rel, writeDown } from './core';
+import { establishmentsWeek } from './establishments';
+import { addFact, bear, clamp, earn, money, ownersChanged, rel, writeDown } from './core';
 import { spawnCivilian } from './world';
 import { Business, Character, Id, Stake, TxKind, Txn, WeekAcct, WEEK, DAY, World } from './types';
 
@@ -287,6 +288,8 @@ function appointManager(w: World, b: Business, o: Character, why: string) {
 }
 
 export function businessWeek(w: World) {
+  // (the people of each place first: what they take from the till, what is drunk on the house, is in this week's accounts: establishments.ts)
+  establishmentsWeek(w);
   const rng = w.rng;
   for (const b of Object.values(w.biz)) {
     if (!b.open) continue;
@@ -383,6 +386,12 @@ export function transferBusiness(w: World, b: Business, to: Id, how: string, tex
   if (b.managerId === to) delete b.managerId;
   if (b.stakes) { b.stakes = b.stakes.filter((s) => s.holder !== to); if (!b.stakes.length) delete b.stakes; }
   if (b.protection?.collectorId === to) delete b.protection; // he would be paying himself
+  // (a made man's own place pays his own family nothing: the collector loses a shop, and knows to whom)
+  else if (b.protection && heir.familyId === b.protection.familyId && ['soldier', 'capo', 'underboss', 'boss'].includes(heir.rank)) {
+    const col = w.chars[b.protection.collectorId];
+    if (col?.alive) bear(w, col, to, 0.06, `${heir.name} bought ${b.name}, and it stopped paying him`);
+    delete b.protection;
+  }
   b.distress = 0;
   ownersChanged(w);
   addFact(w, { kind: 'ownership', actor: to, victim: old?.id, business: b.id, text: text ?? `${heir.name} took over ${b.name}${old ? ` from ${old.name}` : ''}.`, district: b.district }, { witnesses: [] });

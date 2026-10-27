@@ -182,7 +182,8 @@ export function enterpriseWeek(w: World) {
     const d = OPS[op.kind as OpKey];
     const owner = w.chars[op.owner];
     const runner = op.runner ? w.chars[op.runner] : undefined;
-    if (!owner?.alive) { op.state = 'closed'; continue; }
+    // (a dead man's racket waits for its captain's word, running on habit, before it closes: enterprise.assignAsk)
+    if (!owner?.alive) { if (w.enc.some((e) => e.status === 'open' && e.kind === 'ent' && e.data?.k === 'assign' && e.data?.op === op.id)) { op.last = 0; continue; } op.state = 'closed'; continue; }
     if (runner && !runner.alive) op.runner = null;
     op.weeks++;
     if (op.state === 'raided') { op.last = 0; continue; }
@@ -318,6 +319,8 @@ function startEnterprises(w: World) {
     // (one enterprise to begin with; a man doing well, with money put by and the ambition, adds a second of another kind: the way a
     // young man moves on from stealing cars to a numbers bank or a book of loans)
     const mine = w.ops.filter((o) => o.owner === c.id && o.kind !== 'hijack' && (o.state === 'running' || o.state === 'raided'));
+    // (a man running another man's racket has his hands full, and setting up the same trade beside it would be walking out: enterprise.goesOwnWay)
+    if (w.ops.some((o) => o.runner === c.id && (o.state === 'running' || o.state === 'raided'))) continue;
     if (mine.length >= 2 || (mine.length === 1 && !(c.cash > 2500 && c.traits.ambition > 0.5 && w.rng.chance(0.05)))) continue;
     const fam = w.fam[c.familyId];
     // (he weighs them all and leans to what suits him best, but men are not all alike in what they reach for: a weighted choice,

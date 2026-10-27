@@ -29,6 +29,7 @@ import { dangerLevel, LADDER_WORDS } from '../danger';
 import { favourWord, owedTo, owing } from '../encounters';
 import { crewList, waitChoices } from './views_b';
 import { canMeetAt } from '../enterprise';
+import { isEstablishment, placeWord } from '../establishments';
 import { prospects } from '../orders';
 import { myDisputes, playerMoved } from './views_c';
 import { storiesTab, storiesOf, storyKnown, type Story } from './stories';
@@ -76,7 +77,7 @@ const firstName = (c: Character) => c.name.split(' ')[0];
 // What kind of approach it is, in a word or two (never the record's own label).
 const ENC_K: Record<string, string> = {
   threat: 'A threat', ask: 'Wants something', word: 'Wants a word', matter: 'Wants your answer', callin: 'Calling in a favour',
-  squeeze: 'Another family', ent: 'Your racket', invite: 'An invitation', kin: 'Family', imposed: 'Decided over your head', courting: 'A quiet word', crossdeal: 'Another family', cometo: 'Your crew', quarrel: 'Your crew', answer: 'Answer for your man', score: 'A truck', bigbet: 'Your book', cantpay: 'Your book', rivalbook: 'Your book', pad: 'Your book',
+  squeeze: 'Another family', ent: 'Your racket', place: 'Your place', invite: 'An invitation', kin: 'Family', imposed: 'Decided over your head', courting: 'A quiet word', crossdeal: 'Another family', cometo: 'Your crew', quarrel: 'Your crew', answer: 'Answer for your man', score: 'A truck', bigbet: 'Your book', cantpay: 'Your book', rivalbook: 'Your book', pad: 'Your book',
 };
 function approach(w: World, e: Enc, story?: Story): Need {
   const c = e.from ? w.chars[e.from] : undefined;
@@ -84,7 +85,7 @@ function approach(w: World, e: Enc, story?: Story): Need {
   const he = !c ? 'They' : isFemale(c) ? 'She' : 'He';
   const wait = e.kind === 'kin' ? '' : `${he}’ll want an answer ${by}.`;
   const dot = e.kind === 'threat' ? 'red' : story ? (story.tone === 'red' ? 'red' : 'amber')
-    : e.kind === 'callin' || e.data?.what === 'sit_turf' || e.kind === 'ask' || e.kind === 'word' || e.kind === 'matter' || e.kind === 'imposed' || e.kind === 'courting' || e.kind === 'crossdeal' || e.kind === 'answer' || e.kind === 'quarrel' || e.kind === 'cantpay' || e.kind === 'bigbet' || e.kind === 'ent' ? 'amber' : e.kind === 'invite' ? 'blue' : 'green';
+    : e.kind === 'callin' || e.data?.what === 'sit_turf' || e.kind === 'ask' || e.kind === 'word' || e.kind === 'matter' || e.kind === 'imposed' || e.kind === 'courting' || e.kind === 'crossdeal' || e.kind === 'answer' || e.kind === 'quarrel' || e.kind === 'cantpay' || e.kind === 'bigbet' || e.kind === 'ent' || e.kind === 'place' ? 'amber' : e.kind === 'invite' ? 'blue' : 'green';
   return {
     dot, title: e.title, k: e.kind === 'crew' && c?.bossId === w.playerId ? 'One of your men' : ENC_K[e.kind] ?? (c ? 'Wants a word' : 'Word comes'), who: c?.id, when: by.replace(/^by /, ''),
     sub: e.kind === 'threat' ? `This is serious. ${wait}`.trim() : wait || 'It won’t keep for ever.',
@@ -534,6 +535,14 @@ export function bizView(id: Id): string {
   if ((b.owners ?? []).length) who.push(['Before that', esc(b.owners!.map((x) => w.chars[x.id]?.name ?? '?').join(', '))]);
   if (known(w, o)) { const tr = trade(w, b); who.push(['Trade', `about <span class="fig">${esc(money(Math.round(tr.weeks ? tr.revenue : b.income)))}</span> a week`]); const pf = perf(w, b).notes; if (pf.length) who.push(['People say', esc(pf.join(', '))]); }
   out += h('Who has it') + kv(who);
+  // the people of the place: who works there and who comes in (establishments.ts), and how trade is going, when you know it
+  if (isEstablishment(b) && (known(w, o) || b.ownerId === p.id)) {
+    const staff = (b.staff ?? []).map((s): Row => { const c = w.chars[s.id]; return { face: c ? avatar(c) : undefined, title: esc(c?.name ?? 'Someone'), sub: esc(`${s.job}, since ${shortTime(s.since).replace(/,? \d\d:\d\d$/, '')}`), a: c ? `ent:${c.id}` : undefined }; });
+    if (staff.length) out += h('Who works there', String(staff.length)) + rows(staff);
+    const regs = (b.regs ?? []).map((id) => w.chars[id]).filter(Boolean);
+    if (regs.length) out += h('Who comes in') + `<div class="td-crew">${regs.map((c) => `<button class="td-man" data-a="ent:${c.id}">${avatar(c)}<b>${esc(c.name.split(' ')[0])}</b><span>${esc(c.familyId ? (c.familyId === p.familyId ? 'one of ours' : w.fam[c.familyId].name) : 'local')}</span></button>`).join('')}</div>`;
+    if (b.ownerId === p.id) out += `<p class="bz-paper"><span>How it’s doing</span>${esc(placeWord(w, b))}${b.managerId && w.chars[b.managerId] ? `, with ${esc(w.chars[b.managerId].name)} running it` : ''}.</p>`;
+  }
   // your own place: who runs it (econ.setManager); selling it is a price you name to a man with money, in conversation
   if (b.ownerId === p.id && b.open) {
     const mgr = b.managerId ? w.chars[b.managerId] : undefined;
@@ -547,9 +556,11 @@ export function bizView(id: Id): string {
     out += h('Your crew’s place') + note(here ? `Your men drink here and find you here. What the bar hears, you hear. When the police take an interest in you, they take one in ${esc(b.name)}.` : 'A place of your own where your men drink and find you. What is said at the bar reaches you.')
       + choices([{ a: `bmeet:${b.id}`, label: here ? 'Stop meeting here' : 'Make it where your crew meets', hint: here ? 'Your men will drink somewhere else.' : 'Your men like having a place. So do the police.' }], 'Your crew’s place');
   }
+  // its own story, as its owner knows it
+  if (b.ownerId === p.id && (b.hist ?? []).length) out += h('Its story') + `<ul class="op-hist">${b.hist!.slice(-6).reverse().map((x) => `<li><span>${esc(shortTime(x.t).replace(/,? \d\d:\d\d$/, ''))}</span><div>${lk(x.text)}</div></li>`).join('')}</ul>`;
   // what has happened there that you know of
   const told = Object.values(w.facts).filter((f) => f.business === b.id && p.known[f.id] && !f.minor).sort((a, c) => c.t - a.t).slice(0, 5);
-  if (told.length) out += h('What you know of it') + `<ul class="op-hist">${told.map((f) => `<li><span>${esc(shortTime(f.t).replace(/,? \d\d:\d\d$/, ''))}</span>${lk(factText(f, p.known[f.id].knowsActor))}</li>`).join('')}</ul>`;
+  if (told.length) out += h('What you know of it') + `<ul class="op-hist">${told.map((f) => `<li><span>${esc(shortTime(f.t).replace(/,? \d\d:\d\d$/, ''))}</span><div>${lk(factText(f, p.known[f.id].knowsActor))}</div></li>`).join('')}</ul>`;
   return out;
 }
 export function factView(id: Id): string {
