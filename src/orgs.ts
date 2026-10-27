@@ -510,7 +510,12 @@ export function ensureOrgs(w: World) {
   for (const f of Object.values(w.fam)) for (const o of Object.values(w.fam)) if (o.id !== f.id) { f.tension[o.id] ??= 0; relOf(f, o.id, w.now); }
   for (const f of Object.values(w.fam)) { const cl = clubOf(w, f.id); if (cl) { f.hq = cl.id; cl.hostId ??= f.bossId; } }
   // (The Family: every family has a consigliere; one that has none, new or loaded, has the boss's choice: a careful soldier he trusts)
-  for (const f of Object.values(w.fam)) if (!f.consigliere || !w.chars[f.consigliere]?.alive) { const c = consigliereChoice(w, f.id); if (c) seatConsigliere(w, f.id, c, undefined, 'the family has always had a man beside the boss'); }
+  // once only: after that a vacant chair is the boss's to fill (succession.successionWeek), so a loaded world and a running one agree
+  for (const f of Object.values(w.fam)) {
+    if (f.consSeated) continue;
+    f.consSeated = true;
+    if (!f.consigliere || !w.chars[f.consigliere]?.alive) { const c = consigliereChoice(w, f.id); if (c) seatConsigliere(w, f.id, c, undefined, 'the family has always had a man beside the boss'); }
+  }
 }
 // The boss's choice of consigliere: a made man he trusts, careful and well thought of, not the underboss, and not a captain with a crew
 // to run (a captain chosen gives his crew up). Pure: no randomness, so a new world and a loaded one choose alike.

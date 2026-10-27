@@ -255,6 +255,7 @@ export interface Family {
   books?: { since: number; until: number; n: number; made: number; why?: string };
   cool?: Record<string, number>; // when each of the family's reasons to open its books may next count
   booksShut?: number;
+  consSeated?: boolean; // the family was given its consigliere when it was made (or first loaded); later vacancies are the boss's to fill
   lineHead?: { id: Id; since: number }; // who has stood first in its line, since when
   appts?: { t: number; office: string; who: Id; by?: Id; why: string; passed: Id[]; backers: Id[] }[];
 }

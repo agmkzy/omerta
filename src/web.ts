@@ -63,7 +63,8 @@ import { bottomTabs, rail, sectionOf, takeSide, topBar } from './ui/layout';
 import { roomOf } from './ui/lifeview';
 import { openSection, sectionView, swipeTo } from './ui/sections';
 import { startingLines } from './background';
-import { draftBg, draftDone, draftName, forgetSummary, openingAct, openingView, typed } from './ui/opening';
+import { draftBg, draftDone, draftName, draftStart, forgetSummary, openingAct, openingView, typed } from './ui/opening';
+import { openingLines } from './starts';
 import { fullName } from './names';
 import { sundayView, sKey } from './ui/sunday';
 import { wayView } from './ui/views_c';
@@ -385,13 +386,15 @@ function handle(a: string, v: string) {
   if (a === 'new') {
     const n = draftName();
     if (!n.first || !n.last) { S.notice = 'He needs a first name and a surname before anyone will deal with him.'; openingAct('sec|name'); return; }
-    const bg = draftBg();
-    S.w = createWorld(Math.floor(Math.random() * 1e6), fullName(n.first, n.last), { bg }); S.last = {};
+    const bg = draftBg(), start = draftStart();
+    S.w = createWorld(Math.floor(Math.random() * 1e6), fullName(n.first, n.last), { bg, start }); S.last = {};
     S.w.chars[S.w.playerId!].look = { ...S.look };
     draftDone();
     const p = P();
-    const bs = S.w.chars[p.bossId!];
-    S.log = [esc(`New York, March 1970. You’re ${p.name}, an associate of the ${famName(S.w, p)} family. You’re not made, and you’re nobody’s friend yet.`), ...startingLines(S.w, p).map(esc), esc(`${bs.name} is the man you answer to. Go and find him at his usual place, and let him see your face. Then make yourself useful.`)];
+    const bs = p.bossId ? S.w.chars[p.bossId] : undefined;
+    if (start === 'associate') {
+      S.log = [esc(`New York, March 1970. You’re ${p.name}, an associate of the ${famName(S.w, p)} family. You’re not made, and you’re nobody’s friend yet.`), ...startingLines(S.w, p).map(esc), esc(`${bs?.name ?? "your captain"} is the man you answer to. Go and find him at his usual place, and let him see your face. Then make yourself useful.`)];
+    } else S.log = openingLines(S.w, p, start).map(esc);
     S.news = [];
     S.stack = [];
     S.view = { t: 'tab', name: 'today' };

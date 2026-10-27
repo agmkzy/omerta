@@ -13,7 +13,7 @@
 // Every appointment is recorded with who made it, why, who was passed over and who backed it (fam.appts, the men's careers).
 import { capOf, openSeatFor } from './career';
 import { addFact, bear, rel } from './core';
-import { logOrg } from './orgs';
+import { consigliereChoice, logOrg, seatConsigliere } from './orgs';
 import { careerRecord, regardOf } from './standing';
 import { temper } from './temper';
 import { WEEK, type Character, type Family, type Id, type World } from './types';
@@ -194,6 +194,8 @@ export function successionWeek(w: World) {
   for (const f of Object.values(w.fam).sort(byId)) {
     inductionWeek(w, f);
     const boss = w.chars[f.bossId];
+    // a vacant consigliere's chair: the boss names the man he trusts (the player, as boss, names his own)
+    if (boss?.alive && !boss.isPlayer && (!f.consigliere || !w.chars[f.consigliere]?.alive)) { const c = consigliereChoice(w, f.id); if (c) seatConsigliere(w, f.id, c, boss, 'the chair beside the boss was empty'); }
     if (boss?.alive && !boss.isPlayer && (!f.heir || !w.chars[f.heir]?.alive)) {
       const pic = successionPicture(w, f.id);
       if (pic.heir && view(boss, pic.heir) > 0.45 && w.rng.chance(0.15)) { f.heir = pic.heir.id; logOrg(w, f.id, 'heir', `${boss.name} let it be understood that ${pic.heir.name} would follow him.`, pic.heir.id); }

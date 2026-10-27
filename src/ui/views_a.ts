@@ -29,6 +29,7 @@ import { dangerLevel, LADDER_WORDS } from '../danger';
 import { favourWord, owedTo, owing } from '../encounters';
 import { crewList, waitChoices } from './views_b';
 import { canMeetAt } from '../enterprise';
+import { peopleWord, positionOf } from '../standing';
 import { isEstablishment, placeWord } from '../establishments';
 import { prospects } from '../orders';
 import { myDisputes, playerMoved } from './views_c';
@@ -322,8 +323,14 @@ export function longDate(t: number): string { const d = new Date(Date.UTC(1970, 
 function todayHead(w: World, p: Character): string {
   const boss = p.bossId ? w.chars[p.bossId] : undefined;
   const men = Object.values(w.chars).filter((c) => c.alive && c.bossId === p.id).length;
-  const rank = p.jailedUntil > w.now ? 'Inside' : ({ civilian: 'Nobody’s man yet', associate: 'Associate', soldier: 'Made man', capo: 'Captain', underboss: 'Underboss', boss: 'Boss' } as Record<string, string>)[p.rank] ?? p.rank;
-  const where = [rank, p.rank === 'underboss' || p.rank === 'boss' ? `the ${famName(w, p)} family` : boss ? `${boss.name.split(' ').at(-1)}’s crew` : p.familyId ? `the ${famName(w, p)} family` : '', men ? `${men} ${men === 1 ? 'man' : 'men'} of your own` : ''].filter(Boolean).join(' · ');
+  // (where he stands, said by his office: a captain has his own crew; a consigliere sits beside the boss; The Family)
+  const pos = positionOf(w, p), fam = p.familyId ? `the ${famName(w, p)} family` : '';
+  const where = p.jailedUntil > w.now ? 'Inside, and counting the days'
+    : pos === 'boss' ? `Boss of ${fam}` : pos === 'acting boss' ? `Acting boss of ${fam}` : pos === 'underboss' ? `Underboss of ${fam}` : pos === 'consigliere' ? `Consigliere to ${boss?.name ?? 'the boss'}`
+    : pos === 'captain' ? `Captain in ${fam} · ${men} ${men === 1 ? 'man' : 'men'} in your crew`
+    : pos === 'soldier' ? `Made man in ${boss ? `${boss.name.split(' ').at(-1)}’s crew` : fam}${men ? ` · ${men} ${men === 1 ? 'crewman' : 'crewmen'}` : ''}`
+    : pos === 'associate' ? `Associate · ${boss ? `with ${boss.name.split(' ').at(-1)}’s crew` : fam}${men ? ` · ${men} ${men === 1 ? 'crewman' : 'crewmen'}` : ''}`
+    : 'Nobody’s man yet';
   return `<header class="td-hero"><button class="td-hero__me" data-a="ent:${p.id}" aria-label="Your page">${avatar(p)}</button><div class="td-hero__t"><p class="td-hero__day">${esc(longDate(w.now))} 1970</p><p class="td-hero__clock">${hhmm(w.now)}</p><p class="td-hero__who"><b>${esc(p.name)}</b> ${esc(where)}</p></div></header>`;
 }
 
@@ -374,7 +381,7 @@ function fold(key: string, label: string, n: number, line: string, body: string,
 function crewStrip(w: World, p: Character): string {
   const men = crewList();
   // (before the first man: the crew is still there, as what a man builds)
-  if (!men.length) return fold('crew', 'Your crew', 0, 'Nobody yet', `<p class="td-fold__p">Nobody takes your orders yet. A man of your own brings you an envelope every Sunday and does what you send him to do.</p>${acts(prospects(w, p).length ? btn('recruit:', 'Take on a man', 'primary') : btn('sub:people.men', 'Your men'))}`);
+  if (!men.length) return fold('crew', peopleWord(w, p) === 'crew' ? 'Your crew' : 'Your crewmen', 0, 'Nobody yet', `<p class="td-fold__p">Nobody takes your orders yet. A man of your own brings you an envelope every Sunday and does what you send him to do.</p>${acts(prospects(w, p).length ? btn('recruit:', 'Take on a man', 'primary') : btn('sub:people.men', 'Your men'))}`);
   const state = (c: Character): [string, string] => {
     const st = statusOf(w, c);
     if (st.dot === 'red') return [st.word, 'bad'];
@@ -383,7 +390,7 @@ function crewStrip(w: World, p: Character): string {
   };
   const trouble = men.filter((c) => state(c)[1] === 'bad').length, free = men.filter((c) => state(c)[1] === 'idle').length;
   const line = [trouble ? `<em>${trouble} in trouble</em>` : '', free ? `${free} free` : 'all working'].filter(Boolean).join(' · ');
-  return fold('crew', 'Your crew', men.length, line, `<div class="td-crew">${men.map((c) => { const [word, tn] = state(c); return `<button class="td-man ${tn}" data-a="ent:${c.id}">${avatar(c)}<b>${esc(c.name.split(' ')[0])}</b><span>${esc(word)}</span></button>`; }).join('')}<button class="td-man td-man--orders" data-a="orders:"><i aria-hidden="true">›</i><b>Orders</b><span>${free} free</span></button></div>`, false, men.slice(0, 4), trouble > 0);
+  return fold('crew', peopleWord(w, p) === 'crew' ? 'Your crew' : 'Your crewmen', men.length, line, `<div class="td-crew">${men.map((c) => { const [word, tn] = state(c); return `<button class="td-man ${tn}" data-a="ent:${c.id}">${avatar(c)}<b>${esc(c.name.split(' ')[0])}</b><span>${esc(word)}</span></button>`; }).join('')}<button class="td-man td-man--orders" data-a="orders:"><i aria-hidden="true">›</i><b>Orders</b><span>${free} free</span></button></div>`, false, men.slice(0, 4), trouble > 0);
 }
 
 function grudgeHint(): string {

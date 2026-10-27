@@ -38,6 +38,8 @@ export function climb(w: World, log: string[] = []) {
     const r0 = p.rank;
     for (let d = 0; d < 400 && p.rank === r0; d++) { // (a man whose road is done still waits for a seat: career.noticeTick)
       p.lifetimeKick = 1e6; st.deeds = 999; st.kills = 9; p.standing = 90; p.heat = 0;
+      // (and his record kept clean: envelopes paid in full, his word kept; The Family's captaincy weighs reliability)
+      p.books.missed = 0; p.books.arrears = 0; for (const x of p.books.history) x.paid = Math.max(x.paid, x.due); p.rep = { ...(p.rep ?? {}), kept: Math.max(p.rep?.kept ?? 0, 6), broken: 0 } as typeof p.rep;
       // (this is about the ceremonies, not about how long a seat takes: after two months' wait the boss makes the room he can make)
       { const r = readiness(w, p); if (d >= 60 && r?.ready && !r.openSeat && r.to !== 'underboss' && r.to !== 'boss') { const f = w.fam[p.familyId!]; f.capBonus = { ...(f.capBonus ?? {}), [r.to]: 0 }; openSeatFor(w, f.id, r.to); } }
       for (const c of Object.values(w.chars)) if (c.alive && c.familyId === p.familyId && c.id !== p.id) { rel(c, p.id).trust = 0.9; rel(c, p.id).respect = 0.8; }

@@ -69,7 +69,8 @@ export function openingAct(v: string): void {
     case 'keep': S.confirmNew = false; return;
     case 'create': return enter();
     case 'title': S.intro = 'title'; return;
-    case 'sec': D().sec = x as 'name' | 'look' | 'history'; return;
+    case 'sec': D().sec = x as 'name' | 'look' | 'history' | 'place'; return;
+    case 'start': if (STARTS.some((s) => s.id === x)) D().start = x; return;
     case 'both': { const d = D(); const n = rollName(Math.random, [`${d.first} ${d.last}`]); d.first = n.first; d.last = n.last; return; }
     case 'first': D().first = rollFirst(Math.random, D().first); return;
     case 'last': D().last = rollSurname(Math.random, D().last); return;
@@ -89,6 +90,7 @@ function enter() { D(); S.intro = 'create'; }
 const hasRaw = () => !!savedRaw();
 export const draftName = () => { const d = D(); return { first: d.first.trim(), last: d.last.trim() }; };
 export const draftBg = () => D().bg;
+export const draftStart = () => (D().start ?? 'associate') as import('../world').StartAt;
 export function draftDone() { S.draft = null; S.intro = 'title'; S.confirmNew = false; forgetSummary(); }
 
 // ------------------------------------------------------------------ pieces
@@ -184,6 +186,26 @@ function lookPanel(): string {
     ${tabs}${rows}
     <div class="om-row om-row--end">${nxt}</div>`;
 }
+// Where he starts (The Family): six lives in the same family, each its own game; a seat above associate is a real one, taken over with
+// its men, its friends and enemies, and its history.
+export const STARTS: { id: string; label: string; pitch: string; life: string[] }[] = [
+  { id: 'associate', label: 'Associate', pitch: 'On the outside looking in. Everything you have is borrowed: work from men who can drop you, protection that depends on someone’s mood.', life: ['$1,500 and no crew', 'A captain who will give you work', 'Nobody owes you anything'] },
+  { id: 'soldier', label: 'Soldier', pitch: 'You belong now. Build your own earning, your own crewmen, your own name, under a captain who takes his piece.', life: ['Made, three years ago', 'A place in a captain’s crew', '$4,000 and a name men know'] },
+  { id: 'capo', label: 'Captain', pitch: 'The money comes through other men now. Who gets what, who is loyal, who is skimming: your crew is your game.', life: ['A recognised crew of soldiers', 'Six years with a crew', '$9,000'] },
+  { id: 'underboss', label: 'Underboss', pitch: 'You run the family’s business on the boss’s authority. Captains test you, go around you, or back you.', life: ['Every captain answers to you', 'The boss’s trust, for now', '$15,000'] },
+  { id: 'consigliere', label: 'Consigliere', pitch: 'No army: judgment and trust. You find out what really happened, settle what orders can’t, and advise a boss who may not listen.', life: ['Beside the boss, five years', 'No crew of your own', '$12,000'] },
+  { id: 'boss', label: 'Boss', pitch: 'The family is yours: its appointments, its rules, its quarrels. Every man in it has plans of his own.', life: ['The chair, seven years', 'An underboss, a consigliere, captains', '$25,000'] },
+];
+function placePanel(): string {
+  const d = D(), on = d.start ?? 'associate';
+  return `<p class="om-panel__intro">Where you stand in the family on the first day. Each is its own life; promotion is a different chapter, not the point.</p>
+    <div class="om-choices" role="radiogroup" aria-label="Where you start">${STARTS.map((s) => `<button class="om-choice" ${radio(on === s.id)} data-a="om:start|${s.id}">
+      <span class="om-choice__top"><span class="om-choice__label">${esc(s.label)}</span></span>
+      <span class="om-choice__more"><span class="om-choice__blurb">${esc(s.pitch)}</span>
+        <span class="om-choice__life"><span class="om-choice__head">You walk in with</span>${s.life.map((l) => `<span class="om-choice__item">${esc(l)}</span>`).join('')}</span></span>
+    </button>`).join('')}</div>`;
+}
+
 function historyPanel(): string {
   const d = D();
   // The skills and the starting life come from the same record applyBackground uses, so what is shown is what you get.
@@ -203,23 +225,24 @@ function createView(n: string, saved: boolean): string {
   const fade = lastSec !== d.sec ? ' om-fade' : '';
   lastSec = d.sec;
   // painted at the rank chosen under Clothes ("Dressed as"), and only while the Appearance tab is open; otherwise as he starts
-  if (d.sec !== 'look') previewRank = 'associate';
+  // (outside the Appearance tab he is dressed for where he starts: rank shows in the clothes)
+  if (d.sec !== 'look') previewRank = ({ soldier: 'soldier', capo: 'capo', underboss: 'capo', consigliere: 'capo', boss: 'boss' } as Record<string, Rank>)[d.start ?? ''] ?? 'associate';
   const preview = previewChar();
   const tab = (id: typeof d.sec, label: string, n2: string) => `<button class="om-seg__tab" role="tab" aria-selected="${d.sec === id}" data-a="om:sec|${id}"><i>${n2}</i>${label}</button>`;
-  const panel = d.sec === 'name' ? namePanel() : d.sec === 'look' ? lookPanel() : historyPanel();
+  const panel = d.sec === 'name' ? namePanel() : d.sec === 'look' ? lookPanel() : d.sec === 'place' ? placePanel() : historyPanel();
   return `<div class="om om-create">
     <header class="om-bar"><button class="om-link" data-a="om:title">${BACK}<span>Back</span></button><span class="om-eyebrow">A new man</span><span class="om-bar__end"></span></header>
     <div class="om-create__grid">
       <section class="om-hero" aria-label="Your character">
         <figure class="om-portrait">${portrait(preview)}</figure>
         <div class="om-identity">
-          <p class="om-eyebrow">Associate · Corrente family</p>
+          <p class="om-eyebrow">${esc(STARTS.find((s) => s.id === (d.start ?? 'associate'))?.label ?? 'Associate')} · Corrente family</p>
           <h1 class="om-name"><span id="om-name-first" style="--n:${Math.max(4, d.first.length)}">${esc(d.first) || '&nbsp;'}</span><span id="om-name-last" style="--n:${Math.max(4, d.last.length)}">${esc(d.last) || '&nbsp;'}</span></h1>
           <p class="om-identity__bg">${esc(bgLabel(d.bg) ?? '')}</p>
         </div>
       </section>
       <section class="om-builder">
-        <nav class="om-seg" role="tablist" aria-label="Character">${tab('name', 'Name', 'I')}${tab('look', 'Appearance', 'II')}${tab('history', 'History', 'III')}</nav>
+        <nav class="om-seg" role="tablist" aria-label="Character">${tab('name', 'Name', 'I')}${tab('look', 'Appearance', 'II')}${tab('history', 'History', 'III')}${tab('place', 'Standing', 'IV')}</nav>
         ${notice(n)}
         <div class="om-panel${fade}" role="tabpanel">${panel}</div>
       </section>

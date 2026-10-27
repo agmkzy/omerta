@@ -10,7 +10,8 @@ import { storiesTab } from './stories';
 import { peopleRoom, youRoom } from './lifeview';
 import { careerRoom } from './careerview';
 import { businessRoom, workRoom } from './business';
-import { P, S } from './links';
+import { P, S, W } from './links';
+import { peopleWord } from '../standing';
 import { wordRoom } from './word';
 import { moreView } from './more';
 import type { Tab } from './state';
@@ -53,7 +54,9 @@ export function sectionView(raw: Tab): string {
   if (name === 'street') return placesView(true);
   if (name === 'more') return moreView();
   const rs = roomsOf(name), cur = roomIn(name)!;
-  const nav = `<nav class="lf-nav" aria-label="${name}">${rs.map(([id, label]) => `<button class="${cur[0] === id ? 'on' : ''}" data-a="sub:${name}.${id}" aria-current="${cur[0] === id ? 'page' : 'false'}">${label}</button>`).join('')}</nav>`;
+  // (a captain and above has a crew; below that, a man has crewmen: The Family)
+  const word = (id: string, label: string) => (id === 'men' ? (peopleWord(W(), P()) === 'crew' ? 'Your crew' : 'Your crewmen') : label);
+  const nav = `<nav class="lf-nav" aria-label="${name}">${rs.map(([id, label0]) => [id, word(id, label0)] as const).map(([id, label]) => `<button class="${cur[0] === id ? 'on' : ''}" data-a="sub:${name}.${id}" aria-current="${cur[0] === id ? 'page' : 'false'}">${label}</button>`).join('')}</nav>`;
   return nav + cur[2]();
 }
 

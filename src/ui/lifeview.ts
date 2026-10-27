@@ -20,6 +20,7 @@ import { standingWord } from '../jobs';
 import { characterWords } from '../temper';
 import { kinWord, stageWord, warmthWord, DATES, datingPool } from '../life';
 import { pathInfo } from '../path';
+import { peopleWord } from '../standing';
 import { favourWord, owedTo, owing } from '../encounters';
 import { TAGS } from '../notebook';
 import { deepStorage, saveBox, storageNote } from '../savestore';
@@ -157,7 +158,7 @@ export function peopleRoom(): string {
     if (up.length) out += h('Above you') + rows(up);
     // your men, in a line each
     const crew = crewList();
-    if (crew.length) out += h('Your men', String(crew.length)) + rows(crew.map((c) => man(c, c.problem?.revealed ? `${what(c)} · something is wrong` : what(c))));
+    if (crew.length) out += h(peopleWord(w, p) === 'crew' ? 'Your crew' : 'Your crewmen', String(crew.length)) + rows(crew.map((c) => man(c, c.problem?.revealed ? `${what(c)} · something is wrong` : what(c))));
     // money and favours, either way, one row a man
     const ties = new Map<string, { you: number; them: number; money: number; owe: number }>();
     const tie = (id: string) => { if (!ties.has(id)) ties.set(id, { you: 0, them: 0, money: 0, owe: 0 }); return ties.get(id)!; };

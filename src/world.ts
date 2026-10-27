@@ -145,7 +145,7 @@ export function spawnCivilian(w: World, name: string, district: string, cash = 1
 }
 
 // `bg` is the player's background (background.ts). It shapes the start of a new game once, here, and never again.
-export function createWorld(seed: number, playerName = 'Tony Marino', opts: { orgs?: OrgDef[]; bg?: string } = {}): World {
+export function createWorld(seed: number, playerName = 'Tony Marino', opts: { orgs?: OrgDef[]; bg?: string; start?: StartAt } = {}): World {
   const ORGS = opts.orgs ?? STANDARD_ORGS;
   const rng = new Rng(seed);
   // (the version is recorded from the start, where a loaded world keeps it, so a world that never stopped and one saved and loaded
@@ -164,7 +164,9 @@ export function createWorld(seed: number, playerName = 'Tony Marino', opts: { or
     const fid = 'fam_' + def.name.toLowerCase();
     const d = () => rng.pick(def.districts);
     const boss = mk(w, used, { rank: 'boss', familyId: fid, bossId: null, district: d(), cash: cash(8000, 15000), last: def.name });
-    const fam: Family = { id: fid, name: def.name, bossId: boss.id, districts: def.districts, tension: {} };
+    // (the family's fund: years of dues, the money that looks after men inside; recorded through the fund's own door: orgs.treasuryMove)
+    const fund = 4000 + (def.name.length * 700) % 5000; // (no draw from the world's dice: every other world is generated as it always was)
+    const fam: Family = { id: fid, name: def.name, bossId: boss.id, districts: def.districts, tension: {}, treasury: fund, tin: fund, tout: 0 };
     w.fam[fid] = fam;
     const under = mk(w, used, { rank: 'underboss', familyId: fid, bossId: boss.id, district: d(), cash: cash(4000, 7000) });
     link(boss, under, 0.7);
@@ -208,15 +210,19 @@ export function createWorld(seed: number, playerName = 'Tony Marino', opts: { or
   // --- the player and their small crew
   const corrente = 'fam_' + ORGS[0].name.toLowerCase(); // the player starts in the first organisation of the city
   const mentor = famCapos[corrente][1];
-  const player = mk(w, used, { rank: 'associate', familyId: corrente, bossId: mentor.id, district: 'Little Italy', cash: 1500, name: playerName });
+  // (The Family: a game can start at any of the six positions. Above associate, the player takes a seat the family already has: the
+  // man who held it becomes him, with his crew, his relationships and the record of how he came to it: seatPlayer)
+  const start = opts.start ?? 'associate';
+  const player = start === 'associate' ? mk(w, used, { rank: 'associate', familyId: corrente, bossId: mentor.id, district: 'Little Italy', cash: 1500, name: playerName }) : seatPlayer(w, used, members[corrente], famCapos[corrente], start as Exclude<StartAt, 'associate'>, playerName);
   player.isPlayer = true;
   player.intro = {}; // nobody has been introduced yet; saves from before V72 are backfilled in deserialize
   delete player.problem;
+  delete player.want;
   player.traits = { greed: 0.5, violence: 0.5, ambition: 0.7, caution: 0.5, sociability: 0.6, vice: 0.3, courage: 0.7 };
   player.wake = 9;
   w.playerId = player.id;
-  link(mentor, player, 0.5);
-  members[corrente].push(player);
+  if (start === 'associate') { link(mentor, player, 0.5); members[corrente].push(player); }
+  else for (const c of members[corrente]) if (c.id !== player.id && ((c.rels[player.id]?.known ?? 0) > 0 || c.familyId === corrente)) player.intro[c.id] = 0; // (he knows his own family)
   // You start with nobody under you. Taking men on is the first thing you have to do.
 
   // A man from a connected family has an older brother already made in the Corrente family: a soldier in another captain's
@@ -303,6 +309,12 @@ export function createWorld(seed: number, playerName = 'Tony Marino', opts: { or
   void WEEK;
   ensureShape(w);
   if (opts.bg) applyBackground(w, player, opts.bg);
+  // (a captain who starts the game has a crew to govern: three or four made men, topped up last, so nothing else in the world changes)
+  if (start === 'capo') for (let k = Object.values(w.chars).filter((c) => c.alive && c.bossId === player.id && c.rank === 'soldier').length; k < 4; k++) {
+    const sol = mk(w, used, { rank: 'soldier', familyId: player.familyId, bossId: player.id, district: player.district, cash: cash(600, 1800) });
+    link(player, sol, 0.55); player.intro![sol.id] = 0;
+    schedule(w, w.now + rng.int(0, 180), 'think', sol.id);
+  }
   return w;
 }
 
@@ -351,4 +363,37 @@ export function addShops(w: World, n: number): Id[] {
     ids.push(owner.id);
   }
   return ids;
+}
+
+// ------------------------------------------------------------------------------------------------ starting at a seat (The Family)
+export type StartAt = 'associate' | 'soldier' | 'capo' | 'underboss' | 'consigliere' | 'boss';
+// The man who holds the seat becomes the player: his name is the player's, everything else of his is kept (his crew answer to him, his
+// boss knows him, what he owns is his). His career is given the history of how he came to the seat, and his money and name what a man
+// of that seat would have after years in it.
+function seatPlayer(w: World, used: Set<string>, fam: Character[], capos: Character[], start: Exclude<StartAt, 'associate'>, name: string): Character {
+  const boss = fam.find((c) => c.rank === 'boss')!, ub = fam.find((c) => c.rank === 'underboss')!;
+  const mentor = capos[1] ?? capos[0];
+  const soldiers = fam.filter((c) => c.rank === 'soldier');
+  const seat = start === 'boss' ? boss : start === 'underboss' ? ub : start === 'capo' ? mentor
+    : start === 'soldier' ? soldiers.filter((c) => c.bossId === mentor.id).sort((a, b) => (a.id < b.id ? -1 : 1))[0] ?? soldiers[0]
+    : soldiers.filter((c) => c.bossId !== mentor.id).sort((a, b) => (a.id < b.id ? -1 : 1))[0] ?? soldiers[0]; // the consigliere
+  used.delete(seat.name);
+  const was = seat.name;
+  seat.name = name; used.add(name);
+  const Y = 365 * DAY, since = { soldier: -3 * Y, capo: -6 * Y, underboss: -4 * Y, consigliere: -5 * Y, boss: -7 * Y }[start];
+  const f = w.fam[seat.familyId!];
+  const posts: { t: number; text: string; by?: string }[] = [];
+  posts.push({ t: since - 4 * Y, text: 'Made, after years as an associate', by: boss.id });
+  if (start === 'capo' || start === 'underboss' || start === 'boss') posts.push({ t: since - (start === 'capo' ? 0 : 3 * Y), text: 'Captain, given a crew of his own', by: boss.id });
+  if (start === 'underboss' || start === 'boss') posts.push({ t: start === 'boss' ? since - Y : since, text: 'Underboss, named by the boss of the day' });
+  if (start === 'boss') posts.push({ t: since, text: 'Took the chair when the old boss stepped down' });
+  if (start === 'consigliere') posts.push({ t: since, text: 'Consigliere, named for his judgment', by: boss.id });
+  seat.career = { done: 30 + Math.round(-since / Y) * 6, failed: 2, log: [], lw: start === 'soldier' || start === 'consigliere' ? 20 : Math.round(-since / WEEK), svc: 14, ruled: start === 'soldier' ? 1 : 8, posts };
+  seat.standing = { soldier: 40, capo: 55, underboss: 65, consigliere: 62, boss: 75 }[start];
+  seat.cash = { soldier: 4000, capo: 9000, underboss: 15000, consigliere: 12000, boss: 25000 }[start];
+  seat.lifetimeKick = { soldier: 8000, capo: 25000, underboss: 45000, consigliere: 30000, boss: 60000 }[start];
+  if (start === 'consigliere') { f.consigliere = seat.id; seat.bossId = boss.id; seat.wage = 300; link(boss, seat, 0.75); }
+  if (start === 'boss') f.leaderSince = since;
+  void was;
+  return seat;
 }

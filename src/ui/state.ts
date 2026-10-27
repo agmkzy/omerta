@@ -73,7 +73,7 @@ export const S = {
   look: { skin: 1, hairColour: 1, style: 0, beard: 0, glasses: 0, jaw: 1, seed: 'you1' } as import('./portrait').LookX,
   // The opening: the title screen, or the man being made. The draft lives until a game begins, so leaving and coming back keeps him.
   intro: 'title' as 'title' | 'create',
-  draft: null as null | { first: string; last: string; bg: string; sec: 'name' | 'look' | 'history'; lg?: import('./portrait').LookGroup },
+  draft: null as null | { first: string; last: string; bg: string; sec: 'name' | 'look' | 'history' | 'place'; lg?: import('./portrait').LookGroup; start?: string },
   confirmNew: false, // a saved game exists and the player has been told a new one will replace it
   introPlayed: false, // the title's entrance plays once per visit, not on every tap
   seenBrief: 0,
