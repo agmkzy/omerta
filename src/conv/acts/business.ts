@@ -154,7 +154,7 @@ const rateAskA: Act = {
 };
 const partnerChop: Act = {
   base: 'partner_chop', pane: 'business',
-  offers: (c) => { const b = ownerBiz(c.w, c.n.id); return b?.kind === 'garage' && !c.w.ventures.some((v) => v.open && v.ownerId === c.h.id) && c.h.cash >= 2000 ? [offer(c, 'partner_chop', 'Propose a chop shop partnership', '$2,000 up front; he gets 30%.')] : []; },
+  offers: (c) => { const b = ownerBiz(c.w, c.n.id); return b?.kind === 'garage' && !c.w.ops.some((o) => o.kind === 'chop' && o.owner === c.h.id && (o.state === 'running' || o.state === 'raided')) && c.h.cash >= 2000 ? [offer(c, 'partner_chop', 'Propose a chop shop partnership', '$2,000 up front; he gets 30%.')] : []; },
   run: (c) => {
     const x = T(c), { w, p, t } = x;
     if (p.cash < 2000) { c.v.lines.push({ who: 'narr', text: 'You don’t have $2,000.' }); return out(10); }

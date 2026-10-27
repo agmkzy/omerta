@@ -28,6 +28,7 @@ import { isFemale, isPartner, kinOf, kinWord, stageWord, warmthWord } from '../l
 import { dangerLevel, LADDER_WORDS } from '../danger';
 import { favourWord, owedTo, owing } from '../encounters';
 import { crewList, waitChoices } from './views_b';
+import { canMeetAt } from '../enterprise';
 import { prospects } from '../orders';
 import { myDisputes, playerMoved } from './views_c';
 import { storiesTab, storiesOf, storyKnown, type Story } from './stories';
@@ -75,7 +76,7 @@ const firstName = (c: Character) => c.name.split(' ')[0];
 // What kind of approach it is, in a word or two (never the record's own label).
 const ENC_K: Record<string, string> = {
   threat: 'A threat', ask: 'Wants something', word: 'Wants a word', matter: 'Wants your answer', callin: 'Calling in a favour',
-  squeeze: 'Another family', invite: 'An invitation', kin: 'Family', imposed: 'Decided over your head', courting: 'A quiet word', crossdeal: 'Another family', cometo: 'Your crew', quarrel: 'Your crew', answer: 'Answer for your man', score: 'A truck', bigbet: 'Your book', cantpay: 'Your book', rivalbook: 'Your book', pad: 'Your book',
+  squeeze: 'Another family', ent: 'Your racket', invite: 'An invitation', kin: 'Family', imposed: 'Decided over your head', courting: 'A quiet word', crossdeal: 'Another family', cometo: 'Your crew', quarrel: 'Your crew', answer: 'Answer for your man', score: 'A truck', bigbet: 'Your book', cantpay: 'Your book', rivalbook: 'Your book', pad: 'Your book',
 };
 function approach(w: World, e: Enc, story?: Story): Need {
   const c = e.from ? w.chars[e.from] : undefined;
@@ -83,7 +84,7 @@ function approach(w: World, e: Enc, story?: Story): Need {
   const he = !c ? 'They' : isFemale(c) ? 'She' : 'He';
   const wait = e.kind === 'kin' ? '' : `${he}’ll want an answer ${by}.`;
   const dot = e.kind === 'threat' ? 'red' : story ? (story.tone === 'red' ? 'red' : 'amber')
-    : e.kind === 'callin' || e.data?.what === 'sit_turf' || e.kind === 'ask' || e.kind === 'word' || e.kind === 'matter' || e.kind === 'imposed' || e.kind === 'courting' || e.kind === 'crossdeal' || e.kind === 'answer' || e.kind === 'quarrel' || e.kind === 'cantpay' || e.kind === 'bigbet' ? 'amber' : e.kind === 'invite' ? 'blue' : 'green';
+    : e.kind === 'callin' || e.data?.what === 'sit_turf' || e.kind === 'ask' || e.kind === 'word' || e.kind === 'matter' || e.kind === 'imposed' || e.kind === 'courting' || e.kind === 'crossdeal' || e.kind === 'answer' || e.kind === 'quarrel' || e.kind === 'cantpay' || e.kind === 'bigbet' || e.kind === 'ent' ? 'amber' : e.kind === 'invite' ? 'blue' : 'green';
   return {
     dot, title: e.title, k: e.kind === 'crew' && c?.bossId === w.playerId ? 'One of your men' : ENC_K[e.kind] ?? (c ? 'Wants a word' : 'Word comes'), who: c?.id, when: by.replace(/^by /, ''),
     sub: e.kind === 'threat' ? `This is serious. ${wait}`.trim() : wait || 'It won’t keep for ever.',
@@ -265,7 +266,7 @@ export function todayView(): string {
   const dg = dangerLevel(w);
   if (dg.level > 0 && dg.who) out += context([`<b>Watch your back.</b> ${lk(dg.who.name)} is after you: ${esc(LADDER_WORDS[dg.level])}. It won’t stop by itself.`], true);
   // out from inside: the account of it, once, before anything else (inside.ts)
-  if (p.inside?.done && !p.inside.seen && p.inside.account?.length) out += `<section class="wd-inside ui-card" aria-label="Inside"><h2>Back on the street</h2>${p.inside.account.map((l, i) => `<p${i ? '' : ' class="lead"'}>${lk(esc(l))}</p>`).join('')}${acts(btn('insideok:', 'Get back to it', 'primary'))}</section>`;
+  if (p.inside?.done && !p.inside.seen && p.inside.account?.length) out += `<section class="wd-inside ui-card" aria-label="Inside"><h2>Back on the street</h2>${p.inside.account.map((l, i) => `<p${i ? '' : ' class="lead"'}>${lk(l)}</p>`).join('')}${acts(btn('insideok:', 'Get back to it', 'primary'))}</section>`;
   // what just happened, and what it changed
   out += justNow();
   // ---- waiting on you: one card per matter, the most pressing first
@@ -540,6 +541,15 @@ export function bizView(id: Id): string {
     out += h('Running it') + note(`${mgr?.alive ? `${esc(mgr.name)} runs the day-to-day. How well it is run is down to him.` : 'You run it yourself. How well it is run is down to you.'} To sell it, or a piece of it, offer it to a man with money when you talk business.`)
       + choices([...men.map((c) => ({ a: `bmgr:${b.id}|${c.id}`, label: `Put ${c.name.split(' ')[0]} in charge`, hint: skillLine(c) })), { a: `bmgr:${b.id}|hire`, label: 'Hire a manager', hint: 'A man from outside, on wages.' }, ...(mgr ? [{ a: `bmgr:${b.id}|self`, label: 'Run it yourself', hint: 'Nobody between you and the till.' }] : [])], 'Who runs it');
   }
+  // the place your crew meets: a bar or a restaurant of your own (enterprise.meetWeek)
+  if (canMeetAt(w, p, b)) {
+    const here = w.path?.meet === b.id;
+    out += h('Your crew’s place') + note(here ? `Your men drink here and find you here. What the bar hears, you hear. When the police take an interest in you, they take one in ${esc(b.name)}.` : 'A place of your own where your men drink and find you. What is said at the bar reaches you.')
+      + choices([{ a: `bmeet:${b.id}`, label: here ? 'Stop meeting here' : 'Make it where your crew meets', hint: here ? 'Your men will drink somewhere else.' : 'Your men like having a place. So do the police.' }], 'Your crew’s place');
+  }
+  // what has happened there that you know of
+  const told = Object.values(w.facts).filter((f) => f.business === b.id && p.known[f.id] && !f.minor).sort((a, c) => c.t - a.t).slice(0, 5);
+  if (told.length) out += h('What you know of it') + `<ul class="op-hist">${told.map((f) => `<li><span>${esc(shortTime(f.t).replace(/,? \d\d:\d\d$/, ''))}</span>${lk(factText(f, p.known[f.id].knowsActor))}</li>`).join('')}</ul>`;
   return out;
 }
 export function factView(id: Id): string {

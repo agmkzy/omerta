@@ -9,7 +9,8 @@ import { aptitude, grow, lateOf } from './people';
 import { arch, bossWhy, dodge, injury, pitch, whyOf } from './voice';
 import { confide, perform, share, tension } from './actions';
 import { afterClient, afterKilling } from './consequences';
-import { addFact, bear, clamp, concealedGap, earn, factText, feel, feelOn, handleDeath, money, newId, nextAwake, notifyProtector, ownerBiz, recordCareer, regard, rel, repute, shortTime, travelTime, witnessesAt } from './core';
+import { addFact, bear, clamp, concealedGap, earn, factText, feel, feelOn, handleDeath, money, newId, nextAwake, notifyProtector, ownerBiz, recordCareer, regard, rel, repute, shortTime, transfer, travelTime, witnessesAt } from './core';
+import { carName, chopOf, deliverCars, deliverGoods, fenceOf, openChopShop } from './enterprise';
 import { askBetween, move as askMove, openAsk } from './asks';
 import { isOpen } from './situ';
 import { gigApproaches, gigTick, gigOffer, gigResolve, gigStale, GIG_HELP, GIG_LABEL } from './gigs';
@@ -31,7 +32,7 @@ export interface Result {
   moment?: boolean; // it has come to a moment the player plays: the job stays open, and its choices are the moment's (gigs.ts)
 }
 export interface Move {
-  kind: 'sell_cars' | 'pawn_goods' | 'deliver_cars' | 'chop_start' | 'meeting' | 'bonus' | 'topic';
+  kind: 'sell_cars' | 'pawn_goods' | 'deliver_cars' | 'deliver_goods' | 'chop_start' | 'meeting' | 'bonus' | 'topic';
   actor: Id;
   biz?: Id;
   target?: Id;
@@ -993,17 +994,18 @@ export function schemes(w: World, p: Character): SchemeOpt[] {
     const o = w.chars[b.ownerId];
     out.push({ label: `Work ${o.name} at ${b.name}`, hint: o.traits.caution > 0.65 ? 'Looks careful with his money.' : o.traits.caution < 0.4 ? 'Looks trusting.' : 'Hard to read.', job: { kind: 'scam', biz: b.id, target: o.id } });
   }
-  const v = ventureOf(w, p);
+  const v = chopOf(w, p);
   if (!v) {
     for (const b of Object.values(w.biz).filter((x) => x.open && x.kind === 'garage' && w.chars[x.ownerId]?.alive).slice(0, 2)) {
       const o = w.chars[b.ownerId];
       out.push({ label: `Chop shop with ${o.name} at ${b.name}: partner ($2,000)`, hint: 'He gets 30% and stays friendly.', move: { kind: 'chop_start', actor: p.id, biz: b.id, code: 'partner', label: '' } });
       out.push({ label: `Chop shop at ${b.name}: lean on ${o.name} ($300)`, hint: 'He gets 15% and resents it.', move: { kind: 'chop_start', actor: p.id, biz: b.id, code: 'strongarm', label: '' } });
     }
-  } else if (p.cars > 0) out.push({ label: `Deliver ${p.cars} cars to your chop shop`, hint: 'It processes two a week.', move: { kind: 'deliver_cars', actor: p.id, label: '' } });
+  } else if (p.cars > 0) out.push({ label: `Deliver ${p.cars} cars to your chop shop`, hint: 'It strips them and sells the parts. No thief to pay.', move: { kind: 'deliver_cars', actor: p.id, label: '' } });
   if (p.cars > 0)
     for (const b of Object.values(w.biz).filter((x) => x.open && x.kind === 'garage' && w.chars[x.ownerId]?.alive).slice(0, 2))
       out.push({ label: `Sell ${p.cars} cars to ${w.chars[b.ownerId].name} (${money(p.cars * 550)})`, hint: 'No questions, $550 a car.', move: { kind: 'sell_cars', actor: p.id, biz: b.id, label: '' } });
+  { const f = fenceOf(w, p); if (f && p.goods > 0) out.push({ label: `Take ${money(p.goods)} in goods to your fence`, hint: 'It goes out with the week’s loads. No thief’s third to pay.', move: { kind: 'deliver_goods', actor: p.id, label: '' } }); }
   if (p.goods > 0)
     for (const b of Object.values(w.biz).filter((x) => x.open && x.kind === 'pawnshop' && w.chars[x.ownerId]?.alive).slice(0, 2))
       out.push({ label: `Pawn ${money(p.goods)} in goods at ${b.name} (${money(Math.round(p.goods * 0.4))})`, hint: '40% of what it’s worth.', move: { kind: 'pawn_goods', actor: p.id, biz: b.id, label: '' } });
@@ -1061,18 +1063,26 @@ export function performMove(w: World, m: Move): { minutes: number; lines: string
       lines.push(`${w.chars[b.ownerId].name} takes the lot and pays ${money(amt)}.`);
       return { minutes: mins, lines };
     }
+    case 'deliver_goods': {
+      const f = fenceOf(w, p);
+      if (!f || p.goods <= 0) return { minutes: 10, lines: ['Nothing to bring in.'] };
+      deliverGoods(w, f, p.goods, p);
+      lines.push(`${money(p.goods)} in goods goes into the back room. It’ll be gone with the week’s loads.`);
+      p.goods = 0;
+      return { minutes: 60, lines };
+    }
     case 'deliver_cars': {
-      const v = ventureOf(w, p);
+      const v = chopOf(w, p);
       if (!v || p.cars <= 0) return { minutes: 10, lines: ['Nothing to deliver.'] };
-      v.stock += p.cars;
-      lines.push(`${p.cars} cars go into the back bay. The shop clears two a week.`);
+      const cs = deliverCars(w, v, p.cars, p);
+      lines.push(`${cs.length === 1 ? 'The car goes' : `${cs.length} cars go`} into the back bay: ${cs.map(carName).join(', ')}. They’ll be parts by the end of the week.`);
       p.cars = 0;
       return { minutes: 60, lines };
     }
     case 'chop_start': {
       const b = w.biz[m.biz!];
       const host = w.chars[b.ownerId];
-      if (ventureOf(w, p)) return { minutes: 10, lines: ['You already have a chop shop running.'] };
+      if (chopOf(w, p)) return { minutes: 10, lines: ['You already have a chop shop running.'] };
       const partner = m.code === 'partner';
       const cost = partner ? 2000 : 300;
       if (p.cash < cost) return { minutes: 10, lines: [`You need ${money(cost)}.`] };
@@ -1084,11 +1094,10 @@ export function performMove(w: World, m: Move): { minutes: number; lines: string
         lines.push(`${host.name} wants no part of it. He looks past you at the street.`);
         return { minutes: mins, lines };
       }
-      p.cash -= cost;
-      host.cash += cost;
+      transfer(w, p, host, cost, 'stake', `a chop shop at ${b.name}`);
       if (!partner) bear(w, host, p.id, 0.2, `${p.name} forced his way in`);
-      w.ventures.push({ id: newId(w, 'v'), ownerId: p.id, bizId: b.id, hostId: host.id, hostShare: partner ? 0.3 : 0.15, stock: 0, since: w.now, weeks: 0, takings: 0, open: true });
-      lines.push(`${host.name} gives you the back bay at ${b.name}. Bring it cars; it clears two a week. Raids are always a risk, and more cars means more risk.`);
+      openChopShop(w, p, host, b, partner ? 0.3 : 0.15, partner ? 'a partnership, for 30% of what it makes' : 'leaned on, for 15% and no say in it');
+      lines.push(`${host.name} gives you the back bay at ${b.name}. Men will bring it cars and buyers will take the parts; it runs without you. Raids are always a risk, and every car on the street is somebody’s.`);
       return { minutes: mins, lines };
     }
     case 'meeting': {

@@ -21,17 +21,20 @@ export function bookWeek(w: World, op: Op, p: Character) {
   // the precinct's envelope, while he pays it
   if ((op.pad ?? 0) > w.now) { const amt = 40 * lvl; p.cash -= amt; post(w, { from: p.id, to: 'world', amt, flow: 'spend', note: 'the precinct’s envelope' }); }
   if (w.enc.some((e) => ['bigbet', 'cantpay', 'rivalbook', 'pad'].includes(e.kind) && e.status === 'open')) return;
-  const r = w.rng.next();
-  if (r < 0.22 && due(p, 'book:big', w)) return bigBet(w, op, p, lvl);
-  if (r < 0.32 && due(p, 'book:rival', w)) return rivalBook(w, op, p);
-  if (r < 0.4 && due(p, 'book:pad', w) && !((op.pad ?? 0) > w.now) && op.weeks >= 3) return precinct(w, op, p, lvl);
+  // (October 2026: each of these comes from something that is so, not a roll of the week: a regular flush from a winning run, a book
+  // that has actually opened on his ground, a book grown big enough for the precinct to have noticed it)
+  const flush = (op.links ?? []).filter((l) => l.role === 'regular' && (l.bal ?? 0) > 0).map((l) => w.chars[l.id]).filter((c): c is Character => !!c?.alive && c.cash >= 500 && c.jailedUntil <= w.now && (c.cooldown['bet:' + op.id] ?? 0) <= w.now);
+  if (flush.length && due(p, 'book:big', w)) return bigBet(w, op, p, lvl, flush);
+  if (due(p, 'book:rival', w) && rivalBook(w, op, p)) return;
+  if (due(p, 'book:pad', w) && !((op.pad ?? 0) > w.now) && op.weeks >= 3 && ((op.level ?? 1) >= 2 || p.heat > 0.35 || op.total > 3000)) return precinct(w, op, p, lvl);
 }
 
 // ------------------------------------------------------------ the big bet
-function bigBet(w: World, op: Op, p: Character, lvl: number) {
+function bigBet(w: World, op: Op, p: Character, lvl: number, only?: Character[]) {
   const f = p.familyId ? w.fam[p.familyId] : undefined;
-  // (a gambler with money in his pocket, who hasn't had a big bet on this book in two months; any of them, more likely the keener)
-  const gs = Object.values(w.chars).filter((c) => c.alive && !c.isPlayer && c.bossId !== p.id && c.traits.vice >= 0.5 && c.cash >= 500 && c.jailedUntil <= w.now && (c.cooldown['bet:' + op.id] ?? 0) <= w.now && (c.district === op.district || !!f?.districts.includes(c.district)));
+  // (a gambler with money in his pocket, who hasn't had a big bet on this book in two months; any of them, more likely the keener; a
+  // regular of the book's on a winning run first of all)
+  const gs = only?.length ? only : Object.values(w.chars).filter((c) => c.alive && !c.isPlayer && c.bossId !== p.id && c.traits.vice >= 0.5 && c.cash >= 500 && c.jailedUntil <= w.now && (c.cooldown['bet:' + op.id] ?? 0) <= w.now && (c.district === op.district || !!f?.districts.includes(c.district)));
   if (!gs.length) return;
   let r = w.rng.next() * gs.reduce((a, c) => a + c.traits.vice, 0);
   const g = gs.find((c) => (r -= c.traits.vice) <= 0) ?? gs[0];
@@ -62,9 +65,9 @@ function layerFor(w: World, p: Character, amt: number): Character | undefined {
 }
 
 // ------------------------------------------------------------ another book on his ground
-function rivalBook(w: World, op: Op, p: Character) {
+function rivalBook(w: World, op: Op, p: Character): boolean {
   const o = w.ops.find((x) => x.kind === 'bookie' && x.state === 'running' && x.owner !== p.id && x.district === op.district && w.now - x.since < 10 * 7 * DAY && w.chars[x.owner]?.alive && !w.chars[x.owner].isPlayer && w.chars[x.owner].rank !== 'capo');
-  if (!o) return;
+  if (!o) return false;
   const r = w.chars[o.owner];
   p.cooldown['book:rival'] = w.now + 35 * DAY;
   const theirs = r.familyId && r.familyId !== p.familyId, ours = r.familyId === p.familyId;
@@ -77,6 +80,7 @@ function rivalBook(w: World, op: Op, p: Character) {
       { code: 'live', label: 'Leave him be', hint: 'There’s enough for two. Not as much for each.' },
     ],
   });
+  return true;
 }
 
 // ------------------------------------------------------------ the precinct

@@ -65,7 +65,7 @@ describe('voices', { tags: ['unit'] }, () => {
     }
   });
   ok('tone and register follow the relationship and read-only: asking never adds a record', () => {
-    const w = world60(), p = P(w), t = men(w).find((x) => x.rank === 'capo')!;
+    const w = world60(), p = P(w), t = (men(w).find((x) => x.rank === 'capo') ?? men(w).find((x) => x.rank === 'soldier'))!;
     const before = JSON.stringify(t.rels[p.id] ?? null) + JSON.stringify(p.rels[t.id] ?? null);
     toneOf(w, t, p); regOf(w, p, t);
     assert.equal(JSON.stringify(t.rels[p.id] ?? null) + JSON.stringify(p.rels[t.id] ?? null), before);

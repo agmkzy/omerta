@@ -1,4 +1,5 @@
 import { social } from './conv/social';
+import { foldVentures } from './enterprise';
 import { ensureOrgs } from './orgs';
 import { FEMALE } from './names';
 import { ensureClubs } from './clubdata';
@@ -315,6 +316,7 @@ export function ensureShape(w: World) {
   ensureClubs(w);
   ensureOrgs(w);
   w.ventures ??= [];
+  foldVentures(w); // (October 2026: an open venture is a chop shop op housed in its garage)
   w.grievances ??= [];
   w.pending ??= [];
   w.enc ??= [];

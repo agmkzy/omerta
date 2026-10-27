@@ -26,7 +26,7 @@ export type Sheet = Omit<Way, 'id' | 'kind' | 'op'>;
 // and the list of ways below is generated from OPS rather than typed out a second time.
 export const OP_SHEETS: Record<OpKey, Sheet> = {
   chop: {
-    name: 'A car-stealing outfit', cat: 'Stealing', icon: 'car', tone: 'a',
+    name: 'A chop shop', cat: 'Stealing', icon: 'car', tone: 'a',
     pitch: 'Cars taken to order and run to a chop shop, week in, week out.',
     how: ['You or your men take cars off the street, at night, to a garage that strips them for parts.', 'It pays quickly and it needs no money to start, only nerve and someone who can drive.'],
     pays: 'Around $300 to $650 a week in a good stretch.', needs: 'Nothing up front. Men who can drive and keep their nerve.',

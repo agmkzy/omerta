@@ -1,4 +1,6 @@
 import { LIVING } from './engine';
+import { pathState } from './path';
+import { setRunner } from './enterprise';
 import { standingReasons } from './core';
 import { doMove } from './sitmoves';
 import { matterAct } from './matters';
@@ -685,6 +687,14 @@ function handle(a: string, v: string) {
       save();
       return;
     }
+    case 'opman': {
+      const op = w.ops.find((o) => o.id === args[0])!;
+      const lines = setRunner(w, P(), op, args[1] || null);
+      advance(w, w.now + 20);
+      S.view = { t: 'op', id: args[0], lines };
+      save();
+      return;
+    }
     case 'opclose': {
       const lines = closeOp(w, w.ops.find((o) => o.id === v)!);
       return pass(10, lines, { t: 'tab', name: 'rackets' });
@@ -735,6 +745,13 @@ function handle(a: string, v: string) {
       if (who) return go({ t: 'plan', idx: Number(i), who });
       if (S.view.t === 'tab' && Number.isNaN(Number(i))) return;
       return go({ t: 'plan', idx: Number(i) });
+    }
+    case 'bmeet': { // the place his crew meets (enterprise.meetWeek)
+      const b = w.biz[v], ps = pathState(w);
+      if (!b) return;
+      if (ps.meet === b.id) { delete ps.meet; return pass(10, [`Your men will find somewhere else to drink.`], { t: 'biz', id: b.id }); }
+      ps.meet = b.id;
+      return pass(20, [`You tell your men: ${b.name} is where they find you. The back table is yours, and so is whatever is said at the bar.`], { t: 'biz', id: b.id });
     }
     case 'bmgr': { // Stage 4: who runs your place
       const b = w.biz[args[0]];

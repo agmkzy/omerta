@@ -638,3 +638,10 @@ body.g-today .g-top__me, body.g-today .g-when { display: none; }
 .td-fold__b .ui-rows, .td-fold__b .td-ops { border-top: 0; }
 .td-fold__p { margin: 0 0 var(--s-2); color: var(--c-cream-2); font-size: 14px; line-height: 1.5; }
 .td-fold + .td-fold { border-top: 0; }
+/* an enterprise's story: the date, then what happened */
+.op-hist { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--c-line); }
+.op-hist li { display: grid; grid-template-columns: 7.5em minmax(0, 1fr); gap: var(--s-3); padding: 10px 2px; border-bottom: 1px solid var(--c-line); font: 400 15px/1.45 var(--f-ui); color: var(--c-cream-2); }
+.op-hist li span { font: 400 12px/1.6 var(--f-fig); color: var(--c-muted); }
+/* what a man can show for his money, under the week */
+.bz-paper { margin: var(--s-2) 0 var(--s-4); font: 400 14px/1.5 var(--f-ui); color: var(--c-cream-2); }
+.bz-paper span { display: block; font: 600 10.5px var(--f-ui); letter-spacing: var(--track); text-transform: uppercase; color: var(--c-gold); margin-bottom: 2px; }

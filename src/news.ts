@@ -90,7 +90,7 @@ function item(w: World, f: Fact): { head: string; body?: string; section: Sectio
   }
 }
 // (what the paper calls each racket the police raid)
-const RAIDED: Record<string, string> = { 'numbers bank': 'numbers bank', bookmaking: 'bookmaking parlour', 'jukeboxes and vending': 'jukebox route', 'pier loading racket': 'pier racket', 'union local': 'union local', 'street loans': 'loan-sharking ring', 'bootleg cigarettes': 'bootleg cigarette ring', 'a nightclub stake': 'nightclub', 'private carting': 'carting company', 'construction kickbacks': 'construction firm', 'trucking and cargo': 'trucking company', 'car-stealing outfit': 'stolen-car ring', 'fencing operation': 'fencing operation', 'a front business': 'storefront' };
+const RAIDED: Record<string, string> = { 'numbers bank': 'numbers bank', bookmaking: 'bookmaking parlour', 'jukeboxes and vending': 'jukebox route', 'pier loading racket': 'pier racket', 'union local': 'union local', 'street loans': 'loan-sharking ring', 'bootleg cigarettes': 'bootleg cigarette ring', 'a nightclub stake': 'nightclub', 'private carting': 'carting company', 'construction kickbacks': 'construction firm', 'trucking and cargo': 'trucking company', 'chop shop': 'chop shop', 'car-stealing outfit': 'stolen-car ring', 'fencing operation': 'fencing operation', 'a front business': 'storefront' };
 const plural = (k: string) => k.replace(/y$/, 'ie').replace(/(ring|parlour|operation|bank|route|racket|local|nightclub|company|firm|storefront|ie)$/, (e) => e + 's');
 const SEVERITY: Record<string, number> = { murder: 10, attempt: 7, raid: 6, arrest: 5, robbery: 4, beating: 3, burglary: 3, theft: 3, vandalism: 3, business_failed: 2, ownership: 2, event: 2, business_struggling: 1, scam: 1 };
 

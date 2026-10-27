@@ -5,6 +5,7 @@ import { answerCourting, courter, makeCourting } from './loyalty';
 import { answerDeal, dealer, makeDeal } from './crossdeal';
 import { authorityChoose, quarrel } from './authority';
 import { bookChoose } from './book';
+import { entChoose } from './enterprise';
 import { makeScore, scoreChoose, scoreTip } from './score';
 import { answerAsk, answerWord, callFavour, putToPlayer } from './asks';
 import { answerMatter } from './matters';
@@ -534,6 +535,7 @@ export function choose(w: World, p: Character, e: Enc, code: string): { lines: s
   if (e.kind === 'imposed') return answerImposed(w, p, e, code);
   if (e.kind === 'score') return scoreChoose(w, p, e, code); // a truck, played: score.ts
   if (['bigbet', 'cantpay', 'rivalbook', 'pad'].includes(e.kind)) return bookChoose(w, p, e, code); // the book: book.ts
+  if (e.kind === 'ent') return entChoose(w, p, e, code); // what has come about around an enterprise: enterprise.ts
   if (e.kind === 'cometo' || e.kind === 'quarrel' || e.kind === 'answer') return authorityChoose(w, p, e, code); // his crew and what he answers for: authority.ts
   if (e.kind === 'crossdeal') return answerDeal(w, p, e, code); // a man of another family with a job to split: crossdeal.ts
   if (e.kind === 'courting') return answerCourting(w, p, e, code); // a captain asking him to inform on his own: loyalty.ts // a decision made over his head: taken, asked about, or objected to

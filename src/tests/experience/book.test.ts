@@ -19,12 +19,16 @@ function withBook(seed: number) {
   p.cash = 5000;
   startOp(w, p, 'bookie', p.district, null);
   const op = w.ops.find((o) => o.owner === p.id && o.kind === 'bookie')!;
-  op.weeks = 5;
+  // (a book with a season behind it: it has made money enough for the precinct to notice, and it has regulars, some on a winning run
+  // with money in their pockets: October 2026, the book's decisions come from its people, not a roll of the week)
+  op.weeks = 5; op.total = 4000;
+  const gs = Object.values(w.chars).filter((c) => c.alive && !c.isPlayer && c.traits.vice >= 0.5 && c.jailedUntil <= w.now && c.bossId !== p.id).sort((a, b) => (a.id < b.id ? -1 : 1)).slice(0, 4);
+  op.links = gs.map((c) => { c.cash = Math.max(c.cash, 1500); return { id: c.id, role: 'regular' as const, since: w.now, bal: 300 }; });
   return { w, p, op };
 }
 /** Weeks of the book until a decision of this kind comes up. */
 function until(w: World, kind: string, f: () => void) {
-  for (let i = 0; i < 80 && !w.enc.some((e) => e.kind === kind && e.status === 'open'); i++) { for (const k of ['book:big', 'book:rival', 'book:pad']) delete P(w).cooldown[k]; for (const e of w.enc) if (e.status === 'open' && ['bigbet', 'rivalbook', 'pad'].includes(e.kind) && e.kind !== kind) e.status = 'done'; f(); }
+  for (let i = 0; i < 80 && !w.enc.some((e) => e.kind === kind && e.status === 'open'); i++) { delete P(w).cooldown[({ bigbet: 'book:big', rivalbook: 'book:rival', pad: 'book:pad' } as Record<string, string>)[kind] ?? '']; for (const c of Object.values(w.chars)) for (const k of Object.keys(c.cooldown)) if (k.startsWith('bet:')) delete c.cooldown[k]; for (const e of w.enc) if (e.status === 'open' && ['bigbet', 'rivalbook', 'pad'].includes(e.kind) && e.kind !== kind) e.status = 'done'; f(); }
   return w.enc.find((e) => e.kind === kind && e.status === 'open');
 }
 
@@ -74,6 +78,7 @@ describe('the player’s book brings him decisions', { tags: ['scenario'] }, () 
   });
   ok('paying the precinct makes a raid much rarer', () => {
     const { w, p, op } = withBook(3);
+    op.links = []; // (no regular on a winning run to come first)
     const e = until(w, 'pad', () => bookWeek(w, op, p));
     assert.ok(e, 'the precinct never came');
     bookChoose(w, p, e!, 'pay');

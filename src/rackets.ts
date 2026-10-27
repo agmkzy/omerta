@@ -8,6 +8,7 @@ import { askToInvest } from './reports';
 import { temper } from './temper';
 import { addEnc } from './encounters';
 import { bookWeek } from './book';
+import { developments, meetWeek, opsChangeHands, paperWeek, payOpStakes, PILOT, pilotWeek, pruneCars } from './enterprise';
 import { Character, DAY, Id, Op, OpKind, WEEK, World } from './types';
 import { arch, pick } from './voice';
 
@@ -38,7 +39,7 @@ export const OPS: Record<OpKey, OpDef> = {
   carting: { label: 'Private carting', group: 'Waterfront and unions', cost: 1800, base: 440, risk: 0.025, heat: 0.02, rank: 'soldier', districts: ['Bensonhurst', 'The Bronx', 'Staten Island'], skill: 'lean', blurb: 'Every restaurant and shop pays for its rubbish to go, and nobody else is allowed to take it. Dull, steady, vicious if you cross it.' },
   construction: { label: 'Construction kickbacks', group: 'Waterfront and unions', cost: 2500, base: 560, risk: 0.035, heat: 0.03, rank: 'soldier', districts: ["Hell's Kitchen", 'Astoria', 'Little Italy'], skill: 'fix', blurb: 'Concrete, cranes and building inspectors. Every contractor pays to keep the site moving.' },
   trucking: { label: 'Trucking and cargo', group: 'Waterfront and unions', cost: 2200, base: 480, risk: 0.05, heat: 0.035, rank: 'soldier', districts: ['Red Hook', 'Staten Island', 'The Bronx'], skill: 'handle', blurb: 'Control the drivers and you control what gets delivered, what gets lost, and who is told about it.' },
-  chop: { label: 'Car-stealing outfit', group: 'Street trades', cost: 0, base: 480, risk: 0.05, heat: 0.04, rank: 'associate', skill: 'boost', src: 'boost', blurb: 'Cars taken to order and run to a chop shop. Quick money, and a cop’s car is a very bad night.', bad: ['the chop shop was shut for a week', 'a car turned out to be a cop’s', 'the buyer cut his price'], good: ['a good run of cars'] },
+  chop: { label: 'Chop shop', group: 'Street trades', cost: 0, base: 480, risk: 0.05, heat: 0.04, rank: 'associate', skill: 'boost', src: 'boost', blurb: 'Cars taken to order and run to a chop shop. Quick money, and a cop’s car is a very bad night.', bad: ['the chop shop was shut for a week', 'a car turned out to be a cop’s', 'the buyer cut his price'], good: ['a good run of cars'] },
   fencing: { label: 'Fencing operation', group: 'Street trades', cost: 300, base: 400, risk: 0.025, heat: 0.02, rank: 'associate', skill: 'scam', src: 'scam', blurb: 'Whatever comes off a truck, moved on at a third of what it cost somebody.', bad: ['his supplier dried up', 'a load turned out to be junk'], good: ['a rich shipment moved fast'] },
   front: { label: 'A front business', group: 'Fronts', cost: 3000, base: 150, risk: 0.01, heat: -0.04, rank: 'associate', skill: 'numbers', blurb: 'A laundromat or a restaurant on paper. Clean money and a reason to be seen.' },
 };
@@ -171,6 +172,10 @@ const gross0 = (w: World) => w.rng.int(1800, 3800);
 // also decide for themselves: grow it, or after a run of bad weeks change course (npcTend), and men without one start one, by the
 // same rules the player's Rackets tab uses (startEnterprises, canStart).
 export function enterpriseWeek(w: World) {
+  opsChangeHands(w);
+  pruneCars(w);
+  meetWeek(w);
+  paperWeek(w);
   startEnterprises(w);
   for (const op of w.ops) {
     if (op.state === 'closed' || op.kind === 'hijack' || op.state === 'done') continue;
@@ -194,7 +199,10 @@ export function enterpriseWeek(w: World) {
     const dir = fam?.directive && fam.directive.until > w.now ? fam.directive.kind : undefined;
     if (dir) take *= dir === 'push' ? 1.25 : 0.85;
     let cause = d.good?.length ? pick(d.good, op.id + ':' + w.now) : '';
-    if (op.kind === 'bookie' && w.rng.chance(0.18)) { take = -w.rng.int(150, 500) * lvl; cause = d.bad?.length ? pick(d.bad, op.id + ':' + w.now) : 'the favourite came in'; op.bad = (op.bad ?? 0) + 1; }
+    // the four pilot rackets: the week is what their people did (enterprise.ts), with the same weight of the world on it as any other
+    const people = PILOT.has(op.kind) ? pilotWeek(w, op, owner, doer, (owner.isPlayer && hasPerk(w, owner, 'earner') ? 1.12 : 1) * (dir ? (dir === 'push' ? 1.25 : 0.85) : 1) * crowding(w, op)) : undefined;
+    if (people) { take = people.take; cause = people.cause; op.bad = take < 0 ? (op.bad ?? 0) + 1 : Math.max(0, (op.bad ?? 0) - 1); }
+    else if (op.kind === 'bookie' && w.rng.chance(0.18)) { take = -w.rng.int(150, 500) * lvl; cause = d.bad?.length ? pick(d.bad, op.id + ':' + w.now) : 'the favourite came in'; op.bad = (op.bad ?? 0) + 1; }
     else if (w.rng.chance(0.12)) { take *= w.rng.range(0.15, 0.55); cause = d.bad?.length ? pick(d.bad, op.id + ':' + w.now) : 'a bad week'; op.bad = (op.bad ?? 0) + 1; }
     else op.bad = Math.max(0, (op.bad ?? 0) - 1);
     if (op.kind === 'front') take = d.base * w.rng.range(0.8, 1.2);
@@ -245,10 +253,14 @@ export function enterpriseWeek(w: World) {
     op.cause = cause;
     if (net > 0) earn(owner, net, d.src ?? op.kind);
     else owner.cash += net;
+    // (a captain's piece, the garage owner's share: out of a good week's take)
+    payOpStakes(w, op, net);
     // the runner's agreed cut of a good week, out of the owner's pocket (Stage 4: asks 'run', work.delegate)
     if (runner?.alive && runner.id !== owner.id && op.cut && net > 0) { const pay = Math.min(Math.max(0, owner.cash), Math.round(net * op.cut)); owner.cash -= pay; earn(runner, pay, 'cut'); }
     owner.heat = clamp(owner.heat + d.heat, 0, 1.5);
     if (owner.isPlayer && Math.abs(net) >= 1) addFact(w, { kind: 'report', actor: doer.id, minor: true, text: net < 0 ? `A bad week on the ${d.label.toLowerCase()} in ${op.district}: ${cause || 'a favourite came in'}, and ${money(-net)} went out.` : `The ${d.label.toLowerCase()} in ${op.district} brought in ${money(net)}.`, district: op.district }, { witnesses: [owner.id] });
+    // what has come about around it (enterprise.ts): only what has actually happened, and only now and then
+    developments(w, op);
   }
 }
 // (the trade is thinner where many work it: one more of the same kind in the district than two takes a little off everyone's)

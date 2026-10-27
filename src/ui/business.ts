@@ -4,6 +4,8 @@
 import { money } from '../core';
 import { envelopeBlock, lendingCard, owedBlock, weekFull } from './lifeview';
 import { hiddenBlock, runningBlock, waysBlock } from './views_c';
+import { holdingsBlock } from './holdings';
+import { onPaper, onPaperWord } from '../enterprise';
 import { isAttn, needRow, needs } from './views_a';
 import { week } from './money';
 import { h, rows, title } from './kit';
@@ -14,7 +16,8 @@ export function businessRoom(): string {
   if (S.sub.business === 'week' || S.sub.business === 'money') return `<button class="ui-back" data-a="sub:business.run">‹ What you run</button>` + title('Your week') + weekFull();
   const wk = week(w, p);
   let out = `<button class="bz-week" data-a="sub:business.week"><span class="bz-week__k">This week</span><span class="bz-week__fig"><b>${esc(money(wk.inTotal))} in</b> · ${esc(money(wk.outTotal))} out</span><span class="bz-week__s">${wk.soFar ? `${esc(money(wk.soFar))} in so far this week` : 'It comes in on Sunday evening'} · all of it ›</span></button>`;
-  out += runningBlock();
+  { const x = onPaper(w, p); if (x.weeks >= 2 && x.dirty > 0) out += `<p class="bz-paper"><span>On paper</span>about ${esc(money(x.clean))} a week, against about ${esc(money(x.dirty))} that isn’t: ${esc(onPaperWord(x))}.</p>`; }
+  out += holdingsBlock() + runningBlock();
   out += envelopeBlock();
   out += owedBlock();
   return out;

@@ -6,7 +6,8 @@ import { week, weekLine } from './money';
 import { powerOptions } from '../powers2';
 import { SOURCE_LABEL } from '../books';
 import { money, ownerBiz, shortTime } from '../core';
-import { schemes, ventureOf } from '../jobs';
+import { schemes } from '../jobs';
+import { chopOf } from '../enterprise';
 import { orderMenu, OrderOpt } from '../orders';
 import { lateOf } from '../people';
 import { canStart, OPS } from '../rackets';
@@ -112,10 +113,11 @@ export function runningBlock(): string {
   const sts = new Map(WAYS.map((x) => [x.id, statusOf(w, x, b)] as const));
   let out = '';
   // what is running
-  const live = WAYS.filter((x) => sts.get(x.id)!.tone === 'run');
+  const live = WAYS.filter((x) => sts.get(x.id)!.tone === 'run' && !(x.op && w.ops.some((o) => o.kind === x.op && o.owner === p.id && (o.state === 'running' || o.state === 'raided'))));
   const jobsOut = w.jobs.filter((j) => j.status === 'active' && crew(w).some((c) => c.id === j.assignee));
-  out += h('What you run', live.length ? `${live.length} running` : '');
-  if (!live.length && !jobsOut.length) out += quiet('Nothing is running yet. Start something, and it pays you every week.');
+  const any = w.ops.some((o) => (o.owner === p.id || o.runner === p.id) && (o.state === 'running' || o.state === 'raided'));
+  if (live.length) out += h(any ? 'Also running' : 'What you run', `${live.length} running`);
+  if (!live.length && !jobsOut.length && !any) out += h('What you run') + quiet('Nothing is running yet. Start something, and it pays you every week.');
   out += live.map((x) => cardOf(x, sts.get(x.id)!)).join('');
   if (jobsOut.length) out += h('Crew out on jobs', String(jobsOut.length)) + rows(jobsOut.map((j): Row => ({ face: avatar(w.chars[j.assignee]), title: esc(j.title), sub: `${esc(w.chars[j.assignee].name)}${j.orders ? ' · ' + (j.orders === 'hard' ? 'by any means' : 'quietly') : ''}`, a: `job:${j.id}` })));
 
@@ -226,8 +228,8 @@ export function wayView(id: string, lines: string[] = []): string {
       S.schemeMoves = mv;
       out += `<h2 class="ui-h">Your options<small>${mv.length}</small></h2>`;
       out += mv.length ? choices(mv.map((s, i) => ({ a: `scheme:${i}`, label: s.label, hint: s.hint })), 'Your options') : quiet('You’ve nothing to sell, and no buyer to sell to.');
-      const v = ventureOf(w, p);
-      if (v) out += `<div class="ui-card"><h2>Your chop shop</h2><p>${bl(v.bizId)}: ${v.stock} waiting, ${money(v.takings)} taken so far.</p></div>`;
+      const v = chopOf(w, p);
+      if (v) { const n = (w.cars ?? []).filter((c) => c.op === v.id && c.status === 'stock').length; out += `<button class="ui-card" data-a="op:${v.id}" style="text-align:left;width:100%"><h2>Your chop shop</h2><p>${v.base ? esc(w.biz[v.base]?.name ?? '') + ': ' : ''}${n} in the bay, ${money(v.total)} taken so far.</p></button>`; }
       break;
     }
   }

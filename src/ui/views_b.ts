@@ -12,7 +12,7 @@ import { repLines } from '../crewlife';
 import { careerLines, recommendable, recruitable, rewardOptions, standingTable } from '../career';
 import { factText, famName, fmtTime, money, ownerBiz, shortTime } from '../core';
 import { GIG_HELP, GIG_LABEL } from '../gigs';
-import { KIND_HELP, activityOf, KIND_LABEL, approaches, canQuestion, crewMoves, jobChecks, schemes, summonsAt, traitWords, ventureOf } from '../jobs';
+import { KIND_HELP, activityOf, KIND_LABEL, approaches, canQuestion, crewMoves, jobChecks, schemes, summonsAt, traitWords } from '../jobs';
 import { available, current as meetCurrent } from '../meetings';
 import { PLACES, isOpen, present } from '../places';
 import { SLICE, TRACK, openAt, regulars, spotById, spots, whoIsAt, type Spot } from '../city';
@@ -32,6 +32,7 @@ import { takeSide, toSide } from './layout';
 import { whereIs } from '../where';
 import { kinWord, stageWord, warmthWord, DATES, datingPool } from '../life';
 import { canStart, lineOf, OP_GROUPS, OPS } from '../rackets';
+import { carName, PILOT as PILOT_KINDS } from '../enterprise';
 import { isMade, sanctioned } from '../politics';
 import { settleOptions } from '../revenge';
 import { clubView } from './clubview';
@@ -569,13 +570,20 @@ export function opStartView(kind: string): string {
   return out + acts(btn(`opgo:${kind}`, `Start it${d.cost ? ` (${money(d.cost)})` : ''}`, 'primary', err ? ' disabled' : ''));
 }
 export function opView(id: Id, lines: string[], found?: number): string {
-  const w = W();
+  const w = W(), p = P();
   const op = w.ops.find((o) => o.id === id);
   if (!op) return back() + quiet('It’s gone.');
   const d = OPS[op.kind as keyof typeof OPS];
-  const r = op.runner ? w.chars[op.runner] : undefined;
-  let out = back() + title(d?.label ?? 'Job');
-  out += kv([['Where', esc(op.district)], ['Run by', r ? pl(r) : 'you'], ['Last week', `<span class="fig">${esc(money(op.last))}</span>`, op.last < 0 ? 'warn' : 'good'], ['Since you started', `<span class="fig">${esc(money(op.total))}</span> in ${op.weeks} weeks`], ['Status', op.state === 'raided' ? 'shut down by police' : op.state === 'closed' ? 'closed' : 'running', op.state === 'raided' ? 'warn' : '']]);
+  const r = op.runner ? w.chars[op.runner] : undefined, owner = w.chars[op.owner];
+  const base = op.base ? w.biz[op.base] : undefined;
+  let out = back() + title(d?.label ?? 'Job', esc([base ? base.name : '', op.district].filter(Boolean).join(', ')));
+  // the arrangement: whose it is, who runs it, who else takes a piece of it
+  const arr: KV[] = [['Belongs to', owner?.isPlayer ? 'you' : owner ? pl(owner) : 'nobody now']];
+  arr.push(['Run by', r ? `${pl(r)}${op.cut ? ` <small class="muted">for ${Math.round(op.cut * 100)}%</small>` : ''}` : owner?.isPlayer ? 'you, yourself' : owner ? pl(owner) : '–']);
+  for (const st of op.stakes ?? []) { const hdr = w.chars[st.holder]; if (hdr) arr.push([hdr.isPlayer ? 'Your share' : `${hdr.name.split(' ')[0]}’s share`, `${Math.round(st.share * 100)}% <small class="muted">${esc(st.how)}</small>`]); }
+  arr.push(['Last week', `<span class="fig">${esc(money(op.last))}</span>`, op.last < 0 ? 'warn' : 'good'], ['In all', `<span class="fig">${esc(money(op.total))}</span> in ${op.weeks} ${op.weeks === 1 ? 'week' : 'weeks'}`]);
+  out += kv(arr);
+  void p;
   // (what the record knows of how it is going, said in words: why last week went as it did, how big it has grown, the precinct)
   const said: string[] = [];
   if (op.cause) said.push(op.cause.replace(/^./, (m) => m.toUpperCase()).replace(/[.!?]?$/, '.'));
@@ -585,11 +593,17 @@ export function opView(id: Id, lines: string[], found?: number): string {
   if (op.tipped && w.now - op.tipped < 21 * DAY && r) said.push(`You’ve been told the count on it has been coming up light. ${r.name.split(' ')[0]} runs it.`);
   if (said.length) out += `<div class="op-said">${said.map((x) => `<p>${esc(x)}</p>`).join('')}</div>`;
   if (lines.length) out += `<div class="sc-said">${lines.map((l) => `<p class="sc-narr">${lk(l)}</p>`).join('')}</div>`;
-  if (op.state === 'closed') return out;
+  out += opPeople(w, op) + opCars(w, op) + opHistory(op);
+  if (op.state === 'closed' || !owner?.isPlayer) return out;
   const picks: Pick[] = [];
   if (r?.alive && !r.isPlayer) picks.push({ a: `talk:${r.id}|tk:earn`, label: `Talk to ${r.name.split(' ')[0]} about the take`, hint: 'He runs it. Ask him how it’s going, face to face.' });
   if (r) picks.push({ a: `opcount:${op.id}`, label: 'Go through the count', hint: 'An hour with the figures. He may not like being checked.' });
   if (found !== undefined && found > 30 && r) picks.push({ a: `oprule:${op.id}|repay|${found}`, label: 'Make him pay it back' }, { a: `oprule:${op.id}|warn|${found}`, label: 'Tell him it stops' }, { a: `oprule:${op.id}|fire|${found}`, label: 'Take it off him' });
+  // who runs it: one of his own men, for a cut, or his own hands
+  if (PILOT_KINDS.has(op.kind)) {
+    for (const c of crewList().filter((x) => x.id !== op.runner && x.alive && x.jailedUntil <= w.now).slice(0, 4)) picks.push({ a: `opman:${op.id}|${c.id}`, label: `Put ${c.name} in charge of it`, hint: `For 15% of the take. ${skillLine(c)}` });
+    if (r && !r.isPlayer) picks.push({ a: `opman:${op.id}|`, label: 'Run it yourself again', hint: `${r.name.split(' ')[0]} won’t like it.` });
+  }
   picks.push({ a: `opclose:${op.id}`, label: 'Shut it down', hint: 'It stops paying, and stops drawing attention.', kind: 'danger' });
   return out + h('What you do') + choices(picks, 'What you do');
 }
@@ -648,4 +662,45 @@ function crewOverview(w: World, p: Character, crew: Character[]): string {
   }).join('');
   out += `<details class="pp-more"><summary>The figures, side by side</summary><div class="ui-card tbl"><table class="crewt"><thead><tr><th>Man</th><th>Week</th><th>4-wk avg</th><th>Kick-up</th><th>Pays</th><th>Jobs</th><th>Lines</th></tr></thead><tbody>${rows}</tbody></table><p class="muted" style="margin:8px 0 0;font-size:12.5px">These are the numbers they hand you. Tap a name for the full picture.</p></div></details>`;
   return out;
+}
+
+// The people an enterprise depends on, by what they do for it (enterprise.ts), each with what he has done for it.
+const ROLE_HEAD: Record<string, string> = { thief: 'Who brings it in', buyer: 'Who takes it off your hands', runner: 'The runners', spot: 'Where the slips are taken', regular: 'The regulars' };
+function opPeople(w: World, op: import('../types').Op): string {
+  let out = '';
+  for (const role of ['thief', 'buyer', 'runner', 'spot', 'regular'] as const) {
+    const ls = (op.links ?? []).filter((l) => l.role === role);
+    if (!ls.length) continue;
+    const rs: Row[] = ls.map((l): Row => {
+      if (role === 'spot') { const b = w.biz[l.id]; const wks = Math.max(1, Math.round((w.now - l.since) / (7 * DAY))); return { title: esc(b?.name ?? 'A shop'), sub: esc(`${tradeOf(b?.kind ?? '')} · takes slips${l.n ? `, about ${money(Math.round(l.n / wks))} a week` : ''}`), a: b ? `biz:${b.id}` : undefined }; }
+      const c = w.chars[l.id];
+      const did = role === 'thief' ? (op.kind === 'chop' ? `${l.n ?? 0} ${l.n === 1 ? 'car' : 'cars'} brought in` : `${money(l.n ?? 0)} in goods brought in`)
+        : role === 'buyer' ? (op.kind === 'chop' ? `${l.n ?? 0} ${l.n === 1 ? 'car’s' : 'cars’'} parts taken` : `${money(l.n ?? 0)} bought`)
+        : role === 'runner' ? `${l.n ?? 0} ${l.n === 1 ? 'week' : 'weeks'} carrying slips`
+        : (l.bal ?? 0) < 0 ? `down ${money(-(l.bal ?? 0))} to the book` : (l.bal ?? 0) > 0 ? `up ${money(l.bal ?? 0)} on the book` : 'even with the book';
+      const off = c && (!c.alive ? 'dead' : c.jailedUntil > w.now ? 'inside' : '');
+      return { face: c ? avatar(c) : undefined, title: esc(c?.name ?? 'Someone'), sub: esc(`${did}${off ? ` · ${off}` : ''}`), tone: off ? 'dim' : (role === 'regular' && (l.bal ?? 0) < -500 ? 'warn' : ''), a: c ? `ent:${c.id}` : undefined };
+    });
+    out += h(ROLE_HEAD[role], String(ls.length)) + rows(rs);
+  }
+  return out;
+}
+// The chop shop's cars: what is in the bay, and the last few to go, each one a car with a history.
+function opCars(w: World, op: import('../types').Op): string {
+  if (op.kind !== 'chop') return '';
+  const cs = (w.cars ?? []).filter((c) => c.op === op.id).sort((a, b) => (b.out ?? b.t) - (a.out ?? a.t));
+  if (!cs.length) return '';
+  const bay = cs.filter((c) => c.status === 'stock'), gone = cs.filter((c) => c.status !== 'stock').slice(0, 8);
+  const row = (c: import('../types').Car): Row => {
+    const th = c.thief ? w.chars[c.thief] : undefined, by = c.buyer ? w.chars[c.buyer] : undefined, whose = c.owner ? w.chars[c.owner]?.name : c.whose;
+    const fate = c.status === 'stock' ? (c.hot ? 'in the bay, and nobody wants to touch it' : 'in the bay') : c.status === 'sold' ? `stripped; ${by ? `${by.name} took the parts` : 'the scrap men took the parts'}` : c.status === 'returned' ? 'sent back' : c.status === 'dumped' ? 'in the river' : 'seized by the police';
+    return { title: esc(carName(c)), sub: esc(`${c.cond} · ${whose ? (c.owner ? `${whose}’s` : whose) : 'somebody’s'}${th ? `, taken by ${th.name.split(' ')[0]}` : ''} · ${fate}`), end: c.price ? `<span class="fig">${esc(money(c.price))}</span>` : undefined, tone: c.hot ? 'warn' : c.status === 'sold' ? '' : 'dim' };
+  };
+  return (bay.length ? h('In the bay', String(bay.length)) + rows(bay.map(row)) : '') + (gone.length ? h('Lately') + rows(gone.map(row)) : '');
+}
+// What has happened to it, newest first: the record an enterprise keeps of itself.
+function opHistory(op: import('../types').Op): string {
+  const hs = (op.hist ?? []).slice(-8).reverse();
+  if (!hs.length) return '';
+  return h('Its story') + `<ul class="op-hist">${hs.map((x) => `<li><span>${esc(shortTime(x.t).replace(/,? \d\d:\d\d$/, ''))}</span>${lk(x.text)}</li>`).join('')}</ul>`;
 }

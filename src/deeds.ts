@@ -2,6 +2,7 @@
 // talk.ts, threads.ts) did these inline, mixed with its decisions and words; here they are the world's own, with the rules they always
 // had, and the conversation layer reaches them only through its doors (conv/doors.ts). Nothing here decides anything: whether a man
 // agrees, pays or admits a thing is decided before one of these is called.
+import { openChopShop } from './enterprise';
 import { link, addFact, bearOn, clamp, createDebt, earn, feelOn, payDebt, rel, repute, restructure, transfer, writeDown } from './core';
 import { post } from './ledger';
 import { addFavour } from './encounters';
@@ -157,7 +158,7 @@ export function takeOnShop(w: World, p: Character, t: Character, b: Business, fe
 // ---------------------------------------------------------------- a chop-shop partnership in his garage
 export function chopShop(w: World, p: Character, t: Character, b: Business): void {
   transfer(w, p, t, 2000, 'stake', `a chop shop at ${b.name}`);
-  w.ventures.push({ id: 'v' + w.nextId++, ownerId: p.id, bizId: b.id, hostId: t.id, hostShare: 0.3, stock: 0, since: w.now, weeks: 0, takings: 0, open: true });
+  openChopShop(w, p, t, b, 0.3, 'a partnership, for 30% of what it makes');
   memo(w, t, p.id, 'agreement', `You agreed to run a chop shop out of ${b.name}; he takes 30%.`);
 }
 

@@ -41,7 +41,7 @@ describe('situations that come of the work', () => {
     rel(friend, m.id).affection = 0.6; rel(friend, p.id).trust = 0.6;
     startOp(w, p, 'numbers', w.fam[p.familyId!].districts[0], m.id);
     const op = w.ops.find((o) => o.owner === p.id)!;
-    op.skimmed = 300;
+    op.skimmed = 300; op.pad = w.now + 365 * DAY; // (the precinct is looked after: a raid in its first fortnight is not what this is about)
     advance(w, w.now + 2 * WEEK + DAY);
     const told = Object.keys(p.known).map((id) => w.facts[id]).find((f) => f && /coming up light/.test(f.text));
     if (op.runner === m.id) assert.ok(told, 'someone told him');

@@ -196,6 +196,13 @@ export interface Business {
   invest?: number; // improvements that are still paying off (0..INVEST_CAP)
   rivals0?: number; // how many others of its kind were nearby when it was first measured
   acct?: WeekAcct[]; // its accounts for recent weeks, struck from the transaction record once a week (econ.ts)
+  // (October 2026, establishments.ts) the people who work there and come in, what has happened there, and what is quietly going wrong
+  staff?: { id: Id; job: string; since: number }[];
+  regs?: Id[]; // its regulars
+  hist?: OpNote[];
+  cool?: Record<string, number>;
+  skim?: Record<Id, number>; // what each pair of hands has taken from the till, unknown to the owner until it shows
+  tab?: Record<Id, number>; // what men who never pay have drunk on the house
 }
 // Someone else's share of a business: a revenue interest agreed by `how`.
 export interface Stake { holder: Id; share: number; since: number; how: string; shaken?: number }
@@ -561,6 +568,7 @@ export interface World {
   papers?: { t: number; lead: string; items: { head: string; body?: string; section?: 'city' | 'business' | 'society' }[]; filler: string[] }[]; // the Monday paper, newest last (section: older papers have none, and read as the city's)
   snaps?: { t: number; cash: number; standing: number; heat: number; rank: string; kids: number }[]; // one per week, for the briefing
   ops: Op[];
+  cars?: Car[]; // stolen cars with a history (enterprise.ts); pruned once long gone
   promo?: PromoCase;
   path?: PathState; // the road to the next rank: jobs counted, trials passed
   goals?: { done: Record<string, number> };
@@ -587,7 +595,9 @@ export interface PathState { deeds: number; counted: Id[]; trial: Record<string,
   life?: { home: number; car: number; hq: boolean; driver: boolean };
   stakes?: { biz: Id; share: number; since: number; shaken?: number }[]; // before V73 only; moved onto the businesses by the v4 migration
   comm?: { court: Record<Id, number>; allies: Id[]; cd: Record<string, number> };
-  chest?: number; lieut?: Id; successor?: Id; favs?: Record<Id, number> }
+  chest?: number; lieut?: Id; successor?: Id; favs?: Record<Id, number>;
+  meet?: Id; // (October 2026) the place of his own where his crew meets: a bar, a restaurant, a café (enterprise.meetWeek)
+}
 
 export interface PromoCase {
   to: Rank;
@@ -628,6 +638,29 @@ export interface Op {
   pad?: number; // the precinct paid until (book.ts): the police leave it alone
   cut?: number; // (Stage 4) the runner's agreed share of each week's take, paid by the owner
   tipped?: number; // (Stage 5) when the player was last told the count on it was coming up light
+  // The economy (October 2026, enterprise.ts): the people around it, where it works out of, who else has a claim on it, who has owned
+  // it, and what has happened to it. All optional: an older op gets its people the first week it runs.
+  base?: Id; // the establishment it works out of (a garage for the chop shop, a candy store for the numbers bank)
+  links?: OpLink[];
+  stakes?: Stake[]; // other men's shares of the take, as with a business
+  owners?: OwnerSpell[]; // everyone who has owned it before, oldest first
+  hist?: OpNote[]; // what has happened to it, newest last (bounded)
+  cool?: Record<string, number>; // when each kind of development can next arise
+  float?: number; // the numbers bank's cash held back against a big hit
+  held?: number; // goods brought to the fence by its owner or his crew, waiting to be moved (no thief to pay)
+}
+// A man (or a place) an enterprise depends on: the numbers' runners and spots, the chop shop's thieves and buyers, the fence's
+// suppliers and buyers, the book's regulars. `n` is what he has brought or bought, `bal` what he stands at with it (a regular's
+// running account), `want` a buyer's particular want.
+export type OpRole = 'runner' | 'spot' | 'thief' | 'buyer' | 'regular';
+export interface OpLink { id: Id; role: OpRole; since: number; n?: number; bal?: number; want?: string; off?: number }
+export interface OpNote { t: number; text: string; who?: Id }
+// A stolen car, from the street to wherever it ends up. `owner` is whose it was when he is someone; `whose` says who otherwise.
+export interface Car {
+  id: Id; make: string; model: string; year: number; cond: 'rough' | 'fair' | 'clean' | 'mint'; value: number;
+  owner?: Id; whose?: string; thief?: Id; op?: Id; t: number;
+  status: 'stock' | 'sold' | 'returned' | 'dumped' | 'seized';
+  buyer?: Id; price?: number; out?: number; hot?: 'made' | 'police' | 'family'; fact?: Id;
 }
 
 // Someone comes to you. A small scene with its own options; closes when you answer or it lapses.

@@ -2,6 +2,7 @@
 // A man you send out is not a function call. He may do it well, do it and skim, lose half of it at cards,
 // find the debtor was not home, get distracted by something at home, start a fight, or decide the debtor
 // deserves more time. When he comes back he tells you a story, and the story may not be the true one.
+import { chopOf, deliverCars, deliverGoods, fenceOf } from './enterprise';
 import { knowsProtection } from './acquaint';
 import { temper } from './temper';
 import { applyRank } from './rank';
@@ -160,9 +161,9 @@ export function runCrewJob(w: World, j: Job) {
         p.cash += amt - mine;
       };
       if (m.cars > 0) {
-        const v = w.ventures.find((x) => x.open && x.ownerId === p.id);
+        const v = chopOf(w, p);
         if (v) {
-          v.stock += m.cars;
+          deliverCars(w, v, m.cars, m);
           extra += ` ${m.cars} cars went to the chop shop.`;
         } else {
           split(m.cars * 550);
@@ -171,9 +172,9 @@ export function runCrewJob(w: World, j: Job) {
         m.cars = 0;
       }
       if (m.goods > 0) {
-        const g = Math.round(m.goods * 0.4);
-        split(g);
-        extra += ` Pawned the goods for ${money(g)}.`;
+        const f = fenceOf(w, p);
+        if (f) { deliverGoods(w, f, m.goods, m); extra += ` The goods went to your fence.`; }
+        else { const g = Math.round(m.goods * 0.4); split(g); extra += ` Pawned the goods for ${money(g)}.`; }
         m.goods = 0;
       }
     }
