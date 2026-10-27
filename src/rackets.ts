@@ -8,6 +8,7 @@ import { askToInvest } from './reports';
 import { temper } from './temper';
 import { addEnc } from './encounters';
 import { bookWeek } from './book';
+import { recordWeek } from './standing';
 import { developments, meetWeek, opsChangeHands, paperWeek, payOpStakes, PILOT, pilotWeek, pruneCars } from './enterprise';
 import { Character, DAY, Id, Op, OpKind, WEEK, World } from './types';
 import { arch, pick } from './voice';
@@ -172,6 +173,7 @@ const gross0 = (w: World) => w.rng.int(1800, 3800);
 // also decide for themselves: grow it, or after a run of bad weeks change course (npcTend), and men without one start one, by the
 // same rules the player's Rackets tab uses (startEnterprises, canStart).
 export function enterpriseWeek(w: World) {
+  recordWeek(w);
   opsChangeHands(w);
   pruneCars(w);
   meetWeek(w);

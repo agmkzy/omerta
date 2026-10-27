@@ -96,7 +96,7 @@ export function youRoom(): string {
     ? `<ul class="ui-list">${specs.map((s) => `<li><span>${SPEC_LABEL[s]}${tierOf(sc[s]) >= 2 ? `<small class="lf-perk">${esc(SPEC_PERK[s])}</small>` : ''}</span><span class="v ${tierOf(sc[s]) >= 2 ? 'good' : ''}">${TIER_WORD[tierOf(sc[s])]}</span></li>`).join('')}</ul>`
     : quiet('Nothing yet. A name is made by what you do: earn, run something, talk a man round, or put one down, and people start to say it of you.');
   out += `<details class="lf-fold"><summary>What you’re good at</summary>${skillBars(p)}</details>`;
-  // (your road, rank and powers are Your road; milestones, honest work and the saves live in More)
+  // (your position, record and prospects are Your career; milestones, honest work and the saves live in More)
 
   // beside it: who is around you
   let side = '';

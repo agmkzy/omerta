@@ -7,7 +7,8 @@
 import { todayView } from './views_a';
 import { crewList, crewView, familyTab, placesView } from './views_b';
 import { storiesTab } from './stories';
-import { peopleRoom, roadRoom, youRoom } from './lifeview';
+import { peopleRoom, youRoom } from './lifeview';
+import { careerRoom } from './careerview';
 import { businessRoom, workRoom } from './business';
 import { P, S } from './links';
 import { wordRoom } from './word';
@@ -19,7 +20,7 @@ type Room = [id: string, label: string, view: () => string];
 const ROOMS: Partial<Record<Tab, Room[]>> = {
   business: [['run', 'What you run', businessRoom], ['work', 'Work going', workRoom]],
   people: [['men', 'Your men', crewView], ['org', 'The family', familyTab], ['all', 'Everyone', peopleRoom]],
-  story: [['stories', 'Stories', storiesTab], ['road', 'Your road', roadRoom], ['life', 'Your life', youRoom], ['word', 'Your word', wordRoom]],
+  story: [['stories', 'Stories', storiesTab], ['road', 'Your career', careerRoom], ['life', 'Your life', youRoom], ['word', 'Your word', wordRoom]],
 };
 // Where an older name lands: the section, and the room in it (none: the section's own first room).
 export const LEGACY: Partial<Record<Tab, [Tab, string | undefined]>> = {

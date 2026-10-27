@@ -76,7 +76,8 @@ function validSuperior(w: World, c: Character, s?: Character): boolean {
 function nextSuperior(w: World, c: Character, reports: Map<Id, number>): Character | undefined {
   const fam = members(w, c.familyId!);
   for (let r = rankIdx(c.rank) + 1; r < LADDER.length; r++) {
-    const pool = fam.filter((x) => x.rank === LADDER[r] && !x.prospect);
+    // (the consigliere sits beside the boss and commands nobody: no man is handed to him)
+    const pool = fam.filter((x) => x.rank === LADDER[r] && !x.prospect && w.fam[c.familyId!]?.consigliere !== x.id);
     // spread the load: the man with the fewest direct reports, ties by id
     const x = pool.sort((a, b) => (reports.get(a.id) ?? 0) - (reports.get(b.id) ?? 0) || (a.id < b.id ? -1 : 1))[0];
     if (x) return x;

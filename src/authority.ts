@@ -5,6 +5,7 @@
 import { addFact, bear, bearOn, clamp, feel, feelOn, money, peek, recordCareer, rel, repute, transfer } from './core';
 import { addEnc, addFavour } from './encounters';
 import { applyRank } from './rank';
+import { noteRuling } from './standing';
 import { noteConduct, temper } from './temper';
 import { DAY, type Character, type Enc, type Fact, type World } from './types';
 
@@ -176,6 +177,7 @@ function quarrelChoose(w: World, p: Character, e: Enc, code: string) {
   const a = e.from ? w.chars[e.from] : undefined, b = e.about ? w.chars[e.about] : undefined;
   if (!a?.alive || !b?.alive) return { lines: ['By the time you get there, it has gone quiet.'], minutes: 10 };
   const amt = Number(e.data?.amt ?? 0), ra = rel(a, p.id), rb = rel(b, p.id), wrong = w.chars[String(e.data?.wrong ?? '')];
+  if (code !== 'hear') noteRuling(p);
   if (code === 'hear') {
     // (he hears each man alone; the one in the wrong tells it differently the second time, and the player now knows it)
     e.status = 'open'; e.opts = e.opts.filter((o) => o.code !== 'hear'); e.data = { ...(e.data ?? {}), heard: 1 };

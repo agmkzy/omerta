@@ -1,4 +1,5 @@
 import { intentDay } from './intent';
+import { successionWeek } from './succession';
 import { workWeek } from './work';
 import { mattersWeek } from './matters';
 import { pulseWeek } from './pulse';
@@ -202,6 +203,7 @@ function weekly(w: World) {
   // kick-ups: everyone declares, passes a share up, and superiors compare notes (see books.ts)
   peopleWeek(w);
   settleWeek(w);
+  successionWeek(w); // (The Family: the line and the books, the recognised successor)
   careerTick(w);
   agencyWeek(w);
   purge(w);

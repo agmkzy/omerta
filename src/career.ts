@@ -1,3 +1,4 @@
+import { chooseCaptain, madeFromLine, nextToMake, recordAppt, underbossPicture, underbossStanding } from './succession';
 import { promotedOver } from './situ';
 import { ledgerAdd } from './powers2';
 // Career: associate -> soldier -> capo -> underboss -> boss. Nobody is promoted because a number ticked over.
@@ -160,39 +161,43 @@ export function careerTick(w: World) {
     // filling, not a reward for waiting).
     if (!boss.isPlayer) {
       const caps = members(w, fam.id).filter((c) => c.rank === 'capo' && !c.isPlayer && c.jailedUntil <= w.now).sort((a, b) => rateBy(boss, b) - rateBy(boss, a) || (a.id < b.id ? -1 : 1));
-      const ready = caps.find((c) => readiness(w, c)?.ready && canSeatUnderboss(w, boss, c));
+      // (The Family: the boss's own picture of his second; he fills an empty chair after a while, and replaces a sitting underboss only
+      // when he thinks much better of another man)
       const empty = vacancy(w, fam.id, 'underboss');
       if (empty) fam.ubSince ??= w.now; else delete fam.ubSince;
-      const pick = ready ?? (empty && w.now - (fam.ubSince ?? w.now) > 12 * 7 * DAY ? caps[0] : undefined);
+      const pic = underbossPicture(w, fam.id);
+      const pref = pic.preferred && pic.preferred.id !== pic.current?.id && fam.consigliere !== pic.preferred.id ? pic.preferred : undefined;
+      const ready = pref && !empty && pic.current && underbossStanding(w, pref) > underbossStanding(w, pic.current) + 0.25 ? pref : undefined;
+      const pick = ready ?? (empty && pref && w.now - (fam.ubSince ?? w.now) > 6 * 7 * DAY ? pref : undefined);
+      void caps;
       if (pick && w.rng.chance(0.5)) {
         const u = members(w, fam.id).find((x) => x.rank === 'underboss');
         if (u && u.id !== pick.id) { bear(w, u, pick.id, 0.25, `${pick.name} was given the seat above him`); applyRank(w, u, 'capo', { wage: 300, place: (x) => { x.bossId = boss.id; }, fact: { actor: boss.id, victim: u.id, story: 'seat:underboss', text: `${boss.name} has moved ${u.name} aside. He is a captain again.`, broadcast: members(w, fam.id).map((y) => y.id) } }); }
-        promote(w, pick, 'underboss', boss); fam.lastPromo = w.now; delete fam.ubSince; continue;
+        promote(w, pick, 'underboss', boss); fam.lastPromo = w.now; delete fam.ubSince;
+        recordAppt(w, fam.id, { office: 'Underboss', who: pick.id, by: boss.id, why: u ? `${boss.name} thought more of him than of ${u.name}` : 'the chair beside the boss had stood empty', passed: pic.others.map((x) => x.id), backers: [] });
+        continue;
       }
     }
     for (const to of ['capo', 'soldier'] as Rank[]) {
       if (to === 'soldier' && fam.booksClosed) continue;
       if (w.path?.hold === to && w.chars[w.playerId!]?.familyId === fam.id) continue; // the seat is spoken for
       const from = LADDER[LADDER.indexOf(to) - 1];
+      // (The Family: a man is made only when the books are open, and then from the family's line, in order; a captain is the boss's
+      // choice among the contenders, weighed for the men he would command; succession.ts)
+      if (to === 'soldier') {
+        const next = nextToMake(w, fam).map((id) => w.chars[id]).filter((c) => c && !c.isPlayer && c.jailedUntil <= w.now);
+        const c = next[0];
+        if (!c) continue;
+        if (c.career?.proved !== 'soldier') { npcTrial(w, c, 'soldier', sponsorOf(w, c) ?? boss); continue; }
+        promote(w, c, 'soldier', sponsorOf(w, c) ?? boss); madeFromLine(w, fam, c, sponsorOf(w, c) ?? boss); fam.lastPromo = w.now;
+        break;
+      }
       if (!vacancy(w, fam.id, to)) { noticeTick(w, fam, boss, to, from); continue; }
-      // a man whose road is otherwise done is set his test before he can be made (the player's comes in person: path.ts)
-      if (to === 'soldier') for (const c of members(w, fam.id)) if (c.rank === from && !c.isPlayer && c.jailedUntil <= w.now && !isRunner(w, c) && pathInfo(w, c)?.ready && c.career?.proved !== to) npcTrial(w, c, to, sponsorOf(w, c) ?? boss);
-      const cands = members(w, fam.id)
-        .filter((c) => c.rank === from && c.jailedUntil <= w.now && !isRunner(w, c) && !c.isPlayer)
-        .map((c) => ({ c, r: readiness(w, c)! }))
-        .filter(({ r }) => eligible(r))
-        .sort((a, b) => b.r.score - a.r.score);
-      if (!cands.length) continue;
-      const top = cands[0];
-      if (w.rng.chance(0.5)) {
-        promote(w, top.c, to, top.r.sponsor);
-        fam.lastPromo = w.now;
-        // the player was passed over
-        const p = w.chars[w.playerId!];
-        if (p?.alive && p.familyId === fam.id && p.rank === from && p.lifetimeKick >= (ROAD[to]?.kick ?? 1e9) * 0.8) {
-          feel(w, p, boss.id, 'respect', -0.03);
-          p.memos.push({ id: 'm' + w.nextId++, kind: 'question', other: top.c.id, text: `${top.c.name} was made ${to} ahead of you.`, t: w.now, done: true });
-        }
+      if (to === 'capo') {
+        if (w.path?.hold === 'capo' && w.chars[w.playerId!]?.familyId === fam.id) continue;
+        const ch = chooseCaptain(w, fam.id, []);
+        if (!ch || ch.c.isPlayer) continue;
+        if (w.rng.chance(0.5)) { promote(w, ch.c, 'capo', boss); fam.lastPromo = w.now; recordAppt(w, fam.id, { office: 'Captain', who: ch.c.id, by: boss.id, why: 'the family needed another crew, and he was the man for it', passed: ch.passed.map((x) => x.id), backers: [] }); }
         break;
       }
     }
@@ -202,6 +207,7 @@ export function careerTick(w: World) {
 // ---------------------------------------------------------------- the player
 
 export function inductPlayer(w: World, p: Character, to: Rank, shown: number) {
+  if (to === 'soldier' && p.familyId) madeFromLine(w, w.fam[p.familyId], p, sponsorOf(w, p));
   const sp = sponsorOf(w, p);
   repute(w, p, shown, 'induction');
   promote(w, p, to, sp);
@@ -237,7 +243,8 @@ export function recruitable(w: World, p: Character): Character[] {
   return Object.values(w.chars).filter((c) => c.alive && c.rank === 'civilian' && !c.isPlayer && (c.rels[p.id]?.trust ?? 0) >= 0.45 && c.traits.violence + c.traits.ambition > 0.7).slice(0, 4);
 }
 export function recruit(w: World, p: Character, c: Character): string[] {
-  applyRank(w, c, 'associate', { fact: false, place: (x) => { x.familyId = p.familyId; x.bossId = p.id; } });
+  if (['soldier', 'capo', 'underboss', 'boss'].includes(p.rank)) applyRank(w, c, 'associate', { fact: false, place: (x) => { x.familyId = p.familyId; x.bossId = p.id; } });
+  else { c.bossId = p.id; c.kickRate = Math.max(c.kickRate, 0.2); } // (an associate's man is his crewman, not the family's)
   addFact(w, { kind: 'promotion', actor: c.id, minor: true, text: `${c.name} has started running with ${p.name}.`, district: c.district }, { witnesses: [p.id] });
   feel(w, c, p.id, 'trust', 0.1);
   return [`${c.name} shakes your hand. He works for you now, and you answer for him.`];

@@ -14,6 +14,7 @@ import { aptitude, grow } from './people';
 import { mkJob } from './jobs';
 import { motives, pressed, toldOf } from './establishments';
 import { isFemale } from './life';
+import { noteRuling } from './standing';
 import { temper } from './temper';
 import { arch } from './voice';
 import { DAY, WEEK, type Business, type Car, type Character, type Enc, type Id, type Op, type OpLink, type OpRole, type World } from './types';
@@ -936,6 +937,7 @@ export function captainChoose(w: World, p: Character, op: Op, e: Enc, code: stri
     return { lines: [`${first(o)} goes back to his bank empty-handed. By the end of the week the street knows it welshed.`], minutes: 15 };
   }
   // the quarrel between two of his men
+  noteRuling(p);
   const ro = w.ops.find((x) => x.id === e.data?.rop), r = e.about ? w.chars[e.about] : undefined, id = String(e.data?.link), role = String(e.data?.role) as OpRole;
   if (code === 'owner' && ro && r) { ro.links = (ro.links ?? []).filter((x) => x.id !== id); (op.links ??= []).push({ id, role, since: w.now }); bear(w, r, p.id, 0.12, `${p.name} ruled against him`); feel(w, o, p.id, 'trust', 0.06); return { lines: [`You rule for ${first(o)}. ${first(r)} takes it, because you’re his captain.`], minutes: 30 }; }
   if (code === 'rival' && r) { bear(w, o, p.id, 0.12, `${p.name} ruled against him`); feel(w, r, p.id, 'trust', 0.06); return { lines: [`You rule for ${first(r)}. ${first(o)} came to you and got nothing.`], minutes: 30 }; }

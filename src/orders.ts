@@ -419,7 +419,10 @@ export function recruitProspect(w: World, p: Character, c: Character): string[] 
   p.cash -= RECRUIT_COST;
   recordCareer(w, c, `Taken on by ${p.name}`);
   c.prospect = false;
-  applyRank(w, c, 'associate', { fact: false, career: false, place: (x) => { x.familyId = p.familyId; x.bossId = p.id; } });
+  // (The Family: a made man takes a man on as an associate of the family, on its record through him; an associate can't put anyone on
+  // the family's record: his men are crewmen, civilians who work for him, and they give him his piece all the same)
+  if (['soldier', 'capo', 'underboss', 'boss'].includes(p.rank)) applyRank(w, c, 'associate', { fact: false, career: false, place: (x) => { x.familyId = p.familyId; x.bossId = p.id; } });
+  else { c.bossId = p.id; c.kickRate = Math.max(c.kickRate, 0.2); }
   c.cash += 150;
   (c.rels[p.id] ??= { trust: 0.4, respect: 0.35, affection: 0.3, grudge: 0, lastMet: w.now });
   feelTo(c, p.id, 'trust', 0.45);

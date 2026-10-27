@@ -540,7 +540,7 @@ ok('recruitment: his counter names the start he needs and why, and taking it put
   assert.ok(offer > 150);
   playerMove(w, p, s.id, 'take');
   assert.equal(t.bossId, p.id, 'he runs with you now');
-  assert.equal(t.rank, 'associate');
+  assert.equal(t.rank, 'civilian', 'and, taken on by an associate, he is his crewman, not on the family\'s record');
   assert.equal(cash0 - p.cash, offer, 'it cost what he asked');
   assert.equal(t.cash - his0, offer, 'and the money went to him');
   clean(w, 'after a recruit');

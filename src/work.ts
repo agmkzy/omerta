@@ -205,6 +205,8 @@ export function noteWork(w: World, j: Job, ok: boolean) {
   recordCareer(w, m, `${ok ? 'Finished' : 'Botched'}: ${j.title}`, ok);
   if (!ok) return;
   const rec = m.career!;
+  // (The Family: work done for a man above him is service, the record a family reads when it decides what he is good for)
+  { const giver = j.giver ? w.chars[j.giver] : undefined; let up = m.bossId ? w.chars[m.bossId] : undefined, above = false; for (let i = 0; up && i < 6; i++, up = up.bossId ? w.chars[up.bossId] : undefined) if (up.id === giver?.id) { above = true; break; } if (above || j.via === 'boss') rec.svc = (rec.svc ?? 0) + 1; }
   const g = j.giver ? w.chars[j.giver] : j.via === 'order' ? w.chars[w.playerId!] : undefined;
   if (g && g.id !== m.id && (j.via === 'order' || j.via === 'boss')) {
     const gr = (g.career ??= { done: 0, failed: 0, log: [] });

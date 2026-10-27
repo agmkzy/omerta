@@ -294,7 +294,7 @@ export function todayView(): string {
   // ---- beside it (desktop): where you stand, briefly
   const steps = promoSteps(w, p), a_ = p.ambition, amb = a_ ? AMBS.find((x) => x.kind === a_.kind) : undefined;
   const now = steps ? `being considered: ${steps.filter((x) => x.state === 'done').length} of ${steps.length} steps` : pathInfo(w, p) ? 'on the path' : `reputation ${standingWord(p.standing)}`;
-  let side = `<button class="ui-card g-career" data-a="career:"><h2>Your road<small>&rsaquo;</small></h2><p><b class="g-cap">${esc(p.rank)}</b> · ${esc(now)}</p>${amb ? `<p class="muted">Ambition: ${esc(amb.label)}${a_?.done ? ' (done)' : ''}</p>` : ''}</button>`;
+  let side = `<button class="ui-card g-career" data-a="career:"><h2>Your career<small>&rsaquo;</small></h2><p><b class="g-cap">${esc(p.rank)}</b> · ${esc(now)}</p>${amb ? `<p class="muted">Ambition: ${esc(amb.label)}${a_?.done ? ' (done)' : ''}</p>` : ''}</button>`;
   const more = comingUp().slice(1, 4);
   if (more.length) side += `<div class="ui-card"><h2>Later</h2><ul class="ui-list">${more.map((c) => `<li><span>${esc(shortTime(c.t))}</span><span class="v" style="text-align:left;margin-left:12px">${esc(c.text)}</span></li>`).join('')}</ul></div>`;
   toSide(side);

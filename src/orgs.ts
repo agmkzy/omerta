@@ -509,6 +509,30 @@ export function ensureOrgs(w: World) {
   }
   for (const f of Object.values(w.fam)) for (const o of Object.values(w.fam)) if (o.id !== f.id) { f.tension[o.id] ??= 0; relOf(f, o.id, w.now); }
   for (const f of Object.values(w.fam)) { const cl = clubOf(w, f.id); if (cl) { f.hq = cl.id; cl.hostId ??= f.bossId; } }
+  // (The Family: every family has a consigliere; one that has none, new or loaded, has the boss's choice: a careful soldier he trusts)
+  for (const f of Object.values(w.fam)) if (!f.consigliere || !w.chars[f.consigliere]?.alive) { const c = consigliereChoice(w, f.id); if (c) seatConsigliere(w, f.id, c, undefined, 'the family has always had a man beside the boss'); }
+}
+// The boss's choice of consigliere: a made man he trusts, careful and well thought of, not the underboss, and not a captain with a crew
+// to run (a captain chosen gives his crew up). Pure: no randomness, so a new world and a loaded one choose alike.
+export function consigliereChoice(w: World, fid: Id, not?: Id): Character | undefined {
+  const boss = w.chars[w.fam[fid]?.bossId];
+  if (!boss?.alive) return undefined;
+  const score = (c: Character) => rel(boss, c.id).trust * 1.2 + temper(c).caution * 0.6 + c.standing / 100 + (c.rank === 'soldier' ? 0.2 : 0) - (c.traits.violence > 0.7 ? 0.3 : 0);
+  // (a soldier he trusts, as a rule: a captain is taken off his crew only when there is no soldier to choose)
+  const pool = (r: string) => Object.values(w.chars).filter((c) => c.alive && c.familyId === fid && c.rank === r && c.id !== not && c.jailedUntil <= w.now && !c.isPlayer).sort((a, b) => score(b) - score(a) || (a.id < b.id ? -1 : 1));
+  return pool('soldier')[0] ?? pool('capo')[0];
+}
+// One door for the consigliere's seat: he sits beside the boss and answers to him, commands no crew (a captain's men go to another
+// captain), and the appointment is recorded in his career and the family's.
+export function seatConsigliere(w: World, fid: Id, c: Character, by: Character | undefined, why: string) {
+  const f = w.fam[fid], boss = w.chars[f.bossId];
+  if (!f || !boss) return;
+  f.consigliere = c.id;
+  if (c.rank === 'capo') { applyRank(w, c, 'soldier', { fact: false, career: false, wage: WAGE.capo, repair: false, place: (x) => { x.bossId = boss.id; } }); for (const m of Object.values(w.chars)) if (m.alive && m.bossId === c.id && m.rank === 'soldier') m.bossId = null; }
+  c.bossId = boss.id; c.wage = Math.max(c.wage, WAGE.capo);
+  (c.career ??= { done: 0, failed: 0, log: [] }).posts = [...(c.career.posts ?? []), { t: w.now, text: `Named consigliere${by ? ` by ${by.name}` : ''}: ${why}`, by: by?.id }];
+  if (by) { logOrg(w, fid, 'appointment', `${by.name} named ${c.name} consigliere.`, c.id); addFact(w, { kind: 'promotion', actor: by.id, victim: c.id, text: `${by.name} named ${c.name} consigliere of the ${f.name} family.`, district: c.district }, { broadcast: Object.values(w.chars).filter((x) => x.alive && x.familyId === fid).map((x) => x.id) }); }
+  repairHierarchy(w, fid);
 }
 
 // ---------------------------------------------------------------- the integrity check (also read by audit())

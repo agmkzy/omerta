@@ -1,4 +1,5 @@
 import { lineOf } from './rackets';
+import { chooseCaptain, nextToMake, underbossPicture } from './succession';
 import { ledgerAdd } from './powers2';
 import { bizMove } from './econ';
 import { powerOptions as powerOptions2, usePower2 } from './powers2';
@@ -153,6 +154,11 @@ export function pathTick(w: World) {
   (st.latch ??= {})[to] = true; // once you've done the work it stays done
   if (p.jailedUntil > w.now || p.hurtUntil > w.now) return;
   const fam = w.fam[p.familyId];
+  // (The Family: the road done makes him ready; what makes him chosen is the family. He is made only when the books are open and he is
+  // at the head of the line; a captain when a crew needs one and the boss's choice is him; underboss when he is the boss's man)
+  if (to === 'soldier' && !nextToMake(w, fam).includes(p.id)) { delete st.hold; return; }
+  if (to === 'capo' && (!vacancy(w, p.familyId, 'capo') || chooseCaptain(w, p.familyId, [])?.c.id !== p.id)) { delete st.hold; return; }
+  if (to === 'underboss' && underbossPicture(w, p.familyId).preferred?.id !== p.id) { delete st.hold; return; }
   const boss = w.chars[fam.bossId];
   if (!boss?.alive) return;
   if (to === 'soldier' && info.trial !== 'passed') {
@@ -168,14 +174,7 @@ export function pathTick(w: World) {
   if (w.jobs.some((j) => j.kind === 'summons' && j.meeting === 'induction' && j.status === 'offered')) return;
   // he waits for a seat, like any man whose road is done (career.noticeTick); but not for ever: three weeks on, the boss opens the
   // books for a man who has earned it, and says so, rather than let him rot waiting on somebody's funeral
-  if (to !== 'underboss' && !vacancy(w, p.familyId, to)) {
-    st.seatWait ??= w.now;
-    if (w.now - st.seatWait < 21 * DAY) return;
-    const f = w.fam[p.familyId]; f.capBonus = { ...(f.capBonus ?? {}), [to]: (f.capBonus?.[to] ?? 0) + 1 };
-    addFact(w, { kind: 'report', actor: boss.id, victim: p.id, minor: false, text: `${boss.name} has opened the books. There will be a place for one more ${to === 'soldier' ? 'made man' : to}, and your name has been put forward for it.`, district: p.district }, { witnesses: [p.id] });
-  }
   delete st.seatWait;
-  if (to === 'underboss' && !canSeatUnderboss(w, boss, p)) return;
   st.hold = to;
   makeRoom(w, p, boss, to);
   const sp = sponsorOf(w, p) ?? boss;

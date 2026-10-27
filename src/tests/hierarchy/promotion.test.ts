@@ -1,5 +1,6 @@
 // Promotion and the player's road up: a rank change is applied once, keeps the hierarchy valid, and the player's
 // readiness is the one in path.ts. From the V72 suite.
+import { successionWeek } from '../../succession';
 import assert from 'node:assert';
 import { describe, test as ok } from 'vitest';
 import { applyRank, hierarchyIssues, leaveCrew } from '../../rank';
@@ -48,7 +49,8 @@ describe('promotion', { tags: ['unit'] }, () => {
     if (code === 'ask') { assert.equal(old.rank, 'capo'); assert.equal(old.bossId, p.id); } else assert.equal(old.alive, false);
   });
   ok('cut loose / defecting keeps the hierarchy valid', () => {
-    const w = newWorld(7); const p = P(w); p.cash = 5000;
+    // (a made man's recruits are associates of the family; an associate's are his crewmen, civilians who answer to nobody when let go)
+    const w = newWorld(7); const p = P(w); p.cash = 5000; applyRank(w, p, 'soldier', { fact: false, career: false });
     for (const pr of prospects(w, p).slice(0, 3)) recruitProspect(w, p, pr.c);
     const [a, b] = Object.values(w.chars).filter((c) => c.bossId === p.id);
     leaveCrew(w, a); assert.notEqual(a.bossId, p.id); assert.ok(a.bossId, 'has someone to answer to'); assert.deepEqual(hierarchyIssues(w), []);
@@ -91,8 +93,10 @@ describe('promotion', { tags: ['unit'] }, () => {
     assert.ok(!readiness(w, a)!.ready, 'until he has passed the test the family sets him, he is not ready to be made');
     a.career.proved = 'soldier';
     while (!vacancy(w, fid, 'soldier')) { const s = fam(w, fid).find((c) => c.rank === 'soldier' && !c.isPlayer)!; s.alive = false; }
-    for (let i = 0; i < 12 && a.rank === 'associate'; i++) { w.now += 7 * 24 * 60; w.fam[fid].lastPromo = 0; for (const c of fam(w, fid)) if (c.rank === 'associate' && c.id !== a.id) c.lifetimeKick = 0; careerTick(w); }
+    // (The Family: the seat opens the books, the family's line puts him first, and he is made from it, the appointment on record)
+    for (let i = 0; i < 12 && a.rank === 'associate'; i++) { w.now += 7 * 24 * 60; w.fam[fid].lastPromo = 0; for (const c of fam(w, fid)) if (c.rank === 'associate' && c.id !== a.id) { c.lifetimeKick = 0; c.standing = 0; } successionWeek(w); careerTick(w); }
     assert.equal(a.rank, 'soldier');
+    assert.ok((w.fam[fid].appts ?? []).some((x) => x.office === 'Made' && x.who === a.id && /books opened/.test(x.why)), 'and the record says why');
   });
   ok('work a man finishes is on his record, and on his superior\'s when he sent him', () => {
     const w = newWorld(7), p = P(w);

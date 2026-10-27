@@ -49,7 +49,7 @@ export function effectiveRate(w: World, c: Character): number {
 }
 
 export function subordinates(w: World, c: Character): Character[] {
-  return Object.values(w.chars).filter((x) => x.alive && x.bossId === c.id && x.familyId === c.familyId);
+  return Object.values(w.chars).filter((x) => x.alive && x.bossId === c.id && (x.familyId === c.familyId || (x.rank === 'civilian' && !x.familyId)));
 }
 
 // ---------------------------------------------------------------- the envelope
@@ -186,7 +186,8 @@ export function settleOne(w: World, c: Character) {
   const b = c.books;
   const boss = c.bossId ? w.chars[c.bossId] : undefined;
   const gross = reckoned(b.gross);
-  if (!boss || !boss.alive || !c.familyId || boss.familyId !== c.familyId) {
+  // (a crewman, a civilian who works for a man in the life, gives him his piece like anyone: the family's record isn't what makes it owed)
+  if (!boss || !boss.alive || (c.familyId ? boss.familyId !== c.familyId : c.rank !== 'civilian' || !boss.familyId)) {
     pushHistory(w, c, gross, 0, 0, 0, 0);
     return;
   }

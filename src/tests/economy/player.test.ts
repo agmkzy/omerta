@@ -34,6 +34,7 @@ describe('the player in the criminal economy', { tags: ['scenario'] }, () => {
     startOp(w, p, 'numbers', where, null);
     const op = lineOf(w, p)!;
     assert.ok(op && op.kind === 'numbers' && op.owner === p.id, 'it is his: the one enterprise record everyone\'s are kept in');
+    op.pad = w.now + 365 * DAY; // (the precinct looked after: a raid in its first weeks is luck, not what this is about)
     const cash0 = p.cash;
     advance(w, w.now + 3 * WEEK + DAY);
     assert.ok(op.total > 0, 'it earns');

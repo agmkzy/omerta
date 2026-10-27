@@ -156,7 +156,8 @@ export interface Character {
   job?: DayJob;
   problem?: Problem;
   hustle?: Hustle; // (before Stage 4: his own line of work, now an enterprise in w.ops; read only to bring an older save across)
-  career?: { done: number; failed: number; log: { t: number; text: string }[]; led?: number; rough?: number; hard?: number; latch?: string; proved?: string; tries?: number }; // what he has done for you and what has happened to him
+  career?: { done: number; failed: number; log: { t: number; text: string }[]; led?: number; rough?: number; hard?: number; latch?: string; proved?: string; tries?: number;
+    lw?: number; svc?: number; ruled?: number; posts?: { t: number; text: string; by?: Id }[] }; // (The Family: weeks leading men, work done for superiors, quarrels settled; the offices he has held, who gave them and why) // what he has done for you and what has happened to him
   // (Stage 4: work his own men did on his orders, rough work and the family's hard work he did himself, and the rank whose road he has finished: career.ts)
   prospect?: boolean; // a hanger-on who might be taken on
   cars: number; // stolen cars on hand
@@ -249,6 +250,13 @@ export interface Family {
   ubSince?: number; // (Stage 4) since when the chair beside the boss has stood empty
   seatNo?: Record<string, number>; // until when he won't hear another request for a seat
   hunt?: { target: Id; since: number; sev: number; why: string }; // the family has put out word on someone
+  // (The Family, succession.ts) the associates it means to make, in order; its books when open; when they last closed; its appointments
+  line?: Id[];
+  books?: { since: number; until: number; n: number; made: number; why?: string };
+  cool?: Record<string, number>; // when each of the family's reasons to open its books may next count
+  booksShut?: number;
+  lineHead?: { id: Id; since: number }; // who has stood first in its line, since when
+  appts?: { t: number; office: string; who: Id; by?: Id; why: string; passed: Id[]; backers: Id[] }[];
 }
 
 // A quarrel between two sides that outlives the scene in which it started. It has a history, a status and, once settled, terms.
@@ -596,6 +604,7 @@ export interface PathState { deeds: number; counted: Id[]; trial: Record<string,
   stakes?: { biz: Id; share: number; since: number; shaken?: number }[]; // before V73 only; moved onto the businesses by the v4 migration
   comm?: { court: Record<Id, number>; allies: Id[]; cd: Record<string, number> };
   chest?: number; lieut?: Id; successor?: Id; favs?: Record<Id, number>;
+  line?: { order: Id[]; by?: Id; t: number }; // (The Family) the family's line to be made, as a made man who trusts him last told it
   meet?: Id; // (October 2026) the place of his own where his crew meets: a bar, a restaurant, a café (enterprise.meetWeek)
 }
 

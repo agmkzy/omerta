@@ -645,3 +645,23 @@ body.g-today .g-top__me, body.g-today .g-when { display: none; }
 /* what a man can show for his money, under the week */
 .bz-paper { margin: var(--s-2) 0 var(--s-4); font: 400 14px/1.5 var(--f-ui); color: var(--c-cream-2); }
 .bz-paper span { display: block; font: 600 10.5px var(--f-ui); letter-spacing: var(--track); text-transform: uppercase; color: var(--c-gold); margin-bottom: 2px; }
+/* Your career: the office, the record in words with a bar, the line as it was told */
+.cr-head { margin: var(--s-3) 0 var(--s-4); }
+.cr-pos { font: 500 34px/1.1 var(--f-display); color: var(--c-cream); }
+.cr-sub { margin: 4px 0 0; font: 600 11px/1.4 var(--f-ui); letter-spacing: var(--track); text-transform: uppercase; color: var(--c-gold); }
+.cr-resp { margin: var(--s-2) 0 0; font: italic 400 17px/1.45 var(--f-display); color: var(--c-cream-2); }
+.cr-rec { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--c-line); }
+.cr-rec li { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "l w" "b b" "s s"; gap: 4px var(--s-3); padding: 10px 2px; border-bottom: 1px solid var(--c-line); }
+.cr-rec__l { grid-area: l; font: 600 11px/1.4 var(--f-ui); letter-spacing: .12em; text-transform: uppercase; color: var(--c-muted); }
+.cr-rec__w { grid-area: w; font: 500 17px/1.2 var(--f-display); color: var(--c-cream); }
+.cr-rec__bar { grid-area: b; position: relative; height: 3px; background: var(--c-line-2); border-radius: 2px; overflow: hidden; }
+.cr-rec__bar::after { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--v); background: var(--c-gold); }
+.cr-rec small { grid-area: s; font: 400 13px/1.4 var(--f-ui); color: var(--c-cream-2); }
+.cr-pro { padding: 12px 14px; margin: 0 0 var(--s-2); border: 1px solid var(--c-line); border-left: 2px solid var(--c-line-2); background: var(--c-raise); }
+.cr-pro.ok { border-left-color: var(--c-gold); }
+.cr-pro b { font: 500 18px/1.2 var(--f-display); color: var(--c-cream); }
+.cr-pro p { margin: 4px 0; color: var(--c-cream-2); font-size: 14px; }
+.cr-pro small { display: block; color: var(--c-muted); font-size: 12.5px; }
+.cr-note { margin: var(--s-2) 0; color: var(--c-cream-2); font-size: 14px; }
+.cr-line { margin: 0 0 var(--s-3); padding-left: 1.4em; font: 400 17px/1.7 var(--f-display); color: var(--c-cream-2); }
+.cr-line li.you { color: var(--c-gold-2); }
