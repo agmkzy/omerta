@@ -326,6 +326,8 @@ function saveBanner(): string {
 
 function render() {
   const app = document.getElementById('app')!;
+  // (a swipe's slide is for the page it brought in, once: any later redraw comes in still)
+  app.classList.remove('g-swl', 'g-swr');
   document.body.classList.toggle('om-open', !S.w);
   document.body.classList.toggle('g-on', !!S.w);
   // Scenes (a conversation, a meeting, an encounter, the card table) take the whole phone: the tabs step aside until you leave.
