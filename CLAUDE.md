@@ -18,6 +18,22 @@ A single-player sandbox mafia RPG in **1970 New York**. The pitch: a world that 
 - **Conversation & negotiation:** `dialogue.ts` (intents, nodes, used-option memory, `say()`), `flows.ts` (standing, promotion, sit-downs, threats, crew management, recruitment, rival organisations), `negotiate.ts`, voices in `voice.ts`/`voicesheet.ts` (archetypes proud, bitter, schemer, earnest, hothead, cold, jovial, frightened). Rules: used options grey out and give no benefit until a new conversation; no repeated lines (`Convo.spoken`); no database language or internal numbers shown; rank changes authority and choices; NPCs disclose only what they plausibly know; counteroffers must have a stated reason grounded in finances/motives.
 - **UI:** `web.ts` entry and router, `ui/*` views, `web/index.html` (page shell), `web/css/*` (one token set in `tokens.css`, then base, components, shell, conversation, screens, herald, opening; imported in order by `web/main.ts`). Built by Vite (`vite.config.ts`, `vite-plugin-singlefile`) into one HTML file. Since the UI rebuild (`docs/ui/`): screens are written with the components in `ui/kit.ts` (headings, rows, key/value, numbered choices, context box, buttons), not ad-hoc markup; every decision is a numbered `choices()` list (keys 1–9, Escape, arrows); what lies between the player and a man comes from `ui/between.ts` (conversation and his page), money from `ui/money.ts` (Business, Rackets, World); every view type names its section in `ui/layout.ts`. Show only what the player could know: no other men's private records.
 
+## Development doctrine (permanent, 28 Oct 2026; full text docs/architecture/INVARIANTS.md, register INTEGRITY.md)
+One world: what is true in one system is true in all. Characters may lie, err or act irrationally; the simulation must know why.
+- **Fix the class, not the instance.** For any nontrivial bug: what happened; what should have; which invariant; why the code allowed it;
+  where else the same mechanism can fail (search by mechanism); the right scope (local / shared rule / duplicated responsibility /
+  missing concept / presentation). Smallest reliable change that removes the class; record systemic ones in INTEGRITY.md.
+- **Invariants**: A knowledge has provenance (seen, told, rumour, inference; trust is never proof something was said; a man's private
+  state drives only his own behaviour) · B authority follows position (`standing.positionOf`), influence is not authority · C identity
+  (`conv/persp.ts`, the speech pass) · D every consequence has a recorded cause · E persistence in the existing records, no second copies
+  · F NPCs decide by their own knowledge, temper and interests; a proposal is not agreement · G one record per thing · H the ledger · I one
+  clock, in order · J conversation: intention → interpretation → response → state → follow-ups that assume only what was said.
+- **New features join existing systems** (commitments, knowledge, matters, ledger, hierarchy); no parallel sources of truth. Remove what a
+  change supersedes; protect player agency.
+- **Validate**: tests on the invariant across ranks and odd-but-valid cases, not just the example; for gameplay, read transcripts / play
+  in the browser. **Report**: what changed, why that scope, what wider class was checked, how consistency was established, what play
+  showed, what remains imperfect; never claim a class eliminated from a clean finite audit. Proportionate: a typo is a typo.
+
 ## Hard requirements
 - **Save compatibility:** `serialize/deserialize` (SCHEMA 7). Never break loading of older saves; new fields must be optional with safe defaults; add migrations, never delete them. `src/tests/saves/oldsave.test.ts` loads genuine old saves (`src/tests/fixtures/`, incl. a schema-2 save) – keep it passing and add a fixture whenever the schema changes.
 - **Portraits** are procedurally painted in `src/ui/portrait.ts` (`portraits_pack.ts` is an intentionally empty override slot). From V88 the owner has asked for them to be reworked (rank shown through dress, more variety and options). Keep them deterministic (same character, same face) and save-compatible: the existing `Look` fields keep their meaning, and new options are optional with defaults.
