@@ -66,6 +66,10 @@ When the boss comes home he keeps the acting boss's word to the captains if it s
 Measured: underboss start, seed 5, boss jailed 45 days: the player became acting boss, set "keep your heads down" (two captains
 silent), the boss came home and took it back.
 
+## The families view (deployed 28 Oct, 01:46 UTC)
+The consigliere beside the boss, the acting boss while the boss is inside, and the induction line only as the player was told it
+(before, it showed the family's own reckoning, which the new rules say he can only learn from a credible source).
+
 ## What reached each seat in 100 days (seed 3, fresh start, every encounter answered with its first choice)
 | Seat | What came to him (most frequent) | Matters he was in |
 |---|---|---|
@@ -83,4 +87,5 @@ All six: ledger audit 0, hierarchy issues 0, errors 0.
 - A vacant captaincy waits behind inductions in `career.careerTick` (a week that makes a soldier fills no crew): older behaviour,
   left as it was.
 - "Would you put a word in for me?" is offered by a captain to his own soldier (older offer rule in `conv/acts/org.ts recommend`).
-- Not built tonight: contested succession, the org structure view, and long hidden-title playthroughs in the browser.
+- Not built tonight: contested succession (a boss's death fought over), and long hidden-title playthroughs in the browser (measured
+  by script instead, above).
