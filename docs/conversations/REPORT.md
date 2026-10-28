@@ -185,13 +185,34 @@ your name.
 > **You:** Louie Costa sent me.
 > **Louie:** He lets out a breath. "Louie Costa. All right. If Louie Costa says."
 
+### 6. The same captain, a month apart (continuity; seed 5, soldier start)
+**Day 5**
+> **You:** Where do I stand with you?
+> **Danny:** "You're not there. Right now people call you unproven." "You're close on the money. Keep it coming." "When a chair comes
+> up, the men who decide have to think of you. Right now nobody would."
+> **You:** One day I want a crew of my own.
+> **Danny:** "People talk about you. That's a start. A crew's the boss's to give, and he gives it when there's one to give."
+> **You:** What would you need to see from me?
+> **Danny:** "Men who do what you say, and keep doing it when you're not there."
+
+**Day 30**, after three weeks of leading men and passing money up:
+> **Danny:** "Where've you been keeping yourself?"
+> **You:** Where do I stand with you?
+> **Danny:** "You've come on since you asked me a month ago. The money you pass up, for one." "You're ready. There's no chair.
+> Somebody has to die, retire or go away first. Be ready when it happens."
+> **You:** One day I want a crew of my own.
+> **Danny:** "You asked me that a month ago. You've done some leading since. I noticed."
+
+Nothing here is a separate conversation memory: what he remembers is what the world recorded (the topics a man has been asked, the
+record of what the player has done).
+
 ## What remains imperfect
 - Many answers are still drawn from tables by archetype; two men of one temperament can say the same short line on the same day.
 - *What's new?* is kept for what it shows of a man (a friend tells, a wary man gives a rumour at most, a hostile one nothing), but the
   rumours it gives are not always the ones that matter to the player.
 - Some of the older, longer branches (protection, loans, a man's trouble) have not been rewritten line by line; they were checked for
   identity and coherence, not voice.
-- The consigliere's *What are you hearing?* names a captain's grievance from the world's records, where a purist would want it to come
-  only from what has been said in his hearing.
+- The consigliere's *What are you hearing?* now names only what could have reached him (a captain who talks to him, men of a crew who
+  trust him); it is still a judgement about plausibility, not a record of words said in his hearing.
 - Browser playthroughs were made at all six seats and the transcripts read, but not yet the long multi-week playthroughs per seat the
   brief describes.

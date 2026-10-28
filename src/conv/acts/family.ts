@@ -9,6 +9,7 @@ import { careerRecord, isConsigliere, positionOf } from '../../standing';
 import { agoWords, lastOf, remember } from '../kit';
 import * as door from '../doors';
 import { jobSaid } from '../../jobs';
+import { pathInfo } from '../../path';
 import { mtOpen } from './business';
 import { under } from '../../command';
 import { temper } from '../../temper';
@@ -86,7 +87,9 @@ const crewAsk: Act = {
 const crewNeed: Act = {
   base: 'fam_crew_need', pane: 'business',
   run: (c) => {
-    const x = T(c), { w, p } = x, rec = careerRecord(w, p).filter((d) => ['leadership', 'earning', 'reliability'].includes(d.key)).sort((a, b) => a.v - b.v);
+    // (consistent with what he has just told you of the money: if he called you close on it, it isn't what he names now)
+    const earnClose = (pathInfo(c.w, c.h)?.goals.find((g) => g.key === 'earn')?.frac ?? 0) >= 0.75;
+    const x = T(c), { w, p } = x, rec = careerRecord(w, p).filter((d) => ['leadership', 'earning', 'reliability'].includes(d.key) && !(earnClose && d.key === 'earning')).sort((a, b) => a.v - b.v);
     const say: Record<string, string> = { leadership: 'Men who do what you say, and keep doing it when you’re not there.', earning: 'Money. More than you’re bringing up now, week in, week out.', reliability: 'Your envelope in full, every Sunday, and your word kept.' };
     line(x, `“${say[rec[0].key]}${rec[1] && rec[1].v < 0.45 ? ' ' + say[rec[1].key] : ''}”`);
     return out(10);
@@ -253,8 +256,10 @@ const hearing: Act = {
     const x = T(c), { w, p, t } = x, r = R(x); ask(c, 'fam_hear');
     if (r.trust < 0.35) { line(x, `“Nothing worth your time.” He says it smoothly. Too smoothly, maybe.`); return out(5); }
     const caps = Object.values(w.chars).filter((m) => m.alive && m.familyId === p.familyId && m.rank === 'capo' && m.id !== t.id).sort((a, b) => (a.id < b.id ? -1 : 1));
-    const sore = caps.filter((m) => peek(m, p.id).grudge > 0.2).sort((a, b) => peek(b, p.id).grudge - peek(a, p.id).grudge)[0];
-    const light = caps.find((m) => m.books.skim || m.books.hide);
+    // (only what could have reached him: a captain who talks to him, or something he knows of the man; never the books' own truth)
+    const heard = (m: Character) => peek(m, t.id).trust >= 0.3 || Object.keys(t.known).some((id) => w.facts[id]?.actor === m.id && !w.facts[id].minor);
+    const sore = caps.filter((m) => peek(m, p.id).grudge > 0.2 && heard(m)).sort((a, b) => peek(b, p.id).grudge - peek(a, p.id).grudge)[0];
+    const light = caps.find((m) => (m.books.skim || m.books.hide) && heard(m) && Object.values(w.chars).some((x) => x.bossId === m.id && peek(x, t.id).trust >= 0.3));
     if (sore) line(x, `“${first(sore)}. He hasn’t forgotten ${peek(sore, p.id).why?.text ?? 'whatever it is between you'}, and he talks about it where he shouldn’t.”`);
     if (light) line(x, `“And ${first(light)}’s money is lighter than his crew. I can’t prove it. I’d look.”`);
     if (!sore && !light) line(x, `“It’s quiet. The captains are earning and nobody is talking out of turn. Quiet doesn’t last.”`);
