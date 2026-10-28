@@ -43,16 +43,28 @@ export function setPolicy(w: World, boss: Character, kind: Policy): string[] {
   const caps = Object.values(w.chars).filter((c) => c.alive && c.familyId === f.id && c.rank === 'capo' && f.consigliere !== c.id);
   const deaf: Id[] = [], warm: string[] = [], cold: string[] = [];
   for (const c of caps) {
-    const v = takes(w, c, kind) + peek(c, boss.id).trust * 0.3 + (peek(c, boss.id).fear ?? 0) * 0.3;
+    const v = takes(w, c, kind) + peek(c, boss.id).trust * 0.3 + (peek(c, boss.id).fear ?? 0) * 0.3 - (boss.rank === 'boss' ? 0 : 0.15); // (an acting boss's authority is lent)
     if (v < -0.05) { deaf.push(c.id); cold.push(c.name.split(' ')[0]); bear(w, c, boss.id, 0.04, `${boss.name}’s new word goes against how he runs his crew`); }
     else if (v > 0.3) { warm.push(c.name.split(' ')[0]); feel(w, c, boss.id, 'respect', 0.02); }
   }
-  f.policy = { kind, since: w.now, until: w.now + 12 * WEEK, deaf };
+  f.policy = { kind, since: w.now, until: w.now + 12 * WEEK, deaf, by: boss.id };
   addFact(w, { kind: 'event', actor: boss.id, minor: false, text: `${boss.name} told the captains: “${POLICY[kind].said}”`, district: boss.district }, { broadcast: Object.values(w.chars).filter((c) => c.alive && c.familyId === f.id).map((c) => c.id) });
   const out = [`You tell the captains: “${POLICY[kind].said}”`];
   if (warm.length) out.push(`${warm.join(' and ')} ${warm.length === 1 ? 'nods' : 'nod'} along.`);
   if (cold.length) out.push(`${cold.join(' and ')} ${cold.length === 1 ? 'says' : 'say'} nothing. Whether ${cold.length === 1 ? 'his crew goes' : 'their crews go'} along, you’ll see.`);
   return out;
+}
+// The boss comes home to what his acting boss did: the word he gave the captains stands if it suits the boss, or is taken back; and
+// he hears how the family was kept, from the men who were there.
+export function bossBack(w: World, boss: Character, act: Character) {
+  const f = famOf(w, boss);
+  if (!f) return;
+  const pol = f.policy && f.policy.by === act.id && f.policy.until > w.now ? f.policy : undefined;
+  const keeps = pol ? takes(w, boss, pol.kind as Policy) > 0 : true;
+  if (pol && !keeps) { delete f.policy; feel(w, boss, act.id, 'trust', -0.03, `${act.name} set the family a course he wouldn’t have`); }
+  const capsView = Object.values(w.chars).filter((c) => c.alive && c.familyId === f.id && c.rank === 'capo').reduce((a, c) => a + peek(c, act.id).respect, 0);
+  feel(w, boss, act.id, 'trust', 0.04, `${act.name} kept the family together while he was inside`);
+  addFact(w, { kind: 'event', actor: boss.id, victim: act.id, minor: false, text: `${boss.name} is home. ${pol ? (keeps ? `He let ${act.name}’s word to the captains stand.` : `He took back ${act.name}’s word to the captains.`) : `He thanked ${act.name} for keeping things together.`}${capsView > 1.2 ? ' The captains speak well of how it was run.' : ''}`, district: boss.district }, { broadcast: Object.values(w.chars).filter((c) => c.alive && c.familyId === f.id).map((c) => c.id) });
 }
 // whether a captain who went along is in fact doing it: what the boss could see, without being told
 export function policyReport(w: World, boss: Character): string[] {

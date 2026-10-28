@@ -10,6 +10,7 @@
 //   * money: dues up, support for men inside down, every movement through one door that keeps a ledger which reconciles
 //   * relations: cooperation / competition / grievance between organisations as persistent state that the world reads back
 // Nothing in here knows how many organisations there are or what any of them is called.
+import { bossBack } from './direction';
 import { temper } from './temper';
 import { addFact, bear, clamp, feel, feelOn, feelTo, money, payDebt, peek, recordCareer, rel, repute } from './core';
 import { addFavour } from './encounters';
@@ -418,10 +419,10 @@ function leadershipWeek(w: World) {
     if (f.consigliere && (!w.chars[f.consigliere]?.alive || w.chars[f.consigliere].familyId !== f.id)) delete f.consigliere;
     const inside = boss.jailedUntil > w.now ? boss.jailedUntil - w.now : 0;
     if (inside > 21 * DAY && !f.acting) {
-      const act = candidates(w, f.id, boss.id).find((x) => x.c.jailedUntil <= w.now && rankIdx(x.c.rank) >= 2 && !x.c.isPlayer)?.c;
+      const act = candidates(w, f.id, boss.id).find((x) => x.c.jailedUntil <= w.now && rankIdx(x.c.rank) >= 2 && (!x.c.isPlayer || x.c.rank === 'underboss'))?.c; // (the player too, as underboss: The Family's acting boss)
       if (act) { f.acting = act.id; logOrg(w, f.id, 'acting', `${boss.name} is inside. ${act.name} is running things.`, act.id); addFact(w, { kind: 'promotion', actor: act.id, text: `${boss.name} is away. ${act.name} is running the ${f.name} family until he is back.`, district: act.district, minor: true }, { broadcast: membersOf(w, f.id).map((x) => x.id) }); }
     }
-    if (f.acting && inside === 0) { logOrg(w, f.id, 'acting', `${boss.name} is back. ${w.chars[f.acting]?.name ?? 'The acting boss'} steps back.`); delete f.acting; }
+    if (f.acting && inside === 0) { logOrg(w, f.id, 'acting', `${boss.name} is back. ${w.chars[f.acting]?.name ?? 'The acting boss'} steps back.`); if (w.chars[f.acting]?.isPlayer) bossBack(w, boss, w.chars[f.acting]); delete f.acting; }
     if (f.acting && (!w.chars[f.acting]?.alive || w.chars[f.acting].familyId !== f.id)) delete f.acting;
     // a very long sentence ends a reign (never the player's)
     if (inside > 120 * DAY && !boss.isPlayer) {

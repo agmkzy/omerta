@@ -1,5 +1,6 @@
 // The road to the next rank, and what your rank lets you do.
 import { POLICY, policyReport, type Policy } from '../direction';
+import { isActing } from '../standing';
 import { famName, money } from '../core';
 import { chairOptions, pathInfo, powerOptions, raisable, RANKS } from '../path';
 import { members } from '../career';
@@ -45,6 +46,7 @@ export function powersCard(): string {
   if (mine.length) out += choices(mine.map(pick), 'What you can do');
   if (older.length) out += `<details class="ui-fold"><summary>Earlier powers (${older.length})</summary>${choices(older.map(pick), 'Earlier powers')}</details>`;
   if (p.rank === 'boss') out += `<button class="ui-btn" data-a="manage:">Reshape the family</button> <button class="ui-btn" data-a="comm:">The Commission</button>`;
+  else if (isActing(w, p)) out += `<button class="ui-btn" data-a="manage:">The family’s direction</button>`; // (an acting boss gives the word; the appointments wait for the boss)
   const lo = lifeOptions(w, p);
   if (lo.length) out += `<details class="ui-fold"><summary>How you live</summary>${choices(lo.map((x) => ({ a: `buy:${x.code}`, label: `${x.label}${x.owned ? ' ✓' : ''}`, hint: x.owned ? 'Yours.' : `${x.hint} ${money(x.cost)}, ${money(x.upkeep)}/wk. ${x.why}`, kind: x.ok ? '' as const : 'more' as const })), 'How you live')}</details>`;
   const led = (w.path?.ledger ?? []).slice(-6).reverse();
@@ -60,6 +62,7 @@ export function powersCard(): string {
 export function manageView(): string {
   const w = W(), p = P();
   const fam = w.fam[p.familyId!];
+  if (p.rank !== 'boss' && isActing(w, p)) return `<h1 class="page">The ${esc(fam.name)} family</h1><p class="muted pad">You’re running things while ${esc(w.chars[fam.bossId]?.name ?? 'the boss')} is away. Your word goes, as far as the captains let it. The appointments wait for him.</p>` + directionCard();
   const all = members(w, fam.id).filter((c) => c.id !== p.id);
   const order = ['underboss', 'capo', 'soldier', 'associate'];
   all.sort((a, b) => order.indexOf(a.rank) - order.indexOf(b.rank) || b.lifetimeKick - a.lifetimeKick);

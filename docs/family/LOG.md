@@ -59,6 +59,13 @@ When one of a soldier's or captain's men is unhappy or wants more, another made 
 his men and gives him a bigger share, warns the other man off (who backs off, or takes the man and keeps the grudge), or lets him go;
 unanswered, he goes. Fires once or twice in 100 days for a soldier or captain (seeds 3, 5).
 
+## Increment 7: the acting boss (deployed 28 Oct)
+When the boss is inside more than three weeks, the player as underboss can be the one running things (before, the acting boss was
+never the player). He gives the family's direction on lent authority (captains readier to ignore it); appointments wait for the boss.
+When the boss comes home he keeps the acting boss's word to the captains if it suits him, or takes it back, and says so to the family.
+Measured: underboss start, seed 5, boss jailed 45 days: the player became acting boss, set "keep your heads down" (two captains
+silent), the boss came home and took it back.
+
 ## What reached each seat in 100 days (seed 3, fresh start, every encounter answered with its first choice)
 | Seat | What came to him (most frequent) | Matters he was in |
 |---|---|---|
@@ -76,4 +83,4 @@ All six: ledger audit 0, hierarchy issues 0, errors 0.
 - A vacant captaincy waits behind inductions in `career.careerTick` (a week that makes a soldier fills no crew): older behaviour,
   left as it was.
 - "Would you put a word in for me?" is offered by a captain to his own soldier (older offer rule in `conv/acts/org.ts recommend`).
-- Not built tonight: acting boss, contested succession, the org structure view, and long hidden-title playthroughs in the browser.
+- Not built tonight: contested succession, the org structure view, and long hidden-title playthroughs in the browser.

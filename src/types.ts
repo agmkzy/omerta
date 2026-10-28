@@ -257,7 +257,7 @@ export interface Family {
   booksShut?: number;
   consSeated?: boolean;
   counsel?: { t: number; id?: Id; until?: number }; // the consigliere's advice to the boss on a crew without a captain (succession.counselAsk)
-  policy?: { kind: string; since: number; until: number; deaf?: Id[] }; // the boss's word to the captains on what the family is doing for now (direction.ts) // the family was given its consigliere when it was made (or first loaded); later vacancies are the boss's to fill
+  policy?: { kind: string; since: number; until: number; deaf?: Id[]; by?: Id }; // the boss's word to the captains on what the family is doing for now (direction.ts) // the family was given its consigliere when it was made (or first loaded); later vacancies are the boss's to fill
   lineHead?: { id: Id; since: number }; // who has stood first in its line, since when
   appts?: { t: number; office: string; who: Id; by?: Id; why: string; passed: Id[]; backers: Id[] }[];
 }
