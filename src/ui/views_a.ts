@@ -623,17 +623,21 @@ export function treeView(famId: Id): string {
   const hidden = all.filter((c) => !seen(c)).length;
   out += note(`${esc(fam.districts.join(', '))} · ${theirs ? `${all.length - hidden} men you know of${hidden ? `, and more you don’t` : ''}` : `${all.length} men · <b>yours</b>`}<br>${tens}`);
   out += `<div class="tree">`;
-  if (boss?.alive) out += node(boss, 'top');
+  if (boss?.alive) out += node(boss, 'top', fam.acting && w.chars[fam.acting]?.alive ? ` &middot; inside; ${esc(w.chars[fam.acting].id === p.id ? 'you are' : w.chars[fam.acting].name + ' is')} running things` : '');
   else out += `<div class="node top open"><div class="nn"><span>No boss</span><small>the family is without a head</small></div></div>`;
   out += `<div class="vline"></div>`;
   if (under) out += node(under, 'top');
   else out += `<div class="node top open"><div class="nn"><span>No underboss</span><small>vacant</small></div></div>`;
+  // (the consigliere sits beside the boss, outside the chain of command: The Family)
+  { const con = fam.consigliere ? w.chars[fam.consigliere] : undefined; if (con?.alive && seen(con)) out += node(con, 'top', ' &middot; consigliere, beside the boss'); }
   out += `<div class="vline"></div></div>`;
   const kidsOf = (id: Id) => all.filter((c) => c.bossId === id && seen(c)).sort((a, b) => ['soldier', 'associate'].indexOf(a.rank) - ['soldier', 'associate'].indexOf(b.rank) || b.lifetimeKick - a.lifetimeKick);
   const openS = Math.max(0, capOf(w, fam.id, 'soldier') - seats(w, fam.id, 'soldier'));
   const openC = Math.max(0, capOf(w, fam.id, 'capo') - seats(w, fam.id, 'capo'));
   const q = queueOf(w, fam.id);
-  const qx = (c: Character) => { if (theirs) return ''; const k = q.findIndex((r) => r.c.id === c.id); return k < 0 ? '' : ` &middot; <b>${k === 0 ? 'next in line' : '#' + (k + 1) + ' in line'}</b>`; };
+  const told = w.path?.line?.order ?? [];
+  void q;
+  const qx = (c: Character) => { if (theirs) return ''; const k = told.indexOf(c.id); return k < 0 ? '' : ` &middot; <b>${k === 0 ? 'next in line, as you were told' : '#' + (k + 1) + ' in line, as you were told'}</b>`; };
   out += `<div class="crews">`;
   capos.forEach((cp, i) => {
     const kids = kidsOf(cp.id);
