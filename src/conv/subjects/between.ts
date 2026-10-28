@@ -368,8 +368,9 @@ function evTurn(x: X, f: Fact, key: string, code: string): Beat {
 // ================================================================== which places are hurting
 // What he knows of the businesses around him: his own, the ones he collects from, and the ones the street knows are struggling.
 function hurting(x: X): Subject | undefined {
-  const { w, t } = x;
-  if (t.isPlayer) return undefined;
+  const { w, t, p } = x;
+  // (a question for a man on the way up, looking for a place to start: not one a captain or a boss asks)
+  if (t.isPlayer || !['associate', 'soldier'].includes(p.rank)) return undefined;
   const key = 'hurting';
   const known = new Set(Object.keys(t.known).map((id) => w.facts[id]).filter((f) => f && f.kind === 'business_struggling' && f.business && w.now - f.t < 45 * DAY).map((f) => f!.business!));
   for (const b of Object.values(w.biz)) if (b.open && b.distress >= 1 && (b.ownerId === t.id || b.protection?.collectorId === t.id || b.managerId === t.id)) known.add(b.id);

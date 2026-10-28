@@ -7,6 +7,8 @@ import { OPS } from '../../rackets';
 import { booksOpen, captaincyContenders, lineOf, preferredSuccessor, tellLine } from '../../succession';
 import { careerRecord, isConsigliere, positionOf } from '../../standing';
 import { agoWords, lastOf, remember } from '../kit';
+import * as door from '../doors';
+import { jobSaid } from '../../jobs';
 import { mtOpen } from './business';
 import { under } from '../../command';
 import { temper } from '../../temper';
@@ -123,7 +125,7 @@ const putName: Act = {
 };
 // "How are things at your end?" A man asked by the man above him gives his own account of his week. A man who has been holding out
 // shades it, with a reason that sounds right; his books (and his crew's) say what they say.
-const below = (c: Ctx) => c.n.rank !== 'civilian' && (c.n.bossId === c.h.id || (['capo', 'underboss'].includes(c.n.rank) && under(c.w, c.h, c.n)));
+const below = (c: Ctx) => c.n.rank !== 'civilian' && !isConsigliere(c.w, c.n) && (c.n.bossId === c.h.id || (['capo', 'underboss'].includes(c.n.rank) && under(c.w, c.h, c.n)));
 const report: Act = {
   base: 'fam_report', pane: 'business',
   offers: (c) => (below(c) && !asked(c, 'fam_report') ? [offer('fam_report', '“How are things at your end?”', 'His account of his week. It is his account.')] : []),
@@ -133,16 +135,23 @@ const report: Act = {
     const last = t.books.history.at(-1), gross = (last?.gross ?? 0) + crew.reduce((a, m) => a + (m.books.history.at(-1)?.paid ?? 0), 0);
     const hiding = !!(t.books.skim || t.books.hide), op = w.ops.find((o) => (o.runner === t.id || o.owner === t.id) && o.state === 'running');
     const said = hiding ? Math.round(gross * 0.7 / 10) * 10 : Math.round(gross / 10) * 10;
-    const why = ['the weather kept people home', 'one of the spots got raided', 'two of the regulars are tapped out', 'the Fourth of July took everybody out of town', 'there was a fight at one of the spots and people stayed away'];
+    // (reasons a man gives for a light week: plausible ones, none tied to a date that might not fit the calendar)
+    const why = ['the weather kept people home', 'one of the spots got raided', 'two of the regulars are tapped out', 'there was a fight at one of the spots and people stayed away', 'the cops were sitting on the corner half the week'];
     line(x, said <= 0 ? `“Quiet week. Nothing to speak of.”` : `“About ${'$' + said.toLocaleString('en-US')}${crew.length ? ', with the crew' : ''}${op ? `, most of it from the ${(OPS[op.kind as keyof typeof OPS]?.label ?? 'business').toLowerCase()}` : ''}. ${hiding ? `It would have been more, but ${w.rng.pick(why)}.` : temper(t).pride > 0.6 ? 'Good week.' : 'Not bad.'}”`);
     stamp(w, t, 'fam_report');
-    return out(15);
+    // what a man above him says next, having heard it: that it isn't enough, or what he is to do now (orders to a man on the street)
+    const next: Offer[] = [];
+    if (!lately(w, t, 'fam_more', 14)) next.push(offer('fam_more', '“I expect more from you.”', 'He may take it to heart. He may take it badly.'));
+    next.push({ code: 'fam_challenge', label: '“That’s not what your envelope says.”', note: 'If he’s been keeping some back, he may own it. If he hasn’t, he won’t forget you said it.' });
+    if (t.bossId === x.p.id && (t.rank === 'associate' || t.rank === 'soldier')) next.push({ code: 'assign_low', label: '“Keep your head down for a while.”', note: 'Heat drops. He earns less.' }, { code: 'assign_hustle', label: '“Find yourself something extra.”', note: 'It will show up in the books, and in the heat.' });
+    next.push({ code: 'fl_drop', label: '“All right.”' });
+    return out(15, next);
   },
 };
 // "I expect more from you." A man who fears or respects you stops what he has been doing; a proud one who doesn't, resents it.
 const more: Act = {
   base: 'fam_more', pane: 'business',
-  offers: (c) => (below(c) && !asked(c, 'fam_more') && !lately(c.w, c.n, 'fam_more', 14) ? [offer('fam_more', '“I expect more from you.”', 'He may take it to heart. He may take it badly.')] : []),
+  offers: () => [], // (said after he has told you how his week went: fam_report's follow-ups)
   run: (c) => {
     const x = T(c), { w, p, t } = x, r = R(x); ask(c, 'fam_more'); stamp(w, t, 'fam_more');
     const weight = (r.fear ?? 0) * 0.6 + r.respect * 0.5 + r.trust * 0.2 - temper(t).pride * 0.3 - r.grudge * 0.5;
@@ -200,6 +209,58 @@ const dirPress: Act = {
   },
 };
 const dirLet: Act = { base: 'fam_dir_let', pane: 'business', run: (c) => { const x = T(c); tweak(x, 0.02, 0, -0.01); line(x, `${first(x.t)} nods. He’ll remember you let him.`); return out(5); } };
-export const FAMILY: Act[] = [booksAsk, crewAsk, crewNeed, crewMen, crewProve, putName, report, more, counsel, dirTalk, dirPress, dirLet];
+// "I want more responsibility." Said to the man above you, after hearing where you stand. What he says is what his own situation
+// makes of it: a man who needs help puts something in your hands now; one who trusts you encourages you; one who thinks you're ahead
+// of yourself asks what you think you've done; one with bad blood between you won't hear it.
+const moreResp: Act = {
+  base: 'fam_resp', pane: 'business',
+  run: (c) => {
+    const x = T(c), { w, p, t } = x, r = R(x), n0 = w.jobs.length;
+    remember(w, t.id, 'resp', 'asked');
+    if (r.grudge > 0.3) { line(x, `${first(t)} doesn’t even look up. “More? After the way things are between us? No.”`); return out(5); }
+    const short = Object.values(w.chars).filter((m) => m.alive && m.bossId === t.id).length < 3 || t.books.arrears > 0 || (t.problem?.sev ?? 0) > 0.3;
+    if (short && r.trust >= 0.35) {
+      if (t.id === p.bossId) door.bossWork(w); else door.peerWork(w, t, p);
+      line(x, w.jobs.length > n0 ? `“Funny you should say that. I’m stretched thin. Here, take this off my hands.”` : `“I’m stretched thin, as it happens. Next thing that comes up, it’s yours.”`);
+      if (w.jobs.length > n0) { const j = w.jobs.at(-1)!; line(x, jobSaid(j)); }
+      tweak(x, 0.02, 0, 0.02); return out(15);
+    }
+    if (r.trust >= 0.55) { line(x, `“Good. That’s what I like to hear. Keep doing what you’re doing, and I’ll put more your way.”`); tweak(x, 0.01, 0, 0.02); return out(10); }
+    line(x, `${first(t)} studies you. “What do you think you’ve done, that you’re asking me that?”`);
+    if (t.traits.ambition > 0.7) bear(w, t, p.id, 0.03, `${p.name} is getting ahead of himself`);
+    return out(10);
+  },
+};
+// "That's not what your envelope says." Said to your own man after his account of his week: a man who has been holding out owns it
+// or digs in, by his nerve; a man who hasn't is insulted, and remembers it.
+const challenge: Act = {
+  base: 'fam_challenge', pane: 'business',
+  run: (c) => {
+    const x = T(c), { w, p, t } = x, hiding = !!(t.books.skim || t.books.hide), tp = temper(t);
+    if (hiding && tp.caution + t.skills.nerve * 0.5 < 0.9) { delete t.books.skim; delete t.books.hide; line(x, `${first(t)} looks at the table. “All right. I’ve been keeping a little back. It stops.”`); tweak(x, -0.02, 0, 0.04); return out(10); }
+    if (hiding) { line(x, `“Then the envelope’s wrong,” ${first(t)} says, and holds your eye. He’s lying, or he’s very sure of himself.`); return out(10); }
+    bear(w, t, p.id, 0.08, `${p.name} as good as called him a thief`); line(x, `${first(t)} goes very still. “Count it yourself. Every dollar. Then you can apologise.”`);
+    return out(10);
+  },
+};
+// "What are you hearing?" The boss, or the man acting for him, to his consigliere: what a consigliere is for. He tells what he could
+// know of: a captain with a grievance against the boss, or one whose money doesn't add up; a consigliere who doesn't trust the man
+// asking keeps it to himself.
+const hearing: Act = {
+  base: 'fam_hear', pane: 'business',
+  offers: (c) => (isConsigliere(c.w, c.n) && c.n.familyId === c.h.familyId && (c.w.fam[c.h.familyId!]?.bossId === c.h.id || positionOf(c.w, c.h) === 'acting boss') && !asked(c, 'fam_hear') ? [offer('fam_hear', '“What are you hearing?”', 'What he knows that you should. If he trusts you with it.')] : []),
+  run: (c) => {
+    const x = T(c), { w, p, t } = x, r = R(x); ask(c, 'fam_hear');
+    if (r.trust < 0.35) { line(x, `“Nothing worth your time.” He says it smoothly. Too smoothly, maybe.`); return out(5); }
+    const caps = Object.values(w.chars).filter((m) => m.alive && m.familyId === p.familyId && m.rank === 'capo' && m.id !== t.id).sort((a, b) => (a.id < b.id ? -1 : 1));
+    const sore = caps.filter((m) => peek(m, p.id).grudge > 0.2).sort((a, b) => peek(b, p.id).grudge - peek(a, p.id).grudge)[0];
+    const light = caps.find((m) => m.books.skim || m.books.hide);
+    if (sore) line(x, `“${first(sore)}. He hasn’t forgotten ${peek(sore, p.id).why?.text ?? 'whatever it is between you'}, and he talks about it where he shouldn’t.”`);
+    if (light) line(x, `“And ${first(light)}’s money is lighter than his crew. I can’t prove it. I’d look.”`);
+    if (!sore && !light) line(x, `“It’s quiet. The captains are earning and nobody is talking out of turn. Quiet doesn’t last.”`);
+    tweak(x, 0.01); return out(15);
+  },
+};
+export const FAMILY: Act[] = [hearing, moreResp, challenge, booksAsk, crewAsk, crewNeed, crewMen, crewProve, putName, report, more, counsel, dirTalk, dirPress, dirLet];
 // (the position word is read where each answer says what the man can know; kept here so the import is used by intent)
 export const canSpeakToBooks = (w: World, c: Character) => MADE.has(c.rank) && positionOf(w, c) !== 'none';

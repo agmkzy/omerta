@@ -60,17 +60,15 @@ describe('the conversation screen', () => {
     assert.ok(html.includes('data-n="1"'), 'reached by 1');
   });
 
-  ok('a subject reads as what it is for, and opened, it is named above what can be said under it', { tags: ['scenario'] }, () => {
+  ok('one short list, not subjects to browse: what you might say to him, the rest under "Something else", the way out last', { tags: ['scenario'] }, () => {
     const w = newWorld(7), t = soldier(w), v = meet(w, t);
-    S.cxSubject = undefined;
     const home = draw(w, () => talk2View(v));
-    assert.ok(home.includes('Work &amp; money') || home.includes('Work & money'), 'the subjects, by name');
-    assert.ok(home.includes('Jobs, loans, his business, deals'), 'Work & money, said plainly');
-    S.cxSubject = 'work';
-    const under = draw(w, () => talk2View(v));
-    assert.ok(under.includes('Work &amp; money</p>') || under.includes('Work & money</p>'), 'named above its options');
-    assert.ok(/data-a="t2:a:/.test(under.slice(under.indexOf('class="cx-act"'), under.indexOf('class="cx-side'))), 'and what can be said under it, chosen as the engine’s own choices');
-    S.cxSubject = undefined;
+    const act = home.slice(home.indexOf('class="cx-act"'), home.indexOf('class="cx-side'));
+    assert.ok(!/Work &amp; money|Work & money|data-a="cxs:/.test(home), 'no subjects to browse');
+    assert.ok(/data-a="t2:a:|data-a="t2:(news|spend)/.test(act), 'what can be said, chosen as the engine’s own choices');
+    const n = (act.match(/class="ui-choice[" ]/g) ?? []).length;
+    assert.ok(n <= 9, `${n} rows`);
+    assert.ok(!/“[^”]*”<\/span>/.test(act.replace(/ui-choice__hint[^<]*/g, '')), 'what the player says is printed without quotation marks');
     void choose;
   });
 

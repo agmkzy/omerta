@@ -169,7 +169,7 @@ const GOAL_RANK: Record<string, number> = { earn: 0, sponsor: 1, deeds: 2, kills
 // how far off he is on one part of the road, as a captain would say it: no figures, no tally, only what it amounts to
 function howFar(g: { key: string; frac: number }, h: Character, w: World): string {
   const f = g.frac, sp = g.key === 'sponsor';
-  if (g.key === 'earn') return f < 0.1 ? 'You’ve hardly passed anything up.' : f < 0.4 ? 'You’ve started passing money up. It’s a start, not more.' : f < 0.75 ? 'You’re passing up a fair amount. Not enough yet.' : 'You’re close on the money.';
+  if (g.key === 'earn') return f < 0.1 ? 'You’ve hardly passed anything up.' : f < 0.4 ? 'You’ve started passing money up. It’s a start, not more.' : f < 0.75 ? 'You’re passing up a fair amount. Not enough yet.' : 'You’re close on the money. Keep it coming.';
   if (g.key === 'deeds') return f < 0.01 ? 'I haven’t seen you finish anything for me.' : f < 0.5 ? 'You’ve done a job or so. Not enough to talk about.' : 'You’re getting there with the work.';
   if (sp) { const s = h.backer && w.chars[h.backer]?.alive ? w.chars[h.backer] : undefined; return f < 0.34 ? (s ? `${s.name.split(' ')[0]}’s word on its own isn’t enough.` : 'Right now nobody would.') : f < 0.99 ? 'A man or two would. It wants more than that.' : 'You’ve the men. Now one of them has to put your name forward.'; }
   return '';
@@ -208,7 +208,7 @@ const promo: Act = {
     // (the books, for an associate asking a made man who would know: whether anyone is being made, and his place, if he trusts him)
     if (h.rank === 'associate' && ['soldier', 'capo', 'underboss', 'boss'].includes(n.rank)) booksAnswer(c);
     // and what one says next, having heard it: a request for his word, or (a soldier to his captain) the crew one wants one day
-    const next = [...(ACTS.rk_back?.offers?.(c) ?? []), ...(ACTS.recommend?.offers?.(c) ?? []), ...(ACTS.fam_crew?.offers?.(c) ?? [])].map((o) => ({ ...o, kind: undefined }));
+    const next = [...(lastOf(w, n.id, 'resp') && w.now - lastOf(w, n.id, 'resp')!.t < 14 * DAY ? [] : [{ code: 'fam_resp', label: '“I want more responsibility.”', note: 'What he makes of that depends on what he needs, and what he thinks of you.' }]), ...(ACTS.rk_back?.offers?.(c) ?? []), ...(ACTS.recommend?.offers?.(c) ?? []), ...(ACTS.fam_crew?.offers?.(c) ?? [])].map((o) => ({ ...o, kind: undefined }));
     return out(15, next);
   },
 };
@@ -442,7 +442,7 @@ const thPush: Act = {
 // orders to the player's own man: keep his head down, find some extra income; he may push back, and the player may insist
 const assign = (low: boolean): Act => ({
   base: low ? 'assign_low' : 'assign_hustle', pane: 'business',
-  offers: (c) => (orders(c) && crewMan(c) && (c.n.rank === 'associate' || c.n.rank === 'soldier') ? [low ? offer(c, 'assign_low', 'Tell him to keep his head down', 'Heat drops. He earns less.') : offer(c, 'assign_hustle', 'Tell him to find some extra income', 'It will show up in the books, and in the heat.')] : []),
+  offers: () => [], // (the overhaul: said after a man has told you how his week went, as what he is to do now: family.ts fam_report)
   run: (c, code) => {
     const x = T(c), { w, p, t } = x, k = code.split(':')[0];
     const d = low ? ((t.books.arrears > 0 || t.cash < 150) ? chance(w, t.id, 'pushes back', 'goes along', [term('a man behind or short, six times in ten', 0.6)]) : settled(t.id, 'goes along', 'not behind, not short')) : (arch(t) === 'frightened' || temper(t).caution > 0.65) ? chance(w, t.id, 'pushes back', 'goes along', [term('a careful or frightened man', 0.65)]) : settled(t.id, 'goes along', 'not a careful man');

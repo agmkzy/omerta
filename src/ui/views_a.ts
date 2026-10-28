@@ -1,4 +1,5 @@
 import { sendable } from '../command';
+import { bare } from './talk2';
 import { epilogue } from '../epilogue';
 import { spots } from '../city';
 import { tradeOf } from './streetmap';
@@ -513,7 +514,7 @@ export function encView(id: string, lines: string[]): string {
   out += `<header class="pp-head">${c ? avatar(c) : ''}<div class="pp-id">${title(e.title, `${c ? esc(c.name) + (c.rank !== 'civilian' ? ' · ' + esc(c.rank === 'capo' ? 'captain' : c.rank) : '') : 'Nobody you can name'}${e.status === 'open' && e.kind !== 'kin' ? ` · ${!c ? 'they' : isFemale(c) ? 'she' : 'he'}’ll want an answer ${esc(byWhen(w.now, e.expires))}` : ''}`)}</div></header>`;
   out += `<div class="sc-said">${e.lines.map((l, i) => `<p class="${i ? 'sc-say' : 'sc-narr'}">${lk(l)}</p>`).join('')}${lines.map((l) => `<p class="sc-narr">${lk(l)}</p>`).join('')}</div>`;
   if (e.status !== 'open') return out + choices([{ a: 'back:', label: 'Done', hint: 'Back to where you were.' }], 'Where now');
-  const picks: Pick[] = e.opts.map((o) => ({ a: `echoose:${e.id}|${o.code}`, label: o.label, hint: o.hint }));
+  const picks: Pick[] = e.opts.map((o) => ({ a: `echoose:${e.id}|${o.code}`, label: bare(o.label), hint: o.hint })); // (what the player says, without quotation marks, as in the conversation)
   if (c?.alive && !c.isPlayer && e.opts.length) picks.unshift({ a: `talk:${c.id}`, label: `Go and see ${c.name.split(' ')[0]}`, hint: 'Take it up face to face, with everything else between you.' });
   return out + choices(picks, 'How you answer');
 }

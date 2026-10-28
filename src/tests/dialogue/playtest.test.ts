@@ -82,9 +82,9 @@ describe('V90 playtests', () => {
     const w = world60(), t = civ(w).find((c) => !ownerBiz(w, c.id))!;
     rel(t, P(w).id).trust = 0.4;
     const x = new Talk(w, t, '1. An ordinary man');
-    // (the everyday questions are under Personal: what is new, an evening out, how he is keeping, what he makes of things)
+    // (the everyday questions: what is new, an evening out, how he is keeping; "what do you make of…" went in the overhaul)
     const all = everything(w, x.v).map((o) => o.id);
-    assert.ok(['news', 'spend', 'a:how', 'a:think'].every((k) => all.includes(k)), 'the everyday questions: ' + all.join());
+    assert.ok(['news', 'spend', 'a:how'].every((k) => all.includes(k)), 'the everyday questions: ' + all.join());
     x.pick('a:how');
     if (x.c && x.opts().some((o) => o.group === 'reply')) x.pick(x.opts().find((o) => o.group === 'reply')!.id); // whatever his answer opened, answer it
     if (x.has(/What’s new/)) x.pick(/What’s new/);

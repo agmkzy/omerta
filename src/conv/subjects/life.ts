@@ -325,7 +325,7 @@ function wants(x: X): Subject | undefined {
   const { w, p, t } = x;
   const g = agencyOf(w).goals.find((y) => y.who === t.id && y.kind === 'advance');
   const kind = t.want?.kind ?? (g ? 'made' : undefined);
-  if (!kind || t.isPlayer || t.rank === 'boss' || rk(t) >= rk(p) + 2) return undefined; // a boss does not tell an associate his dreams
+  if (!kind || t.isPlayer || t.rank === 'boss' || rk(t) >= rk(p) + 2 || t.id === p.bossId || (t.familyId && p.familyId && t.familyId !== p.familyId && peek(t, p.id).trust < 0.5)) return undefined; // a boss does not tell an associate his dreams, nor a captain the man under him
   const key = 'want';
   const boss = live(w, t.bossId);
   return {

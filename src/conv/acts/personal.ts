@@ -1,8 +1,9 @@
 // Personal: how he is, what he wants, who he gets on with, what people say, an introduction, a kindness, a rival family's man over a
 // drink (Gate 4, from the old engine's personal, family-talk and rival leaves). Each: what can be said now (offers, the old engine's
 // own conditions), his decision in the layer's record (decide.ts), what it does through doors.ts, and his words.
+import { peek } from '../../core';
 import { wantSaid } from '../subjects/life';
-import { isFamilyBoss } from '../relation';
+import { downward, isFamilyBoss } from '../relation';
 import { feePosition } from '../../negotiate';
 import { ownerBiz } from '../../core';
 import { historyLines } from '../../powers2';
@@ -99,7 +100,7 @@ const leaveIt: Act = { base: 'leave_it', pane: 'personal', run: (c) => { const x
 // ---------------------------------------------------------------- kindnesses
 const helpGift: Act = {
   base: 'help_gift', pane: 'personal',
-  offers: (c) => one(short(c) && c.h.cash >= 200, offer(c, 'help_gift', 'Slip him $200, no questions', 'He won’t forget it.')),
+  offers: () => [], // (the overhaul: offered when he has said he is short, as the answer to it)
   conduct: (c, before) => { if (c.h.cash < before.cash) door.conduct(c.h, 'generous'); },
   run: (c) => {
     const x = T(c);
@@ -112,7 +113,7 @@ const helpGift: Act = {
 };
 const helpLoan: Act = {
   base: 'help_loan', pane: 'personal',
-  offers: (c) => one(short(c) && (c.n.rank === 'civilian' || c.n.rank === 'associate'), offer(c, 'help_loan', 'Offer to lend him money', 'At a friend’s rate.')),
+  offers: () => [], // (the overhaul: offered when he says he is short ("How are you keeping?" → "Is there anything I can do?"), not before)
   run: (c) => {
     const x = T(c), { w, p, t } = x;
     if (p.cash < 100) { line(x, 'You can’t spare it.'); return out(5); }
@@ -235,7 +236,7 @@ const about: Act = {
 // which man: he asks the player who, and the men of the family he has views on are what can be asked
 const pickMember: Act = {
   base: 'pick_member', pane: 'personal', opens: true,
-  offers: (c) => one(inFamily(c.h, c.n) && !!c.n.familyId && members(c).length > 0, offer(c, 'pick_member', 'Ask about one of the others')),
+  offers: () => [], // (the overhaul: an opinion of "the others" in general was filler; a man in a matter is asked about in it)
   run: (c) => {
     const x = T(c), tp = temper(x.t), hot = tp.volatility + tp.pride > 1.15;
     line(x, hot ? '“Who? Spit it out.”' : tp.caution > 0.6 ? '“Depends who you mean.”' : '“Who did you have in mind?”');
@@ -245,7 +246,7 @@ const pickMember: Act = {
 const leaders: Act = {
   base: 'leaders', pane: 'personal',
   repeat: { window: 20, sig: (c) => `${c.n.bossId ?? ''}|${c.n.familyId ? c.w.fam[c.n.familyId].bossId : ''}` },
-  offers: (c) => one(inFamily(c.h, c.n) && superior(c) && !isFamilyBoss(c.w, c.n), offer(c, 'leaders', 'Talk about the leadership', 'Who runs what, and who’s rising.')), // (not the boss: he is what runs it)
+  offers: () => [], // (the overhaul: the family's leadership is on the Family screen; asked in talk it only produced generalities)
   run: (c) => {
     const x = T(c), { w, t } = x, r = R(x);
     const boss = t.bossId ? w.chars[t.bossId] : undefined, top = t.familyId ? w.chars[w.fam[t.familyId].bossId] : undefined;
@@ -262,7 +263,7 @@ const leaders: Act = {
 const askRep: Act = {
   base: 'ask_rep', pane: 'personal',
   repeat: { window: 10, sig: (c) => String(Math.round(c.h.standing / 4)) },
-  offers: (c) => one(c.n.rank !== 'civilian' && (c.h.cooldown[`rep:${c.n.id}`] ?? 0) <= c.w.now, offer(c, 'ask_rep', 'Ask what people say about you', 'Not always flattering.')),
+  offers: (c) => one(c.n.rank !== 'civilian' && peek(c.n, c.h.id).trust >= 0.35 && !downward(c.w, c.h, c.n) && (c.h.cooldown[`rep:${c.n.id}`] ?? 0) <= c.w.now, offer(c, 'ask_rep', 'Ask what people say about you', 'Not always flattering.')), // (asked of a man who would tell you straight, and not of your own men)
   run: (c) => {
     const x = T(c), { w, p, t } = x;
     door.cool(p, `rep:${t.id}`, w.now + 3 * DAY);
@@ -286,7 +287,7 @@ const repWho: Act = {
 const askHistory: Act = {
   base: 'ask_history', pane: 'personal',
   repeat: { window: 14, sig: (c) => String(Object.values(c.w.facts).filter((f) => f.actor === c.h.id).length) },
-  offers: (c) => one(historyLines(c.w, c.h, c.n).length > 0, offer(c, 'ask_history', 'Bring up what’s between you', 'Some things are remembered.')),
+  offers: () => [], // (the overhaul: what is between you is shown beside the conversation, and raised by what is still open)
   run: (c) => { const x = T(c); for (const l of historyLines(x.w, x.p, x.t)) line(x, l); door.regard(x.w, x.t, x.p.id, 'respect', 0.02, 'remembered together'); return out(5); },
 };
 // ---------------------------------------------------------------- a man the player has not met
@@ -337,7 +338,7 @@ const rival = (c: Ctx) => !!c.n.familyId && !!c.h.familyId && c.n.familyId !== c
 const famName = (c: Ctx, ch: Character) => (ch.familyId ? c.w.fam[ch.familyId].name : '');
 const rvDrink: Act = {
   base: 'rv_drink', pane: 'personal',
-  offers: (c) => one(rival(c) && !c.v.th.asked.includes('rv_drink'), offer(c, 'rv_drink', 'Stand him a drink ($30)', 'Courtesy costs little.')),
+  offers: () => [], // (the overhaul: a drink with a man of another family is the same evening as with anyone)
   run: (c) => {
     const x = T(c); c.v.th.asked.push('rv_drink');
     if (x.p.cash < 30) { line(x, 'You’re short.'); return out(5); }
@@ -372,7 +373,7 @@ const rvFavour: Act = {
 // gossip with a rival's man: he gives what he hears, or wants a trade first (flows.ts rv_ears)
 const rvEars: Act = {
   base: 'rv_ears', pane: 'personal',
-  offers: (c) => one(rival(c), offer(c, 'rv_ears', 'Trade a little gossip', 'What’s said in a bar stays in a bar. Mostly.')),
+  offers: () => [], // (the overhaul: gossip passes over a drink, the one evening there is)
   run: (c) => {
     const x = T(c), { w, p, t } = x, r = R(x);
     const stamp = (t.talk ?? {})['rv_ears'];

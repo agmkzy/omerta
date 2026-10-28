@@ -533,7 +533,6 @@ function handle(a: string, v: string) {
     case 'talk': return talkTo(args[0] ?? v, args[1]);
     // (Gate 3: the new conversation's choices; who has come looking for you; the switch)
     // a subject opened in the conversation: presentation only, nothing said, no time passes
-    case 'cxs': S.cxSubject = v || undefined; S.cxLast = undefined; S.open.cxsubj = false; return;
     case 't2': {
       if (S.view.t !== 'talk2') return;
       S.open.cxsubj = false;

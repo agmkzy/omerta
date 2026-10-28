@@ -119,7 +119,7 @@ const earnA: Act = {
   base: 'earn', pane: 'business',
   repeat: { window: 7, sig: (c) => [c.n.books.history.length, c.n.books.arrears, c.h.books.arrears, c.w.debts.filter((d) => d.status === 'active' && (d.creditor === c.n.id || d.debtor === c.n.id)).reduce((a, d) => a + d.balance, 0)].join('|') },
   // (your own man's money is what Sunday and the crew screen show: not asked of him; your boss, or a man there is money owed with)
-  offers: (c) => (!crewMan(c) && (isBoss(c) || debtsWith(c).length) ? [offer(c, 'earn', isBoss(c) ? 'Discuss earnings' : 'Discuss what’s owed')] : []),
+  offers: (c) => (!crewMan(c) && debtsWith(c).length ? [offer(c, 'earn', 'Discuss what’s owed')] : []), // (the overhaul: your earnings with your captain are part of where you stand; what is owed between you stays)
   run: (c) => {
     const x = T(c), { w, p, t } = x;
     if (t.bossId === p.id) {

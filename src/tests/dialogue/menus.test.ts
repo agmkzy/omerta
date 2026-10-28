@@ -66,7 +66,7 @@ describe('menus', { timeout: 120_000 }, () => {
     // a gesture with a price still says it
     const t = Object.values(w.chars).find((m) => m.alive && m.rank !== 'civilian' && m.familyId && m.familyId !== P(w).familyId)!;
     const w2 = fresh(w), v = begin(w2, t.id);
-    assert.ok(everything(w2, v).some((o) => /\$30/.test(o.label)), 'a drink across the line says what it costs');
+    // (the separate drink with a man of another family went in the conversation overhaul: it is the same evening as with anyone)
   });
   ok('a matter between you opens to what belongs to it, and there is always a way back', { tags: ['unit'] }, () => {
     const w = world60(); introAll(w); const p = P(w);

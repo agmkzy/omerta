@@ -64,7 +64,7 @@ const tk: Act = {
 const THINK = ['b_stand', 'pick_member', 'leaders', 'ask_rep', 'ask_history', 'ask_want', 'ask_crew', 'rv_ears', 'rv_mood', 'rk_back_ask', 'about'];
 const think: Act = {
   base: 'think', pane: 'personal', opens: true,
-  offers: (c) => [{ code: 'think', label: 'What do you make of…?', says: 'I want your opinion on something.', note: 'His view of a man, of the family, of you.' }],
+  offers: () => [], // (the overhaul: a menu of opinions was a second menu; what remains is asked directly, where it fits)
   run: (c) => {
     const x = T(c), { w, p, t } = x, tp = temper(t);
     if (openness(w, t, p) === 'hostile') {

@@ -41,7 +41,7 @@ function exHtml(x: Ex, dbg: boolean): { said: string; fx: string[] } {
   let said = '';
   const fx: string[] = [];
   for (const l of x) {
-    if (l.who === 'you') said += `<p class="cx-you"><span class="sr-only">You: </span>${esc(l.text)}</p>`;
+    if (l.who === 'you') said += `<p class="cx-you"><span class="sr-only">You: </span>${esc(bare(l.text))}</p>`;
     else if (l.who === 'him') said += `<p class="cx-say">${esc(l.text)}</p>${dbg && l.trace?.length ? `<details class="cx-dbg"><summary>why (developer view)</summary><pre>${esc(l.trace.join('\n'))}</pre></details>` : ''}`;
     else if (l.who === 'card') fx.push(esc(l.text));
     else said += `<p class="cx-narr">${esc(l.text)}</p>`;
@@ -99,7 +99,8 @@ const entryOf = (code: string) => ENTRY.find((e) => e.codes.includes(code));
 const subjOf = (c: Choice): Subj => SUBJECT_OF[codeOf(c.id)] ?? (c.pane === 'business' ? 'work' : c.pane === 'confront' ? 'settle' : 'personal');
 const isMatter = (c: Choice) => BETWEEN.test(codeOf(c.id));
 // a choice as a numbered pick, with its figure when it takes one
-const pickOf = (c: Choice, lead = false): Pick => ({ a: 't2:' + c.id, label: c.label, hint: c.note, kind: lead ? 'lead' : '', fig: c.amount ? figure(c) : undefined });
+export const bare = (s: string) => s.replace(/^[“"]\s*/, '').replace(/\s*[”"]([.!?]?)$/, '$1');
+const pickOf = (c: Choice, lead = false): Pick => ({ a: 't2:' + c.id, label: bare(c.label), hint: c.note, kind: lead ? 'lead' : '', fig: c.amount ? figure(c) : undefined });
 // What can be said, sorted out: his question and its answers (the exchange in hand), what is between you, and the subjects
 function sorted(w: ReturnType<typeof W>, v: Visit) {
   const now = v.choices.filter((c) => c.group === 'reply');
@@ -124,6 +125,22 @@ function subjectPicks(xs: Choice[]): string {
   return choices(rows, 'What you say');
 }
 void HEAD_HINT;
+// ---------------------------------------------------------------- the conversation, organised around the man (the overhaul, 28 Oct)
+// Not a set of categories to browse: one short list, in the order a man would think of it. What is unfinished between you first; then
+// the reasons a man in your position talks to this man (what each is for, to whom, is the engine's: conv/relation.ts); then the man
+// himself; and whatever else there is, under one "Something else", flat, for the occasion it fits.
+const CORE = ['intro', 'intro_via', 'promo', 'recommend', 'rk_back', 'rk_back_ask', 'fam_crew', 'fam_name', 'fam_counsel', 'fam_dir', 'fam_hear', 'b_need', 'work', 'pick_concern', 'b_tribute', 'borrow', 'earn',
+  'fam_report', 'cr_ask', 'recruit_offer',
+  'suggest', 'protect', 'offer_loan', 'buy_ask', 'sell_ask', 'run_ask', 'partner_chop', 'partner_fence', 'terms_cut', 'terms_raise', 'sh_how', 'sh_ears', 'sh_back', 'sh_time', 'sh_why', 'sh_lean',
+  'rv_mood', 'rv_warn', 'rv_favour'];
+const PERSONAL = ['how', 'spend', 'congrats', 'welcome', 'ask_want', 'ask_rep', 'tk:want', 'tk:kin'];
+const rankOf = (c: Choice) => { const k = codeOf(c.id), i = CORE.indexOf(k), j = PERSONAL.indexOf(k); return c.lead ? -1 : i >= 0 ? i : j >= 0 ? 100 + j : 200; };
+function ordered(sx: ReturnType<typeof sorted>) {
+  const rest = [...sx.by.values()].flat().sort((a, b) => rankOf(a) - rankOf(b));
+  const core = rest.filter((c) => rankOf(c) < 100).slice(0, 4), mine = rest.filter((c) => rankOf(c) >= 100 && rankOf(c) < 200).slice(0, 2);
+  const more = rest.filter((c) => !core.includes(c) && !mine.includes(c));
+  return { core, mine, more };
+}
 
 export function talk2View(v: Visit): string {
   const w = W(), p = P(), t = w.chars[v.npc];
@@ -162,30 +179,27 @@ export function talk2View(v: Visit): string {
   // ---- what you can say: the exchange in hand, or the subject you have opened, or what is between you; beside it, the subjects
   // (a man who will not talk today, or has stopped: only the way out)
   const sx = v.ended || v.th?.shut ? undefined : sorted(w, v);
-  const subj = S.cxSubject as Subj | undefined;
+  const subj = undefined as Subj | undefined; // (no subjects to browse since the overhaul: one list, ordered by what matters with him)
   const leaveLabel = v.choices.find((c) => c.id === 'leave')?.label ?? 'Leave';
   out += `<div class="cx-act">`;
   if (!v.ended && v.th?.shut) out += choices([{ a: 't2:leave', label: 'Leave', kind: 'out' }], 'Leave');
   else if (v.ended || !sx) out += choices([{ a: 'back:', label: 'Go on', hint: 'Back to where you were.' }, { a: `ent:${t.id}`, label: `${t.name.split(' ')[0]}’s page`, hint: 'Everything you know of him, and what is between you.' }], 'Where now');
   else if (sx.now.length && !subj) out += `<p class="cx-under">${v.waiting ? 'He’s waiting on you' : 'Your answer'}</p>` + choices([...sx.now.map((c, i) => pickOf(c, i === 0 && !!v.approach)), { a: 't2:leave', label: leaveLabel, kind: 'out' }], 'Your answer');
-  else if (subj) {
-    const xs = sx.by.get(subj)!;
-    out += `<p class="cx-under"><button class="cx-subback" data-a="cxs:" aria-label="Back to what’s between you">‹</button>${esc(SUBJ.find((x) => x.k === subj)!.name)}</p>` + (xs.length ? subjectPicks(xs) : `<p class="ui-quiet">Nothing to say on that, with him, now.</p>`);
-  } else if (sx.matters.length) out += `<p class="cx-under">Between you</p>` + choices(sx.matters.slice(0, 5).map((c) => pickOf(c)), 'Between you');
   else {
-    // nothing between you: what a man in your position would naturally say to him first, then the subjects (on a phone, in place)
-    const lead = [...sx.by.values()].flat().filter((c) => c.lead).slice(0, 3);
-    const easy = lead.length ? lead : [...sx.by.values()].flat().filter((c) => c.group === 'social').slice(0, 2);
-    const subjs = SUBJ.filter((x) => sx.by.get(x.k)!.length).map((x): Pick => ({ a: 'cxs:' + x.k, label: x.name, hint: x.hint, kind: 'more' }));
-    out += `<p class="cx-under">What’s on your mind?</p>` + choices([...easy.map((c) => pickOf(c)), ...(narrow() ? subjs : [])], 'To start') + (narrow() ? '' : `<p class="cx-pick">Or pick a subject beside the conversation.</p>`);
+    // what is between you, the reasons to talk to him, the man himself; the rest folded under "Something else"
+    const o = ordered(sx), open = !!S.open.cxmore;
+    const rows: Pick[] = [...sx.matters.slice(0, 4).map((c) => ({ ...pickOf(c), kind: 'lead' as const })), ...o.core.map((c) => pickOf(c)), ...o.mine.map((c) => pickOf(c))];
+    if (o.more.length) rows.push({ a: 'tog:cxmore', label: open ? 'Something else' : `Something else (${o.more.length})`, hint: open ? undefined : o.more.slice(0, 2).map((y) => y.label.replace(/^“|”$/g, '')).join(' · ') + (o.more.length > 2 ? ' …' : ''), kind: 'more' });
+    if (open) rows.push(...o.more.map((c) => ({ ...pickOf(c), kind: 'sub' as const })));
+    rows.push({ a: 't2:leave', label: leaveLabel, kind: 'out' });
+    out += `<p class="cx-under">${sx.matters.length ? 'Between you, and what else you might say' : 'What you might say'}</p>` + choices(rows, 'What you say');
   }
-  if (sx && (sx.now.length || subj || sx.matters.length)) out += `<button class="cx-subjbtn" data-a="tog:cxsubj" aria-expanded="${!!S.open.cxsubj}"><span>Subjects</span><b>${sx.matters.length ? `${sx.matters.length} between you` : ''}</b></button>`;
+  if (sx && sx.now.length) out += `<button class="cx-subjbtn" data-a="tog:cxsubj" aria-expanded="${!!S.open.cxsubj}"><span>Between you</span><b>${sx.matters.length ? `${sx.matters.length} open` : ''}</b></button>`;
   out += `</div>`;
-  // ---- the subjects: what is between you first, then the five subjects; a panel beside on a desktop, a drawer on a phone
+  // ---- beside it: what is between you (a panel beside on a desktop, a drawer on a phone)
   if (sx) {
     let side = `<h2 class="cx-sh">Between you</h2>${shown.length ? `<div class="cx-ctx">${shown.map((x) => `<p>${x}</p>`).join('')}</div>` : ''}`;
     side += sx.matters.length ? `<ul class="cx-subjs">${sx.matters.map((c) => `<li><button data-a="t2:${esc(c.id)}"><b>${esc(c.label.replace(/^“|”$/g, ''))}</b>${c.note ? `<small>${esc(c.note)}</small>` : ''}</button></li>`).join('')}</ul>` : (shown.length ? '' : `<p class="cx-none">Nothing unfinished.</p>`);
-    side += `<h2 class="cx-sh">Subjects</h2><ul class="cx-subjs">${SUBJ.filter((x) => sx.by.get(x.k)!.length || subj === x.k).map((x) => { const n = sx.by.get(x.k)!.length; return `<li><button class="${subj === x.k ? 'on' : ''}" data-a="cxs:${x.k}"${n ? '' : ' disabled'}><b>${x.name}</b><small>${n ? x.hint : 'Nothing with him now'}</small></button></li>`; }).join('')}</ul>`;
     side += `<button class="cx-leave2" data-a="t2:leave">${leaveLabel === 'Not now' ? 'Not now' : 'Leave conversation'}</button>`;
     out += `<aside class="cx-side${S.open.cxsubj ? ' is-open' : ''}" aria-label="Subjects">${side}</aside>`;
   }
