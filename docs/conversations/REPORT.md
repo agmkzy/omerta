@@ -216,3 +216,120 @@ record of what the player has done).
   trust him); it is still a judgement about plausibility, not a record of words said in his hearing.
 - Browser playthroughs were made at all six seats and the transcripts read, but not yet the long multi-week playthroughs per seat the
   brief describes.
+
+---
+
+# The deepening pass (28 October, late): men who decide, and know only what reached them
+
+## The structural weaknesses found
+| Weakness | Kind | Where |
+|---|---|---|
+| Characters spoke from another man's private record (his books, his grudge) | Incorrect knowledge handling; a missing simulation concept (what men can see of each other) | the consigliere's report, hearing witnesses, the underboss's look at a crew |
+| Outcomes computed from the player's choice with a token weighing | Missing NPC decision logic | the consigliere's advice; a challenged crewman; *Where do I stand* asked of the boss; a name put forward |
+| Follow-ups lost after a matter move; a question put to the player with no answer | Poorly structured follow-ups | matter moves in conversation; the boss's "Are you?" |
+| Record text (third person) inside a speaker's quotes | Generic templates over records | the job pitch |
+| New conversation code writing the world directly | Duplicated responsibility (caught by existing architecture tests) | the new family interactions |
+
+## Knowledge and its provenance (invariant A)
+One rule (`conv/notice.ts`): what a man can see of another (`seesLifeOf`: his captain, his own men, his crew, the men who work his
+places, the made men at the club, men who know him well) and what that shows (`signsOf`: living beyond what he passes up, going
+without, hurt), said as a sign, not a finding; and what he has heard a man say or do against another (`heardAgainst`: facts he holds,
+said as seen or as told by a named man). A man's private state drives his own behaviour only. Relationships decide whether a man
+*shares* what he has, never whether he has it.
+
+## Judgment and reactivity
+- The boss weighs advice (trust in the consigliere, what was actually found, his own ties to both men, the stakes, his temper) and
+  accepts, challenges, refuses, or keeps it to think over and decides later by his own weighing.
+- A challenged crewman answers as he is and as he stands with you; what follows depends on what he said; only an admission is recorded.
+- *Where do I stand*, from the boss, is his situation: succession on his mind, pressure on the family, the man's reach, trust.
+- *I want more responsibility* is the captain's situation; a name put forward can be refused; an introduction is a reason to talk.
+
+## Transcripts (real game states, through the engine the screen uses: `src/tests/tools/transcripts.ts`)
+
+### The consigliere advises the boss (consigliere start, seed 7)
+**A boss who trusts him, with nothing between him and the accused**
+> You: Louie did it. I'm sure of it.
+> Teddy: Teddy nods. "I thought as much."
+> *(Recorded: found against him.)*
+
+**A boss who is fond of the accused** (he refuses)
+> You: Louie did it. I'm sure of it.
+> Teddy: Teddy shakes his head. "No. Not Louie. I don't see it."
+> *(Recorded: the charge thrown out.)*
+
+**A boss who wants to know what it rests on** (he challenges; then decides himself)
+> You: Louie did it. I'm sure of it.
+> Teddy: Teddy leans back. "You're sure? Louie has been with us a long time. What have you got?"
+> You: Here's what I found.
+> (You lay it out: A man around him told you he has been spending more than his envelopes explain.)
+> Teddy: Teddy looks at you a long time. "Leave it with me." Whatever he decides, it won't be tonight.
+> *(Two days later he decided: found against him. With nothing to lay out and only the consigliere's word, the same boss decided: no
+> finding.)*
+
+**An uncertain consigliere**
+> You: I can't tell you for certain.
+> Teddy: Teddy rubs his eyes. "Then I'll sleep on it." *(He decided on the day he meant to.)*
+
+### A captain challenges his own men about their envelopes (captain starts, seeds 3, 5, 7)
+| Man | As he is | What happened |
+|---|---|---|
+| Louie Caruso (holding out; careful, with men under him) | "It's not me. Mickey's been light, and I've been covering for him." → *Don't lie to me* → "I told you how it is." He holds your eye. | No admission recorded; the lie stands until disproved |
+| Angelo Rizzo (holding out; proud, but fears and respects his captain) | "You calling me a thief?" → *I'm asking you* → "All right. I've been keeping a little back." → *Put it back / Once / You're out* | Admission recorded; the holding back stops |
+| Ralphie Russo (holding out; proud, little fear or respect) | "You calling me a thief?" → *I'm asking you* → "Then the answer's no." | No admission; a little grudge |
+| Carmine Costa (holding out; cautious) | "What makes you say that?" → (his books show no short week, so the only answer is) *Call it a feeling* → "Then there's nothing to talk about." | Nothing; you had nothing to show |
+| Sonny Lupo (honest; proud) | "Count it yourself. Every dollar. Then you can apologise." → *I'll count it* → "Go ahead." | His grudge against you, recorded with its reason |
+| Marty Bellini (honest; easy) | "Go through my books with me, any time you want. It's all there." | Nothing |
+
+### A soldier asks his captain for more responsibility (soldier start, seed 5)
+| The captain's situation | What he said |
+|---|---|
+| Stretched (few men, behind) | "I'm stretched thin, as it happens. Next thing that comes up, it's yours." |
+| Trusts him | "Good. That's what I like to hear. Keep doing what you're doing, and I'll put more your way." |
+| Thinks he's ahead of himself | Danny studies you. "What do you think you've done, that you're asking me that?" |
+| Bad blood | Danny doesn't even look up. "More? After the way things are between us? No." |
+
+### The underboss asks the boss where he stands (underboss start, seed 7)
+| The boss's situation | What he said |
+|---|---|
+| Trusts him, has him in mind to follow | "I won't be in this chair for ever. When I'm done, the family will need a man who knows it. Keep doing what you're doing." |
+| Pressure on the family | "Right now I need to know who's with me. Nothing else matters this month. Are you?" → *I'm with you. You know that.* (a promise, kept) |
+| Distrusts his reach among the captains | "I hear you've been making friends among the captains. Be careful whose friend you are." |
+
+### The boss raises his direction with captains (boss start, seed 5; "keep your heads down")
+| Captain | What he said |
+|---|---|
+| Going along | "We're doing it. Some of my men grumble. They'll live." |
+| Ignoring it, respects the boss | "Not yet. My men don't like it, and I haven't pushed them." → *Push them* → "All right." He doesn't like it. He'll do it. |
+| The same captain, without that respect | "We're doing it," Danny says. He says it easily. *(He isn't.)* |
+
+### An associate, introduced by name to a stranger, asks him for money (associate start, seed 3)
+> You: Louie Costa sent me.
+> (Louie had a word with Teddy Lucchese before you arrived.)
+> Teddy: He nods slowly. "A recommendation. I do like to know what a recommendation costs."
+> You: Could you lend me $500? I'll pay interest, whatever's fair.
+> Teddy: "I don't know you well enough for that."
+
+## Consequences that persist (checked)
+- Advice refused is recorded as refused; advice taken is recorded as the boss's ruling; a decision put off is made later by the boss's
+  own weighing, and when the truth surfaces he remembers whose advice it was.
+- An admission is a fact both men hold; a denial is not; a lie told in blame stays a lie told.
+- "I'm with you" is a promise in the boss's memos; a captain's "I'm with you" in the contest that he doesn't keep is on the record.
+- A month later, a captain says what has changed since you last asked (the money you pass up; the leading you've done).
+
+## Tests and play
+- Full suite: 756 passed (before the last additions; 478 conversation tests after them, with the new judgment and provenance tests).
+- `coherence.test.ts` now also checks: knowledge provenance (a man holding out but living poor shows nothing; a private grudge is not
+  heard; said in front of him, it is); a boss fond of the accused refusing the advice, recorded as refused; a denial is never recorded
+  as a confession, an admission is.
+- Played in the browser at all six seats (associate to captain, soldier to captain, captain to his own man, underboss to captains and to
+  the boss, consigliere to the boss, boss to the underboss, consigliere and captains); the transcripts above were played through the same
+  engine the screen uses.
+
+## What remains imperfect
+- Older parts of the conversation (a man's trouble, protection, loans) still choose many lines from tables by temperament; they were
+  checked for identity and coherence, not rebuilt around each man's situation.
+- Some older encounter outcomes narrate compliance without showing a decision (register R2), and some older code still reads private
+  state for a third party's words (register R6); both are listed for the next review.
+- What a man can see of another (`seesLifeOf`) is a rule of proximity; it is a judgment about plausibility, and a stricter version
+  would record sightings as facts. It never asserts wrongdoing, only signs.
+- Long multi-week play in the browser at each seat has not been done; continuity was checked by scripted month-apart conversations.
