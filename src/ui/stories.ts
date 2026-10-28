@@ -96,6 +96,7 @@ function originOf(w: World, p: Character, s: Situation): string {
     case 'skim': return 'Began with missing money';
     case 'hearing': return 'A charge';
     case 'charge': return 'The boss’s charge';
+    case 'contest': return 'The chair';
     case 'intel': return 'Began with a secret';
     case 'rivalry': return 'Bad blood';
     case 'dispute': return 'A quarrel';
@@ -426,7 +427,7 @@ function matterStories(w: World, p: Character, byStory: Map<string, Fact[]>): St
         extra: s.kind === 'hearing' && notesOf(s).length ? h('What you’ve found', 'what you were told, and what you saw') + `<ul class="op-hist">${notesOf(s).map((n) => `<li><div>${esc(n)}</div></li>`).join('')}</ul>` : undefined,
         unknown: s.kind === 'hearing' && !closed ? ['Whether he did it. Nobody will tell you that; you have to decide what you believe.'] : base.unknown,
         waiting: !closed && !opts.length ? (inIt ? 'Nothing is yours to do about it today. It will move when they move.' : 'It isn’t yours to settle. From where you stand, you can only hear them out.') : undefined,
-        actions: closed ? [] : [...opts, ...(s.kind === 'hearing' || s.kind === 'charge' ? [] : people.filter((c) => !opts.some((o) => o.a.endsWith('|' + c.id))).map((c) => ({ a: `talk:${c.id}`, label: `Go and see ${first(c)}`, hint: 'Hear what he has to say about it.' })))].slice(0, s.kind === 'hearing' || s.kind === 'charge' ? 9 : 7),
+        actions: closed ? [] : [...opts, ...(s.kind === 'hearing' || s.kind === 'charge' || s.kind === 'contest' ? [] : people.filter((c) => !opts.some((o) => o.a.endsWith('|' + c.id))).map((c) => ({ a: `talk:${c.id}`, label: `Go and see ${first(c)}`, hint: 'Hear what he has to say about it.' })))].slice(0, s.kind === 'hearing' || s.kind === 'charge' || s.kind === 'contest' ? 9 : 7),
       });
       continue;
     }

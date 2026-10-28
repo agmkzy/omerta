@@ -70,6 +70,15 @@ silent), the boss came home and took it back.
 The consigliere beside the boss, the acting boss while the boss is inside, and the induction line only as the player was told it
 (before, it showed the family's own reckoning, which the new rules say he can only learn from a credible source).
 
+## Increment 8: a contested succession (deployed 28 Oct)
+`contest.ts`. When a boss dies and the runner-up came within 70% of the new man (and has the stomach for it, or is the player), the
+chair is contested for two weeks while the new man holds it: the player stands with one side (or presses his own claim, or accepts
+the new boss), works on the underboss, captains and consigliere one by one (a man firmly on the other side may tell him what he wants
+to hear), or brokers a settlement (the rival made underboss); the contenders lobby captains of their own, and a losing, violent
+rival may have a supporter beaten. It ends with the captains' real leanings: the new boss confirmed, or the rival in the chair and
+the new boss out. Measured on five seeds: the player's own claim failed (5, 3), was conceded (11), and won the chair (13); audits,
+hierarchy and save round-trips clean.
+
 ## What reached each seat in 100 days (seed 3, fresh start, every encounter answered with its first choice)
 | Seat | What came to him (most frequent) | Matters he was in |
 |---|---|---|
@@ -87,5 +96,4 @@ All six: ledger audit 0, hierarchy issues 0, errors 0.
 - A vacant captaincy waits behind inductions in `career.careerTick` (a week that makes a soldier fills no crew): older behaviour,
   left as it was.
 - "Would you put a word in for me?" is offered by a captain to his own soldier (older offer rule in `conv/acts/org.ts recommend`).
-- Not built tonight: contested succession (a boss's death fought over), and long hidden-title playthroughs in the browser (measured
-  by script instead, above).
+- Not built tonight: long hidden-title playthroughs in the browser (measured by script instead, above).

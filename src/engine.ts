@@ -244,6 +244,7 @@ import { ensureShape } from './world';
 import { hearingWeek } from './hearing';
 import { chargeWeek } from './charge';
 import { allegianceWeek, courtedWeek } from './allegiance';
+import './contest'; // (a close succession contested: registers itself with orgs.succeed)
 export function deserialize(s: string): World {
   const o = JSON.parse(s);
   const rng = new Rng(0);

@@ -502,7 +502,7 @@ export interface Venture {
   open: boolean;
 }
 
-export type SitKind = 'money' | 'ambition' | 'turf' | 'org' | 'skim' | 'tribute' | 'debt' | 'partner' | 'grudge' | 'intel' | 'dispute' | 'crew' | 'ask' | 'rivalry' | 'arrest' | 'revenge' | 'climb' | 'hearing' | 'charge'; // (The Family: a charge heard and ruled on, hearing.ts; the boss's charge to his underboss, charge.ts)
+export type SitKind = 'money' | 'ambition' | 'turf' | 'org' | 'skim' | 'tribute' | 'debt' | 'partner' | 'grudge' | 'intel' | 'dispute' | 'crew' | 'ask' | 'rivalry' | 'arrest' | 'revenge' | 'climb' | 'hearing' | 'charge' | 'contest'; // (The Family: a charge heard and ruled on, hearing.ts; the boss's charge to his underboss, charge.ts)
 // V89: where one person stands in a matter. Read and changed by matters.ts; all optional, so older saves load as they were.
 export interface Stance {
   resolve: number; // 0..1 how firmly he holds his position

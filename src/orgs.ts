@@ -235,6 +235,8 @@ export function leaderChanged(w: World, fid: Id, winner: Character, oldId: Id | 
   repairHierarchy(w, fid);
 }
 
+// Who else hears that the chair has changed hands (contest.ts registers: a close race may not be over)
+export const onSucceed: ((w: World, fid: Id, cand: Character, cs: Cand[], cause: string) => void)[] = [];
 // Install a successor and say what happened. `old` is the man leaving the chair (dead, jailed, retiring or stepping aside).
 export function succeed(w: World, fid: Id, old: Character | undefined, cause: string, o: SuccOpts = {}): Character | undefined {
   const f = w.fam[fid];
@@ -250,6 +252,7 @@ export function succeed(w: World, fid: Id, old: Character | undefined, cause: st
     fact: { actor: cand.id, text: `${cand.name} takes over the ${f.name} family.`, broadcast: kin },
   });
   leaderChanged(w, fid, cand, old?.id, cause, cs);
+  for (const h of onSucceed) h(w, fid, cand, cs, cause);
   return cand;
 }
 
