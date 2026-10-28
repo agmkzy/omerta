@@ -12,11 +12,12 @@
 //
 // Every appointment is recorded with who made it, why, who was passed over and who backed it (fam.appts, the men's careers).
 import { capOf, openSeatFor } from './career';
-import { addFact, bear, rel } from './core';
+import { addFact, bear, feel, rel } from './core';
+import { addEnc } from './encounters';
 import { consigliereChoice, logOrg, seatConsigliere } from './orgs';
 import { careerRecord, regardOf } from './standing';
 import { temper } from './temper';
-import { WEEK, type Character, type Family, type Id, type World } from './types';
+import { DAY, WEEK, type Character, type Enc, type Family, type Id, type World } from './types';
 
 const byId = (a: { id: string }, b: { id: string }) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 const live = (w: World, c?: Character) => !!c?.alive && c.jailedUntil <= w.now;
@@ -145,9 +146,37 @@ export function preferredSuccessor(w: World, capo: Character): Character | undef
   return Object.values(w.chars).filter((c) => c.alive && c.bossId === capo.id && c.rank === 'soldier').sort((a, b) => rel(capo, b.id).trust - rel(capo, a.id).trust || byId(a, b))[0];
 }
 // The boss's choice for a crew without a captain: the contender he weighs highest for these men.
+// The consigliere's word on a crew without a captain: asked before the boss decides, and weighed as far as the boss trusts him.
+function counselFor(w: World, fid: Id, c: Character): number {
+  const f = w.fam[fid], k = f.counsel;
+  if (!k?.id || k.id !== c.id || (k.until ?? 0) <= w.now || !f.consigliere) return 0;
+  return 0.08 + view(w.chars[f.bossId], w.chars[f.consigliere]) * 0.2;
+}
+export function counselAsk(w: World, fid: Id): boolean {
+  const f = w.fam[fid], p = w.playerId ? w.chars[w.playerId] : undefined, boss = w.chars[f.bossId];
+  if (!p?.alive || f.consigliere !== p.id || !boss?.alive || boss.isPlayer || (f.counsel && w.now - f.counsel.t < 35 * DAY)) return false;
+  const cs = membersOf(w, fid).filter((c) => c.rank === 'soldier' && f.consigliere !== c.id && live(w, c) && recV(w, c, ['leadership', 'earning', 'reliability']) >= 0.25)
+    .map((c) => ({ c, s: captaincyStanding(w, c, []) })).sort((a, b) => b.s - a.s || byId(a.c, b.c)).slice(0, 3);
+  if (cs.length < 2) return false;
+  f.counsel = { t: w.now };
+  addEnc(w, { kind: 'counsel', from: boss.id, title: `${boss.name.split(' ')[0]} wants your advice`, days: 5, lines: [`${boss.name.split(' ')[0]} pours two glasses. “There’s a crew needs a captain. Who would you give it to?”`],
+    opts: [...cs.map((x) => ({ code: 'c:' + x.c.id, label: x.c.name, hint: `${careerRecord(w, x.c).filter((d) => ['leadership', 'earning', 'reliability'].includes(d.key)).map((d) => `${d.label.toLowerCase()}: ${d.word}`).join(', ')}. The men around him see it how they see it.` })), { code: 'none', label: '“That’s yours to decide.”', hint: 'He asked. Not answering is an answer.' }], data: { fid } });
+  return true;
+}
+export function counselChoose(w: World, p: Character, e: Enc, code: string): string[] {
+  e.status = 'done';
+  const f = w.fam[String(e.data?.fid)], boss = f ? w.chars[f.bossId] : undefined;
+  if (!f || !boss) return [];
+  if (code === 'none') { feel(w, boss, p.id, 'trust', -0.02, 'he wouldn’t give his advice when asked'); return [`${boss.name.split(' ')[0]} looks at you a moment longer than he needs to. “All right.”`]; }
+  const c = w.chars[code.slice(2)];
+  if (!c) return [];
+  f.counsel = { t: f.counsel?.t ?? w.now, id: c.id, until: w.now + 35 * DAY };
+  (p.career ??= { done: 0, failed: 0, log: [] }).log.push({ t: w.now, text: `Advised ${boss.name} to give a crew to ${c.name}` });
+  return [`“${c.name.split(' ')[0]},” you say, and tell him why. ${boss.name.split(' ')[0]} listens. He doesn’t say what he thinks.`];
+}
 export function chooseCaptain(w: World, fid: Id, crew: Character[], outgoing?: Character, not?: Id[]): { c: Character; passed: Character[] } | undefined {
   const cs = membersOf(w, fid).filter((c) => c.rank === 'soldier' && w.fam[fid].consigliere !== c.id && live(w, c) && !(not ?? []).includes(c.id) && recV(w, c, ['leadership', 'earning', 'reliability']) >= 0.25)
-    .map((c) => ({ c, s: captaincyStanding(w, c, crew, outgoing) })).sort((a, b) => b.s - a.s || byId(a.c, b.c));
+    .map((c) => ({ c, s: captaincyStanding(w, c, crew, outgoing) + counselFor(w, fid, c) })).sort((a, b) => b.s - a.s || byId(a.c, b.c));
   if (!cs.length) return undefined;
   return { c: cs[0].c, passed: cs.slice(1, 4).filter((x) => x.s > cs[0].s - 0.15).map((x) => x.c) };
 }

@@ -76,14 +76,14 @@ const BETWEEN = /^(answer|report|job|jobtake|jobpass|m|memo|sit|b_envelope|b_env
 const SUBJECT_OF: Record<string, Subj> = {};
 const put = (k: Subj, xs: string) => { for (const x of xs.split(' ')) SUBJECT_OF[x] = k; };
 put('work', 'work b_need b_more rate_ask b_tribute borrow loan favcall offer_loan buy_ask stake_ask sell_ask run_ask partner_chop partner_fence op biz_none sh_how sh_ears sh_back sh_time sh_why sh_lean suggest terms_cut terms_raise deal d_time d_half d_favour d_forgive d_pay d_all d_ask d_remind cr_cash cr_duties assign_low assign_hustle recruit_offer protect tk:shop tk:racket');
-put('family', 'promo recommend rk_back rk_back_ask b_stand earn tk:earn leaders mediate pick_concern concern ask_rep ask_crew answers rv_mood');
+put('family', 'fam_books fam_crew fam_name fam_report fam_more promo recommend rk_back rk_back_ask b_stand earn tk:earn leaders mediate pick_concern concern ask_rep ask_crew answers rv_mood');
 put('people', 'tk:op tk:ev tk:tell tk:hurting think pick_member suspect pick_incident tell who news rv_ears ask_around about inc');
 put('personal', 'how old_times spend rv_drink congrats welcome ask_want ask_history help_gift help_loan cr_ask sit_ask intro intro_via rv_favour tk:kin');
 put('settle', 'demand confront amends word_make accuse rv_warn cr_drop cr_thin cr_look challenge refuse');
 // the entries several options share: one row (the fitting wording, when only one may be said), or the choice of them when there are more
 const ENTRY: { key: string; name: string; codes: string[]; one?: boolean }[] = [
   { key: 'work', name: 'Ask for work', codes: ['b_need', 'work', 'b_more'] }, // (every one reachable: alone, it is said as itself; several, they open)
-  { key: 'standing', name: 'Your standing', codes: ['earn', 'tk:earn', 'b_stand', 'ask_rep', 'promo', 'recommend', 'rk_back', 'rk_back_ask'] },
+  { key: 'standing', name: 'Your standing', codes: ['earn', 'tk:earn', 'b_stand', 'fam_books', 'fam_crew', 'ask_rep', 'promo', 'recommend', 'rk_back', 'rk_back_ask', 'fam_name'] },
   { key: 'money', name: 'Money between you', codes: ['borrow', 'loan', 'offer_loan', 'help_loan', 'favcall', 'b_tribute', 'rate_ask'] },
   { key: 'debt', name: 'A debt', codes: ['d_time', 'd_half', 'd_favour', 'd_forgive', 'd_pay', 'd_all', 'd_ask', 'd_remind'] },
   { key: 'shop', name: 'His business', codes: ['sh_how', 'sh_ears', 'op', 'biz_none', 'tk:shop', 'tk:racket'] },

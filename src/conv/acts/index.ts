@@ -7,12 +7,13 @@ import { BUSINESS } from './business';
 import { ORG } from './org';
 import { CONFRONT } from './confront';
 import { SUBJECTS } from './subjects';
+import { FAMILY } from './family';
 
 let reg: Record<string, Act> | undefined;
 function all(): Record<string, Act> {
   if (reg) return reg;
   const r: Record<string, Act> = {};
-  for (const a of [...PERSONAL, ...INFO, ...BUSINESS, ...ORG, ...CONFRONT, ...SUBJECTS]) { if (r[a.base]) throw new Error(`two interactions share the code ${a.base}`); r[a.base] = a; }
+  for (const a of [...PERSONAL, ...INFO, ...BUSINESS, ...ORG, ...CONFRONT, ...SUBJECTS, ...FAMILY]) { if (r[a.base]) throw new Error(`two interactions share the code ${a.base}`); r[a.base] = a; }
   return (reg = r);
 }
 export const ACTS: Record<string, Act> = new Proxy({} as Record<string, Act>, {

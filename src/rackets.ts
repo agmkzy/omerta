@@ -1,3 +1,4 @@
+import { policyFor } from './direction';
 import { hasPerk } from './specs';
 // Ongoing operations. Each one has a runner, a weekly take, and a way to go wrong. Money from these comes through the books
 // like everything else, so what your superiors can see is a choice with consequences.
@@ -323,7 +324,8 @@ function startEnterprises(w: World) {
     const mine = w.ops.filter((o) => o.owner === c.id && o.kind !== 'hijack' && (o.state === 'running' || o.state === 'raided'));
     // (a man running another man's racket has his hands full, and setting up the same trade beside it would be walking out: enterprise.goesOwnWay)
     if (w.ops.some((o) => o.runner === c.id && (o.state === 'running' || o.state === 'raided'))) continue;
-    if (mine.length >= 2 || (mine.length === 1 && !(c.cash > 2500 && c.traits.ambition > 0.5 && w.rng.chance(0.05)))) continue;
+    const earn = policyFor(w, c) === 'earn'; // (direction.ts: the boss's word to make money)
+    if (mine.length >= 2 || (mine.length === 1 && !(c.cash > (earn ? 1500 : 2500) && c.traits.ambition > (earn ? 0.35 : 0.5) && w.rng.chance(earn ? 0.12 : 0.05)))) continue;
     const fam = w.fam[c.familyId];
     // (he weighs them all and leans to what suits him best, but men are not all alike in what they reach for: a weighted choice,
     // not every man taking the single best-paying trade)

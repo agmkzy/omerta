@@ -1,4 +1,4 @@
-import { chooseCaptain, madeFromLine, nextToMake, recordAppt, underbossPicture, underbossStanding } from './succession';
+import { chooseCaptain, counselAsk, madeFromLine, nextToMake, recordAppt, underbossPicture, underbossStanding } from './succession';
 import { promotedOver } from './situ';
 import { ledgerAdd } from './powers2';
 // Career: associate -> soldier -> capo -> underboss -> boss. Nobody is promoted because a number ticked over.
@@ -195,6 +195,7 @@ export function careerTick(w: World) {
       if (!vacancy(w, fam.id, to)) { noticeTick(w, fam, boss, to, from); continue; }
       if (to === 'capo') {
         if (w.path?.hold === 'capo' && w.chars[w.playerId!]?.familyId === fam.id) continue;
+        if (counselAsk(w, fam.id)) continue; // (the player as consigliere is asked first: his word weighs in the choice, succession.ts)
         const ch = chooseCaptain(w, fam.id, []);
         if (!ch || ch.c.isPlayer) continue;
         if (w.rng.chance(0.5)) { promote(w, ch.c, 'capo', boss); fam.lastPromo = w.now; recordAppt(w, fam.id, { office: 'Captain', who: ch.c.id, by: boss.id, why: 'the family needed another crew, and he was the man for it', passed: ch.passed.map((x) => x.id), backers: [] }); }

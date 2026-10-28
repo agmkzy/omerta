@@ -1,3 +1,4 @@
+import { policyFor } from './direction';
 import { free } from './conv/obey';
 import { menace } from './danger';
 import { temper } from './temper';
@@ -144,7 +145,7 @@ export function generate(w: World, c: Character, kind: Kind): Action[] {
         if (!r || r.grudge < 0.5 || (x.familyId && x.familyId === c.familyId) || x.jailedUntil > now) continue; // (V89: 0.45 → 0.5, docs/V89_HEALTH.md)
         if (!free(w, c, x.id, ownerBiz(w, x.id)?.id)) continue; // (Gate 2a/2b: bound to leave him alone, and, weighing it now, meaning it)
         if (c.isPlayer && !sanctioned(w, c, x)) continue;
-        const hi = x.rank === 'boss' || x.rank === 'underboss' ? 0.4 : 0;
+        const hi = (x.rank === 'boss' || x.rank === 'underboss' ? 0.4 : 0) + (({ quiet: 0.15, hard: -0.1 } as Record<string, number>)[policyFor(w, c) ?? ''] ?? 0); // (direction.ts)
         const base = r.grudge * (0.6 + tp.pride * 0.2) + T.violence * 0.2 + tp.volatility * 0.15 - T.caution * 0.25 - tp.caution * 0.2 - (r.fear ?? 0) * 0.4 * (1 - tp.courage) + T.ambition * 0.05 - hi - crime - 0.08;
         const tag = `${grudgeWord(r.grudge)} grudge`;
         // Someone already laid up in bed isn't beaten again; each kind of revenge has its own cooldown.

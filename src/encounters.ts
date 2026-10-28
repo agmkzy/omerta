@@ -1,3 +1,4 @@
+import { counselChoose } from './succession';
 import { routine, spotById } from './city';
 import { kinTie } from './kin';
 import { answerImposed } from './imposed';
@@ -542,6 +543,7 @@ export function choose(w: World, p: Character, e: Enc, code: string): { lines: s
   if (e.kind === 'imposed') return answerImposed(w, p, e, code);
   if (e.kind === 'score') return scoreChoose(w, p, e, code); // a truck, played: score.ts
   if (['bigbet', 'cantpay', 'rivalbook', 'pad'].includes(e.kind)) return bookChoose(w, p, e, code); // the book: book.ts
+  if (e.kind === 'counsel') return { lines: counselChoose(w, p, e, code), minutes: 20 }; // the boss asks his consigliere: succession.ts
   if (e.kind === 'ent') return entChoose(w, p, e, code); // what has come about around an enterprise: enterprise.ts
   if (e.kind === 'place') return placeChoose(w, p, e, code); // among the people of a place of his: establishments.ts
   if (e.kind === 'cometo' || e.kind === 'quarrel' || e.kind === 'answer') return authorityChoose(w, p, e, code); // his crew and what he answers for: authority.ts

@@ -1,4 +1,5 @@
 // The road to the next rank, and what your rank lets you do.
+import { POLICY, policyReport, type Policy } from '../direction';
 import { famName, money } from '../core';
 import { chairOptions, pathInfo, powerOptions, raisable, RANKS } from '../path';
 import { members } from '../career';
@@ -62,12 +63,18 @@ export function manageView(): string {
   const all = members(w, fam.id).filter((c) => c.id !== p.id);
   const order = ['underboss', 'capo', 'soldier', 'associate'];
   all.sort((a, b) => order.indexOf(a.rank) - order.indexOf(b.rank) || b.lifetimeKick - a.lifetimeKick);
-  let out = `<h1 class="page">The ${esc(fam.name)} family</h1><p class="muted pad">You’re the boss. Make a man, or break one. Men remember both. Demotions especially.</p>`;
+  let out = `<h1 class="page">The ${esc(fam.name)} family</h1><p class="muted pad">You’re the boss. Make a man, or break one. Men remember both. Demotions especially.</p>` + directionCard();
   for (const c of all.slice(0, 40)) {
     out += `<div class="ui-card"><div class="row"><b>${lk(c.name)}</b><small class="muted"> ${esc(c.rank)} &middot; ${money(c.lifetimeKick)} passed up${c.bossId && w.chars[c.bossId] ? ' &middot; under ' + esc(w.chars[c.bossId].name.split(' ')[0]) : ''}</small></div><div class="ui-pills">`
       + RANKS.map((r) => `<button class="ui-pill ${c.rank === r ? 'on' : ''}" ${c.rank === r ? 'disabled' : `data-a="setrank:${c.id}|${r}"`}>${r === 'underboss' ? 'Underboss' : r[0].toUpperCase() + r.slice(1)}</button>`).join('') + `</div></div>`;
   }
   return out + manageExtras();
+}
+// The family's direction: the boss's word to the captains on what the family is doing for now (direction.ts)
+function directionCard(): string {
+  const w = W(), p = P(), f = w.fam[p.familyId!], pol = f.policy && f.policy.until > w.now ? f.policy : undefined;
+  const heard = policyReport(w, p);
+  return h('The family’s direction', pol ? POLICY[pol.kind as Policy].label : 'none given') + (heard.length ? heard.map((x) => `<p class="cr-note">${esc(x)}</p>`).join('') : '') + choices((Object.keys(POLICY) as Policy[]).map((k) => ({ a: `policy:${k}`, label: POLICY[k].label, hint: POLICY[k].hint, sel: pol?.kind === k })), 'The family’s direction');
 }
 
 export function commView(): string {

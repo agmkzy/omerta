@@ -38,6 +38,7 @@ import type { World } from './types';
 import { relevance } from './reports';
 import { ignoreDispute, investigate, callSitdown, playerActed, touchDispute } from './disputes';
 import { askLeave, noteBreach, sendMan, type Deed } from './command';
+import { setPolicy, type Policy } from './direction';
 import { orderTarget } from './ui/orderview';
 import { whereIs } from './where';
 import { back as backBtn } from './ui/common';
@@ -898,6 +899,7 @@ function handle(a: string, v: string) {
     case 'court': return pass(60, courtBoss(w, P(), v), { t: 'comm' });
     case 'propose': return pass(90, propose(w, P(), args[0], args[1] || undefined), { t: 'comm' });
     case 'consig': return pass(5, setConsigliere(w, P(), w.chars[v]), { t: 'manage' });
+    case 'policy': return pass(60, setPolicy(w, P(), v as Policy), { t: 'tab', name: 'today' });
     case 'heir': return pass(5, setHeir(w, P(), w.chars[v]), { t: 'manage' });
     case 'setboss': return pass(5, setBoss(w, P(), w.chars[args[0]], w.chars[args[1]]), { t: 'manage' });
     case 'setrank': { const lines = setRank(w, P(), w.chars[args[0]], args[1] as import('./types').Rank); return pass(5, lines, { t: 'manage' }); }

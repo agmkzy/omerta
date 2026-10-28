@@ -4,6 +4,7 @@ import { dealDue } from './crossdeal';
 import { betDue } from './book';
 import { huntDue } from './violence';
 import { orderDue } from './command';
+import { adviceDue } from './hearing';
 // Delayed consequences. Violence and secrets do not resolve when they happen: witnesses come forward,
 // the police take an interest, a client calls in a favour, a false accusation comes apart.
 import { addFact, bear, clamp, DEED, ease, feel, handleDeath, learn, ownerBiz, rel, repute } from './core';
@@ -63,6 +64,11 @@ export function pendingTick(w: World) {
       }
       case 'loyalty': {
         loyaltyDue(w, q); // (the player sold his captain's business: whether it comes out now)
+        break;
+      }
+      case 'advice': {
+        const b = q.a ? w.chars[q.a] : undefined, c = q.b ? w.chars[q.b] : undefined; // (hearing.ts: the truth about a man the consigliere advised on)
+        if (b && c) adviceDue(w, b, c, q.note === 'right', q.c ? w.chars[q.c] : undefined);
         break;
       }
       case 'order': {

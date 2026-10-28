@@ -1,3 +1,4 @@
+import { policyFor } from './direction';
 import { arch } from './voice';
 import { skimNoticed } from './situ';
 import { temper, viewOf } from './temper';
@@ -297,7 +298,7 @@ export function settleOne(w: World, c: Character) {
   const gap = jailed ? 0 : Math.max(0, expected - due);
   if (gap > Math.max(40, expected * 0.15)) {
     const fl = (boss.books.flags[c.id] ??= { amt: 0, n: 0, last: 0 });
-    const p = clamp(0.3 + temper(boss).caution * 0.4 + (gap / Math.max(1, expected)) * 0.5, 0.15, 0.95);
+    const p = clamp(0.3 + temper(boss).caution * 0.4 + (gap / Math.max(1, expected)) * 0.5 + (policyFor(w, boss) === 'discipline' ? 0.2 : 0), 0.15, 0.95); // (direction.ts: a boss's word to clean house)
     if (rng.chance(p)) {
       fl.amt += gap;
       fl.n++;
