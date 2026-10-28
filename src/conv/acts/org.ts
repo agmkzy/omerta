@@ -21,7 +21,8 @@ import { first, line, out, R, T, tweak, voice } from './common';
 import { inFamily, isSuperior } from './words';
 import { canSpeakUp, isFamilyBoss, upward } from '../relation';
 import { booksAnswer } from './family';
-import { isConsigliere } from '../../standing';
+import { careerRecord, isConsigliere } from '../../standing';
+import { successionPicture } from '../../succession';
 import { ACTS } from './index';
 import { said } from './personal';
 
@@ -184,9 +185,19 @@ const promo: Act = {
     // (the man at the top of the player's own seat, asked by his underboss or his consigliere: there is no chair to talk about, only
     // how he sees the man beside him)
     if (isFamilyBoss(w, n) && (h.rank === 'underboss' || isConsigliere(w, h))) {
-      const tr = peek(n, h.id).trust;
-      line(T(c), tr >= 0.7 ? `“You’re where you are because I trust you. Keep it that way.”` : tr >= 0.45 ? `“You do your job. That’s where you stand.”` : `“You want to know where you stand? Think about the last month, and you tell me.”`);
-      return out(10);
+      // (what he says is his situation: whether he is thinking about who follows him, whether the family is under pressure, whether the
+      // man's reach among the captains worries him, how far he trusts him)
+      const tr = peek(n, h.id).trust, f = w.fam[n.familyId!], heir = f.heir === h.id || successionPicture(w, f.id).heir?.id === h.id;
+      const pressed = (f.unrest?.level ?? 0) > 0.3 || Object.values(f.tension ?? {}).some((v) => v >= 5);
+      const reach = careerRecord(w, h).find((d) => d.key === 'influence')?.v ?? 0;
+      const say = heir && tr >= 0.6 ? `“I won’t be in this chair for ever. When I’m done, the family will need a man who knows it. Keep doing what you’re doing.”`
+        : pressed ? `“Right now I need to know who’s with me. Nothing else matters this month. Are you?”`
+        : reach > 0.6 && tr < 0.6 ? `“I hear you’ve been making friends among the captains. Be careful whose friend you are.”`
+        : tr >= 0.7 ? `“You’re where you are because I trust you. You’ve kept things quiet, and I notice. Keep it that way.”`
+        : tr >= 0.45 ? `“You do your job. That’s where you stand.”` : `“You want to know where you stand? Think about the last month, and you tell me.”`;
+      line(T(c), say);
+      // (he asked a question: it is answered, and what is said is a promise he will remember)
+      return out(10, pressed && !(heir && tr >= 0.6) ? [{ code: 'fam_loyal', label: '“I’m with you. You know that.”', note: 'He’ll hold you to it.' }, { code: 'fl_drop', label: '“You have to ask?”' }] : undefined);
     }
     const info = canSay ? pathInfo(w, h) : undefined, rd = canSay ? readiness(w, h) : undefined;
     if (!canSay || !info) { him(c, plain(n.id, canSay ? 'advance.top' : 'advance.notMe')); return out(15); }

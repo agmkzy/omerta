@@ -646,7 +646,7 @@ const mtOpen: Act = {
     return { minutes: 2, next: mtOpen.offersFor!(c, sid) };
   },
 };
-const mt: Act = { base: 'mt', pane: 'personal', run: (c, code) => { const x = T(c), [, sid] = code.split(':'), mc = code.split(':').slice(2).join(':'); /* (a move's own code may have a colon in it: 'lean:c12', 'adv:guilty') */ const r = door.matterAct(x.w, x.p, sid, mc, x.t.id); for (const l of r.lines) line(x, l); return out(r.minutes); } };
+const mt: Act = { base: 'mt', pane: 'personal', run: (c, code) => { const x = T(c), [, sid] = code.split(':'), mc = code.split(':').slice(2).join(':'); /* (a move's own code may have a colon in it: 'lean:c12', 'adv:guilty') */ const r = door.matterAct(x.w, x.p, sid, mc, x.t.id); for (const l of r.lines) line(x, l); /* what follows is the matter's own next moves with this man (a challenge is answered, a denial pressed), while it is open */ return out(r.minutes, mtOpen.offersFor!(c, sid)); } };
 // his trouble (situations.ts): asked about, then what the player can do about it once he has told it
 const sitAskA: Act = {
   base: 'sit_ask', pane: 'personal',

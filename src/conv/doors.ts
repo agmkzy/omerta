@@ -3,6 +3,7 @@
 // Each action leaves an act record (social.log) that obligations are kept or broken by, and, where the world records it, a fact.
 import { addFact, bear, clamp, compat, ease as coreEase, feel, feelAtLeast, feelToOn, knowMore, learn, payDebt as corePayDebt, regard as coreRegard, rel, repute as coreRepute, transfer, writeDown as coreWriteDown } from '../core';
 import * as deeds from '../deeds';
+import { leaveCrew as leaveCrewOf } from '../rank';
 import { share, confide as tellAbout } from '../actions';
 import { handOver as booksHandOver, react as booksReact } from '../books';
 import { giveWork, needsOf } from '../work';
@@ -240,3 +241,22 @@ export function questionAgain(w: World, j: Job): string[] { return questionRepor
 // an offer of amends that comes with money: what is on the table is at least that
 export function raiseTerms(s: Situation, amt: number): void { if (s.terms) s.terms.amt = Math.max(s.terms.amt ?? 0, amt); }
 export { wontBorrowFrom } from '../core'; // (a man does not borrow from his own subordinates)
+// ---- the family's own conversations (conv/acts/family.ts): what they change, through here
+// he owns that he has been keeping money back: the holding back stops, and it is on the record between the two men
+export function admitHolding(w: World, man: Character, to: Character): void {
+  delete man.books.skim; delete man.books.hide;
+  addFact(w, { kind: 'event', actor: man.id, victim: to.id, minor: false, text: `${man.name} admitted to ${to.name} he had been keeping money back.`, district: man.district }, { witnesses: [to.id, man.id] });
+}
+// he is told it stops, and he means it: the holding back stops (nothing is recorded as an admission: he admitted nothing)
+export function stopHolding(man: Character): void { delete man.books.skim; delete man.books.hide; }
+// money handed back, from one man's pocket to another's
+export function repay(w: World, from: Character, to: Character, amt: number): number { return transfer(w, from, to, Math.max(0, Math.round(amt)), 'kickup', 'repaid what he kept back'); }
+// put out of a man's crew, for a reason the crew will hear
+export function putOut(w: World, boss: Character, man: Character, why: string): void {
+  leaveCrewOf(w, man);
+  addFact(w, { kind: 'event', actor: boss.id, victim: man.id, minor: false, text: `${boss.name} put ${man.name} out of his crew ${why}.`, district: boss.district }, { witnesses: [boss.id, man.id] });
+}
+// a man said in the player's hearing that another man is at fault: what was said, on the record as said (true or not)
+export function saidOf(w: World, by: Character, about: Character, to: Character, text: string): void { addFact(w, { kind: 'event', actor: by.id, victim: about.id, minor: true, text, district: by.district }, { witnesses: [to.id, by.id] }); }
+// a made man vouches for his crewman: his word, on the record and on him
+export function vouch(w: World, p: Character, m: Character, to: Character): void { m.backer = p.id; (p.career ??= { done: 0, failed: 0, log: [] }).log.push({ t: w.now, text: `Put ${m.name}’s name forward to be made, to ${to.name}` }); }

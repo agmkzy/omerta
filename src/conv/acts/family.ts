@@ -2,10 +2,12 @@
 // from what that man knows and how he regards the one asking: the line and the books as a made man knows them, a crew and who is
 // talked of for one as a captain knows it, and the risk a made man takes when he puts his own crewman's name forward. Nothing is
 // a number; a man who doesn't trust you says less, and a proud captain may not like being asked at all.
-import { bear, peek } from '../../core';
+import { bear, ease, feel, peek } from '../../core';
 import { OPS } from '../../rackets';
 import { booksOpen, captaincyContenders, lineOf, preferredSuccessor, tellLine } from '../../succession';
 import { careerRecord, isConsigliere, positionOf } from '../../standing';
+import { heardAgainst, signsOf } from '../notice';
+import { nameIn } from '../persp';
 import { agoWords, lastOf, remember } from '../kit';
 import * as door from '../doors';
 import { jobSaid } from '../../jobs';
@@ -118,9 +120,10 @@ const putName: Act = {
     const x = T(c), { w, p, t } = x, id = code.split(':')[1] ?? '', m = w.chars[id];
     if (!m?.alive) return out(3);
     ask(c, 'fam_name:' + id);
-    m.backer = p.id;
-    (p.career ??= { done: 0, failed: 0, log: [] }).log.push({ t: w.now, text: `Put ${m.name}’s name forward to be made, to ${t.name}` });
-    const v = peek(t, m.id).trust;
+    // (his judgment of the man named, and of the man naming him: a name he doesn't rate, from a man he doesn't trust, he won't take)
+    const v = peek(t, m.id).trust, vp = peek(t, p.id).trust;
+    if (v < 0.2 && vp < 0.5) { line(x, `${first(t)} shakes his head. “${first(m)}? No. I don’t know him, and I don’t know you well enough to take your word for him.”`); return out(10); }
+    door.vouch(w, p, m, t);
     line(x, v >= 0.45 ? `${first(t)} nods. “He’s all right. I’ll remember you said it.”` : `${first(t)} takes a while. “I don’t know him like you do. It’s your word, then.”`);
     tweak(x, 0, 0, 0.01);
     return out(10);
@@ -158,7 +161,7 @@ const more: Act = {
   run: (c) => {
     const x = T(c), { w, p, t } = x, r = R(x); ask(c, 'fam_more'); stamp(w, t, 'fam_more');
     const weight = (r.fear ?? 0) * 0.6 + r.respect * 0.5 + r.trust * 0.2 - temper(t).pride * 0.3 - r.grudge * 0.5;
-    if (weight > 0.2) { if (t.books.skim) delete t.books.skim; if (t.books.hide) delete t.books.hide; line(x, `${first(t)} nods slowly. “You’ll have it.”`); tweak(x, -0.01, 0, 0.02); }
+    if (weight > 0.2) { door.stopHolding(t); line(x, `${first(t)} nods slowly. “You’ll have it.”`); tweak(x, -0.01, 0, 0.02); }
     else { bear(w, t, p.id, 0.06, `${p.name} told him he wasn’t doing enough`); line(x, `${first(t)}’s jaw sets. “I’m doing what I can. If that’s not enough, say so plainly.”`); }
     return out(10);
   },
@@ -234,16 +237,56 @@ const moreResp: Act = {
     return out(10);
   },
 };
-// "That's not what your envelope says." Said to your own man after his account of his week: a man who has been holding out owns it
-// or digs in, by his nerve; a man who hasn't is insulted, and remembers it.
+// "That's not what your envelope says." Said to your own man after his account of his week. What he does is what he is and what he has
+// done (invariant F): a man who has been holding out and fears you, or hasn't the nerve, owns it; a careful one with men under him puts
+// it on one of them; a proud or hot one takes it as an insult; a cautious one asks what you have. A man who hasn't been holding out is
+// insulted, or offers his books, as his nature runs. What follows depends on what he said: a denial is answered as a denial, and only an
+// admission is recorded as one.
+const shortWeeks = (t: Character) => t.books.history.slice(-4).filter((h) => h.due > 0 && h.paid < h.due * 0.9).length;
 const challenge: Act = {
   base: 'fam_challenge', pane: 'business',
   run: (c) => {
-    const x = T(c), { w, p, t } = x, hiding = !!(t.books.skim || t.books.hide), tp = temper(t);
-    if (hiding && tp.caution + t.skills.nerve * 0.5 < 0.9) { delete t.books.skim; delete t.books.hide; line(x, `${first(t)} looks at the table. “All right. I’ve been keeping a little back. It stops.”`); tweak(x, -0.02, 0, 0.04); return out(10); }
-    if (hiding) { line(x, `“Then the envelope’s wrong,” ${first(t)} says, and holds your eye. He’s lying, or he’s very sure of himself.`); return out(10); }
-    bear(w, t, p.id, 0.08, `${p.name} as good as called him a thief`); line(x, `${first(t)} goes very still. “Count it yourself. Every dollar. Then you can apologise.”`);
+    const x = T(c), { w, p, t } = x, r = R(x), tp = temper(t), hiding = !!(t.books.skim || t.books.hide);
+    const men = Object.values(w.chars).filter((m) => m.alive && m.bossId === t.id).sort((a, b) => (a.id < b.id ? -1 : 1));
+    if (hiding) {
+      if ((r.fear ?? 0) >= 0.4 || (r.respect >= 0.55 && t.skills.nerve < 0.5)) return admitted(c);
+      if (men.length && tp.caution > 0.55 && tp.pride < 0.6) { remember(w, t.id, 'blamed', men[0].id); line(x, `“It’s not me. ${nameIn(w, men[0].id, t, p)}’s been light, and I’ve been covering for him.”`); return out(10, [{ code: 'fch:liar', label: '“Don’t lie to me.”', note: 'If he’s lying, he may crack. If he isn’t, he won’t forget it.' }, { code: 'fch:sort', label: '“Then sort him out.”', note: 'You take his word for it.' }]); }
+      if (tp.pride > 0.6 || tp.volatility > 0.6) { line(x, `${first(t)}’s face changes. “You calling me a thief?”`); return out(10, [{ code: 'fch:asking', label: '“I’m asking you.”', note: 'Hold the line without making it worse.' }, { code: 'fch:drop', label: '“Forget I said it.”', note: 'You back off. He’ll know you did.' }]); }
+      line(x, `${first(t)} doesn’t blink. “What makes you say that?”`);
+      return out(10, [...(shortWeeks(t) ? [{ code: 'fch:books', label: `“Your envelopes have been light ${shortWeeks(t) === 1 ? 'a week' : `${shortWeeks(t)} weeks`} out of four.”`, note: 'It’s in your books. He knows it.' }] : []), { code: 'fch:feel', label: '“Call it a feeling.”', note: 'You have nothing to show him.' }]);
+    }
+    if (tp.pride > 0.55 || tp.volatility > 0.6) { bear(w, t, p.id, 0.08, `${p.name} as good as called him a thief`); line(x, `${first(t)} goes very still. “Count it yourself. Every dollar. Then you can apologise.”`); return out(10, [{ code: 'fch:sorry', label: '“I was wrong. I’m sorry.”', note: 'It costs you something. It saves more.' }, { code: 'fch:stand', label: '“I’ll count it.”', note: 'You don’t take it back.' }]); }
+    line(x, `“Go through my books with me, any time you want. It’s all there.” He doesn’t look worried.`);
     return out(10);
+  },
+};
+// he owns it: and then what you do with it
+function admitted(c: Ctx) {
+  const x = T(c), { w, p, t } = x;
+  door.admitHolding(w, t, p);
+  line(x, `${first(t)} looks at the table. “All right. I’ve been keeping a little back.”`);
+  return out(10, [{ code: 'fch:back', label: '“Put it back. All of it.”', note: 'What he can pay, now.' }, { code: 'fch:warn', label: '“Once. There won’t be a second time.”', note: 'He keeps his place, and knows where he stands.' }, { code: 'fch:out', label: '“You’re out of my crew.”', note: 'The hardest thing. Others will hear why.' }]);
+}
+const fch: Act = {
+  base: 'fch', pane: 'business',
+  run: (c, code) => {
+    const x = T(c), { w, p, t } = x, r = R(x), k = code.split(':')[1], hiding = !!(t.books.skim || t.books.hide);
+    switch (k) {
+      case 'liar': if (hiding && t.skills.nerve < 0.6) return admitted(c); line(x, `“I told you how it is.” He holds your eye. You can’t prove otherwise, and he knows it.`); remember(w, t.id, 'denied', 'envelope'); return out(5);
+      case 'sort': { const blamed = w.chars[String(lastOf(w, t.id, 'blamed')?.out ?? '')]; line(x, `“I will.”`); if (blamed?.alive) door.saidOf(w, t, blamed, p, `${t.name} told ${p.name} ${blamed.name} had been light with his envelope.`); return out(5); }
+      case 'asking': if (hiding && ((r.fear ?? 0) >= 0.3 || r.respect >= 0.5)) return admitted(c); bear(w, t, p.id, 0.06, `${p.name} pressed him about his envelope`); line(x, `“Then the answer’s no.” He doesn’t look away. Neither do you.`); remember(w, t.id, 'denied', 'envelope'); return out(5);
+      case 'drop': feel(w, t, p.id, 'respect', -0.04, `${p.name} backed down`); line(x, `He nods slowly. He’ll remember you backed off.`); return out(3);
+      case 'books': if (hiding && (t.skills.nerve < 0.65 || (r.fear ?? 0) >= 0.25)) return admitted(c);
+        line(x, `“Slow weeks. You want to come and stand on the corner with me, you’ll see.” It’s an answer. You don’t have to believe it.`); remember(w, t.id, 'denied', 'envelope');
+        return out(5, [{ code: 'fch:warn', label: '“Then the next one had better not be.”', note: 'He knows you’re watching.' }]);
+      case 'feel': line(x, `He spreads his hands. “Then there’s nothing to talk about.”`); return out(3);
+      case 'sorry': ease(t, p.id, 0.5); feel(w, t, p.id, 'respect', 0.02); line(x, `He takes a breath. “All right. Forget it.” It isn’t forgotten, but it’s smaller.`); return out(3);
+      case 'stand': bear(w, t, p.id, 0.05, `${p.name} wouldn’t take it back`); line(x, `“Go ahead.” He says it like a man with nothing to hide.`); return out(3);
+      case 'back': { const owed = Math.max(0, Math.round(t.books.history.slice(-4).reduce((a, h) => a + Math.max(0, h.due - h.paid), 0))), pay = door.repay(w, t, p, Math.max(100, owed)); line(x, pay ? `He counts it out on the table: ${'$' + pay.toLocaleString('en-US')}.${pay < owed ? ' It’s all he has on him.' : ''}` : `“I haven’t got it. Not now.”`); bear(w, t, p.id, 0.04, `${p.name} made him pay it back`); return out(5); }
+      case 'warn': door.memoOnce(w, t, p.id, 'threat', `He was told there will not be a second time.`); line(x, `“Understood.”`); return out(3);
+      case 'out': door.putOut(w, p, t, 'for keeping money back'); bear(w, t, p.id, 0.25, `${p.name} threw him out of his crew`); line(x, `He stands, slowly. “You’ll regret this.” Maybe. Your crew will hear why.`); return out(5);
+    }
+    return out(1);
   },
 };
 // "What are you hearing?" The boss, or the man acting for him, to his consigliere: what a consigliere is for. He tells what he could
@@ -256,16 +299,19 @@ const hearing: Act = {
     const x = T(c), { w, p, t } = x, r = R(x); ask(c, 'fam_hear');
     if (r.trust < 0.35) { line(x, `“Nothing worth your time.” He says it smoothly. Too smoothly, maybe.`); return out(5); }
     const caps = Object.values(w.chars).filter((m) => m.alive && m.familyId === p.familyId && m.rank === 'capo' && m.id !== t.id).sort((a, b) => (a.id < b.id ? -1 : 1));
-    // (only what could have reached him: a captain who talks to him, or something he knows of the man; never the books' own truth)
-    const heard = (m: Character) => peek(m, t.id).trust >= 0.3 || Object.keys(t.known).some((id) => w.facts[id]?.actor === m.id && !w.facts[id].minor);
-    const sore = caps.filter((m) => peek(m, p.id).grudge > 0.2 && heard(m)).sort((a, b) => peek(b, p.id).grudge - peek(a, p.id).grudge)[0];
-    const light = caps.find((m) => (m.books.skim || m.books.hide) && heard(m) && Object.values(w.chars).some((x) => x.bossId === m.id && peek(x, t.id).trust >= 0.3));
-    if (sore) line(x, `“${first(sore)}. He hasn’t forgotten ${peek(sore, p.id).why?.text ?? 'whatever it is between you'}, and he talks about it where he shouldn’t.”`);
-    if (light) line(x, `“And ${first(light)}’s money is lighter than his crew. I can’t prove it. I’d look.”`);
-    if (!sore && !light) line(x, `“It’s quiet. The captains are earning and nobody is talking out of turn. Quiet doesn’t last.”`);
+    // (only what reached him: what a captain said or did against the boss in his hearing, or was told him; and what he can see of how a
+    // captain lives. Said as he holds it: seen, told, or a sign; never the captain's books, which he has not seen)
+    const sore = caps.map((m) => ({ m, f: heardAgainst(w, t, m, p) })).filter((x) => x.f).sort((a, b) => b.f!.t - a.f!.t)[0];
+    const flush = caps.find((m) => signsOf(w, t, m).includes('flush'));
+    if (sore) { const k = t.known[sore.f!.id], told = k?.from && k.from !== t.id ? w.chars[k.from] : undefined; line(x, told ? `“${first(sore.m)}. ${nameIn(w, told.id, t, p)} tells me he’s been talking against you. I didn’t hear it myself.”` : `“${first(sore.m)}. He’s been talking against you. I heard it myself.”`); }
+    if (flush) line(x, `“Something’s not right with ${first(flush)}’s money. He’s spending more than his crew brings in. I can’t tell you why.”`);
+    if (!sore && !flush) line(x, `“It’s quiet. Nobody is talking out of turn that I’ve heard. Quiet doesn’t last.”`);
     tweak(x, 0.01); return out(15);
   },
 };
-export const FAMILY: Act[] = [hearing, moreResp, challenge, booksAsk, crewAsk, crewNeed, crewMen, crewProve, putName, report, more, counsel, dirTalk, dirPress, dirLet];
+// "I'm with you." Said to the boss when he asks, under pressure: a promise, kept in the world's commitments (memos), that a later move
+// against him breaks.
+const loyal: Act = { base: 'fam_loyal', pane: 'business', run: (c) => { const x = T(c); door.memoOnce(x.w, x.t, x.p.id, 'promise', 'He said he was with him, when it mattered.'); tweak(x, 0.03); line(x, `${first(x.t)} holds your eye a moment longer. “Good.”`); return out(5); } };
+export const FAMILY: Act[] = [loyal, hearing, moreResp, challenge, fch, booksAsk, crewAsk, crewNeed, crewMen, crewProve, putName, report, more, counsel, dirTalk, dirPress, dirLet];
 // (the position word is read where each answer says what the man can know; kept here so the import is used by intent)
 export const canSpeakToBooks = (w: World, c: Character) => MADE.has(c.rank) && positionOf(w, c) !== 'none';

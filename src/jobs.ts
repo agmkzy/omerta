@@ -1396,5 +1396,5 @@ export function haggleJob(w: World, j: Job): { lines: string[]; minutes: number 
 const IMPERATIVE = new Set(['Bring', 'Burgle', 'Carry', 'Collect', 'Find', 'Get', 'Guard', 'Lean', 'Ride', 'Shake', 'Spend', 'Take', 'Watch', 'Work']);
 export function jobSaid(j: Job): string {
   const first = j.title.split(' ')[0];
-  return IMPERATIVE.has(first) ? `“I need somebody to ${j.title.charAt(0).toLowerCase() + j.title.slice(1)}. It’s yours if you want it.”` : `“Here’s one for you. ${j.title}.”`;
+  return IMPERATIVE.has(first) ? `“I need somebody to ${j.title.charAt(0).toLowerCase() + j.title.slice(1)}. It’s yours if you want it.”` : `“I’ve got something for you.” ${j.title}.`; // (a job's title is a record, said of the man; inside his own quotes it would have him speak of himself as another man)
 }

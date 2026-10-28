@@ -18,6 +18,7 @@ import { closeSit, isOpen, know, spawn, tell, registerStep } from './situ';
 import { MATTERS, confront, type Opt } from './matters';
 import { noteRuling, positionOf } from './standing';
 import { leaveCrew } from './rank';
+import { heardAgainst, seesLifeOf, signsOf } from './conv/notice';
 import { DAY, WEEK, type Character, type Id, type Situation, type World } from './types';
 
 const first = (c: Character) => c.name.split(' ')[0];
@@ -166,8 +167,10 @@ function askAround(w: World, s: Situation, p: Character): string[] {
   const out: string[] = [];
   if (!talk.length) { note(s, 'Nobody around them would say anything to you.'); return ['Nobody will say anything. Whether that is loyalty or fear, you can’t tell.']; }
   const c = talk[0];
-  if (guilty(s)) { M(s).around = 2; note(s, `${first(c)} told you ${first(def)} has had more money than his envelopes explain.`); out.push(`${first(c)}, after a while: “He’s been flush. Flusher than his envelopes, if you ask me. I didn’t say that.”`); }
-  else if (peek(acc, def.id).grudge > 0.3) { M(s).around = -1; note(s, `${first(c)} told you ${first(acc)} has had it in for ${first(def)} for a long time${peek(acc, def.id).why ? `, since ${peek(acc, def.id).why!.text}` : ''}.`); out.push(`${first(c)} shrugs. “${first(acc)}’s had it in for him for a long time. You know that, right?”`); }
+  // (what he can say is what he has seen: how the accused lives, or what has passed between the two men in front of him)
+  const flush = signsOf(w, c, def).includes('flush'), bad = heardAgainst(w, c, acc, def);
+  if (flush) { M(s).around = 2; note(s, `${first(c)} told you ${first(def)} has been spending more than his envelopes explain.`); out.push(`${first(c)}, after a while: “He’s been flush. Flusher than his envelopes, if you ask me. I didn’t say that.”`); }
+  else if (bad || peek(acc, def.id).grudge > 0.3 && seesLifeOf(w, c, acc)) { M(s).around = -1; note(s, `${first(c)} told you ${first(acc)} has had it in for ${first(def)}${bad ? `: he saw it himself` : ''}.`); out.push(`${first(c)} shrugs. “${first(acc)}’s had it in for him a long time. ${bad ? 'I’ve seen it.' : 'Everybody around them knows it.'}”`); }
   else { note(s, `${first(c)} didn’t know anything about it.`); out.push(`${first(c)} doesn’t know anything about it, and seems to mean it.`); }
   if (quiet.length) { note(s, `${first(quiet[0])} wouldn’t meet your eye.`); out.push(`${first(quiet[0])} won’t meet your eye.`); }
   if (w.rng.chance(0.35)) { know(w, s, def.id, 2, 'heard he was asking'); M(s).defHeard = 1; }
@@ -235,21 +238,53 @@ function rule(w: World, s: Situation, j: Character, r: Ruling, by?: { advice?: s
   return lines;
 }
 // the consigliere's advice, taken or not by a boss who has his own view; when the truth comes out later he remembers whose advice it was
-function advise(w: World, s: Situation, p: Character, advice: 'guilty' | 'false' | 'unsure'): string[] {
-  const boss = w.chars[role(s, 'judge')!], acc = w.chars[role(s, 'acc')!], def = w.chars[role(s, 'def')!];
-  const trustCon = peek(boss, p.id).trust, ownLean = peek(boss, acc.id).trust - peek(boss, def.id).trust; // >0: he leans to believe the accuser
-  let r: Ruling;
-  if (advice === 'unsure') r = ownLean > 0.15 ? 'guilty' : 'none';
-  else r = trustCon + 0.25 > Math.abs(ownLean) ? (advice === 'guilty' ? 'guilty' : 'false') : ownLean > 0 ? 'guilty' : 'false';
-  const followed = advice !== 'unsure' && r === advice;
-  const lines = [followed ? `${first(boss)} hears you out, and does what you said.` : advice === 'unsure' ? `${first(boss)} doesn’t like “I don’t know.” He decides it himself.` : `${first(boss)} hears you out, and decides the other way.`];
-  lines.push(...rule(w, s, boss, r, { advice }));
-  const right = advice === 'unsure' ? 0 : (advice === 'false') === !guilty(s) ? 1 : -1;
-  M(s).adv = right;
-  // the truth surfaces in time, or doesn't: when it does, the boss remembers who told him what (consequences.ts 'reveal' would be
-  // the general route; here it is the advice itself that is on the record)
-  if (right !== 0) (w.pending ??= []).push({ id: 'p' + w.nextId++, due: w.now + w.rng.int(3, 8) * WEEK, kind: 'advice', a: boss.id, b: p.id, note: right > 0 ? 'right' : 'wrong', c: def.id });
-  return lines;
+// What the consigliere can point to, as the boss would weigh it: the books, an admission, what a man said he saw, an accuser whose story
+// changed, what the man sent to look made of it. Positive leans to guilt. (The truth is not in here: only what was found.)
+function weightOf(s: Situation): number {
+  return (num(s, 'admit') ? 0.6 : 0) + (num(s, 'bookSays') === 1 ? 0.35 : num(s, 'bookSays') === -1 ? -0.35 : 0) + (num(s, 'around') === 2 ? 0.2 : num(s, 'around') === -1 ? -0.2 : 0) + (num(s, 'slip') ? -0.35 : 0) + num(s, 'ltSays') * 0.15;
+}
+// The boss weighs the consigliere's advice: how far he trusts him, what he can point to, how the boss himself stands with the two men,
+// how much is at stake, and his temper. He may take it, ask what it rests on, decide against it, or keep it to think over and decide
+// later on his own. He is a man deciding, not an instrument of the advice. (Invariant F.)
+function advise(w: World, s: Situation, p: Character, advice: 'guilty' | 'false' | 'unsure', pressed?: 'show' | 'insist'): string[] {
+  const boss = w.chars[role(s, 'judge')!], acc = w.chars[role(s, 'acc')!], def = w.chars[role(s, 'def')!], tp = temper(boss);
+  const trustCon = peek(boss, p.id).trust, lean = peek(boss, def.id).trust + peek(boss, def.id).affection * 0.5 - peek(boss, acc.id).trust; // >0: he is on the accused's side
+  const e = weightOf(s), serious = s.m?.charge === 'talk' || def.rank === 'capo' ? 0.2 : 0;
+  const B = first(boss), D = first(def), A = first(acc);
+  M(s).advice = advice;
+  const decide = (r: Ruling, said: string) => { const lines = [said, ...rule(w, s, boss, r, { advice })]; remember(); return lines; };
+  const remember = () => {
+    const right = advice === 'unsure' ? 0 : (advice === 'false') === !guilty(s) ? 1 : -1;
+    M(s).adv = right;
+    if (right !== 0) (w.pending ??= []).push({ id: 'p' + w.nextId++, due: w.now + w.rng.int(3, 8) * WEEK, kind: 'advice', a: boss.id, b: p.id, note: right > 0 ? 'right' : 'wrong', c: def.id });
+  };
+  if (advice === 'unsure') {
+    const own = e - lean;
+    if (Math.abs(own) < 0.15) { M(s).postAt = w.now + w.rng.int(3, 6) * DAY; s.next = Math.min(s.next ?? 1e12, M(s).postAt as number); return [`${B} rubs his eyes. “Then I’ll sleep on it.” He doesn’t say when he’ll decide.`]; }
+    return decide(own > 0 ? 'guilty' : 'false', `${B} doesn’t like “I don’t know.” “Then I’ll decide it myself.”`);
+  }
+  const toward = advice === 'guilty' ? 1 : -1;
+  let support = trustCon * 0.6 + toward * e * 0.6 - toward * lean * 0.5 - serious + tp.volatility * 0.1 - tp.caution * 0.1;
+  if (pressed === 'show') support += toward * e * 0.5;          // (what you found, laid out: it counts as far as it goes)
+  if (pressed === 'insist') support += trustCon * 0.3 - 0.1;    // (your word: it counts as far as he trusts it)
+  const verdict: Ruling = advice === 'guilty' ? 'guilty' : 'false';
+  if (support > 0.45) return decide(verdict, advice === 'guilty'
+    ? (lean > 0.2 ? `${B} is quiet a long time. “I’ve known ${D} a long time. All right. If you say so.”` : `${B} nods. “I thought as much.”`)
+    : (lean < -0.2 ? `${B} frowns. “I’d have bet on it the other way. All right. ${D} keeps his place.”` : `${B} nods. “Good. I didn’t want it to be him.”`));
+  if (support > 0.15 && !pressed) {
+    M(s).challenged = advice;
+    return [advice === 'guilty' ? `${B} leans back. “You’re sure? ${D} has been with us a long time. What have you got?”` : `${B} isn’t convinced. “${A} doesn’t make things up for nothing. What makes you so sure?”`];
+  }
+  if (toward * lean > 0.25 || support < -0.1) return decide(advice === 'guilty' ? 'false' : 'guilty', advice === 'guilty' ? `${B} shakes his head. “No. Not ${D}. I don’t see it.”` : `${B} shakes his head. “No. I believe ${A}.”`);
+  M(s).postAt = w.now + w.rng.int(3, 6) * DAY; s.next = Math.min(s.next ?? 1e12, M(s).postAt as number);
+  return [`${B} looks at you a long time. “Leave it with me.” Whatever he decides, it won’t be tonight.`];
+}
+// a boss who said he'd think it over decides on his own: what was found, and how he stands with the two men
+function decideLater(w: World, s: Situation) {
+  const boss = w.chars[role(s, 'judge')!], def = w.chars[role(s, 'def')!], acc = w.chars[role(s, 'acc')!];
+  const own = weightOf(s) - (peek(boss, def.id).trust - peek(boss, acc.id).trust) * 0.5;
+  delete s.m!.postAt;
+  rule(w, s, boss, own > 0.1 ? 'guilty' : own < -0.1 ? 'false' : 'none');
 }
 export function adviceDue(w: World, boss: Character, con: Character, right: boolean, def?: Character) {
   if (!boss.alive || !con.alive || !w.rng.chance(0.6)) return;
@@ -276,6 +311,7 @@ function appeal(w: World, s: Situation, ub: Character): string[] {
 function step(w: World, s: Situation) {
   const acc = live(w, role(s, 'acc')), def = live(w, role(s, 'def')), j = live(w, role(s, 'judge')), p = P(w);
   if (!acc || !def || !j || !p) return closeSit(w, s, 'gone', ['one of them is gone'], 4);
+  if (num(s, 'postAt') && num(s, 'postAt') <= w.now) return decideLater(w, s);
   const lt = live(w, role(s, DELEGATE));
   if (lt && num(s, 'ltDue') && num(s, 'ltDue') <= w.now) delegateReport(w, s, p, lt);
   const age = (w.now - s.since) / DAY;
@@ -304,6 +340,7 @@ function step(w: World, s: Situation) {
     return closeSit(w, s, 'left unanswered', ['nobody settled it', 'the crew noticed'], 6);
   }
   s.next = w.now + w.rng.int(2, 4) * DAY;
+  if (num(s, 'postAt')) s.next = Math.min(s.next, num(s, 'postAt')); // (a boss who said he would think it over decides on the day he meant)
 }
 function blows(w: World, s: Situation, acc: Character, def: Character, j: Character) {
   addFact(w, { kind: 'beating', actor: acc.id, victim: def.id, story: 'sit:' + s.id, text: `${acc.name} beat up ${def.name} over the money, when nobody would settle it.`, district: def.district }, { witnesses: [acc.id, def.id, j.id] });
@@ -343,9 +380,14 @@ MATTERS.hearing = {
       }
     }
     // the consigliere's finding, said to the boss himself, here or from the record
-    if (seat === 'inq' && (!t || t.id === role(s, 'judge'))) {
+    if (seat === 'inq' && !num(s, 'postAt') && (!t || t.id === role(s, 'judge'))) { // (not while he is thinking it over: your advice has been given)
       // (to his face, it is said; from the record, it is what you go and tell him)
       const j = first(w.chars[role(s, 'judge')!]), face = !!t;
+      if (s.m?.challenged) {
+        out.push({ code: 'adv:show', label: face ? `“Here’s what I found.”` : `Lay out for ${j} what you found`, hint: 'What you can point to, and no more. It counts as far as it goes.', big: true });
+        out.push({ code: 'adv:insist', label: face ? '“It’s my judgment. That’s what you keep me for.”' : `Tell ${j} it’s your judgment`, hint: 'It counts as far as he trusts you.', big: true });
+        return out;
+      }
       out.push({ code: 'adv:guilty', label: face ? `“${first(def)} did it. I’m sure of it.”` : `Tell ${j}: ${first(def)} did it`, hint: 'He decides. If you are wrong, he will remember whose advice it was.', big: true });
       out.push({ code: 'adv:false', label: face ? `“There’s nothing in it. ${first(acc)} has his reasons.”` : `Tell ${j}: there’s nothing in it`, hint: `If you’re wrong, that is remembered too.`, big: true });
       out.push({ code: 'adv:unsure', label: face ? '“I can’t tell you for certain.”' : `Tell ${j} you can’t be sure`, hint: 'Honest. He doesn’t like it, and decides by his own lights.' });
@@ -376,6 +418,7 @@ MATTERS.hearing = {
     if (code === 'around') return askAround(w, s, p);
     if (code.startsWith('lt:')) { const m = w.chars[code.slice(3)]; return m ? delegateTo(w, s, p, m) : []; }
     if (code.startsWith('rule:')) { const r = code.slice(5) as Ruling; const lines = rule(w, s, p, r); if (positionOf(w, p) === 'underboss') lines.push(...appeal(w, s, p)); return lines; }
+    if (code === 'adv:show' || code === 'adv:insist') { const a = String(s.m?.challenged) as 'guilty' | 'false'; delete s.m!.challenged; const found = notesOf(s); return [...(code === 'adv:show' && found.length ? [`You lay it out: ${found.slice(-3).join(' ')}`] : []), ...advise(w, s, p, a, code === 'adv:show' ? 'show' : 'insist')]; }
     if (code.startsWith('adv:')) return advise(w, s, p, code.slice(4) as 'guilty' | 'false' | 'unsure');
     if (code === 'mediate') {
       const willing = peek(acc, def.id).grudge < 0.5 && peek(def, acc.id).grudge < 0.5 && (guilty(s) ? temper(def).agreeable > 0.4 : temper(acc).agreeable > 0.4);

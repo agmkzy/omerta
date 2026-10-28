@@ -327,7 +327,7 @@ const introVia: Act = {
   run: (c, code) => {
     const x = T(c), { w, p, t } = x, via = w.chars[code.split(':')[1]];
     if (!via?.alive) { line(x, 'He can’t help you with that any more.'); return out(5); }
-    door.introduced(w, p, t); c.v.th.asked.push('met'); tweak(x, 0.1, 0.03, 0.03); door.regard(w, via, p.id, 'respect', 0.01);
+    door.introduced(w, p, t); c.v.th.asked.push('met'); tweak(x, 0.02, 0.02, 0.03); // (an introduction is a reason to talk, not to cooperate: a little respect for who sent you, not trust) door.regard(w, via, p.id, 'respect', 0.01);
     c.v.lines.push({ who: 'narr', text: `${first(via) === first(t) ? via.name : first(via)} had a word with ${t.name} before you arrived.` });
     line(x, voice(x, 'vouch', { V: first(via) === first(t) ? via.name : first(via) }), settled(t.id, 'takes your hand', `${first(via)} vouched for you`));
     return out(15);

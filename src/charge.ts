@@ -151,11 +151,13 @@ MATTERS.charge = {
     if (code.startsWith('why:')) {
       const c = w.chars[code.slice(4)]; M(s).why = 1;
       if (!c) return [];
-      const men = crewOf(w, c), skim = men.filter((x) => x.books.skim || x.books.hide), self = !!(c.books.skim || c.books.hide), inside = men.filter((x) => x.jailedUntil > w.now);
-      const found = self ? `${first(c)} himself is keeping more than he should: his men pay him, and less of it comes up` : skim.length ? `${skim.map((x) => first(x)).join(' and ')} ${skim.length === 1 ? 'is' : 'are'} holding out on ${first(c)}, and he hasn’t caught it` : inside.length ? `${inside.map((x) => first(x)).join(' and ')} ${inside.length === 1 ? 'is' : 'are'} inside, and the crew is short-handed` : 'nobody is stealing: it has been a slow season on his streets';
+      // (a day around them is what he sees: who is living well on what he passes up, who is inside; not their books, which are their own)
+      const flush = (m: Character) => { const h = m.books.history.slice(-4), paid = h.length ? h.reduce((a, y) => a + y.paid, 0) / h.length : 0; return m.cash > Math.max(600, paid * 6); };
+      const men = crewOf(w, c), living = men.filter(flush), inside = men.filter((x) => x.jailedUntil > w.now);
+      const found = flush(c) ? `${first(c)} himself is living well for a man whose crew brings in so little` : living.length ? `${living.map((x) => first(x)).join(' and ')} ${living.length === 1 ? 'is' : 'are'} spending like men with more than their share` : inside.length ? `${inside.map((x) => first(x)).join(' and ')} ${inside.length === 1 ? 'is' : 'are'} inside, and the crew is short-handed` : 'nothing you can see is wrong: the spots are quiet, and it looks like a slow season on his streets';
       M(s).found = found;
       tell(w, s, `${p.name} spent a day around ${c.name}’s crew.`, { actor: p.id, victim: c.id, witnesses: [p.id, c.id], minor: true });
-      if (self) bear(w, c, p.id, 0.05, `${p.name} has been looking into his crew`);
+      bear(w, c, p.id, 0.03, `${p.name} has been looking into his crew`); // (a captain doesn't like the underboss around his men)
       return [`You spend a day around ${first(c)}’s men and his spots. ${found.charAt(0).toUpperCase() + found.slice(1)}.`];
     }
     const [how, id] = code.split(':') as ['ask' | 'lean' | 'offer', string];

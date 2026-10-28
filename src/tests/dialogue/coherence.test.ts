@@ -130,3 +130,45 @@ describe('what arrives, audited at every seat', { tags: ['property'] }, () => {
     assert.deepEqual(r.flags.slice(0, 6), []);
   }, 300_000);
 });
+
+describe('men decide for themselves, and know only what reached them', { tags: ['scenario'] }, () => {
+  const consig = () => { const w = createWorld(7, 'Tony Marino', { start: 'consigliere' }); advance(w, w.now + 5 * DAY); w.now = Math.floor(w.now / DAY) * DAY + 15 * 60; for (const e of w.enc) e.status = 'done'; return w; };
+  ok('a consigliere does not name a captain’s money from his books, only from what he can see; a grievance only if he heard it', async () => {
+    const { rel, addFact } = await import('../../core');
+    const w = consig(), p = P(w), f = w.fam[p.familyId!], boss = w.chars[f.bossId];
+    // the boss asking: play as the boss would (the player is the consigliere; the question is the boss's), so measure the rule itself
+    const { signsOf, heardAgainst } = await import('../../conv/notice');
+    const cap = Object.values(w.chars).find((c) => c.alive && c.familyId === f.id && c.rank === 'capo')!;
+    cap.books.skim = { until: w.now + 30 * DAY, frac: 0.3 }; cap.cash = 50;
+    assert.ok(!signsOf(w, p, cap).includes('flush'), 'holding out on his books, but living like a poor man: nothing to see');
+    cap.cash = 5000;
+    assert.ok(signsOf(w, p, cap).includes('flush'), 'living well: that can be seen');
+    rel(cap, boss.id).grudge = 0.6;
+    assert.equal(heardAgainst(w, p, cap, boss), undefined, 'a grudge he keeps to himself is not heard');
+    addFact(w, { kind: 'rumour', actor: cap.id, victim: boss.id, minor: true, text: `${cap.name} ran the boss down at the club.`, district: cap.district }, { witnesses: [p.id] });
+    assert.ok(heardAgainst(w, p, cap, boss), 'said in front of him, it is heard');
+  });
+  ok('the boss weighs the consigliere’s advice: fond of the accused, he can refuse it, and the record says what he decided', () => {
+    const w = consig(), p = P(w), boss = w.chars[w.fam[p.familyId!].bossId];
+    let s; for (let d = 0; d < 90 && !s; d++) { advance(w, w.now + DAY); s = (w.situations ?? []).find((q) => q.kind === 'hearing' && q.stage !== 'resolved'); }
+    assert.ok(s);
+    for (const e of w.enc) e.status = 'done'; w.now = Math.floor(w.now / DAY) * DAY + 15 * 60;
+    const def = w.chars[s!.parties!.find((x) => x.role === 'def')!.id];
+    Object.assign(boss.rels[def.id] ??= { trust: 0, respect: 0, affection: 0, grudge: 0, lastMet: 0 }, { trust: 0.85, affection: 0.8 });
+    Object.assign(boss.rels[p.id] ??= { trust: 0, respect: 0, affection: 0, grudge: 0, lastMet: 0 }, { trust: 0.45 });
+    let v = begin(w, boss.id); v = choose(w, v, everything(w, v).find((c) => c.id === 'a:fam_counsel')!.id).v;
+    const guilty = v.choices.find((c) => /did it/.test(c.label))!; v = choose(w, v, guilty.id).v;
+    assert.equal(s!.stage, 'resolved'); assert.equal(s!.out, 'the charge thrown out', 'he decided against the advice, and that is what happened');
+  });
+  ok('a man who denies is not recorded as having confessed; one who admits is', () => {
+    const run = (fear: number) => {
+      const w = createWorld(3, 'Tony Marino', { start: 'capo' }); advance(w, w.now + 20 * DAY); w.now = Math.floor(w.now / DAY) * DAY + 15 * 60; for (const e of w.enc) e.status = 'done';
+      const p = P(w), m = Object.values(w.chars).find((c) => c.name === 'Ralphie Russo')!;
+      m.books.skim = { until: w.now + 30 * DAY, frac: 0.2 }; Object.assign(m.rels[p.id] ??= { trust: 0, respect: 0, affection: 0, grudge: 0, lastMet: 0 }, { fear, respect: fear >= 0.3 ? 0.6 : 0.3, trust: 0.4, grudge: 0 });
+      let v = begin(w, m.id); for (const re of [/at your end/, /not what your envelope/, /asking you/]) { const c = [...v.choices, ...everything(w, v)].find((x) => re.test(x.label)); if (!c) break; v = choose(w, v, c.id).v; }
+      return Object.values(w.facts).some((f) => f.actor === m.id && /admitted to .* he had been keeping money back/.test(f.text));
+    };
+    assert.equal(run(0.05), false, 'he denied it: no confession on the record');
+    assert.equal(run(0.5), true, 'he owned it: on the record');
+  });
+});
