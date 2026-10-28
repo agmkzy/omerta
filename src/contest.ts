@@ -98,6 +98,12 @@ function settle(w: World, s: Situation) {
 // what the outcome means for the player: whom he stood with, and how it went
 function judgedBy(w: World, s: Situation, winner: Character, loser: Character, side: 'boss' | 'rival') {
   const p = w.chars[w.playerId!], mine = str(s, 'side');
+  // the men who told him they were with him, and weren't: when the captains settle it, everybody sees who stood where
+  if (mine) for (const v of voices(w, s)) {
+    if (str(s, 'said:' + v.id) !== 'said he’s with you') continue;
+    const stood = leanOf(w, s, v) >= 0 ? 'boss' : 'rival';
+    if (stood !== mine) addFact(w, { kind: 'event', actor: v.id, victim: p.id, minor: false, text: `${v.name} told ${p.name} he was with him over the chair, and stood with ${(stood === 'boss' ? w.chars[role(s, 'boss')!] : w.chars[role(s, 'rival')!]).name} when it came to it.`, district: v.district }, { witnesses: [p.id, v.id] });
+  }
   if (!mine || winner.isPlayer) return;
   if (mine === side) { feel(w, winner, p.id, 'trust', 0.15, `${p.name} stood with him for the chair`); return; }
   bear(w, winner, p.id, 0.25, `${p.name} stood with ${loser.name} against him`); feel(w, winner, p.id, 'trust', -0.15);

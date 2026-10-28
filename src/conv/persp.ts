@@ -25,5 +25,8 @@ export function possessive(w: World, id: Id | undefined, speaker: Character, lis
   const n = nameIn(w, id, speaker, listener);
   return n.endsWith('s') ? `${n}’` : `${n}’s`;
 }
+// straight quotation marks as the book prints them: opening after a space or the start, closing otherwise (some lines were written
+// with straight quotes and printed beside curly ones)
+export const curly = (s: string) => s.replace(/(^|[\s(—–-])"/g, '$1“').replace(/"/g, '”');
 // "a" or "an" before a word, by its sound (a underboss → an underboss; a one-man → a one-man)
 export const article = (word: string) => (/^(one|uni|use|eu|u[rs][aeiou])/i.test(word) ? 'a' : /^[aeiou]/i.test(word) ? 'an' : 'a');

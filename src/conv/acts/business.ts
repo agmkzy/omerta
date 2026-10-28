@@ -308,7 +308,7 @@ const buyAsk = (stake: boolean): Act => ({
 const opOf = (c: Ctx) => c.w.ops.find((o) => o.owner === c.n.id && o.kind !== 'hijack' && o.state === 'running' && o.runner !== c.h.id);
 const runAsk: Act = {
   base: 'run_ask', pane: 'business',
-  offers: (c) => { const o = opOf(c); return o && !c.n.isPlayer && c.n.bossId !== c.h.id && !askBetween(c.w, 'run', c.h.id, c.n.id) ? [offer(c, 'run_ask', `Offer to run his ${OPS[o.kind as keyof typeof OPS]?.label.toLowerCase() ?? 'operation'}`, 'You name your cut of the take. He weighs what he thinks of you and whether he has a man on it.')] : []; },
+  offers: (c) => { const o = opOf(c); return o && !c.n.isPlayer && c.n.bossId !== c.h.id && (!c.n.familyId || c.n.familyId === c.h.familyId) && !askBetween(c.w, 'run', c.h.id, c.n.id) ? [offer(c, 'run_ask', `Offer to run his ${OPS[o.kind as keyof typeof OPS]?.label.toLowerCase() ?? 'operation'}`, 'You name your cut of the take. He weighs what he thinks of you and whether he has a man on it.')] : []; },
   run: (c) => {
     const x = T(c), { w, p, t } = x, o = opOf(c);
     if (!o) return out(5);
@@ -677,4 +677,4 @@ const sitHelp = (how: 'cover' | 'lend' | 'leave' | 'rival'): Act => ({
 
 export { mtOpen };
 export const BUSINESS: Act[] = [op, bizNone, earnA, rateAskA, partnerChop, partnerFence, termsCut, termsRaise, deal, suggest, borrow, buyAsk(false), buyAsk(true), runAsk, sellAsk, offerLoan, shHow, shWhy, shEars, shBack, shTime, shLean, ...DEBT, envelope, envelopeWait, extra(false), extra(true), tributeA, matterA, mv, xA, nm, favcall, mtOpen, mt, sitAskA, sitDoor, sitHelp('cover'), sitHelp('lend'), sitHelp('leave'), sitHelp('rival')];
-void sitAsk; void owedOf;
+

@@ -1,4 +1,6 @@
 import { counselChoose } from './succession';
+import { speechFor } from './conv/acts/words';
+import { curly } from './conv/persp';
 import { allegianceChoose, courtedChoose } from './allegiance';
 import { routine, spotById } from './city';
 import { kinTie } from './kin';
@@ -35,6 +37,9 @@ export function addEnc(w: World, e: Omit<Enc, 'id' | 't' | 'status' | 'expires'>
   const { days, ...rest } = e;
   const from = rest.from ? w.chars[rest.from] : undefined, r = from && PLACED.has(rest.kind) ? routine(w, from, w.now) : undefined, sp = r && r !== 'home' ? spotById(w, r) : undefined;
   if (sp && sp.kind !== 'biz' && !/\b(club|bar|outside|at the|back room|on the street|door|car|office|house|home)\b/i.test(rest.lines[0] ?? '')) rest.lines = [`At ${sp.name.replace(/, on .*$/, '')}.`, ...rest.lines];
+  // (what he says passes through the same speech as a conversation: his own name is "I", the player's is "you", quotes are curly)
+  const pl = w.playerId ? w.chars[w.playerId] : undefined;
+  if (from && pl) rest.lines = rest.lines.map((l) => curly(speechFor(w, pl, from, l)));
   const enc: Enc = { ...rest, id: newId(w, 'e'), t: w.now, expires: w.now + (days ?? 4) * DAY, status: 'open' };
   w.enc.push(enc);
   return enc;
@@ -530,7 +535,9 @@ function lapse(w: World, p: Character, e: Enc) {
 
 // ------------------------------------------------------------ answering
 
-export function choose(w: World, p: Character, e: Enc, code: string): { lines: string[]; minutes: number } {
+// (what comes back is printed as the conversation prints it: curly quotation marks)
+export function choose(w: World, p: Character, e: Enc, code: string): { lines: string[]; minutes: number } { const r = choose0(w, p, e, code); r.lines = r.lines.map(curly); return r; }
+function choose0(w: World, p: Character, e: Enc, code: string): { lines: string[]; minutes: number } {
   const c = e.from ? w.chars[e.from] : undefined;
   const lines: string[] = [];
   const done = (m = 20) => {
@@ -565,8 +572,8 @@ export function choose(w: World, p: Character, e: Enc, code: string): { lines: s
     if (code === 'thanks') {
       feelOn(w, r, 'trust', 0.05);
       const f = w.facts[String(e.data?.fact)];
-      const others = Object.values(w.chars).filter((x) => x.alive && x.id !== c.id && f && x.known[f.id]).slice(0, 4);
-      lines.push(`${c.name} thinks. "${others.length ? others.map((o) => o.name).join(', ') + ' know.' : 'Nobody I know of.'} I didn’t hear it from anybody. I saw it."`);
+      const others = Object.values(w.chars).filter((x) => x.alive && x.id !== c.id && x.id !== p.id && f && x.known[f.id]).slice(0, 4);
+      lines.push(curly(speechFor(w, p, c, `${c.name} thinks. "${others.length ? others.map((o) => o.name).join(', ') + (others.length === 1 ? ' knows.' : ' know.') : 'Nobody I know of.'} I didn’t hear it from anybody. I saw it."`)));
     } else lines.push(`${c.name} nods once. "Not a word."`);
     return done(10);
   }

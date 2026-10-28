@@ -4,6 +4,7 @@
 // past a point it moves a man no further; what it says of the player's conduct; a running matter it moves on goes on that matter's
 // record; now and then he recalls something real between them; what changed is shown as a card; and his patience: pressure and going
 // over old ground use it up, and when it runs out he turns cold or ends it. A man with something of his own to raise breaks in.
+import { curly } from './persp';
 import { readiness } from '../career';
 import { clamp, peek } from '../core';
 import { temper, viewOf } from '../temper';
@@ -61,9 +62,7 @@ function tidy(out: Offer[]) {
   for (const [, i] of ev.slice(1)) drop.add(i);
   for (const i of [...drop].sort((a, b) => b - a)) out.splice(i, 1);
 }
-// straight quotation marks as the book prints them: opening after a space or the start, closing otherwise (the overhaul: some lines
-// were written with straight quotes and printed beside curly ones)
-export const curly = (s: string) => s.replace(/(^|[\s(—–-])"/g, '$1“').replace(/"/g, '”');
+export { curly } from './persp';
 export function offersNow(c: Ctx): Offer[] {
   const out: Offer[] = [];
   for (const a of Object.values(ACTS)) if (a.offers) for (const o of a.offers(c)) out.push({ pane: a.pane, ...o });

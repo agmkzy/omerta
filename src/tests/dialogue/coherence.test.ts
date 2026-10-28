@@ -121,3 +121,12 @@ describe('what was said is kept', { tags: ['scenario'] }, () => {
     assert.ok(again === undefined || again !== first, 'he does not simply say it all again');
   });
 });
+
+describe('what arrives, audited at every seat', { tags: ['property'] }, () => {
+  ok('what men come to the player with, and what they answer, passes the same checks as the conversation', async () => {
+    const { encAudit } = await import('../tools/encaudit');
+    const r = encAudit(3, 60);
+    assert.ok(r.n > 50, `${r.n} encounters`);
+    assert.deepEqual(r.flags.slice(0, 6), []);
+  }, 300_000);
+});
