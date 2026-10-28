@@ -76,3 +76,48 @@ describe('the family’s matters, carried in person', { tags: ['scenario'] }, ()
     assert.ok(s!.m?.['st:' + capId], 'his answer is recorded on the charge');
   });
 });
+
+describe('trying to break it', { tags: ['scenario'] }, () => {
+  const soldier = () => { const w = createWorld(5, 'Tony Marino', { start: 'soldier' }); advance(w, w.now + 5 * DAY); w.now = Math.floor(w.now / DAY) * DAY + 14 * 60; return w; };
+  ok('asked the same thing again, he says it was asked, and when', () => {
+    const w = soldier(), p = P(w), cap = w.chars[p.bossId!];
+    const ask = () => { const v = begin(w, cap.id); const o = everything(w, v).find((c) => c.id === 'a:promo'); assert.ok(o, 'where he stands can be asked'); const r = choose(w, v, o!.id); return r.v.lines.filter((l) => l.who === 'him').map((l) => l.text).join(' '); };
+    ask(); w.now += 3 * 60;
+    assert.match(ask(), /asked|same|again|nothing’s moved|hasn’t changed/i);
+  });
+  ok('a man already working for you is not offered work with you', () => {
+    const w = createWorld(5, 'Tony Marino', { start: 'capo' }); advance(w, w.now + 5 * DAY); w.now = Math.floor(w.now / DAY) * DAY + 14 * 60;
+    const p = P(w);
+    for (const m of Object.values(w.chars).filter((c) => c.alive && c.bossId === p.id).slice(0, 4)) assert.ok(!everything(w, begin(w, m.id)).some((c) => c.id.startsWith('a:recruit')), `offered to recruit ${m.name}, who already works for him`);
+  });
+  ok('a man who changed sides is spoken to as what he is now', () => {
+    const w = soldier(), p = P(w), old = w.chars[p.bossId!];
+    const other = Object.values(w.chars).find((c) => c.alive && c.familyId === p.familyId && c.rank === 'capo' && c.id !== old.id)!;
+    p.bossId = other.id;
+    assert.notEqual(tieOf(w, p, old), 'superior');
+    assert.equal(tieOf(w, p, other), 'superior');
+  });
+  ok('a hearing once decided cannot be reopened, and nobody is judge or investigator in his own case', () => {
+    for (const start of ['capo', 'consigliere', 'boss'] as const) {
+      const w = createWorld(7, 'Tony Marino', { start }); const p = P(w);
+      let s; for (let d = 0; d < 90 && !s; d++) { advance(w, w.now + DAY); s = (w.situations ?? []).find((q) => q.kind === 'hearing'); }
+      if (!s) continue;
+      const role = (r: string) => (s!.parties ?? []).find((x) => x.role === r)?.id;
+      assert.notEqual(role('def'), role('judge')); assert.notEqual(role('def'), role('inq')); assert.notEqual(role('acc'), role('def'));
+      assert.notEqual(role('def'), p.id, 'the player is never the accused in a case he decides');
+    }
+  });
+});
+
+describe('what was said is kept', { tags: ['scenario'] }, () => {
+  ok('asked to put in a word a second time within the month, he has already answered, and it pays nothing again', () => {
+    const w = createWorld(5, 'Tony Marino', { start: 'soldier' }); advance(w, w.now + 5 * DAY); w.now = Math.floor(w.now / DAY) * DAY + 14 * 60;
+    const p = P(w), cap = w.chars[p.bossId!];
+    const once = () => { const v = begin(w, cap.id); const o = everything(w, v).find((c) => c.id === 'a:recommend'); if (!o) return undefined; return choose(w, v, o.id).v.lines.filter((l) => l.who === 'him').map((l) => l.text).join(' '); };
+    const first = once(); if (first === undefined) return;
+    const favours = w.favours.length; w.now += DAY;
+    const again = once();
+    assert.equal(w.favours.length, favours, 'no second favour for the same word');
+    assert.ok(again === undefined || again !== first, 'he does not simply say it all again');
+  });
+});

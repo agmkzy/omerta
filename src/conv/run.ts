@@ -56,6 +56,7 @@ function tidy(out: Offer[]) {
   out.forEach((o, i) => { const b = o.code.split(':')[0]; if ((specific && b === 'biz_none') || (b === 'sit_ask' && out.some((q) => q.code.split(':')[0] === 'op'))) drop.add(i); });
   const has = (b: string) => out.some((o) => o.code.split(':')[0] === b);
   out.forEach((o, i) => { if ((o.code === 'tk:want' && has('ask_want')) || (['op', 'biz_none', 'sit_ask'].includes(o.code.split(':')[0]) && has('fam_report')) || (o.code.startsWith('tk:pressed:') && has('cr_ask'))) drop.add(i); });
+  if (has('pick_incident')) out.forEach((o, i) => { if (o.code.startsWith('tk:ev:')) drop.add(i); });
   const ev = out.map((o, i) => [o.code, i] as const).filter(([k]) => k.startsWith('tk:ev:'));
   for (const [, i] of ev.slice(1)) drop.add(i);
   for (const i of [...drop].sort((a, b) => b - a)) out.splice(i, 1);

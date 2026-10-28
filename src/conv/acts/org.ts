@@ -2,6 +2,7 @@
 // orders, work he offers and work done, where the player stands and what it would take to move up, a word put in, a man to back him, a
 // concern about a man, the player's own men (what is wrong, help, a light envelope, looking into it, thin ice, keeping low, finding more),
 // and taking a man on. Each: offered under the old engine's conditions, decided in the layer's record, done through doors.ts.
+import { strangerHere } from './personal';
 import { askBetween } from '../../asks';
 import { readiness } from '../../career';
 import { clamp, peek } from '../../core';
@@ -52,7 +53,7 @@ const orders = (c: Ctx) => inFamily(c.h, c.n) || c.w.jobs.some((j) => j.giver ==
 // ---------------------------------------------------------------- work
 const work: Act = {
   base: 'work', pane: 'business',
-  offers: (c) => (orders(c) && !crewMan(c) && !isBoss(c) ? [offer(c, 'work', 'Ask if there’s work')] : []),
+  offers: (c) => (orders(c) && !crewMan(c) && !isBoss(c) && !strangerHere(c) ? [offer(c, 'work', 'Ask if there’s work')] : []), // (a man is met before he is asked for work)
   run: (c) => {
     const x = T(c), { w, p, t } = x, n0 = w.jobs.length;
     if (t.id === p.bossId) door.bossWork(w);
@@ -215,6 +216,8 @@ const promo: Act = {
 const rkOffered = (c: Ctx) => inFamily(c.h, c.n) && c.h.rank === 'associate' && c.n.rank !== 'associate' && c.n.rank !== 'civilian' && c.h.backer !== c.n.id && c.n.id !== c.h.bossId;
 const recommend: Act = {
   base: 'recommend', pane: 'business',
+  // (asked again within the month, unchanged, he has already answered it: it is remembered, and it pays nothing a second time)
+  repeat: { window: 30, sig: (c) => `${c.h.rank}|${c.n.rank}` },
   offers: (c) => (inFamily(c.h, c.n) && upward(c.w, c.h, c.n) && canSpeakUp(c.w, c.n) && !rkOffered(c) ? [offer(c, 'recommend', 'Ask him to put in a word for you')] : []),
   run: (c) => {
     const x = T(c), { w, p, t } = x;

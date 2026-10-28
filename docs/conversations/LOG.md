@@ -79,3 +79,17 @@ Empty subjects are no longer shown.
 - Commitments from conversation into the world's records beyond those that exist (backing, favours, memos): a captain's promise to
   recommend, a captain's agreement to the underboss, kept or broken.
 - Adversarial play in the browser at all six seats, read as a player; recorded below as it is done.
+
+## Increment 2 (28 October)
+Measured (convaudit): **10.5–11.0 choices per conversation** (from 16.2), 43–50 actions, no flags on seeds 3, 7, 11.
+- Money is asked only of a man you have met, and never of another family's boss; work is asked of a man you have met.
+- A stranger is met first (*Walk over and say who you are*, or *X sent me*): the evening is not also offered as an introduction.
+- One way into an event: the menu of recent trouble when there is more than one; the single question otherwise.
+- What a man wants is said in one wording, whichever question reaches it (*What's new?* and *What are you after?* no longer give
+  two different ambitions).
+- Asked to put in a word a second time within the month, he has already answered: it is remembered and pays nothing again.
+- The road to a chair, said by the boss himself, is not "the men above me".
+- Hints that described the game instead of the man ("Opens the protection conversation") reworded.
+- Tests added: asked twice, he says so; a man already working for you is not offered work with you; a man who changed sides is
+  spoken to as what he is now; a decided hearing cannot be reopened, nobody judges or investigates his own case; the word put in
+  is kept, not paid twice.

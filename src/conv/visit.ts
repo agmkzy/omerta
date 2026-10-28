@@ -309,7 +309,7 @@ function subjectsNow(c: Ctx, k: Pane, all: boolean): Choice[] {
     if (all) {
       const ways = actRows(c, k, ['other']);
       // (not from a man who owes the player money himself: the player would be borrowing his own money back at interest)
-      if ((n.rank !== 'civilian' || n.cash >= 600) && !wontBorrowFrom(h, n) && !ways.some((x) => x.id.startsWith('a:borrow')) && !w.debts.some((d) => d.status === 'active' && d.creditor === h.id && d.debtor === n.id)) out.push({ id: 'loan:500', label: line(c, 'ask.loan', { amt: '$500' }), group: 'matter' });
+      if (!strangerHere(c) && !(n.rank === 'boss' && n.familyId !== h.familyId) && (n.rank !== 'civilian' || n.cash >= 600) && !wontBorrowFrom(h, n) && !ways.some((x) => x.id.startsWith('a:borrow')) && !w.debts.some((d) => d.status === 'active' && d.creditor === h.id && d.debtor === n.id)) out.push({ id: 'loan:500', label: line(c, 'ask.loan', { amt: '$500' }), group: 'matter' });
       // who a man answers to: the men troubling people the player has promised to help
       for (const id of new Set(social(w).obs.filter((o) => o.obligor === h.id && o.status === 'pending' && o.matter?.against).map((o) => o.matter!.against!))) { const m = w.chars[id]; if (m && m.id !== n.id && m.id !== h.id) out.push({ id: 'answers:' + m.id, label: line(c, 'ask.answersTo', { manFirst: first(m.name) }), group: 'matter' }); }
       out.push(...ways);
@@ -320,7 +320,7 @@ function subjectsNow(c: Ctx, k: Pane, all: boolean): Choice[] {
     out.push(...pending.slice(0, 2));
     // (a man who has turned cold on the player is in no mood for small talk: what is between them, and that is all)
     if (!c.v.mem.points.includes('news') && !c.v.th.cold) out.push({ id: 'news', label: line(c, 'ask.news'), group: 'social' });
-    if (!c.v.mem.points.includes('spend') && !c.v.th.cold) out.push({ id: 'spend', label: line(c, acquainted(w, h, n) ? 'spend.time.' + partOfDay(w.now) : 'introduce.self'), note: acquainted(w, h, n) ? 'An evening with him. That’s the rest of the visit.' : undefined, group: 'social' });
+    if (!c.v.mem.points.includes('spend') && !c.v.th.cold && !strangerHere(c)) out.push({ id: 'spend', label: line(c, acquainted(w, h, n) ? 'spend.time.' + partOfDay(w.now) : 'introduce.self'), note: acquainted(w, h, n) ? 'An evening with him. That’s the rest of the visit.' : undefined, group: 'social' });
     out.push(...pending.slice(2));
     // something the player knows that bears on this man: trouble on his street, or by his people
     for (const f of Object.values(w.facts).filter((f) => !memo(c, 'acts', () => offersNow(c)).some((o) => o.code.startsWith('tk:ev:')) && h.known[f.id] && !n.known[f.id] && !f.minor && HOSTILE.has(f.kind) && f.business && w.now - f.t < 21 * DAY && (f.district === (ownerBiz(w, n.id)?.district ?? n.district) || offender(f) === n.id || w.chars[offender(f) ?? '']?.bossId === n.id || crewGround(w, n).has(f.district))).sort((a, b) => b.t - a.t).slice(0, 1)) out.push({ id: 'tell:' + f.id, label: line(c, 'tell.news', { topic: w.biz[f.business!].name }), group: 'matter' });
@@ -362,7 +362,7 @@ function general(c: Ctx) { c.memo.clear(); if (c.v.pane) pane(c, c.v.pane); else
 export function everything(w: World, v: Visit): Choice[] {
   const c = ctx(w, v), out: Choice[] = v.waiting ? [{ id: 'answer', label: `Answer him: ${v.waiting.q}`, group: 'reply' }] : [];
   for (const k of PANES) out.push(...subjects(c, k, true));
-  if (!v.th.cold && !v.th.shut) out.push({ id: 'news', label: line(c, 'ask.news'), group: 'social' }, { id: 'spend', label: line(c, acquainted(w, c.h, c.n) ? 'spend.time.' + partOfDay(w.now) : 'introduce.self'), note: acquainted(w, c.h, c.n) ? 'An evening with him. That’s the rest of the visit.' : undefined, group: 'social' }); // (a man you haven't met is met first)
+  if (!v.th.cold && !v.th.shut) out.push({ id: 'news', label: line(c, 'ask.news'), group: 'social' }, ...(strangerHere(c) ? [] : [{ id: 'spend', label: line(c, acquainted(w, c.h, c.n) ? 'spend.time.' + partOfDay(w.now) : 'introduce.self'), note: acquainted(w, c.h, c.n) ? 'An evening with him. That’s the rest of the visit.' : undefined, group: 'social' as const }])); // (a man you haven't met is met first)
   out.push({ id: 'home', label: 'Never mind', group: 'more' }, { id: 'leave', label: 'Leave', group: 'leave' });
   return out.filter((x, i) => out.findIndex((y) => y.id === x.id) === i);
 }

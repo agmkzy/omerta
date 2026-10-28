@@ -1,6 +1,7 @@
 // Personal: how he is, what he wants, who he gets on with, what people say, an introduction, a kindness, a rival family's man over a
 // drink (Gate 4, from the old engine's personal, family-talk and rival leaves). Each: what can be said now (offers, the old engine's
 // own conditions), his decision in the layer's record (decide.ts), what it does through doors.ts, and his words.
+import { wantSaid } from '../subjects/life';
 import { isFamilyBoss } from '../relation';
 import { feePosition } from '../../negotiate';
 import { ownerBiz } from '../../core';
@@ -163,7 +164,7 @@ const askWant: Act = {
     door.insight(p, t.id, 'want');
     const kind = door.settleWant(w, t);
     line(x, `${t.name} thinks about it. “You really want to know?”`, d);
-    line(x, `“${WANT_SAY[kind][arch(t) === 'cold' || arch(t) === 'proud' || arch(t) === 'schemer' || arch(t) === 'frightened' ? 1 : 0]}”`);
+    line(x, `“${wantSaid(kind, arch(t)) ?? WANT_SAY[kind][arch(t) === 'cold' || arch(t) === 'proud' || arch(t) === 'schemer' || arch(t) === 'frightened' ? 1 : 0]}”`);
     return out(20, kind === 'rich' || kind === 'gamble' || kind === 'independent' || kind === 'made' ? [{ code: 'f_want', label: 'Is there anything I can do about that?' }] : undefined);
   },
 };

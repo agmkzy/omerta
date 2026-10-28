@@ -318,6 +318,8 @@ const WANT: Record<string, Partial<Record<Arch, string>> & { _: string }> = {
   rich: { jovial: 'Money! A boat. A blonde. In that order, maybe.', cold: 'Enough money that I never have to count it.', frightened: 'Enough put by that nobody can squeeze me.', _: 'Money. Real money.' },
   respect: { proud: 'I want men to stop talking when I come in.', hothead: 'Respect. And I’ll take it if I’m not given it.', _: 'I want to be taken seriously. That’s all.' },
 };
+// (one wording for what a man wants, whichever question reaches it: "what are you after?" says what this says)
+export const wantSaid = (kind: string, a: Arch): string | undefined => (WANT[kind] ? WANT[kind][a] ?? WANT[kind]._ : undefined);
 const WHY: Record<string, string> = { 'money has been tight': 'Money’s been tight. A man starts thinking.', 'he keeps being passed over': 'I keep getting passed over.', 'he took a beating to his pride': 'After what happened to me, I’m done being nobody.', 'he has money and wants the name that goes with it': 'I’ve got the money. I want the name to go with it.', 'he’s been trusted and wants more of it': 'They trust me. I want them to need me.', 'was punished unfairly': 'They punished me for something I didn’t do. I won’t forget it.' };
 function wants(x: X): Subject | undefined {
   const { w, p, t } = x;
