@@ -50,3 +50,23 @@ the captain the envelope (he answers what the books say), take a car-to-order jo
 behaves as the sim says he would. Open questions before then: real-time versus action-costed time; the engine (Godot, with the sim
 ported or bridged, against Three.js in the browser, which keeps everything but limits the look); and how much of the person-first
 work the 3D would take time from.
+
+## 03–04. The truck (described; the image files were not saved to disk, so add them here as 03-truck-shootout and 04-truck-driver)
+
+Two scenes of a truck robbery on a country road. In one, the crew (Rocco DeLuca, Salvatore Marino, Frankie Esposito, with health bars)
+fire on an armoured truck while its driver stands with his hands up, an objectives box top right (stop the truck, take the money, get
+out before the police arrive), a minimap and an SMG's ammunition; Rocco shouts and the player answers from a numbered list. In the
+other, a quieter version: the driver on his knees, a crewman's pistol on him, a big man in a fedora standing over him, and the choice of
+what happens to him (take the cash and let him go, rough him up for who sent it, make an example of him, call it off).
+
+| On screen | In the game today |
+|---|---|
+| A truck job with your crew | Truck hijacks are a playable racket (`rackets.ts`, `resolveHijack`; Phase 1 "truck" increment) |
+| The crew beside you, named | Your crewmen and their own natures (`crewlife.ts`, `temper.ts`); the man shouting is the man the sim says is the hothead |
+| What happens to the driver | The same choice as any beating or killing (`actions.ts`), with witnesses, heat, and a driver who remembers faces |
+| "Rough him up until he tells us who sent it" | Knowledge as a mechanic: what he knows is what he witnessed or was told (`core.ts`) |
+| Get out before the police arrive | Heat and arrests (`police`, `jail`) |
+
+The second image is the closer fit. OMERTÀ's violence is a decision with consequences, not a shooting gallery: the driver's choice
+is the scene; a firefight is a failure of planning, and a dead driver is a murder the precinct works. If jobs are ever played, the
+shooting is the rare outcome and the people are the point.
