@@ -3,6 +3,7 @@
 // who else was there, where he heard it, why, what he will do, what can be done. And a man he has a problem with: who he suspects, what
 // the player knows of that man, an offer to deal with him or to sit the two of them down. Each answer is his (decision.ts: his odds
 // where the rules leave it to chance), what it changes goes through doors.ts, and he only says what he knows.
+import { nameIn } from '../persp';
 import { famName, ownerBiz } from '../../core';
 import { mkJob } from '../../jobs';
 import { arch } from '../../voice';
@@ -123,7 +124,7 @@ const pickIncident: Act = {
   run: (c) => {
     const x = T(c), { w, p, t } = x, tp = temper(t), hot = tp.volatility + tp.pride > 1.15;
     line(x, hot ? '“Which business? There’s always something.”' : '“What, the business with…? Which one?”');
-    const fn = (id?: string) => (id && w.chars[id] ? first(w.chars[id]) : '');
+    const fn = (id?: string) => (id && w.chars[id] ? nameIn(w, id, p, t) : '');
     // (said to him, about him and the player as "you" and "me": never the man in front of him, or the player himself, by name)
     const topic = (f: Fact) => {
       const b = f.business ? w.biz[f.business] : undefined, k = p.known[f.id], parties = [f.actor, f.victim];

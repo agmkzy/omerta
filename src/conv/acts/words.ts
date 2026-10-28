@@ -1,6 +1,7 @@
 // What a man knows of a thing, and how he puts it into words (moved from the old conversation engine, Gate 4): which incidents he can
 // speak to, what he will and will not say of them and to whom, how a fact sounds in his mouth, and the small ways a man talks (his own
 // name as "I", the men he mentions by first name). Nothing here decides or changes anything.
+import { nameIn } from '../persp';
 import { flavour, isResolved, ownerBiz } from '../../core';
 import { arch, told as voiceTold } from '../../voice';
 import { temper } from '../../temper';
@@ -73,7 +74,10 @@ function toYou(w: World, p: Character, s: string): string {
   }
   return s.replace(/(^|[.!?]\s+)you\b/g, (_m, a: string) => `${a}You`);
 }
-export function speechFor(w: World, p: Character, t: Character, line: string): string {
+// what he says, with his own name made "I", "me" and "my" where he speaks of himself; a sentence that then begins with "my" or "me"
+// begins with a capital, as any sentence does
+export const speechFor = (w: World, p: Character, t: Character, line: string): string => speech0(w, p, t, line).replace(/((?:^|[.!?]\s+|“))(my|me)\b/g, (_x, pre: string, w0: string) => pre + w0.charAt(0).toUpperCase() + w0.slice(1));
+function speech0(w: World, p: Character, t: Character, line: string): string {
   if (!/["“]/.test(line)) return line;
   if (p.isPlayer && t.id !== p.id && (line.includes(p.name) || line.includes(p.name.split(' ')[0]))) line = line.replace(/(["“])([^"“”]+)(["”])/g, (_m, a: string, body: string, z: string) => `${a}${toYou(w, p, body)}${z}`);
   // (his first name with a possessive, where nobody else has it, is "my": "carry Sammy's envelopes" said by Sammy)
@@ -92,7 +96,7 @@ export function speechFor(w: World, p: Character, t: Character, line: string): s
       s = s.replace(new RegExp(`(^|[.!?;,—]\\s+|\\b(?:and|but|then|so|after|before|when|because|until|since|if|that|while) )${n} ((?:now |just |also |still |never |only )?)([A-Za-z’']+)`, 'g'), (_x, pre: string, adv: string, v: string) => `${pre}I ${adv}${selfVerb(v)}`);
       s = s.split(t.name).join('me');
     }
-    for (const c of found) if (c.id !== t.id && s.includes(c.name) && count.get(first(c.name)) === 1 && introduced(w, p, c)) s = s.split(c.name).join(first(c.name));
+    for (const c of found) if (c.id !== t.id && s.includes(c.name) && count.get(first(c.name)) === 1 && introduced(w, p, c) && nameIn(w, c.id, t, p) === first(c.name)) s = s.split(c.name).join(first(c.name)); // (not when the speaker, or the player, has the same first name)
     return `${a}${s}${z}`;
   });
 }

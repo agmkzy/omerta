@@ -37,7 +37,10 @@ const B: Record<string, Entry> = {
   'advance.ready': { _: ['“You’ve done what was asked. It’s with the people above me now. Be patient, and be seen.”'] },
   'advance.noSeat': { _: ['“You’re ready. There’s no chair. Somebody has to die, retire or go away first. Be ready when it happens.”'] },
   // (what he still needs to see, said as a man says it: how far off, never the family's own tally)
-  'advance.gap.earn': { _: ['“The money isn’t there yet. {how} Nobody puts a name forward for a man short of it.”'] },
+  'advance.gap.earn': { _: ['“{how} Nobody puts a name forward for a man short of it.”'] },
+  'advance.gap.earn.made': { _: ['“{how} A man who wants more has to bring more up than that.”'] },
+  'advance.gap.sponsor.made': { _: ['“The men above me have to think of you when a chair comes up. {how}”'] },
+  'advance.gap.name.made': { _: ['“People don’t talk about you yet. You’re {standing}. That comes from what your men do, and who sees it.”'] },
   'advance.gap.deeds': { _: ['“I need to see more work done. {how} Take what you’re given and finish it.”'] },
   'advance.gap.kills': { _: ['“There’s been no hard work from you. When the family has some, ask for it.”'] },
   'advance.gap.name': { _: ['“People don’t speak of you yet. You’re {standing}. That comes from what you do, and who sees it.”'] },

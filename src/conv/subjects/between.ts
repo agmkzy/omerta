@@ -8,6 +8,7 @@
 // Nothing here is a separate system. A week's grace is a promise with a date on it (dialogue.memoTick holds him to it); what he
 // pays, he pays (core.payDebt, the books); what he admits is what he did (Books.skim); a question about a story is answered from
 // what he knows of it and how (rumour.ts); a name he gives you is learned (core.learn). The player only ever sees what he could.
+import { nameIn } from '../persp';
 import { money, peek } from '../../core';
 import { lineOf, OPS } from '../../rackets';
 import { knowing, versionOf } from '../../rumour';
@@ -313,7 +314,7 @@ function event(x: X): Subject | undefined {
   return {
     key, sig: String(f.id), weight: 0.4,
     // (asked of the man it happened to, it is his own story: "what happened to you", not to him by name)
-    label: f.victim === t.id ? '“What happened to you?”' : f.actor === t.id ? '“What was that business you were in?”' : `“What do you know about what happened${f.business && w.biz[f.business] ? ` at ${w.biz[f.business].name}` : f.victim && w.chars[f.victim] ? ` to ${first(w.chars[f.victim])}` : ''}?”`,
+    label: f.victim === t.id ? '“What happened to you?”' : f.actor === t.id ? '“What was that business you were in?”' : `“What do you know about what happened${f.business && w.biz[f.business] ? ` at ${w.biz[f.business].name}` : f.victim && w.chars[f.victim] ? ` to ${nameIn(w, f.victim, p, t)}` : f.district ? ` in ${f.district}` : ''}?”`,
     hint: short.length > 70 ? short.slice(0, 68).replace(/\s+\S*$/, '') + '…' : short,
     open: () => evOpen(x, f, key),
     reply: (x, code) => evTurn(x, f, key, code),

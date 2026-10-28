@@ -46,9 +46,27 @@ export function roleOf(c: Ctx): string {
   const { w, h: p, n: t } = c;
   return t.id === p.bossId ? 'boss' : t.bossId === p.id ? 'mine' : t.rank === 'civilian' ? (Object.values(w.biz).some((b) => b.ownerId === t.id && b.open) ? 'shop' : 'civilian') : t.familyId && p.familyId && t.familyId !== p.familyId ? 'rival' : RK(t.rank) > RK(p.rank) ? 'above' : 'peer';
 }
+// The opening list, said once each (the conversation overhaul): a man's view of people is asked through "What do you make of…?", not
+// also one by one at the top; one way of asking how business is; one event at a time (the rest come up through what's new).
+const OPINION = new Set(['pick_member', 'leaders', 'ask_rep', 'ask_history', 'ask_crew', 'rk_back_ask', 'about', 'rv_mood']);
+function tidy(out: Offer[]) {
+  const drop = new Set<number>();
+  out.forEach((o, i) => { if (OPINION.has(o.code.split(':')[0]) && (o.kind ?? 'other') === 'other') drop.add(i); });
+  const specific = out.some((o) => ['op', 'sit_ask'].includes(o.code.split(':')[0]));
+  out.forEach((o, i) => { const b = o.code.split(':')[0]; if ((specific && b === 'biz_none') || (b === 'sit_ask' && out.some((q) => q.code.split(':')[0] === 'op'))) drop.add(i); });
+  const has = (b: string) => out.some((o) => o.code.split(':')[0] === b);
+  out.forEach((o, i) => { if ((o.code === 'tk:want' && has('ask_want')) || (['op', 'biz_none', 'sit_ask'].includes(o.code.split(':')[0]) && has('fam_report')) || (o.code.startsWith('tk:pressed:') && has('cr_ask'))) drop.add(i); });
+  const ev = out.map((o, i) => [o.code, i] as const).filter(([k]) => k.startsWith('tk:ev:'));
+  for (const [, i] of ev.slice(1)) drop.add(i);
+  for (const i of [...drop].sort((a, b) => b - a)) out.splice(i, 1);
+}
+// straight quotation marks as the book prints them: opening after a space or the start, closing otherwise (the overhaul: some lines
+// were written with straight quotes and printed beside curly ones)
+export const curly = (s: string) => s.replace(/(^|[\s(—–-])"/g, '$1“').replace(/"/g, '”');
 export function offersNow(c: Ctx): Offer[] {
   const out: Offer[] = [];
   for (const a of Object.values(ACTS)) if (a.offers) for (const o of a.offers(c)) out.push({ pane: a.pane, ...o });
+  tidy(out);
   const lead = ROLE_PUTS[roleOf(c)].map((k) => out.find((o) => (o.kind ?? 'other') === 'other' && o.code.split(':')[0] === k)).filter((o): o is Offer => !!o).slice(0, 2);
   for (const o of lead) o.kind = 'lead';
   return out;
@@ -114,7 +132,7 @@ export function perform(c: Ctx, code: string, label: string): Done {
   // a proposal that has become a matter between them is now the subject in hand: what can be said to it comes next
   if (!r.next && !r.end && !r.meeting) { const opened = openAsks(w).find((x) => x.terms?.by === p.id && x.terms?.of === t.id && !open0.has(x.id)); if (opened) r.next = ACTS.m?.offersFor?.(c, opened.id); }
   // (what he says is said as a man talks: his own name is "I", the men he names by their first names)
-  for (let i = from; i < v.lines.length; i++) if (v.lines[i].who !== 'you' && v.lines[i].who !== 'card') v.lines[i].text = speechFor(w, p, t, v.lines[i].text);
+  for (let i = from; i < v.lines.length; i++) if (v.lines[i].who !== 'you' && v.lines[i].who !== 'card') v.lines[i].text = curly(speechFor(w, p, t, v.lines[i].text));
   if (dull) {
     const a = snap();
     door.regardTo(w, t, p.id, 'trust', before.tr + (a.tr - before.tr) * 0.2); door.regardTo(w, t, p.id, 'affection', before.af + (a.af - before.af) * 0.2); door.regardTo(w, t, p.id, 'respect', before.rs + (a.rs - before.rs) * 0.2);
@@ -125,7 +143,7 @@ export function perform(c: Ctx, code: string, label: string): Done {
     const q = peek(t, p.id); let capped = false;
     if (q.trust > 0.6 && q.trust > before.tr) { door.regardTo(w, t, p.id, 'trust', Math.max(before.tr, 0.6)); capped = true; }
     if (q.affection > 0.8 && q.affection > before.af) { door.regardTo(w, t, p.id, 'affection', Math.max(before.af, 0.8)); capped = true; }
-    if (capped && before.tr >= 0.55) says(c, 'There’s a point past which talk doesn’t move a man. The rest has to be earned.');
+    void capped; // (talk past its worth simply moves him no further; it is not announced)
   }
   act.conduct?.(c, before);
   // now and then he mentions something that really happened between them, before his answer (not in the middle of a matter, and
@@ -168,15 +186,16 @@ export function perform(c: Ctx, code: string, label: string): Done {
   }
   // what needs no words back still gets an answer, in keeping with what it was and how he is with the player
   if (!r.end && !act.nav && !act.opens && !v.lines.slice(from).some((l) => l.who === 'him' || answered(l.text, t.name.split(' ')[0]))) says(c, ackLine(w, t, p, v.lines.length - from, SOCIAL_ACK.has(base)));
-  // what changed, as a card
+  // what changed: money as a plain figure; how he takes it only when it shows, and in words, never as a measure (the overhaul: the
+  // relationship is the simulation's, and the player reads it in the man, not in arrows)
   {
-    const a = snap(), bits: string[] = [];
-    const arrow = (d: number, name: string) => { if (Math.abs(d) < 0.004) return; const big = Math.abs(d) >= 0.08; bits.push(`${name} ${d > 0 ? (big ? '▲▲' : '▲') : big ? '▼▼' : '▼'}`); };
-    arrow(a.tr - before.tr, 'Trust'); arrow(a.af - before.af, 'Warmth'); arrow(a.rs - before.rs, 'Respect'); arrow(-(a.gr - before.gr), 'Goodwill');
-    if (a.cash !== before.cash) bits.push(`${a.cash > before.cash ? '+' : '−'}${money(Math.abs(a.cash - before.cash))}`);
-    if (a.st !== before.st) bits.push(`Standing ${a.st > before.st ? '▲' : '▼'}`);
-    if (a.ht !== before.ht) bits.push(`Heat ${a.ht > before.ht ? '▲' : '▼'}`);
-    if (bits.length && v.lines.length > from) v.lines.push({ who: 'card', text: bits.join('  ·  ') });
+    const a = snap();
+    if (v.lines.length > from) {
+      const he = t.name.split(' ')[0], warm = (a.tr - before.tr) + (a.af - before.af) + (a.rs - before.rs), sore = a.gr - before.gr;
+      const showed = sore >= 0.08 ? `${he} won’t forget that.` : warm <= -0.1 ? `Something in ${he} cools toward you.` : warm >= 0.12 ? `${he} will remember that you did.` : '';
+      if (showed && !v.lines.slice(from).some((l) => l.text === showed)) v.lines.push({ who: 'narr', text: showed });
+      if (a.cash !== before.cash) v.lines.push({ who: 'card', text: `${a.cash > before.cash ? '+' : '−'}${money(Math.abs(a.cash - before.cash))}` });
+    }
   }
   // he remembers what he was asked, and what it stood on, for next time
   if (act.repeat && v.lines.length > from && !r.skip) (t.talk ??= {})[tkey] = { d: day0, sig: act.repeat.sig(c, arg), n: 1 };

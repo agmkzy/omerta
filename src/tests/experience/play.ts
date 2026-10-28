@@ -95,7 +95,7 @@ export function thirdPersonSelf(w: World, lines: string[]): string[] {
 }
 /** Choices whose words have the player speak of himself as another man ("Mickey’s having trouble with Lawrence Oliveri"). */
 export function selfChoices(w: World, cs: Choice[]): Choice[] {
-  const p = P(w), n = `(${p.name}|${first(p)})`;
+  const p = P(w), n = `(${p.name}|${first(p)}(?! [A-Z]))`; // (a first name with another man's surname after it is that other man)
   const third = new RegExp(`\\b${n}(’s|'s)?\\s+(wants|has|is|was|did|came|took|asked|said|won’t|doesn’t|didn’t|answers|people|men|been|keeps|leans|knows|told)\\b|\\b(with|against|from|by|between|and|about|to|answer to|over)\\s+${n}\\b`);
   return cs.filter((c) => third.test(c.label + ' ' + (c.says ?? '')));
 }

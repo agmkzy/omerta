@@ -323,7 +323,7 @@ function subjectsNow(c: Ctx, k: Pane, all: boolean): Choice[] {
     if (!c.v.mem.points.includes('spend') && !c.v.th.cold) out.push({ id: 'spend', label: line(c, acquainted(w, h, n) ? 'spend.time.' + partOfDay(w.now) : 'introduce.self'), note: acquainted(w, h, n) ? 'An evening with him. That’s the rest of the visit.' : undefined, group: 'social' });
     out.push(...pending.slice(2));
     // something the player knows that bears on this man: trouble on his street, or by his people
-    for (const f of Object.values(w.facts).filter((f) => h.known[f.id] && !n.known[f.id] && !f.minor && HOSTILE.has(f.kind) && f.business && w.now - f.t < 21 * DAY && (f.district === (ownerBiz(w, n.id)?.district ?? n.district) || offender(f) === n.id || w.chars[offender(f) ?? '']?.bossId === n.id || crewGround(w, n).has(f.district))).sort((a, b) => b.t - a.t).slice(0, 1)) out.push({ id: 'tell:' + f.id, label: line(c, 'tell.news', { topic: w.biz[f.business!].name }), group: 'matter' });
+    for (const f of Object.values(w.facts).filter((f) => !memo(c, 'acts', () => offersNow(c)).some((o) => o.code.startsWith('tk:ev:')) && h.known[f.id] && !n.known[f.id] && !f.minor && HOSTILE.has(f.kind) && f.business && w.now - f.t < 21 * DAY && (f.district === (ownerBiz(w, n.id)?.district ?? n.district) || offender(f) === n.id || w.chars[offender(f) ?? '']?.bossId === n.id || crewGround(w, n).has(f.district))).sort((a, b) => b.t - a.t).slice(0, 1)) out.push({ id: 'tell:' + f.id, label: line(c, 'tell.news', { topic: w.biz[f.business!].name }), group: 'matter' });
     // who did something the player knows of but not who did it, where this man might know
     for (const f of Object.values(w.facts).filter((f) => h.known[f.id] && !h.known[f.id].knowsActor && HOSTILE.has(f.kind) && f.business && (f.district === n.district || ownerBiz(w, n.id)?.district === f.district)).sort((a, b) => b.t - a.t).slice(0, 1)) out.push({ id: 'who:' + f.id, label: line(c, 'ask.who', { shop: w.biz[f.business!].name }), group: 'matter' });
     out.push(...actRows(c, k, ['lead']));
@@ -973,11 +973,13 @@ function doSpend(c: Ctx): number {
   const r1 = peek(n, h.id), moved = (r1.affection ?? 0) + r1.trust + (r1.known ?? 0) * 0.3 - before;
   const a = spendTimeAccount(c.ph(), c.pn(), n, venue, compat(w, h, n), String(Math.floor(w.now / DAY)), between, moved, part);
   narr(c, a.text);
-  // over the evening he passes on what he has heard (he only tells what he knows, and only a man he trusts enough or likes company)
-  const heard: string[] = [], toldF = door.passOn(w, n, h, heard);
-  for (const l of heard) says(c, speechFor(w, h, n, l));
-  // what the evening turned on, he comes back to before you part: what he said of it, and what you say to that
+  // what the evening turned on, he comes back to before you part: what he said of it, and what you say to that (and that is all:
+  // the evening is about one thing, not three run together)
   if (mind && subjectsOf(w, h, n).some((x) => x.key === mind.key)) { heRaises(c, mind.key, mind.sig); if (c.v.choices.some((x) => x.group === 'reply')) return 120; }
+  // otherwise, over the evening he passes on what he has heard (only what he knows, and only to a man he trusts enough or likes)
+  const heard: string[] = [], toldF = door.passOn(w, n, h, heard);
+  if (heard.length) narr(c, 'Before you part, he passes something on.');
+  for (const l of heard) says(c, speechFor(w, h, n, l));
   const mins = part === 'morning' ? 45 : part === 'afternoon' ? 75 : 120;
   if (toldF.length) { c.v.th.fact = toldF[0].id; c.v.th.asked = []; afterAct(c, ACTS.inc.questions?.(c) ?? [], 'spend'); return mins; }
   // (an evening is the end of the day; over a coffee or an afternoon drink the talk can go on)

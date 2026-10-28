@@ -263,7 +263,7 @@ const deal: Act = {
 // protection put to a shop the player may not take on as the layer's own (that is visit.doProtect): opened as a matter
 const suggest: Act = {
   base: 'suggest', pane: 'business',
-  offers: (c) => { const b = ownerBiz(c.w, c.n.id); return b && b.protection?.familyId !== c.h.familyId && c.n.rank === 'civilian' && !askBetween(c.w, 'protect', c.h.id, c.n.id, b.id) && !PROTECT_OWN(c) ? [offer(c, 'suggest', 'Suggest he could use some friends', 'Opens the protection conversation.')] : []; },
+  offers: (c) => { const b = ownerBiz(c.w, c.n.id); return b && b.protection?.familyId !== c.h.familyId && c.n.rank === 'civilian' && !askBetween(c.w, 'protect', c.h.id, c.n.id, b.id) && !PROTECT_OWN(c) ? [offer(c, 'suggest', 'Suggest he could use some friends', 'He’ll understand what you mean. What he says to it is his business.')] : []; },
   run: (c) => {
     const x = T(c), { w, p, t } = x, b = ownerBiz(w, t.id)!;
     c.v.lines.push({ who: 'narr', text: 'You steer the conversation toward the neighbourhood and who watches over it.' });
@@ -308,7 +308,7 @@ const buyAsk = (stake: boolean): Act => ({
 const opOf = (c: Ctx) => c.w.ops.find((o) => o.owner === c.n.id && o.kind !== 'hijack' && o.state === 'running' && o.runner !== c.h.id);
 const runAsk: Act = {
   base: 'run_ask', pane: 'business',
-  offers: (c) => { const o = opOf(c); return o && !c.n.isPlayer && !askBetween(c.w, 'run', c.h.id, c.n.id) ? [offer(c, 'run_ask', `Offer to run his ${OPS[o.kind as keyof typeof OPS]?.label.toLowerCase() ?? 'operation'}`, 'You name your cut of the take. He weighs what he thinks of you and whether he has a man on it.')] : []; },
+  offers: (c) => { const o = opOf(c); return o && !c.n.isPlayer && c.n.bossId !== c.h.id && !askBetween(c.w, 'run', c.h.id, c.n.id) ? [offer(c, 'run_ask', `Offer to run his ${OPS[o.kind as keyof typeof OPS]?.label.toLowerCase() ?? 'operation'}`, 'You name your cut of the take. He weighs what he thinks of you and whether he has a man on it.')] : []; },
   run: (c) => {
     const x = T(c), { w, p, t } = x, o = opOf(c);
     if (!o) return out(5);
@@ -551,7 +551,7 @@ const tributeA: Act = {
     const x = T(c), { w, p, t } = x; ask(c, 'b_tribute');
     if (p.cash < 300) { c.v.lines.push({ who: 'narr', text: 'You’re short.' }); return out(15); }
     door.tribute(w, p, t, 300, 'for nothing in particular');
-    c.v.lines.push({ who: 'narr', text: `You leave an envelope on his table. ${t.name} doesn’t open it. "For what?" "For nothing." He almost smiles. "Nothing is a good reason."` });
+    c.v.lines.push({ who: 'narr', text: `You leave an envelope on his table. ${t.name} doesn’t open it. “For what?” “For nothing.” He almost smiles. “Nothing is a good reason.”` });
     tweak(x, 0.07, 0.04, 0.03); door.repute(w, p, 1, 'gift');
     return out(15);
   },
@@ -646,7 +646,7 @@ const mtOpen: Act = {
     return { minutes: 2, next: mtOpen.offersFor!(c, sid) };
   },
 };
-const mt: Act = { base: 'mt', pane: 'personal', run: (c, code) => { const x = T(c), [, sid, mc] = code.split(':'); const r = door.matterAct(x.w, x.p, sid, mc, x.t.id); for (const l of r.lines) line(x, l); return out(r.minutes); } };
+const mt: Act = { base: 'mt', pane: 'personal', run: (c, code) => { const x = T(c), [, sid] = code.split(':'), mc = code.split(':').slice(2).join(':'); /* (a move's own code may have a colon in it: 'lean:c12', 'adv:guilty') */ const r = door.matterAct(x.w, x.p, sid, mc, x.t.id); for (const l of r.lines) line(x, l); return out(r.minutes); } };
 // his trouble (situations.ts): asked about, then what the player can do about it once he has told it
 const sitAskA: Act = {
   base: 'sit_ask', pane: 'personal',
@@ -675,5 +675,6 @@ const sitHelp = (how: 'cover' | 'lend' | 'leave' | 'rival'): Act => ({
   run: (c) => { const x = T(c); for (const l of door.situationHelp(x.w, x.p, x.t, how)) line(x, l); return out(15); },
 });
 
+export { mtOpen };
 export const BUSINESS: Act[] = [op, bizNone, earnA, rateAskA, partnerChop, partnerFence, termsCut, termsRaise, deal, suggest, borrow, buyAsk(false), buyAsk(true), runAsk, sellAsk, offerLoan, shHow, shWhy, shEars, shBack, shTime, shLean, ...DEBT, envelope, envelopeWait, extra(false), extra(true), tributeA, matterA, mv, xA, nm, favcall, mtOpen, mt, sitAskA, sitDoor, sitHelp('cover'), sitHelp('lend'), sitHelp('leave'), sitHelp('rival')];
 void sitAsk; void owedOf;

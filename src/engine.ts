@@ -118,7 +118,7 @@ function weekly(w: World) {
     earn(t, amt, 'scheme');
     t.heat = clamp(t.heat + 0.1, 0, 1.5);
     const wit = witnessesAt(w, b.district, [t.id, o.id], 2).filter(() => rng.chance(0.4));
-    const f = addFact(w, { kind: 'robbery', actor: t.id, victim: o.id, business: b.id, amount: amt, hiddenActor: true, text: `${t.name} robbed ${b.name} of ${money(amt)}.`, textHidden: `${b.name} was robbed of ${money(amt)}.`, district: b.district }, { witnesses: wit });
+    const f = addFact(w, { kind: 'robbery', actor: t.id, victim: o.id, business: b.id, amount: amt, hiddenActor: true, text: `${t.name} robbed ${b.name} of ${money(amt)}.`, textHidden: `${b.name} was robbed${amt >= 1000 ? ', a good deal of money' : amt >= 300 ? ', a few hundred dollars' : ''}.`, district: b.district }, { witnesses: wit });
     notifyProtector(w, b, f);
   }
 

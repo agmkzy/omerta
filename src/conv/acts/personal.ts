@@ -1,6 +1,7 @@
 // Personal: how he is, what he wants, who he gets on with, what people say, an introduction, a kindness, a rival family's man over a
 // drink (Gate 4, from the old engine's personal, family-talk and rival leaves). Each: what can be said now (offers, the old engine's
 // own conditions), his decision in the layer's record (decide.ts), what it does through doors.ts, and his words.
+import { isFamilyBoss } from '../relation';
 import { feePosition } from '../../negotiate';
 import { ownerBiz } from '../../core';
 import { historyLines } from '../../powers2';
@@ -137,7 +138,7 @@ const oldTimes: Act = {
   base: 'old_times', pane: 'personal', social: true,
   repeat: { window: 1, sig: () => 'x' },
   // (not offered to a man who could hardly like the player more, nor a third time in a day: see run.ts on ordinary talk)
-  offers: (c) => { const day = Math.floor(c.w.now / DAY), soc = c.h.cooldown[`soc:${c.n.id}`] ?? 0, today = Math.floor(soc / 10) === day ? soc % 10 : 0; return one(acquaintedHere(c) && R(T(c)).affection < 0.8 && today < 2, offer(c, 'old_times', 'Reminisce')); },
+  offers: () => [], // (folded into "How are you keeping?" and an evening together in the conversation overhaul)
   run: (c) => {
     const x = T(c), { w, p, t } = x, lines: string[] = [];
     tweak(x, 0.02, 0.04);
@@ -243,7 +244,7 @@ const pickMember: Act = {
 const leaders: Act = {
   base: 'leaders', pane: 'personal',
   repeat: { window: 20, sig: (c) => `${c.n.bossId ?? ''}|${c.n.familyId ? c.w.fam[c.n.familyId].bossId : ''}` },
-  offers: (c) => one(inFamily(c.h, c.n) && superior(c), offer(c, 'leaders', 'Talk about the leadership', 'Who runs what, and who’s rising.')),
+  offers: (c) => one(inFamily(c.h, c.n) && superior(c) && !isFamilyBoss(c.w, c.n), offer(c, 'leaders', 'Talk about the leadership', 'Who runs what, and who’s rising.')), // (not the boss: he is what runs it)
   run: (c) => {
     const x = T(c), { w, t } = x, r = R(x);
     const boss = t.bossId ? w.chars[t.bossId] : undefined, top = t.familyId ? w.chars[w.fam[t.familyId].bossId] : undefined;
@@ -291,7 +292,7 @@ const askHistory: Act = {
 const askAround: Act = {
   base: 'ask_around', pane: 'personal',
   repeat: { window: 30, sig: (c) => `${c.n.rank}|${ownerBiz(c.w, c.n.id)?.id ?? ''}` },
-  offers: (c) => one(strangerHere(c) && !c.v.th.asked.includes('ask_around'), { ...offer(c, 'ask_around', 'Ask around about him first', 'What the street says.'), kind: 'lead' }),
+  offers: () => [], // (asking around about a man is not something said to him: removed from the conversation in the overhaul)
   run: (c) => {
     const x = T(c), { w, t } = x;
     const fam = t.familyId ? `the ${w.fam[t.familyId].name} family` : 'nobody in particular';
@@ -320,13 +321,13 @@ const intro: Act = {
 };
 const introVia: Act = {
   base: 'intro_via', pane: 'personal',
-  offers: (c) => (!strangerHere(c) ? [] : introducers(c.w, c.h, c.n).map((v) => offer(c, 'intro_via:' + v.id, `Ask ${first(v)} to put in a word`, 'A name he trusts opens the door.', 'lead'))),
+  offers: (c) => (!strangerHere(c) ? [] : introducers(c.w, c.h, c.n).map((v) => offer(c, 'intro_via:' + v.id, `“${v.name} sent me.”`, 'A name he trusts opens the door.', 'lead'))),
   run: (c, code) => {
     const x = T(c), { w, p, t } = x, via = w.chars[code.split(':')[1]];
     if (!via?.alive) { line(x, 'He can’t help you with that any more.'); return out(5); }
     door.introduced(w, p, t); c.v.th.asked.push('met'); tweak(x, 0.1, 0.03, 0.03); door.regard(w, via, p.id, 'respect', 0.01);
-    c.v.lines.push({ who: 'narr', text: `${first(via)} had a word with ${t.name} before you arrived.` });
-    line(x, voice(x, 'vouch', { V: first(via) }), settled(t.id, 'takes your hand', `${first(via)} vouched for you`));
+    c.v.lines.push({ who: 'narr', text: `${first(via) === first(t) ? via.name : first(via)} had a word with ${t.name} before you arrived.` });
+    line(x, voice(x, 'vouch', { V: first(via) === first(t) ? via.name : first(via) }), settled(t.id, 'takes your hand', `${first(via)} vouched for you`));
     return out(15);
   },
 };

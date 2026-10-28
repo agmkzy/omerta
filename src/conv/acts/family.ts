@@ -3,8 +3,11 @@
 // talked of for one as a captain knows it, and the risk a made man takes when he puts his own crewman's name forward. Nothing is
 // a number; a man who doesn't trust you says less, and a proud captain may not like being asked at all.
 import { bear, peek } from '../../core';
+import { OPS } from '../../rackets';
 import { booksOpen, captaincyContenders, lineOf, preferredSuccessor, tellLine } from '../../succession';
-import { positionOf } from '../../standing';
+import { careerRecord, isConsigliere, positionOf } from '../../standing';
+import { agoWords, lastOf, remember } from '../kit';
+import { mtOpen } from './business';
 import { under } from '../../command';
 import { temper } from '../../temper';
 import { DAY, type Character, type World } from '../../types';
@@ -21,9 +24,20 @@ const stamp = (w: World, t: Character, k: string) => { (t.talk ??= {})[k] = { d:
 
 // "What about the books?" An associate asks a made man of his own family. He knows whether they are open, and why, because the
 // family's made men are told; the order of the line he tells only a man he trusts.
+export function booksAnswer(c: Ctx) {
+  const x = T(c), { w, p, t } = x, f = w.fam[p.familyId!], r = R(x);
+  if (r.trust < 0.25) return;
+  if (!booksOpen(w, f)) line(x, `“As for the books, they’re closed. Nobody gets made until there’s a reason to.”`);
+  else line(x, `“The books are open. ${f.books?.why ? f.books.why.charAt(0).toUpperCase() + f.books.why.slice(1) + '.' : ''}”`);
+  const order = lineOf(w, f.id), mine = order.indexOf(p.id);
+  if (r.trust >= 0.45 && order.length) {
+    tellLine(w, p, t);
+    line(x, mine === 0 ? `He lowers his voice. “When it’s time, you’re first. Don’t make me wrong.”` : mine > 0 ? `He lowers his voice. “There are men ahead of you. ${first(w.chars[order[0]])}, for one. You’re in it, though.”` : `“Your name hasn’t come up. Somebody has to say it.”`);
+  }
+}
 const booksAsk: Act = {
   base: 'fam_books', pane: 'business',
-  offers: (c) => (sameFam(c) && c.h.rank === 'associate' && MADE.has(c.n.rank) && !asked(c, 'fam_books') ? [offer('fam_books', '“What about the books?”', 'Whether anybody is being made, and where you stand.')] : []),
+  offers: () => [], // (the books are answered as part of "Where do I stand?" (org.ts promo) since the conversation overhaul)
   run: (c) => {
     const x = T(c), { w, p, t } = x, f = w.fam[p.familyId!], r = R(x); ask(c, 'fam_books');
     if (r.trust < 0.25) { line(x, `${first(t)} looks at you. “That’s not something we talk about with you.”`); return out(5); }
@@ -46,16 +60,46 @@ const crewAsk: Act = {
   run: (c) => {
     const x = T(c), { w, p, t } = x, r = R(x), tp = temper(t); ask(c, 'fam_crew'); stamp(w, t, 'fam_crew');
     const heir = preferredSuccessor(w, t), cs = captaincyContenders(w, p.familyId!), me = cs.findIndex((y) => y.c.id === p.id);
+    const rec = careerRecord(w, p), lead = rec.find((d) => d.key === 'leadership')?.v ?? 0, men = Object.values(w.chars).filter((m) => m.alive && m.bossId === p.id).length;
+    // (he remembers the last time: what he said then, and whether anything has changed since)
+    const prev = lastOf(w, t.id, 'crewask'), was = Number(prev?.sig ?? -1);
+    remember(w, t.id, 'crewask', me === 0 ? 'leading' : me > 0 ? 'talked of' : 'not yet', String(Math.round(lead * 10)));
+    if (prev && was >= 0) line(x, Math.round(lead * 10) > was ? `“You asked me that ${agoWords(w.now, prev.t)}. You’ve done some leading since. I noticed.”` : `“You asked me that ${agoWords(w.now, prev.t)}. What’s changed?”`);
     const touchy = tp.pride > 0.6 && r.trust < 0.55;
     if (touchy) { bear(w, t, p.id, 0.05, `${p.name} let it be known he wants a crew`); line(x, `${first(t)}’s face doesn’t change. “You want my chair? Get in line.” It isn’t a joke.`); return out(10); }
-    if (heir?.id === p.id && r.trust >= 0.5) { line(x, `${first(t)} nods slowly. “When I move up, I’ll say your name. Don’t tell anybody I said that.”`); tweak(x, 0.02, 0, 0.02); return out(15); }
+    if (heir?.id === p.id && r.trust >= 0.5) { line(x, `${first(t)} nods slowly. “When I move up, I’ll say your name. Don’t tell anybody I said that.”`); tweak(x, 0.02, 0, 0.02); return out(15, [{ code: 'fam_crew_prove', label: '“I won’t let you down.”' }]); }
     if (me === 0) line(x, `“People talk about you. That’s a start. A crew’s the boss’s to give, and he gives it when there’s one to give.”`);
     else if (me > 0) line(x, `“You’re talked about. So is ${first(cs[0].c)}, more. ${heir && heir.id !== p.id && r.trust >= 0.45 ? `And if I moved up tomorrow, I’d want ${first(heir)} in my chair. I’m telling you straight.` : 'Earn, lead your men, keep your mouth shut.'}”`);
-    else line(x, `${first(t)} laughs, not unkindly. “You? Lead men first. Right now you couldn’t lead a horse to water.”`);
+    else line(x, `“You’ve done well for yourself. Running men is different from earning. Show me you can keep your own people in line.”`);
     if (t.traits.ambition > 0.7) bear(w, t, p.id, 0.02, `${p.name} has ambitions`);
-    return out(15);
+    // what one says next, having heard it
+    return out(15, [
+      { code: 'fam_crew_need', label: '“What would you need to see from me?”' },
+      ...(men ? [{ code: 'fam_crew_men', label: `“I’ve already got ${men === 1 ? 'a man' : 'men'} working for me.”` }] : []),
+      { code: 'fam_crew_prove', label: '“Then I’ll prove it.”' },
+    ]);
   },
 };
+// what he would need to see: the parts of the record a crew asks for, said as a captain says them, weakest first
+const crewNeed: Act = {
+  base: 'fam_crew_need', pane: 'business',
+  run: (c) => {
+    const x = T(c), { w, p } = x, rec = careerRecord(w, p).filter((d) => ['leadership', 'earning', 'reliability'].includes(d.key)).sort((a, b) => a.v - b.v);
+    const say: Record<string, string> = { leadership: 'Men who do what you say, and keep doing it when you’re not there.', earning: 'Money. More than you’re bringing up now, week in, week out.', reliability: 'Your envelope in full, every Sunday, and your word kept.' };
+    line(x, `“${say[rec[0].key]}${rec[1] && rec[1].v < 0.45 ? ' ' + say[rec[1].key] : ''}”`);
+    return out(10);
+  },
+};
+const crewMen: Act = {
+  base: 'fam_crew_men', pane: 'business',
+  run: (c) => {
+    const x = T(c), { w, p } = x, men = Object.values(w.chars).filter((m) => m.alive && m.bossId === p.id);
+    const loyal = men.filter((m) => peek(m, p.id).trust >= 0.5).length;
+    line(x, loyal >= Math.max(1, men.length / 2) ? `“I know. They stick with you. That counts.”` : `“Working for you and being yours aren’t the same thing. Half of them would go with whoever paid more.”`);
+    return out(10);
+  },
+};
+const crewProve: Act = { base: 'fam_crew_prove', pane: 'business', run: (c) => { const x = T(c); line(x, `${first(x.t)} nods. “Do that.”`); remember(x.w, x.t.id, 'crewpromise', 'said he would prove it'); return out(5); } };
 // "Put my man's name in." A made man vouches for one of his own crewmen to be made. It goes on record, and on him: if that man
 // shames the family later, the men who listened remember whose word it was.
 const putName: Act = {
@@ -87,10 +131,10 @@ const report: Act = {
     const x = T(c), { w, t } = x; ask(c, 'fam_report');
     const crew = Object.values(w.chars).filter((m) => m.alive && m.bossId === t.id);
     const last = t.books.history.at(-1), gross = (last?.gross ?? 0) + crew.reduce((a, m) => a + (m.books.history.at(-1)?.paid ?? 0), 0);
-    const hiding = !!(t.books.skim || t.books.hide);
+    const hiding = !!(t.books.skim || t.books.hide), op = w.ops.find((o) => (o.runner === t.id || o.owner === t.id) && o.state === 'running');
     const said = hiding ? Math.round(gross * 0.7 / 10) * 10 : Math.round(gross / 10) * 10;
     const why = ['the weather kept people home', 'one of the spots got raided', 'two of the regulars are tapped out', 'the Fourth of July took everybody out of town', 'there was a fight at one of the spots and people stayed away'];
-    line(x, said <= 0 ? `“Quiet week. Nothing to speak of.”` : `“About ${'$' + said.toLocaleString('en-US')}${crew.length ? ', with the crew' : ''}. ${hiding ? `It would have been more, but ${w.rng.pick(why)}.` : temper(t).pride > 0.6 ? 'Good week.' : 'Not bad.'}”`);
+    line(x, said <= 0 ? `“Quiet week. Nothing to speak of.”` : `“About ${'$' + said.toLocaleString('en-US')}${crew.length ? ', with the crew' : ''}${op ? `, most of it from the ${(OPS[op.kind as keyof typeof OPS]?.label ?? 'business').toLowerCase()}` : ''}. ${hiding ? `It would have been more, but ${w.rng.pick(why)}.` : temper(t).pride > 0.6 ? 'Good week.' : 'Not bad.'}”`);
     stamp(w, t, 'fam_report');
     return out(15);
   },
@@ -107,6 +151,55 @@ const more: Act = {
     return out(10);
   },
 };
-export const FAMILY: Act[] = [booksAsk, crewAsk, putName, report, more];
+// "Is there something you want my view on?" The consigliere to his boss. The boss raises what is waiting on him where a consigliere's
+// view matters: the inquiry he set him, if there is one open; otherwise a man he isn't sure of; otherwise nothing.
+const counsel: Act = {
+  base: 'fam_counsel', pane: 'business',
+  offers: (c) => (isConsigliere(c.w, c.h) && c.n.familyId === c.h.familyId && c.w.fam[c.h.familyId!]?.bossId === c.n.id && !asked(c, 'fam_counsel') ? [offer('fam_counsel', '“Is there something you want my view on?”', 'He raises what is on his mind, if he wants your view on it.')] : []),
+  run: (c) => {
+    const x = T(c), { w, p, t } = x; ask(c, 'fam_counsel');
+    const s = (w.situations ?? []).find((q) => q.kind === 'hearing' && q.stage !== 'resolved' && (q.parties ?? []).some((y) => y.role === 'inq' && y.id === p.id));
+    if (s) {
+      const d = w.chars[(s.parties ?? []).find((y) => y.role === 'def')!.id];
+      line(x, `${first(t)} doesn’t waste time. “${d ? first(d) : 'That business'}. What did you find?”`);
+      return out(10, (mtOpen.offersFor?.(c, s.id) ?? []).filter((o) => o.code.includes(':adv:')));
+    }
+    const caps = Object.values(w.chars).filter((m) => m.alive && m.familyId === t.familyId && m.rank === 'capo').sort((a, b) => peek(t, a.id).trust - peek(t, b.id).trust || (a.id < b.id ? -1 : 1));
+    const doubt = caps[0] && peek(t, caps[0].id).trust < 0.45 ? caps[0] : undefined;
+    if (doubt) { line(x, `${first(t)} turns his glass. “${first(doubt)}. I don’t know what to make of him lately. Keep an eye on him for me.”`); tweak(x, 0.02); return out(15); }
+    line(x, `“Not today. Keep your ears open.”`);
+    return out(5);
+  },
+};
+// "About what I told the captains." The boss, or the man acting for him, raises the family's direction with one captain. A captain who
+// is going along says so; one who isn't either admits it, if he respects or fears the man asking, or says he is, if he doesn't.
+const dirTalk: Act = {
+  base: 'fam_dir', pane: 'business',
+  offers: (c) => {
+    const f = c.h.familyId ? c.w.fam[c.h.familyId] : undefined, pol = f?.policy;
+    return pol && pol.until > c.w.now && pol.by === c.h.id && c.n.rank === 'capo' && c.n.familyId === c.h.familyId && !asked(c, 'fam_dir') ? [offer('fam_dir', '“About what I told the captains.”', 'Whether his crew is going along with it. He may not tell you the truth.')] : [];
+  },
+  run: (c) => {
+    const x = T(c), { w, p, t } = x, f = w.fam[p.familyId!], r = R(x); ask(c, 'fam_dir');
+    const deaf = (f.policy?.deaf ?? []).includes(t.id);
+    if (!deaf) { line(x, `“We’re doing it. Some of my men grumble. They’ll live.”`); return out(10); }
+    if ((r.fear ?? 0) * 0.6 + r.respect * 0.5 > 0.45) {
+      line(x, `${first(t)} doesn’t look away. “Not yet. My men don’t like it, and I haven’t pushed them.”`);
+      return out(10, [{ code: 'fam_dir_press', label: '“Push them.”', note: 'He’ll do it, or he’ll resent being told twice.' }, { code: 'fam_dir_let', label: '“Do it your way, then.”', note: 'His crew goes on as before, with your blessing.' }]);
+    }
+    line(x, `“We’re doing it,” ${first(t)} says. He says it easily.`);
+    return out(10);
+  },
+};
+const dirPress: Act = {
+  base: 'fam_dir_press', pane: 'business',
+  run: (c) => {
+    const x = T(c), { w, p, t } = x, f = w.fam[p.familyId!], r = R(x);
+    if ((r.fear ?? 0) * 0.6 + r.respect * 0.5 + r.trust * 0.3 > 0.55) { if (f.policy) f.policy.deaf = (f.policy.deaf ?? []).filter((id) => id !== t.id); line(x, `“All right.” He doesn’t like it. He’ll do it.`); return out(5); }
+    bear(w, t, p.id, 0.08, `${p.name} told him twice`); line(x, `${first(t)}’s jaw sets. “I heard you the first time.”`); return out(5);
+  },
+};
+const dirLet: Act = { base: 'fam_dir_let', pane: 'business', run: (c) => { const x = T(c); tweak(x, 0.02, 0, -0.01); line(x, `${first(x.t)} nods. He’ll remember you let him.`); return out(5); } };
+export const FAMILY: Act[] = [booksAsk, crewAsk, crewNeed, crewMen, crewProve, putName, report, more, counsel, dirTalk, dirPress, dirLet];
 // (the position word is read where each answer says what the man can know; kept here so the import is used by intent)
 export const canSpeakToBooks = (w: World, c: Character) => MADE.has(c.rank) && positionOf(w, c) !== 'none';

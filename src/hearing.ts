@@ -214,6 +214,8 @@ function rule(w: World, s: Situation, j: Character, r: Ruling, by?: { advice?: s
     if (r === 'out' && def.bossId) { leaveCrew(w, def); lines.push(`${first(def)} is out of the crew.`); }
     if (r === 'down' && def.rank === 'capo') lines.push(`${first(def)}’s crew is no longer his to run.`);
     if (def.books.skim) delete def.books.skim;
+    // the man who put his name forward is remembered for it, when it was true (conv/acts/family putName)
+    { const v = def.backer ? w.chars[def.backer] : undefined; if (right && v?.alive && v.id !== j.id) feel(w, j, v.id, 'trust', -0.04, `${v.name} put ${def.name}’s name forward`); }
     // he paid the man deciding, and was found against anyway: he says so, to the men who matter
     if (num(s, 'took') && j.isPlayer) { bear(w, def, j.id, 0.3, `${j.name} took his money and ruled against him anyway`); addFact(w, { kind: 'rumour', actor: j.id, victim: def.id, minor: false, text: `${def.name} is telling people ${j.name} took an envelope from him while he was deciding about him.`, district: def.district }, { witnesses: crew.slice(0, 4).map((c) => c.id) }); for (const c of crew.slice(0, 4)) feel(w, c, j.id, 'trust', -0.06, `${j.name} takes envelopes from men he is judging`); lines.push(`${first(def)} won’t keep quiet about the envelope.`); }
     lines.push(s.m?.charge === 'talk' ? `Nobody tells ${first(def)} anything from now on. Whatever happens to him next is the boss’s business.` : `${first(def)} pays back ${money(pay)}${pay < (s.amt ?? 0) ? ', all he has on him' : ''}.`);
@@ -325,6 +327,8 @@ MATTERS.hearing = {
     const acc = w.chars[role(s, 'acc')!], def = w.chars[role(s, 'def')!], out: Opt[] = [];
     const add = (code: string, label: string, hint: string, who?: Id, big?: boolean) => { if (!num(s, 'did:' + code)) out.push({ code, label, hint, who, big }); };
     if (!t || t.id === acc.id) { add('hear_acc', `“Tell me exactly what ${first(def)} did.”`, `${first(acc)}’s account. It will be his account.`, acc.id); if (num(s, 'heardAcc')) add('press_acc', `“How do you know? Take me through it again.”`, 'An honest man holds to his story. A liar may not.', acc.id); }
+    // what has been found can be put to him: the numbers, or what a man said (only what has actually been found)
+    if ((!t || t.id === def.id) && (num(s, 'bookSays') === 1 || num(s, 'around') === 2) && !num(s, 'admit')) add('show', num(s, 'bookSays') === 1 ? `“Your numbers don’t add up, ${first(def)}. Explain it.”` : `“People say you’ve been flush. Explain it.”`, 'Put what you found to his face. A guilty man has less room; an innocent one has an answer.', def.id);
     if (!t || t.id === def.id) add('hear_def', `“${first(acc)} says you’ve been ${s.m?.charge === 'talk' ? 'talking to people you shouldn’t' : s.m?.charge === 'took' ? 'helping yourself to the crew’s money' : 'holding out'}.”`, `Put it to ${first(def)}’s face. He’ll know who told you.`, def.id);
     if (!t) {
       if (s.m?.charge !== 'talk') add('books', seat === 'inq' ? `Ask to see ${first(def)}’s numbers` : `Go through ${first(def)}’s numbers`, seat === 'inq' ? 'His captain will show you, and know you asked. They say what they say about money, and nothing else.' : 'An hour with the books. They say what they say about money, and nothing else.');
@@ -336,12 +340,16 @@ MATTERS.hearing = {
         else if (positionOf(w, p) === 'boss') out.push({ code: 'rule:down', label: `Rule against ${first(def)}: take his crew from him`, hint: 'Pays it back and loses his crew. Every captain will read it.', big: true });
         out.push({ code: 'rule:false', label: `Throw the charge out: ${first(acc)} was lying`, hint: `${first(acc)} is shamed in front of the crew. If he was telling the truth, ${first(def)} walks.`, big: true });
         out.push({ code: 'rule:none', label: 'No finding', hint: 'You can’t tell, and you say so. Neither of them will thank you.' });
-      } else {
-        out.push({ code: 'adv:guilty', label: `Tell ${first(w.chars[role(s, 'judge')!])}: ${first(def)} did it`, hint: 'He decides. If you are wrong, he will remember whose advice it was.', big: true });
-        out.push({ code: 'adv:false', label: `Tell him: there’s nothing in it`, hint: `${first(acc)} has his reasons. If you’re wrong, that is remembered too.`, big: true });
-        out.push({ code: 'adv:unsure', label: 'Tell him you can’t be sure', hint: 'Honest. He doesn’t like it, and decides by his own lights.' });
-        if (!num(s, 'did:mediate')) out.push({ code: 'mediate', label: 'Bring the two of them together', hint: 'A settlement without a verdict. It works if both want to be done with it.' });
       }
+    }
+    // the consigliere's finding, said to the boss himself, here or from the record
+    if (seat === 'inq' && (!t || t.id === role(s, 'judge'))) {
+      // (to his face, it is said; from the record, it is what you go and tell him)
+      const j = first(w.chars[role(s, 'judge')!]), face = !!t;
+      out.push({ code: 'adv:guilty', label: face ? `“${first(def)} did it. I’m sure of it.”` : `Tell ${j}: ${first(def)} did it`, hint: 'He decides. If you are wrong, he will remember whose advice it was.', big: true });
+      out.push({ code: 'adv:false', label: face ? `“There’s nothing in it. ${first(acc)} has his reasons.”` : `Tell ${j}: there’s nothing in it`, hint: `If you’re wrong, that is remembered too.`, big: true });
+      out.push({ code: 'adv:unsure', label: face ? '“I can’t tell you for certain.”' : `Tell ${j} you can’t be sure`, hint: 'Honest. He doesn’t like it, and decides by his own lights.' });
+      if (!face && !num(s, 'did:mediate')) out.push({ code: 'mediate', label: `Bring ${first(acc)} and ${first(def)} together`, hint: 'A settlement without a verdict. It works if both want to be done with it.' });
     }
     return out;
   },
@@ -358,6 +366,12 @@ MATTERS.hearing = {
     if (code === 'hear_acc') return hearAcc(w, s, p, acc);
     if (code === 'press_acc') return pressAcc(w, s, p, acc);
     if (code === 'hear_def') return hearDef(w, s, p, def);
+    if (code === 'show') {
+      // the evidence in front of him: a guilty man with little nerve owns it; a cool one has a story that doesn't quite hold
+      if (guilty(s) && temper(def).caution + def.skills.nerve * 0.5 < 0.95) { M(s).admit = 1; note(s, `Faced with it, ${first(def)} admitted it.`); return [`${first(def)} looks at what you have for a long time. “All right. I took it. I was going to put it back.”`]; }
+      if (guilty(s)) { note(s, `Faced with it, ${first(def)} had an explanation. It was thin.`); return [`“A couple of the spots were slow, and I covered the difference out of what I was owed.” He has an answer for everything. It doesn’t quite add up.`]; }
+      note(s, `Faced with it, ${first(def)} explained it plainly.`); return [`“Ask anybody where it went. I’ll show you every dollar.” He doesn’t hesitate.`];
+    }
     if (code === 'books') return readBooks(w, s, p, def);
     if (code === 'around') return askAround(w, s, p);
     if (code.startsWith('lt:')) { const m = w.chars[code.slice(3)]; return m ? delegateTo(w, s, p, m) : []; }

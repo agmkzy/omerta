@@ -14,6 +14,10 @@ const first = (c: Character) => c.name.split(' ')[0];
 export const openSits = (w: World) => (w.situations ??= []).filter((s) => s.stage !== 'resolved');
 export const sitOf = (w: World, who: Id) => openSits(w).find((s) => s.who === who);
 
+// The causes are written as a third man would say them ("he’s in deep with a bookmaker"); said by the man himself they are his own
+// ("I’m in deep with a bookmaker"). The set of causes is fixed (causeOf), so this is a table of their openings, not a guess.
+const OWN: [RegExp, string][] = [[/^he thinks he’s/, 'I think I’m'], [/^he’s run/, 'I’ve run'], [/^he’s/, 'I’m'], [/^he needs/, 'I need'], [/costs him$/, 'costs me'], [/costing him$/, 'costing me'], [/^the drinking/, 'the drinking'], [/^a woman/, 'a woman']];
+export const ownWords = (cause: string) => OWN.reduce((s, [re, to]) => s.replace(re, to), cause);
 function causeOf(w: World, c: Character): string | undefined {
   const b = ownerBiz(w, c.id);
   if (b && b.distress >= 1) { const rv = Object.values(w.biz).find((x) => x.open && x.id !== b.id && x.kind === b.kind && x.district === b.district); return rv ? `${b.name} is losing customers to ${rv.name}` : `${b.name} has been losing money`; }
@@ -111,7 +115,7 @@ export function askAbout(w: World, p: Character, c: Character): string[] {
   const open = r.trust >= 0.4 || s.stage === 'asking' || temper(c).caution < 0.3;
   if (!open) { p.cooldown[`sitask:${c.id}`] = w.now + 3 * DAY; return [`${c.name} shrugs. "Fine. Slow, but fine."`, 'He isn’t telling you everything. Give it time, or ask someone who knows him.']; }
   s.told = true; s.knows = true;
-  return [`${c.name} lets out a breath. "Since you ask. ${s.cause.replace(/^./, (m) => m.toUpperCase())}."`, 'He doesn’t ask you for anything. He wants you to see it.'];
+  return [`${c.name} lets out a breath. “Since you ask. ${ownWords(s.cause).replace(/^./, (m) => m.toUpperCase())}.”`, 'He doesn’t ask you for anything. He wants you to see it.'];
 }
 export function helpWith(w: World, p: Character, c: Character, how: 'cover' | 'lend' | 'leave' | 'rival'): string[] {
   const s = sitOf(w, c.id);

@@ -76,7 +76,7 @@ const BETWEEN = /^(answer|report|job|jobtake|jobpass|m|memo|sit|b_envelope|b_env
 const SUBJECT_OF: Record<string, Subj> = {};
 const put = (k: Subj, xs: string) => { for (const x of xs.split(' ')) SUBJECT_OF[x] = k; };
 put('work', 'work b_need b_more rate_ask b_tribute borrow loan favcall offer_loan buy_ask stake_ask sell_ask run_ask partner_chop partner_fence op biz_none sh_how sh_ears sh_back sh_time sh_why sh_lean suggest terms_cut terms_raise deal d_time d_half d_favour d_forgive d_pay d_all d_ask d_remind cr_cash cr_duties assign_low assign_hustle recruit_offer protect tk:shop tk:racket');
-put('family', 'fam_books fam_crew fam_name fam_report fam_more promo recommend rk_back rk_back_ask b_stand earn tk:earn leaders mediate pick_concern concern ask_rep ask_crew answers rv_mood');
+put('family', 'fam_books fam_crew fam_name fam_report fam_more fam_counsel fam_dir promo recommend rk_back rk_back_ask b_stand earn tk:earn leaders mediate pick_concern concern ask_rep ask_crew answers rv_mood');
 put('people', 'tk:op tk:ev tk:tell tk:hurting think pick_member suspect pick_incident tell who news rv_ears ask_around about inc');
 put('personal', 'how old_times spend rv_drink congrats welcome ask_want ask_history help_gift help_loan cr_ask sit_ask intro intro_via rv_favour tk:kin');
 put('settle', 'demand confront amends word_make accuse rv_warn cr_drop cr_thin cr_look challenge refuse');
@@ -185,7 +185,7 @@ export function talk2View(v: Visit): string {
   if (sx) {
     let side = `<h2 class="cx-sh">Between you</h2>${shown.length ? `<div class="cx-ctx">${shown.map((x) => `<p>${x}</p>`).join('')}</div>` : ''}`;
     side += sx.matters.length ? `<ul class="cx-subjs">${sx.matters.map((c) => `<li><button data-a="t2:${esc(c.id)}"><b>${esc(c.label.replace(/^“|”$/g, ''))}</b>${c.note ? `<small>${esc(c.note)}</small>` : ''}</button></li>`).join('')}</ul>` : (shown.length ? '' : `<p class="cx-none">Nothing unfinished.</p>`);
-    side += `<h2 class="cx-sh">Subjects</h2><ul class="cx-subjs">${SUBJ.map((x) => { const n = sx.by.get(x.k)!.length; return `<li><button class="${subj === x.k ? 'on' : ''}" data-a="cxs:${x.k}"${n ? '' : ' disabled'}><b>${x.name}</b><small>${n ? x.hint : 'Nothing with him now'}</small></button></li>`; }).join('')}</ul>`;
+    side += `<h2 class="cx-sh">Subjects</h2><ul class="cx-subjs">${SUBJ.filter((x) => sx.by.get(x.k)!.length || subj === x.k).map((x) => { const n = sx.by.get(x.k)!.length; return `<li><button class="${subj === x.k ? 'on' : ''}" data-a="cxs:${x.k}"${n ? '' : ' disabled'}><b>${x.name}</b><small>${n ? x.hint : 'Nothing with him now'}</small></button></li>`; }).join('')}</ul>`;
     side += `<button class="cx-leave2" data-a="t2:leave">${leaveLabel === 'Not now' ? 'Not now' : 'Leave conversation'}</button>`;
     out += `<aside class="cx-side${S.open.cxsubj ? ' is-open' : ''}" aria-label="Subjects">${side}</aside>`;
   }

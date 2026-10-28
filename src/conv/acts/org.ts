@@ -18,6 +18,10 @@ import { chance, settled, term } from '../decide';
 import { agoWords, him, lastOf, line as mine, plain, remember, type Act, type Ctx, type Offer } from '../kit';
 import { first, line, out, R, T, tweak, voice } from './common';
 import { inFamily, isSuperior } from './words';
+import { canSpeakUp, isFamilyBoss, upward } from '../relation';
+import { booksAnswer } from './family';
+import { isConsigliere } from '../../standing';
+import { ACTS } from './index';
 import { said } from './personal';
 
 const money = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
@@ -69,7 +73,7 @@ const bNeed: Act = {
 const bMore: Act = {
   base: 'b_more', pane: 'business',
   // (a man asks for more once he has shown what he does with what he has: work finished, or money passed up)
-  offers: (c) => (isBoss(c) && !asked(c, 'b_more') && c.h.rank !== 'boss' && ((c.h.career?.done ?? 0) >= 1 || c.h.lifetimeKick > 0) ? [offer(c, 'b_more', 'Ask for a bigger piece', 'More ground and more risk.')] : []),
+  offers: () => [], // ("I'm ready for more" said the same as asking for work and where you stand: folded into those)
   run: (c) => {
     const x = T(c), { w, p, t } = x, rd = readiness(w, p); ask(c, 'b_more');
     const d = chance(w, t.id, 'gives you more', 'says you are not ready', [term('base', 0.15), term('his trust in you × 0.5', R(x).trust * 0.5), term('your standing / 250', p.standing / 250), term('what you have passed up, × 0.15', (rd?.earn ?? 0) * 0.15)], 0.1, 0.85);
@@ -144,7 +148,7 @@ const refuse: Act = {
 // ---------------------------------------------------------------- where the player stands
 const bStand: Act = {
   base: 'b_stand', pane: 'personal',
-  offers: (c) => (isBoss(c) && !asked(c, 'b_stand') ? [offer(c, 'b_stand', 'Ask where you stand', 'He’ll tell you what he thinks, in his way.')] : []),
+  offers: () => [], // (folded into 'promo', "Where do I stand?", in the conversation overhaul; kept for old saves' memory keys)
   run: (c) => {
     const x = T(c), { w, p, t } = x, pi = pathInfo(w, p); ask(c, 'b_stand');
     if (!pi) line(x, `${t.name} looks at you for a long moment. "You’re where you should be. There’s nowhere higher for you to ask about."`);
@@ -172,10 +176,17 @@ function howFar(g: { key: string; frac: number }, h: Character, w: World): strin
 const GOAL_WORD: Record<string, string> = { earn: 'the money you pass up', deeds: 'the work', kills: 'the hard work', name: 'what people say of you', sponsor: 'the men who would back you', trial: 'your proof' };
 const promo: Act = {
   base: 'promo', pane: 'business',
-  offers: (c) => (inFamily(c.h, c.n) && superior(c) ? [offer(c, 'promo', 'Talk about moving up')] : []),
+  offers: (c) => (inFamily(c.h, c.n) && upward(c.w, c.h, c.n) && !asked(c, 'promo') ? [offer(c, 'promo', 'Ask where you stand', 'What he thinks of you, and what it would take.')] : []),
   run: (c) => {
     const { w, h, n } = c;
     const canSay = ['capo', 'underboss', 'boss'].includes(n.rank) || n.id === h.bossId;
+    // (the man at the top of the player's own seat, asked by his underboss or his consigliere: there is no chair to talk about, only
+    // how he sees the man beside him)
+    if (isFamilyBoss(w, n) && (h.rank === 'underboss' || isConsigliere(w, h))) {
+      const tr = peek(n, h.id).trust;
+      line(T(c), tr >= 0.7 ? `“You’re where you are because I trust you. Keep it that way.”` : tr >= 0.45 ? `“You do your job. That’s where you stand.”` : `“You want to know where you stand? Think about the last month, and you tell me.”`);
+      return out(10);
+    }
     const info = canSay ? pathInfo(w, h) : undefined, rd = canSay ? readiness(w, h) : undefined;
     if (!canSay || !info) { him(c, plain(n.id, canSay ? 'advance.top' : 'advance.notMe')); return out(15); }
     const lvl = (g: { done: boolean; frac: number }) => (g.done ? 4 : Math.floor(g.frac * 4));
@@ -191,16 +202,20 @@ const promo: Act = {
     else if (prev && (better.length || nameUp)) him(c, plain(n.id, 'advance.better', { ago: agoWords(w.now, prev.t), what: better.length ? GOAL_WORD[better[0].key] ?? 'the work' : `what people call you: ${word} now` }, 'warm'));
     else him(c, plain(n.id, 'advance.open', { standing: word }, 'flat'));
     if (!gaps.length) him(c, plain(n.id, rd?.openSeat ? 'advance.ready' : 'advance.noSeat'));
-    for (const g of gaps.slice(0, 2)) him(c, plain(n.id, 'advance.gap.' + (g.key === 'trial' && g.note.startsWith('waiting') ? 'trialOpen' : g.key), { how: howFar(g, h, w), standing: word, label: g.label }, 'flat'));
+    for (const g of gaps.slice(0, 2)) him(c, plain(n.id, 'advance.gap.' + (g.key === 'trial' && g.note.startsWith('waiting') ? 'trialOpen' : g.key) + (h.rank !== 'associate' && ['earn', 'sponsor', 'name'].includes(g.key) ? '.made' : ''), { how: howFar(g, h, w), standing: word, label: g.label }, 'flat'));
     remember(w, n.id, 'advance', 'asked', sig);
-    return out(15);
+    // (the books, for an associate asking a made man who would know: whether anyone is being made, and his place, if he trusts him)
+    if (h.rank === 'associate' && ['soldier', 'capo', 'underboss', 'boss'].includes(n.rank)) booksAnswer(c);
+    // and what one says next, having heard it: a request for his word, or (a soldier to his captain) the crew one wants one day
+    const next = [...(ACTS.rk_back?.offers?.(c) ?? []), ...(ACTS.recommend?.offers?.(c) ?? []), ...(ACTS.fam_crew?.offers?.(c) ?? [])].map((o) => ({ ...o, kind: undefined }));
+    return out(15, next);
   },
 };
 // a word put in for the player with the family's boss: his decision, on how far he trusts the player
 const rkOffered = (c: Ctx) => inFamily(c.h, c.n) && c.h.rank === 'associate' && c.n.rank !== 'associate' && c.n.rank !== 'civilian' && c.h.backer !== c.n.id && c.n.id !== c.h.bossId;
 const recommend: Act = {
   base: 'recommend', pane: 'business',
-  offers: (c) => (inFamily(c.h, c.n) && c.n.rank !== 'associate' && c.n.rank !== 'civilian' && !rkOffered(c) ? [offer(c, 'recommend', 'Ask him to put in a word for you')] : []),
+  offers: (c) => (inFamily(c.h, c.n) && upward(c.w, c.h, c.n) && canSpeakUp(c.w, c.n) && !rkOffered(c) ? [offer(c, 'recommend', 'Ask him to put in a word for you')] : []),
   run: (c) => {
     const x = T(c), { w, p, t } = x;
     const d = chance(w, t.id, 'puts in a word', 'will not', [term('his trust in you × 0.9', R(x).trust * 0.9)], 0.1, 0.9);
@@ -424,7 +439,7 @@ const thPush: Act = {
 // orders to the player's own man: keep his head down, find some extra income; he may push back, and the player may insist
 const assign = (low: boolean): Act => ({
   base: low ? 'assign_low' : 'assign_hustle', pane: 'business',
-  offers: (c) => (orders(c) && crewMan(c) ? [low ? offer(c, 'assign_low', 'Tell him to keep his head down', 'Heat drops. He earns less.') : offer(c, 'assign_hustle', 'Tell him to find some extra income', 'It will show up in the books, and in the heat.')] : []),
+  offers: (c) => (orders(c) && crewMan(c) && (c.n.rank === 'associate' || c.n.rank === 'soldier') ? [low ? offer(c, 'assign_low', 'Tell him to keep his head down', 'Heat drops. He earns less.') : offer(c, 'assign_hustle', 'Tell him to find some extra income', 'It will show up in the books, and in the heat.')] : []),
   run: (c, code) => {
     const x = T(c), { w, p, t } = x, k = code.split(':')[0];
     const d = low ? ((t.books.arrears > 0 || t.cash < 150) ? chance(w, t.id, 'pushes back', 'goes along', [term('a man behind or short, six times in ten', 0.6)]) : settled(t.id, 'goes along', 'not behind, not short')) : (arch(t) === 'frightened' || temper(t).caution > 0.65) ? chance(w, t.id, 'pushes back', 'goes along', [term('a careful or frightened man', 0.65)]) : settled(t.id, 'goes along', 'not a careful man');

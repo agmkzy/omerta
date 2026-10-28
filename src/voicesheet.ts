@@ -915,7 +915,7 @@ const SPEAK: Record<string, { re?: RegExp; to: Say }> = {
   pick_member: { to: { _: `What do you make of the others?` } },
   leaders: { to: { _: `Who’s really running things?` } },
   pick_concern: { to: { _: `There’s something you ought to know about a man` } },
-  promo: { to: { _: `What would it take to be moved up?` } },
+  promo: { to: { _: `Where do I stand with you?` } },
   recommend: { to: { up: `Would you put in a word for me?`, _: `Would you put a word in for me?` } },
   ask_want: { to: { _: `What are you after, in all this?` } },
   ask_crew: { to: { _: `How are you getting along with the others?` } },
