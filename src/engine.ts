@@ -173,6 +173,7 @@ function weekly(w: World) {
   hearingWeek(w); // (The Family: a charge brought to the player to find out and decide: hearing.ts)
   chargeWeek(w); // (the boss's charge to his underboss: charge.ts)
   allegianceWeek(w); // (another made man wants the player working for him: allegiance.ts)
+  courtedWeek(w); // (another made man wants one of the player's men)
   // V89: bad feeling between families cools when nothing feeds it (it used to only ever rise; docs/V89_HEALTH.md). A tenth a week
   // above a floor of quiet suspicion, so old wars are remembered but a quiet month is felt.
   for (const f of Object.values(w.fam)) for (const k of Object.keys(f.tension)) if (f.tension[k] > 1) f.tension[k] = Math.round((1 + (f.tension[k] - 1) * 0.9) * 100) / 100;
@@ -242,7 +243,7 @@ import { repairAll } from './rank';
 import { ensureShape } from './world';
 import { hearingWeek } from './hearing';
 import { chargeWeek } from './charge';
-import { allegianceWeek } from './allegiance';
+import { allegianceWeek, courtedWeek } from './allegiance';
 export function deserialize(s: string): World {
   const o = JSON.parse(s);
   const rng = new Rng(0);

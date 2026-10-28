@@ -1,5 +1,5 @@
 import { counselChoose } from './succession';
-import { allegianceChoose } from './allegiance';
+import { allegianceChoose, courtedChoose } from './allegiance';
 import { routine, spotById } from './city';
 import { kinTie } from './kin';
 import { answerImposed } from './imposed';
@@ -501,6 +501,7 @@ function lapse(w: World, p: Character, e: Enc) {
   const c = e.from ? w.chars[e.from] : undefined;
   if (!c?.alive) return;
   const r = rel(c, p.id);
+  if (e.kind === 'courted') { const m = w.chars[String(e.data?.m)], x = w.chars[String(e.data?.x)]; if (m?.alive && x?.alive && m.bossId === p.id) { m.bossId = x.id; addFact(w, { kind: 'event', actor: m.id, victim: p.id, minor: false, text: `${m.name} went over to ${x.name}. Nobody stopped him.`, district: m.district }, { witnesses: [p.id, m.id, x.id] }); } return; } // (unanswered, he goes)
   if (e.kind === 'ent' || e.kind === 'place') {
     // (left unanswered, a man takes it as an answer: the cut he asked for is no, the captain's piece is ignored, the advance is refused)
     const k = String(e.data?.k);
@@ -544,7 +545,8 @@ export function choose(w: World, p: Character, e: Enc, code: string): { lines: s
   if (e.kind === 'imposed') return answerImposed(w, p, e, code);
   if (e.kind === 'score') return scoreChoose(w, p, e, code); // a truck, played: score.ts
   if (['bigbet', 'cantpay', 'rivalbook', 'pad'].includes(e.kind)) return bookChoose(w, p, e, code); // the book: book.ts
-  if (e.kind === 'allegiance') return allegianceChoose(w, p, e, code); // another made man wants him: allegiance.ts
+  if (e.kind === 'allegiance') return allegianceChoose(w, p, e, code);
+  if (e.kind === 'courted') return courtedChoose(w, p, e, code); // one of his men courted by another: allegiance.ts // another made man wants him: allegiance.ts
   if (e.kind === 'counsel') return { lines: counselChoose(w, p, e, code), minutes: 20 }; // the boss asks his consigliere: succession.ts
   if (e.kind === 'ent') return entChoose(w, p, e, code); // what has come about around an enterprise: enterprise.ts
   if (e.kind === 'place') return placeChoose(w, p, e, code); // among the people of a place of his: establishments.ts

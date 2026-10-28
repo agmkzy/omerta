@@ -45,3 +45,51 @@ export function allegianceChoose(w: World, p: Character, e: Enc, code: string): 
   return { lines: [`${first(who)} shrugs. “Your loss.” He means it, a little.`], minutes: 10 };
 }
 
+
+// The other side of it: one of the player's own men is being courted by another made man. A man who isn't happy where he is listens;
+// the player hears of it (from another of his men), and can talk to him (a better cut keeps most men), have a word with the man doing
+// the courting (made man to made man: it may settle it, or start something), or let him go, and with him what he brings in.
+export function courtedWeek(w: World) {
+  const p = w.playerId ? w.chars[w.playerId] : undefined;
+  if (!p?.alive || !p.familyId || !['soldier', 'capo'].includes(p.rank) || (p.cooldown.courted ?? 0) > w.now) return;
+  if (w.enc.some((e) => e.status === 'open' && e.kind === 'courted')) return;
+  const mine = Object.values(w.chars).filter((c) => c.alive && c.bossId === p.id && (c.rank === 'associate' || (c.rank === 'soldier' && p.rank === 'capo')) && !c.isPlayer);
+  for (const m of mine.sort((a, b) => (a.id < b.id ? -1 : 1))) {
+    const r = peek(m, p.id);
+    // a man listens if he isn't happy where he is, or wants more than he has
+    if (r.trust >= 0.5 && r.grudge < 0.1 && m.traits.ambition <= 0.65) continue;
+    // who courts him: a made man who knows him a little and wants more men (a soldier's man by a captain only if he is a soldier)
+    const x = Object.values(w.chars).filter((c) => c.alive && !c.isPlayer && c.familyId === p.familyId && (m.rank === 'soldier' ? c.rank === 'capo' : c.rank === 'soldier' || c.rank === 'capo') && c.id !== p.bossId && c.id !== p.id && peek(c, m.id).trust >= 0.15 && c.traits.ambition > 0.45)
+      .sort((a, b) => peek(b, m.id).trust - peek(a, m.id).trust || (a.id < b.id ? -1 : 1))[0];
+    if (!x || (Math.floor(w.now / WEEK) + m.id.length) % 4 !== 0) continue;
+    const teller = mine.find((c) => c.id !== m.id && peek(c, p.id).trust >= 0.35);
+    p.cooldown.courted = w.now + 6 * WEEK;
+    addEnc(w, { kind: 'courted', from: teller?.id ?? m.id, about: m.id, title: `${first(m)} is being courted`, days: 5,
+      lines: [teller ? `${first(teller)}, quietly: “${first(m)}’s been having coffee with ${x.name}. More than once. I’m only saying.”` : `${first(m)} mentions, as if it were nothing, that ${x.name} has been asking after him.`],
+      opts: [
+        { code: 'cut', label: `Talk to ${first(m)}: a bigger share for him`, hint: 'He keeps more of what he brings in. Most men stay for that. You get less.' },
+        { code: 'word', label: `Have a word with ${first(x)}`, hint: `Made man to made man: leave my men alone. ${first(x)} may back off, or take it badly.` },
+        { code: 'let', label: `Let ${first(m)} go if he wants`, hint: 'A man who wants to leave isn’t worth keeping. What he brings in goes with him.' },
+      ], data: { m: m.id, x: x.id } });
+    return;
+  }
+}
+export function courtedChoose(w: World, p: Character, e: Enc, code: string): { lines: string[]; minutes: number } {
+  e.status = 'done';
+  const m = w.chars[String(e.data?.m)], x = w.chars[String(e.data?.x)];
+  if (!m?.alive || !x?.alive || m.bossId !== p.id) return { lines: ['It sorted itself out before you got to it.'], minutes: 5 };
+  if (code === 'cut') {
+    m.kickRate = Math.max(0.1, Math.round((m.kickRate - 0.05) * 100) / 100); feel(w, m, p.id, 'trust', 0.1, `${p.name} gave him a bigger share to keep him`);
+    return { lines: [`You take ${first(m)} for a drink and tell him he keeps more from now on. He doesn’t pretend not to know why. He stays.`], minutes: 40 };
+  }
+  if (code === 'word') {
+    const backs = peek(x, p.id).respect + peek(x, p.id).trust * 0.5 + (p.rank === 'capo' && x.rank === 'soldier' ? 0.3 : 0) - x.traits.ambition * 0.3;
+    if (backs > 0.2) { bear(w, m, p.id, 0.05, `${p.name} warned ${x.name} off him`); return { lines: [`${first(x)} spreads his hands. “I was only being friendly.” He won’t be again. ${first(m)} hears you went to him, and doesn’t like it much.`], minutes: 30 }; }
+    bear(w, x, p.id, 0.15, `${p.name} told him to keep away from his men`); m.bossId = x.id; feel(w, m, x.id, 'trust', 0.05);
+    addFact(w, { kind: 'event', actor: m.id, victim: p.id, minor: false, text: `${m.name} left ${p.name} for ${x.name}.`, district: m.district }, { witnesses: [p.id, m.id, x.id] });
+    return { lines: [`${first(x)} looks at you a long time. “He’s a grown man. Ask him.” By the end of the week ${first(m)} is with ${first(x)}, and ${first(x)} has a grudge with your name on it.`], minutes: 30 };
+  }
+  m.bossId = x.id; feel(w, m, x.id, 'trust', 0.05); feel(w, m, p.id, 'respect', 0.03);
+  addFact(w, { kind: 'event', actor: m.id, victim: p.id, minor: false, text: `${m.name} went over to ${x.name}, with ${p.name}’s leave.`, district: m.district }, { witnesses: [p.id, m.id, x.id] });
+  return { lines: [`You tell ${first(m)} he can go with your blessing. He looks relieved, and goes. What he brought in goes with him.`], minutes: 15 };
+}
