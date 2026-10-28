@@ -392,7 +392,12 @@ function seatPlayer(w: World, used: Set<string>, fam: Character[], capos: Charac
   seat.standing = { soldier: 40, capo: 55, underboss: 65, consigliere: 62, boss: 75 }[start];
   seat.cash = { soldier: 4000, capo: 9000, underboss: 15000, consigliere: 12000, boss: 25000 }[start];
   seat.lifetimeKick = { soldier: 8000, capo: 25000, underboss: 45000, consigliere: 30000, boss: 60000 }[start];
-  if (start === 'consigliere') { f.consigliere = seat.id; seat.bossId = boss.id; seat.wage = 300; link(boss, seat, 0.75); }
+  if (start === 'consigliere') {
+    f.consigliere = seat.id; seat.bossId = boss.id; seat.wage = 300; link(boss, seat, 0.75);
+    // (a consigliere commands nobody: the men who worked under him go to the captain he answered to)
+    const cap = Object.values(w.chars).find((c) => c.alive && c.familyId === f.id && c.rank === 'capo' && c.id !== seat.id);
+    for (const m of Object.values(w.chars)) if (m.alive && m.bossId === seat.id) m.bossId = cap?.id ?? boss.id;
+  }
   if (start === 'boss') f.leaderSince = since;
   void was;
   return seat;

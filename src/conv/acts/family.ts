@@ -5,6 +5,7 @@
 import { bear, peek } from '../../core';
 import { booksOpen, captaincyContenders, lineOf, preferredSuccessor, tellLine } from '../../succession';
 import { positionOf } from '../../standing';
+import { under } from '../../command';
 import { temper } from '../../temper';
 import { DAY, type Character, type World } from '../../types';
 import type { Act, Ctx, Offer } from '../kit';
@@ -78,7 +79,7 @@ const putName: Act = {
 };
 // "How are things at your end?" A man asked by the man above him gives his own account of his week. A man who has been holding out
 // shades it, with a reason that sounds right; his books (and his crew's) say what they say.
-const below = (c: Ctx) => c.n.bossId === c.h.id && c.n.rank !== 'civilian';
+const below = (c: Ctx) => c.n.rank !== 'civilian' && (c.n.bossId === c.h.id || (['capo', 'underboss'].includes(c.n.rank) && under(c.w, c.h, c.n)));
 const report: Act = {
   base: 'fam_report', pane: 'business',
   offers: (c) => (below(c) && !asked(c, 'fam_report') ? [offer('fam_report', '“How are things at your end?”', 'His account of his week. It is his account.')] : []),
