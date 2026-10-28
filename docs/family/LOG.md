@@ -44,3 +44,32 @@ a captain asking leave to kill a civilian refused by his underboss; ledger audit
 Measured (scripted 50–70 day runs, seeds 5, 7, 11): captain, underboss, consigliere and boss each received hearings; true and false
 charges both occurred; the consigliere's evidence correctly separated a false charge from a true one; an underboss's leaned-on
 captain went over his head; the boss's "clean house" was ignored by one captain; audits clean, save round-trips exact.
+
+Deployed 28 Oct 00:50 UTC. Browser-checked from fresh starts: the captain's hearing (findings list, what you don't know, the moves
+dropping away as used), the consigliere's inquiry (asks to see the books, cannot send men, advises), the underboss's charge (captain by
+captain, the "find out why" day), the boss's direction (on his family screen; captains' reactions on Today), the family conversation
+moves under Family business.
+
+## Increment 5: allegiances and reviews up the chain (deployed 28 Oct, 01:05 UTC)
+Another made man may ask a well-regarded associate to come over (go, stay, or tell your own man); a boss or underboss can ask any
+captain in his chain for his account and say he expects more; a consigliere start commands nobody.
+
+## What reached each seat in 100 days (seed 3, fresh start, every encounter answered with its first choice)
+| Seat | What came to him (most frequent) | Matters he was in |
+|---|---|---|
+| associate | family, imposed work, tips, invitations, his crewmen | (none; his play is what he starts: work, sponsors, the books) |
+| soldier | imposed work, his crewmen, family, invitations, a crossdeal, a captain's summons | (none; his rackets, recruits and book) |
+| captain | tips, family, hearings (4), his crew, scores | hearing 2 |
+| underboss | his crew (14), mediation (11), reports, hearings (5), the boss's charge (3), quarrels | hearing 3, charge 2, rivalry |
+| consigliere | favours asked of him (7), hearings (5), crew, tips | hearing 3 (as investigator), climb |
+| boss | mediation (9), crew, scores, hearings about captains (4), favours | hearing 2 |
+All six: ledger audit 0, hierarchy issues 0, errors 0.
+
+## Still open (honest list)
+- Associate and soldier are told apart mostly by what the player starts (conversation, rackets, recruiting, backing); fewer things
+  arrive that only their seat receives. A soldier-specific arriving process (the captain's expectations of his own earner) is the
+  next candidate.
+- A vacant captaincy waits behind inductions in `career.careerTick` (a week that makes a soldier fills no crew): older behaviour,
+  left as it was.
+- "Would you put a word in for me?" is offered by a captain to his own soldier (older offer rule in `conv/acts/org.ts recommend`).
+- Not built tonight: acting boss, contested succession, the org structure view, and long hidden-title playthroughs in the browser.
