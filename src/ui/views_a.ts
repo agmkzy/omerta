@@ -1,3 +1,4 @@
+import { sendable } from '../command';
 import { epilogue } from '../epilogue';
 import { spots } from '../city';
 import { tradeOf } from './streetmap';
@@ -531,6 +532,8 @@ export function bizView(id: Id): string {
     o.id !== p.id && o.alive ? btn(`talk:${o.id}|g:business`, `Talk business with ${o.name.split(' ')[0]}`) : '',
     // (leaning on a place is putting it to its owner: the same conversation, the same rule of whose place it is to lean on)
     !prot && o.alive && o.id !== p.id ? btn(`talk:${o.id}|g:business`, 'Lean on it') : prot && prot.familyId !== p.familyId ? btn(`plan:lean|${b.id}`, 'Lean on it') : btn(`plan:burgle|${b.id}`, 'Other ideas'));
+  // (having the place wrecked by one of your men: whose word it needs is shown on the next screen, ui/orderview.ts)
+  if (o.alive && o.id !== p.id && b.open && sendable(w, p, o).length) out += `<details class="pp-more"><summary>More</summary>${acts(btn(`sv:sd:wreck:${b.id}|${o.id}`, 'Have it wrecked', 'danger'))}</details>`;
   if (prot && lateOf(b) > 0 && prot.collectorId === p.id) out += context([`${esc(o.name)} is behind by <b>${esc(money(owedOf(b)))}</b>. You can send a man to shake him, or go yourself.`], true) + acts(btn(`shake:${b.id}`, 'Shake him myself', 'danger'), btn('orders:', 'Send a man'));
   const who: KV[] = [['Owner', o.id === p.id ? 'you' : pl(o)]];
   // (who looks after it is known on his own streets, or where he has been or heard; not across the whole city: acquaint.knowsProtection)

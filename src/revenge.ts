@@ -42,7 +42,7 @@ export function settleOptions(w: World, p: Character, x: Character, kill = false
   // Words first: always available and often the smartest play.
   if (sup && !pend) o.push({ code: 'sup', label: `Go to ${sup.name}`, hint: `${x.name} answers to him. Put it on the table.` });
   if (same && x.rank === p.rank && x.rank !== 'boss' && !(p.cooldown[`under:${x.id}`] > w.now)) o.push({ code: 'undercut', label: `Make sure the right people hear about ${x.name.split(' ')[0]}’s failings`, hint: 'Cheap and quiet. If it comes back to you, it costs you.' });
-  if (!pend && !same && mine && mine.alive && (!sup || sup.familyId !== p.familyId)) o.push({ code: 'mine', label: `Take it to ${mine.name}`, hint: 'Let your own boss deal with the other family.' });
+  if (!pend && !same && x.familyId && mine && mine.alive && (!sup || sup.familyId !== p.familyId)) o.push({ code: 'mine', label: `Take it to ${mine.name}`, hint: 'Let your own boss deal with the other family.' });
   const sh = shameOf(w, p, x);
   if (sh) o.push({ code: 'shame', label: `Let it be known what he did`, hint: 'Tell the right people. It costs him respect, not blood.' });
   {

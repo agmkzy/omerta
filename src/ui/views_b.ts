@@ -29,6 +29,8 @@ import { avatar, back, banner, sink, meterRow, skillBars, skillLine, traitTags }
 import { bl, chip, esc, fl, known, lk, P, pl, S, statusOf, W, who } from './links';
 import { bizView, justNow, treeView, wantsHere } from './views_a';
 import { takeSide, toSide } from './layout';
+import { orderEntry, orderPicks, sendPicks, sentAfter } from './orderview';
+import type { Deed } from '../command';
 import { whereIs } from '../where';
 import { kinWord, stageWord, warmthWord, DATES, datingPool } from '../life';
 import { canStart, lineOf, OP_GROUPS, OPS } from '../rackets';
@@ -616,7 +618,7 @@ export function hijackView(picked: Id[]): string {
   out += choices(crew.map((c) => ({ a: `hjpick:${c.id}`, label: c.name, hint: skillLine(c), sel: picked.includes(c.id) })), 'Who goes');
   return out + acts(btn('hjgo:', 'Send them', 'primary', picked.length < 2 ? ' disabled' : ''));
 }
-export function settleView(id: Id, lines: string[], kill = false): string {
+export function settleView(id: Id, lines: string[], kill = false, send?: string, biz?: Id): string {
   const w = W();
   const p = P();
   const x = w.chars[id];
@@ -625,7 +627,14 @@ export function settleView(id: Id, lines: string[], kill = false): string {
   let out = back() + `<header class="pp-head">${avatar(x)}<div class="pp-id">${title(`Settle it with ${x.name}`)}</div></header>`;
   out += context([why ? lk(why.text) : 'There’s bad blood. Nothing specific you can point to.', `${esc(cap1(grudgeWord(rel(x, p.id)?.grudge ?? 0)))} grudge on his side, ${esc(grudgeWord(rel(p, x.id)?.grudge ?? 0))} on yours.`]);
   if (lines.length) out += `<div class="sc-said">${lines.map((l) => `<p class="sc-narr">${lk(l)}</p>`).join('')}</div>`;
-  return out + choices(settleOptions(w, p, x, kill).map((o): Pick => ({ a: `sv:${o.code}|${x.id}`, label: o.label, hint: o.hint, kind: o.danger ? 'danger' : '' })), 'What you do');
+  out += sentAfter(w, p, x);
+  if (send === 'pick') return out + choices([...orderPicks(w, p, x, biz), { a: `sv:back|${x.id}`, label: 'Think better of it', hint: 'Go back.' }], 'What you have done');
+  if (send) return out + sendPicks(w, p, x, send as Deed, biz);
+  // what he could do himself, then what he could have done by his own men (ui/orderview.ts); "let it go" stays last
+  const own = settleOptions(w, p, x, kill).map((o): Pick => ({ a: `sv:${o.code}|${x.id}`, label: o.label, hint: o.hint, kind: o.danger ? 'danger' : '' }));
+  const sent = kill ? [] : orderEntry(w, p, x, biz);
+  const last = own.length && own[own.length - 1].a.startsWith('sv:drop') ? own.splice(own.length - 1, 1) : [];
+  return out + choices([...own, ...sent, ...last], 'What you do');
 }
 const cap1 = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const wk = (c: Character) => c.books.history.slice(-4);

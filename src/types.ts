@@ -255,7 +255,8 @@ export interface Family {
   books?: { since: number; until: number; n: number; made: number; why?: string };
   cool?: Record<string, number>; // when each of the family's reasons to open its books may next count
   booksShut?: number;
-  consSeated?: boolean; // the family was given its consigliere when it was made (or first loaded); later vacancies are the boss's to fill
+  consSeated?: boolean;
+  policy?: { kind: string; since: number; until: number; deaf?: Id[] }; // the boss's word to the captains on what the family is doing for now (direction.ts) // the family was given its consigliere when it was made (or first loaded); later vacancies are the boss's to fill
   lineHead?: { id: Id; since: number }; // who has stood first in its line, since when
   appts?: { t: number; office: string; who: Id; by?: Id; why: string; passed: Id[]; backers: Id[] }[];
 }
@@ -476,7 +477,7 @@ export interface Memo {
 export interface Pending {
   id: Id;
   due: number;
-  kind: 'reveal' | 'heat' | 'blackmail' | 'truth' | 'dispute' | 'seat' | 'intent' | 'plan' | 'hunt' | 'loyalty' | 'crossdeal' | 'bet';
+  kind: 'reveal' | 'heat' | 'blackmail' | 'truth' | 'dispute' | 'seat' | 'intent' | 'plan' | 'hunt' | 'loyalty' | 'crossdeal' | 'bet' | 'order' | 'advice';
   fact?: Id;
   a?: Id;
   b?: Id;
@@ -484,6 +485,7 @@ export interface Pending {
   amount?: number;
   tries?: number;
   note?: string;
+  by?: Id; // an order: the man who gave it (command.ts)
 }
 
 export interface Venture {
@@ -499,7 +501,7 @@ export interface Venture {
   open: boolean;
 }
 
-export type SitKind = 'money' | 'ambition' | 'turf' | 'org' | 'skim' | 'tribute' | 'debt' | 'partner' | 'grudge' | 'intel' | 'dispute' | 'crew' | 'ask' | 'rivalry' | 'arrest' | 'revenge' | 'climb';
+export type SitKind = 'money' | 'ambition' | 'turf' | 'org' | 'skim' | 'tribute' | 'debt' | 'partner' | 'grudge' | 'intel' | 'dispute' | 'crew' | 'ask' | 'rivalry' | 'arrest' | 'revenge' | 'climb' | 'hearing' | 'charge'; // (The Family: a charge heard and ruled on, hearing.ts; the boss's charge to his underboss, charge.ts)
 // V89: where one person stands in a matter. Read and changed by matters.ts; all optional, so older saves load as they were.
 export interface Stance {
   resolve: number; // 0..1 how firmly he holds his position

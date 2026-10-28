@@ -37,6 +37,8 @@ import { createWorld } from './world';
 import type { World } from './types';
 import { relevance } from './reports';
 import { ignoreDispute, investigate, callSitdown, playerActed, touchDispute } from './disputes';
+import { askLeave, noteBreach, sendMan, type Deed } from './command';
+import { orderTarget } from './ui/orderview';
 import { whereIs } from './where';
 import { back as backBtn } from './ui/common';
 import { esc, lk, P, S, W } from './ui/links';
@@ -308,7 +310,7 @@ function body(): string {
     case 'dispute': return disputeView(v.id, v.lines);
     case 'story': return storyView(v.id, v.lines);
     case 'way': return wayView(v.id, v.lines);
-    case 'settle': return settleView(v.id, v.lines, v.kill);
+    case 'settle': return settleView(v.id, v.lines, v.kill, v.send, v.biz);
     case 'place': return placeView(v.id);
     case 'places': return placesView();
     case 'help': return helpView(v.who, v.lines);
@@ -558,7 +560,16 @@ function handle(a: string, v: string) {
       const x = w.chars[id];
       if (code === 'back') return go({ t: 'settle', id, lines: [] });
       if (code === 'whack') return go({ t: 'settle', id, lines: [], kill: true });
+      // (having it done by one of his men, or asking leave for it: command.ts, ui/orderview.ts)
+      { const [op, deed, a1, a2] = code.split(':') as [string, Deed, string, string];
+        if (op === 'sd') return go({ t: 'settle', id, lines: [], send: deed, biz: a1 || undefined }); // (deed 'pick': the list of what he could have done)
+        if (op === 'ask') { const t = orderTarget(w, x, deed, a1 || undefined); return t ? pass(45, [], { t: 'settle', id, lines: askLeave(w, P(), deed, t) }) : undefined; }
+        if (op === 'sm') { const t = orderTarget(w, x, deed, a2 || undefined), m = w.chars[a1]; if (!t || !m) return; const lines = sendMan(w, P(), m, deed, t); return pass(20, [], { t: 'settle', id, lines }); } }
+      // (doing it himself: the same rule of whose word it needed)
+      const own = code === 'beat' ? 'beat' : code === 'smash' || code === 'torch' || code === 'rob' ? 'wreck' : code.startsWith('hit') ? 'kill' : undefined;
+      const ownT = own ? orderTarget(w, x, own) : undefined;
       const r = settleDo(w, P(), x, code);
+      if (r.done && own && ownT) noteBreach(w, P(), own, ownT);
       if (r.done) playerActed(w, P(), x, code);
       if (!r.done) return go({ t: 'settle', id, lines: r.lines });
       return pass(r.minutes, r.lines, { t: 'tab', name: 'today' });

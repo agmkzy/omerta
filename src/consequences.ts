@@ -3,6 +3,7 @@ import { loyaltyDue } from './loyalty';
 import { dealDue } from './crossdeal';
 import { betDue } from './book';
 import { huntDue } from './violence';
+import { orderDue } from './command';
 // Delayed consequences. Violence and secrets do not resolve when they happen: witnesses come forward,
 // the police take an interest, a client calls in a favour, a false accusation comes apart.
 import { addFact, bear, clamp, DEED, ease, feel, handleDeath, learn, ownerBiz, rel, repute } from './core';
@@ -62,6 +63,10 @@ export function pendingTick(w: World) {
       }
       case 'loyalty': {
         loyaltyDue(w, q); // (the player sold his captain's business: whether it comes out now)
+        break;
+      }
+      case 'order': {
+        orderDue(w, q, perform); // (a man sent by his superior to beat, wreck or kill: command.ts)
         break;
       }
       case 'bet': {

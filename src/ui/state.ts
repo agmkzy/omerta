@@ -42,7 +42,7 @@ export type View =
   | { t: 'dispute'; id: string; lines: string[] }
   | { t: 'story'; id: string; lines?: string[] } // lines: what just happened, when he acted from the story
   | { t: 'way'; id: string; lines: string[] }
-  | { t: 'settle'; id: Id; lines: string[]; kill?: boolean }
+  | { t: 'settle'; id: Id; lines: string[]; kill?: boolean; send?: string; biz?: Id }
   | { t: 'place'; id: string }
   | { t: 'places' }
   | { t: 'help'; who: Id; lines: string[] }
