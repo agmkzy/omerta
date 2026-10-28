@@ -54,6 +54,11 @@ moves under Family business.
 Another made man may ask a well-regarded associate to come over (go, stay, or tell your own man); a boss or underboss can ask any
 captain in his chain for his account and say he expects more; a consigliere start commands nobody.
 
+## Increment 6: a man of yours courted (deployed 28 Oct, 01:27 UTC)
+When one of a soldier's or captain's men is unhappy or wants more, another made man may court him; the player hears from another of
+his men and gives him a bigger share, warns the other man off (who backs off, or takes the man and keeps the grudge), or lets him go;
+unanswered, he goes. Fires once or twice in 100 days for a soldier or captain (seeds 3, 5).
+
 ## What reached each seat in 100 days (seed 3, fresh start, every encounter answered with its first choice)
 | Seat | What came to him (most frequent) | Matters he was in |
 |---|---|---|
@@ -66,9 +71,8 @@ captain in his chain for his account and say he expects more; a consigliere star
 All six: ledger audit 0, hierarchy issues 0, errors 0.
 
 ## Still open (honest list)
-- Associate and soldier are told apart mostly by what the player starts (conversation, rackets, recruiting, backing); fewer things
-  arrive that only their seat receives. A soldier-specific arriving process (the captain's expectations of his own earner) is the
-  next candidate.
+- Associate and soldier are still told apart more by what the player starts (conversation, rackets, recruiting, backing) than by
+  what arrives; the allegiance offer (associate) and the courted man (soldier, captain) are the first arriving processes of their own.
 - A vacant captaincy waits behind inductions in `career.careerTick` (a week that makes a soldier fills no crew): older behaviour,
   left as it was.
 - "Would you put a word in for me?" is offered by a captain to his own soldier (older offer rule in `conv/acts/org.ts recommend`).
