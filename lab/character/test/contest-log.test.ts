@@ -35,15 +35,17 @@ describe('describeEvent', { tags: ['unit'] }, () => {
 
   test('describes weapon-drawn checks and escalation', () => {
     assert.equal(log(spec({ approach: 'armed-threat' }), 5)[0], 'D makes a nerve check (weapon drawn on them): needed 12, rolled 5, failed.');
-    assert.equal(log(spec({ maxRounds: 2, defender: defender({ temper: 0.9 }) }), 15, 10, 9, 10, 10, 1)[2], 'D escalates. The contest becomes a fight.');
+    assert.equal(log(spec({ maxRounds: 2, defender: defender({ temper: 0.9 }) }), 15, 10, 9, 10, 10)[2], 'D escalates. The contest becomes a fight.');
   });
 
   test('describes fight rounds: hits, critical hits, misses and the nerve check after damage', () => {
-    assert.equal(log(spec({ approach: 'fight' }), 15, 10, 3)[0], 'Round 1 (Fight): A rolled 17, D rolled 10. A hits for 3 damage (D: 5 HP left).');
-    assert.equal(log(spec({ approach: 'fight' }), 15, 10, 4, 20)[1], `D makes a nerve check (badly hurt): needed ${NERVE_DC.hurt}, rolled 18, passed.`);
-    assert.equal(log(spec({ approach: 'fight' }), 20, 5, 2, 3, 20)[0], 'Round 1 (Fight): A rolled 22, D rolled 5. A lands a critical hit for 5 damage (D: 3 HP left).');
-    assert.equal(log(spec({ approach: 'fight' }), 8, 10)[0], 'Round 1 (Fight): A rolled 10, D rolled 10. No hit.');
-    assert.equal(log(spec({ approach: 'fight' }), 5, 15, 2)[0], 'Round 1 (Fight): A rolled 7, D rolled 15. D hits for 2 damage (A: 6 HP left).');
+    assert.equal(log(spec({ approach: 'fight' }), 15, 10, 3)[0], 'Round 1 (Fight): A rolled 17, D rolled 10. A hits for 3 damage (D: 7 HP left).');
+    assert.deepEqual(log(spec({ approach: 'fight' }), 20, 5, 2, 3, 20).slice(0, 2), [
+      'Round 1 (Fight): A rolled 22, D rolled 5. A lands a critical hit for 5 damage (D: 5 HP left).',
+      `D makes a nerve check (badly hurt): needed ${NERVE_DC.hurt}, rolled 18, passed.`,
+    ]);
+    assert.equal(log(spec({ approach: 'fight' }), 12, 10)[0], 'Round 1 (Fight): A rolled 14, D rolled 10. No hit.');
+    assert.equal(log(spec({ approach: 'fight' }), 5, 15, 2)[0], 'Round 1 (Fight): A rolled 7, D rolled 15. D hits for 2 damage (A: 8 HP left).');
   });
 });
 

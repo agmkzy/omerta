@@ -87,8 +87,8 @@ export function rollFor(c: Character, skill: Skill, options: RollOptions = {}): 
   };
 }
 
-/** Hit points before Constitution and Toughness, as for a D&D d8 hit die at first level. */
-export const BASE_HIT_POINTS = 8;
+/** Hit points before Constitution and Toughness, as for a D&D d10 hit die at first level. */
+export const BASE_HIT_POINTS = 10;
 
 /** What a character's maximum hit points are made of: the base, the Constitution modifier and Toughness training. */
 export function hitPointModifiers(c: Character): Modifier[] {
@@ -103,7 +103,7 @@ export function hitPointModifiers(c: Character): Modifier[] {
   return modifiers;
 }
 
-/** Maximum hit points. The lowest possible is 3 (Constitution 1, untrained). */
+/** Maximum hit points. The lowest possible is 5 (Constitution 1, untrained). */
 export function maxHitPoints(c: Character): number {
   return bonusOf(hitPointModifiers(c));
 }

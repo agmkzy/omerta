@@ -86,15 +86,15 @@ describe('runContest: nerve checks', { tags: ['unit'] }, () => {
   });
 
   test('high temper: escalates on failure and the contest becomes a fight', () => {
-    // Round 2 is a fight: 12 vs 10, a hit for 2 (8 → 6 HP, not badly hurt, so no nerve check).
-    const r = run(spec({ winningLead: 4, maxRounds: 2, defender: defender({ temper: 0.9 }) }), 15, 10, 9, 10, 10, 2);
+    // Round 2 is a fight: 12 vs 10, not a win by 5, so no hit.
+    const r = run(spec({ winningLead: 4, maxRounds: 2, defender: defender({ temper: 0.9 }) }), 15, 10, 9, 10, 10);
     assert.deepEqual(kinds(r.events), ['round', 'nerve', 'escalation', 'fight-round', 'end']);
     assert.equal(r.ending.how, 'stalemate');
   });
 
   test('high temper: does not escalate during a fight; a failed nerve check gives up', () => {
-    // Round 1: lead 3 of 6, nerve fails, escalates. Round 2 (fight): hit for 4 (8 → 4 HP, badly hurt), nerve fails again.
-    const r = run(spec({ winningLead: 6, maxRounds: 2, defender: defender({ temper: 0.9 }) }), 20, 10, 1, 15, 10, 4, 1);
+    // Round 1: lead 3 of 6, nerve fails, escalates. Round 2 (fight): critical hit for 5 (10 → 5 HP, badly hurt), nerve fails again.
+    const r = run(spec({ winningLead: 6, maxRounds: 2, defender: defender({ temper: 0.9 }) }), 20, 10, 1, 20, 5, 2, 3, 1);
     assert.deepEqual(kinds(r.events), ['round', 'nerve', 'escalation', 'fight-round', 'nerve', 'end']);
     assert.deepEqual(r.ending, { how: 'gives-up', loser: 'defender' });
   });
@@ -134,62 +134,63 @@ describe('rollDamage', { tags: ['unit'] }, () => {
 });
 
 describe('runContest: fight', { tags: ['unit'] }, () => {
+  // Both characters have 10 HP, so 5 HP or below is badly hurt.
   const fight = (over: Partial<ContestSpec> = {}) => spec({ approach: 'fight', ...over });
   const fightRounds = (events: readonly ContestEvent[]) => events.filter((e) => e.kind === 'fight-round');
 
   test('each side starts with its maximum hit points', () => {
     const r = run(fight(), 8, 10);
-    assert.deepEqual(r.maxHp, { attacker: 8, defender: 8 });
-    assert.deepEqual(r.hp, { attacker: 8, defender: 8 });
+    assert.deepEqual(r.maxHp, { attacker: 10, defender: 10 });
+    assert.deepEqual(r.hp, { attacker: 10, defender: 10 });
   });
 
-  test('the higher roll hits for 1d4 + Strength modifier', () => {
+  test('winning a round by 5 or more hits for 1d4 + Strength modifier', () => {
     const r = run(fight(), 15, 10, 3); // 17 vs 10; 3 damage
     const round = fightRounds(r.events)[0];
     assert.ok(round?.kind === 'fight-round' && round.hit?.by === 'attacker' && round.hit.damage.total === 3 && !round.hit.critical);
-    assert.equal(r.hp.defender, 5);
+    assert.equal(r.hp.defender, 7);
   });
 
-  test('no nerve check while above half hit points', () => {
-    assert.deepEqual(kinds(run(fight(), 15, 10, 3).events), ['fight-round', 'end']); // 8 → 5 HP
-  });
-
-  test('a tie is no hit', () => {
-    const r = run(fight(), 8, 10);
-    assert.deepEqual(kinds(r.events), ['fight-round', 'end']);
-    const round = fightRounds(r.events)[0];
-    assert.ok(round?.kind === 'fight-round' && round.hit === null);
+  test('winning by less than 5, or a tie, is no hit', () => {
+    for (const faces of [[12, 10], [8, 10]]) {
+      const round = fightRounds(run(fight(), ...faces).events)[0];
+      assert.ok(round?.kind === 'fight-round' && round.hit === null, faces.join(','));
+    }
   });
 
   test('the defender can hit the attacker', () => {
-    const r = run(fight(), 5, 15, 2); // 7 vs 15: a normal hit for 2
-    assert.equal(r.hp.attacker, 6);
+    const r = run(fight(), 5, 15, 2); // 7 vs 15: a hit for 2
+    assert.equal(r.hp.attacker, 8);
   });
 
   test('winning by 10 or more is a critical hit', () => {
-    const r = run(fight(), 20, 5, 4, 4); // 22 vs 5; 8 damage
+    const r = run(fight(), 20, 5, 4, 4, 20); // 22 vs 5; 8 damage, then a nerve check at 2 HP
     const round = fightRounds(r.events)[0];
     assert.ok(round?.kind === 'fight-round' && round.hit?.critical === true);
-    assert.deepEqual(r.ending, { how: 'knocked-out', loser: 'defender' });
+    assert.equal(r.hp.defender, 2);
+  });
+
+  test('no nerve check while above half hit points', () => {
+    assert.deepEqual(kinds(run(fight(), 15, 10, 4).events), ['fight-round', 'end']); // 10 → 6 HP
   });
 
   test('each hit taken at half hit points or below triggers a nerve check, and gives −2 to rolls', () => {
-    const r = run(fight({ maxRounds: 2 }), 15, 10, 4, 20, 10, 10, 1, 20);
-    assert.deepEqual(kinds(r.events), ['fight-round', 'nerve', 'fight-round', 'nerve', 'end']);
-    const nerve = r.events[1];
+    const r = run(fight({ maxRounds: 3 }), 15, 10, 4, 15, 10, 1, 20, 10, 10);
+    assert.deepEqual(kinds(r.events), ['fight-round', 'fight-round', 'nerve', 'fight-round', 'end']);
+    const nerve = r.events[2];
     assert.ok(nerve?.kind === 'nerve' && nerve.trigger === 'hurt' && nerve.result.dc === NERVE_DC.hurt && nerve.result.roll.modifiers.some((m) => m.reason === 'Badly hurt'));
-    const second = fightRounds(r.events)[1];
-    assert.ok(second?.kind === 'fight-round');
-    assert.deepEqual(second.result.passive.modifiers.at(-1), { value: -2, reason: 'Badly hurt' });
-    assert.equal(r.hp.defender, 3);
+    const third = fightRounds(r.events)[2];
+    assert.ok(third?.kind === 'fight-round');
+    assert.deepEqual(third.result.passive.modifiers.at(-1), { value: -2, reason: 'Badly hurt' });
+    assert.equal(r.hp.defender, 5);
   });
 
   test('failing the nerve check when badly hurt ends the fight', () => {
-    assert.deepEqual(run(fight(), 15, 10, 4, 1).ending, { how: 'gives-up', loser: 'defender' });
+    assert.deepEqual(run(fight({ maxRounds: 2 }), 15, 10, 4, 15, 10, 1, 1).ending, { how: 'gives-up', loser: 'defender' });
   });
 
   test('reaching 0 hit points is a knockout', () => {
-    const r = run(fight({ maxRounds: 3 }), 15, 10, 4, 20, 15, 10, 4);
+    const r = run(fight({ maxRounds: 3 }), 20, 5, 4, 4, 20, 15, 10, 2);
     assert.deepEqual(r.ending, { how: 'knocked-out', loser: 'defender' });
     assert.equal(r.hp.defender, 0);
     assert.equal(r.rounds, 2);

@@ -105,29 +105,29 @@ describe('rollFor', { tags: ['unit'] }, () => {
 });
 
 describe('hit points', { tags: ['unit'] }, () => {
-  test('are 8 plus the Constitution modifier', () => {
-    assert.equal(BASE_HIT_POINTS, 8);
-    assert.equal(maxHitPoints(createCharacter({ name: 'Average' })), 8);
-    assert.equal(maxHitPoints(createCharacter({ name: 'Hardy', attributes: attributeScores({ con: 16 }) })), 11);
-    assert.equal(maxHitPoints(createCharacter({ name: 'Frail', attributes: attributeScores({ con: 6 }) })), 6);
+  test('are 10 plus the Constitution modifier', () => {
+    assert.equal(BASE_HIT_POINTS, 10);
+    assert.equal(maxHitPoints(createCharacter({ name: 'Average' })), 10);
+    assert.equal(maxHitPoints(createCharacter({ name: 'Hardy', attributes: attributeScores({ con: 16 }) })), 13);
+    assert.equal(maxHitPoints(createCharacter({ name: 'Frail', attributes: attributeScores({ con: 6 }) })), 8);
   });
 
   test('add the proficiency bonus for Toughness training, twice for expertise', () => {
-    assert.equal(maxHitPoints(createCharacter({ name: 'T', training: { toughness: 'trained' } })), 10);
-    assert.equal(maxHitPoints(createCharacter({ name: 'E', training: { toughness: 'expert' }, proficiencyBonus: 3 })), 14);
+    assert.equal(maxHitPoints(createCharacter({ name: 'T', training: { toughness: 'trained' } })), 12);
+    assert.equal(maxHitPoints(createCharacter({ name: 'E', training: { toughness: 'expert' }, proficiencyBonus: 3 })), 16);
   });
 
   test('are listed with reasons', () => {
     const c = createCharacter({ name: 'T', attributes: attributeScores({ con: 14 }), training: { toughness: 'trained' } });
     assert.deepEqual(hitPointModifiers(c), [
-      { value: 8, reason: 'Base' },
+      { value: 10, reason: 'Base' },
       { value: 2, reason: 'Constitution 14' },
       { value: 2, reason: 'Trained in Toughness' },
     ]);
   });
 
-  test('are 3 at the lowest Constitution score', () => {
-    assert.equal(maxHitPoints(createCharacter({ name: 'X', attributes: attributeScores({ con: 1 }) })), 3);
+  test('are 5 at the lowest Constitution score', () => {
+    assert.equal(maxHitPoints(createCharacter({ name: 'X', attributes: attributeScores({ con: 1 }) })), 5);
   });
 });
 

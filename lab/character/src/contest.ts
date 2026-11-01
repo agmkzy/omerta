@@ -4,8 +4,9 @@
 // of lead per POINTS_PER_LEAD points of difference, rounded up. The lead is positive when the attacker is ahead. A character
 // who gets `winningLead` points ahead wins.
 //
-// Fights are decided by hit points instead. Each round both characters roll Brawling, and the higher roll deals damage
-// (1d4 + Strength modifier; dice rolled twice on a critical hit). A character at 0 hit points is knocked out.
+// Fights are decided by hit points instead. Each round both characters roll Brawling. Winning by HIT_MARGIN or more deals
+// damage (1d4 + Strength modifier; dice rolled twice when winning by CRITICAL_MARGIN or more). A character at 0 hit points
+// is knocked out.
 //
 // Nerve checks are triggered by events (falling behind by half the winning lead, taking damage at half hit points or
 // below, having a weapon drawn on them); a failed nerve check ends the contest in a way decided by temperament. Every
@@ -28,7 +29,7 @@ export const APPROACH_INFO: { readonly [A in Approach]: { readonly name: string;
   },
   fight: {
     name: 'Fight',
-    description: 'Each round: Brawling against Brawling. The higher roll deals 1d4 + Strength modifier damage (dice doubled when winning by 10 or more). 0 hit points is a knockout.',
+    description: 'Each round: Brawling against Brawling. Winning by 5 or more deals 1d4 + Strength modifier damage (dice doubled when winning by 10 or more). 0 hit points is a knockout.',
   },
 };
 
@@ -107,6 +108,8 @@ export const NERVE_FAILURE: Readonly<Partial<Record<Trait, string>>> = {
 
 /** Points of roll difference per point of lead (rounded up). */
 export const POINTS_PER_LEAD = 5;
+/** In a fight, winning a round by at least this much lands a hit; a narrower win is no hit. */
+export const HIT_MARGIN = 5;
 /** In a fight, winning a round by at least this much is a critical hit. */
 export const CRITICAL_MARGIN = 10;
 /** Unarmed damage: 1d4 + Strength modifier, minimum 1. */
@@ -185,7 +188,7 @@ export function runContest(spec: ContestSpec, roller: Roller): ContestResult {
   const fightRound = (): Ending | null => {
     const result = resolveOpposed({ active: roundRoll('attacker'), passive: roundRoll('defender') }, roller);
     const difference = result.margin + 1;
-    if (difference === 0) {
+    if (Math.abs(difference) < HIT_MARGIN) {
       events.push({ kind: 'fight-round', round, result, hit: null, hp: { ...hp } });
       return null;
     }
