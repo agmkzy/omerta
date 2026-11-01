@@ -22,7 +22,7 @@ const listeners: Listener[] = [];
 let lastSaveOk = true;
 
 let roster: Roster = (storage && loadRoster(storage)) ?? createRoster([
-  { id: newId(), character: rollCharacter('Enforcer 1', 'enforcer', dice) },
+  { id: newId(), character: rollCharacter('Fighter 1', 'fighter', dice) },
   { id: newId(), character: rollCharacter('Shopkeeper 1', 'shopkeeper', dice) },
 ]);
 

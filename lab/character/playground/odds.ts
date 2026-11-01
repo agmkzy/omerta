@@ -1,10 +1,10 @@
 // Dice and odds panel: choose the dice, a bonus and a DC or opposing bonus, and compare the outcome probabilities across dice.
 import { checkOdds, opposedOdds, resolveCheck, resolveOpposed, succeeded, type Odds, type Outcome, type Roll } from '../src/check';
-import { DICE, DICE_NAMES, EDGES, type DiceName, type Edge } from '../src/dice';
+import { DICE, DICE_NAMES, EDGES, EDGE_INFO, type DiceName, type Edge } from '../src/dice';
 import { describeCheck, describeOpposed, percent, signed } from '../src/explain';
 import { roller, seeded, type Roller } from '../src/random';
 import { h, segmented, slider } from './dom';
-import { oddsView, outcomeTag, type Panel } from './views';
+import { hint, oddsView, outcomeGuide, outcomeTag, type Panel } from './views';
 
 type Against = 'dc' | 'opponent';
 
@@ -20,10 +20,9 @@ interface State {
   log: { text: string; outcome: Outcome }[];
 }
 
-const EDGE_LABEL: Readonly<Record<Edge, string>> = { none: 'None', advantage: 'Advantage', disadvantage: 'Disadvantage' };
 
 export function oddsPanel(): Panel {
-  const state: State = { dice: 'd20', against: 'dc', bonus: 3, edge: 'none', dc: 13, opponentBonus: 2, opponentEdge: 'none', seed: 1970, log: [] };
+  const state: State = { dice: 'd20', against: 'dc', bonus: 3, edge: 'none', dc: 13, opponentBonus: 2, opponentEdge: 'none', seed: 1, log: [] };
   let dice: Roller = roller(seeded(state.seed));
 
   const root = h('section', { class: 'panel', id: 'odds', 'aria-labelledby': 'odds-title' });
@@ -51,6 +50,7 @@ export function oddsPanel(): Panel {
   function renderResults() {
     results.replaceChildren(
       oddsView(odds()),
+      outcomeGuide(),
       h('h3', {}, 'Comparison by dice'),
       h('table', {},
         h('thead', {}, h('tr', {}, h('th', {}, 'Dice'), h('th', {}, 'Success'), h('th', {}, 'Full success or better'), h('th', {}, 'Critical failure'))),
@@ -75,21 +75,24 @@ export function oddsPanel(): Panel {
   }
 
   function render() {
-    const edge = (current: Edge, set: (e: Edge) => void) => segmented(EDGES, current, (e) => { set(e); render(); }, (e) => EDGE_LABEL[e]);
+    const edge = (current: Edge, set: (e: Edge) => void) => segmented(EDGES, current, (e) => { set(e); render(); }, (e) => EDGE_INFO[e].name);
     root.replaceChildren(
       h('h2', { id: 'odds-title' }, 'Dice and odds'),
+      hint('Explore how the dice, bonuses and difficulty affect the chances, independently of any character.'),
       h('div', { class: 'grid' },
         h('div', {},
-          h('div', { class: 'field' }, h('span', {}, 'Dice'), segmented(DICE_NAMES, state.dice, (d) => { state.dice = d; render(); })),
+          h('div', { class: 'field' }, h('span', {}, 'Dice'), segmented(DICE_NAMES, state.dice, (d) => { state.dice = d; render(); }), hint(DICE[state.dice].description)),
           h('div', { class: 'field' }, h('span', {}, 'Against'), segmented(['dc', 'opponent'] as const, state.against, (a) => { state.against = a; render(); },
             (a) => (a === 'dc' ? 'DC' : 'Opponent'))),
-          slider('Bonus', state.bonus, -5, 15, (v) => { state.bonus = v; renderResults(); }, signed),
-          h('div', { class: 'field' }, h('span', {}, 'Advantage'), edge(state.edge, (e) => (state.edge = e))),
+          slider('Bonus', state.bonus, -5, 15, (v) => { state.bonus = v; renderResults(); }, signed,
+            'Everything added to the dice: attribute modifier, proficiency and situational modifiers. A typical trained skill is +2 to +7.'),
+          h('div', { class: 'field' }, h('span', {}, 'Advantage'), edge(state.edge, (e) => (state.edge = e)), hint(EDGE_INFO[state.edge].description)),
           state.against === 'dc'
-            ? slider('DC', state.dc, 0, 30, (v) => { state.dc = v; renderResults(); })
+            ? slider('DC', state.dc, 0, 30, (v) => { state.dc = v; renderResults(); }, String,
+                'Difficulty class: the total needed. Roughly 10 is easy, 15 moderate, 20 hard, 25 very hard.')
             : h('div', {},
                 slider('Opponent bonus', state.opponentBonus, -5, 15, (v) => { state.opponentBonus = v; renderResults(); }, signed),
-                h('div', { class: 'field' }, h('span', {}, 'Opponent advantage'), edge(state.opponentEdge, (e) => (state.opponentEdge = e))),
+                h('div', { class: 'field' }, h('span', {}, 'Opponent advantage'), edge(state.opponentEdge, (e) => (state.opponentEdge = e)), hint(EDGE_INFO[state.opponentEdge].description)),
                 h('p', { class: 'muted' }, 'The active side must beat the opponent’s total; ties fail.')),
         ),
         results,

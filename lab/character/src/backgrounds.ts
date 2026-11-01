@@ -6,7 +6,7 @@ import type { Roller } from './random';
 import type { Skill } from './skills';
 import { rollTemperament, type Temperament } from './temperament';
 
-export const BACKGROUNDS = ['enforcer', 'driver', 'gunman', 'racketeer', 'con-artist', 'bookkeeper', 'shopkeeper', 'labourer'] as const;
+export const BACKGROUNDS = ['fighter', 'driver', 'marksman', 'negotiator', 'trickster', 'accountant', 'shopkeeper', 'labourer'] as const;
 export type BackgroundName = (typeof BACKGROUNDS)[number];
 
 export interface Background {
@@ -21,9 +21,9 @@ export interface Background {
 }
 
 export const BACKGROUND_INFO: { readonly [B in BackgroundName]: Background } = {
-  enforcer: {
-    name: 'Enforcer',
-    description: 'Collects debts and uses force when required.',
+  fighter: {
+    name: 'Fighter',
+    description: 'Physically strong and used to confrontation.',
     trained: ['intimidation', 'toughness'],
     expert: ['brawling'],
     priorities: ['str', 'con', 'cha', 'agi', 'wis', 'int'],
@@ -31,39 +31,39 @@ export const BACKGROUND_INFO: { readonly [B in BackgroundName]: Background } = {
   },
   driver: {
     name: 'Driver',
-    description: 'Getaway and pursuit driving.',
+    description: 'A skilled driver who stays alert.',
     trained: ['reflexes', 'notice', 'mechanics'],
     expert: ['driving'],
     priorities: ['agi', 'wis', 'int', 'con', 'cha', 'str'],
     temperament: { caution: 0.6, courage: 0.6, temper: 0.35 },
   },
-  gunman: {
-    name: 'Gunman',
-    description: 'Armed jobs and killings.',
+  marksman: {
+    name: 'Marksman',
+    description: 'An accurate shot who stays calm under pressure.',
     trained: ['stealth', 'nerve', 'reflexes'],
     expert: ['firearms'],
     priorities: ['agi', 'wis', 'con', 'int', 'str', 'cha'],
     temperament: { violence: 0.7, temper: 0.25, sociability: 0.3, courage: 0.7, loyalty: 0.65 },
   },
-  racketeer: {
-    name: 'Racketeer',
-    description: 'Runs rackets and deals; earns money for the organisation.',
+  negotiator: {
+    name: 'Negotiator',
+    description: 'Good with people, deals and making money.',
     trained: ['streetwise', 'scheming', 'insight'],
     expert: ['persuasion'],
     priorities: ['cha', 'int', 'wis', 'con', 'agi', 'str'],
     temperament: { greed: 0.75, ambition: 0.75, sociability: 0.7 },
   },
-  'con-artist': {
-    name: 'Con artist',
-    description: 'Cons, card games and theft.',
+  trickster: {
+    name: 'Trickster',
+    description: 'Relies on lies, misdirection and quick hands.',
     trained: ['larceny', 'carousing', 'streetwise'],
     expert: ['deception'],
     priorities: ['cha', 'agi', 'int', 'wis', 'con', 'str'],
     temperament: { honesty: 0.2, vice: 0.75, caution: 0.35, greed: 0.65 },
   },
-  bookkeeper: {
-    name: 'Bookkeeper',
-    description: 'Keeps the accounts and launders money.',
+  accountant: {
+    name: 'Accountant',
+    description: 'Careful with numbers and details.',
     trained: ['scheming', 'insight', 'deception'],
     expert: ['bookkeeping'],
     priorities: ['int', 'wis', 'cha', 'con', 'agi', 'str'],
@@ -71,7 +71,7 @@ export const BACKGROUND_INFO: { readonly [B in BackgroundName]: Background } = {
   },
   shopkeeper: {
     name: 'Shopkeeper',
-    description: 'Runs a legitimate business such as a shop, bar or betting office.',
+    description: 'Runs a small business.',
     trained: ['bookkeeping', 'persuasion', 'notice'],
     expert: [],
     priorities: ['int', 'cha', 'wis', 'con', 'agi', 'str'],
@@ -79,7 +79,7 @@ export const BACKGROUND_INFO: { readonly [B in BackgroundName]: Background } = {
   },
   labourer: {
     name: 'Labourer',
-    description: 'Manual work such as the docks or construction.',
+    description: 'Does physical work for a living.',
     trained: ['brawling', 'toughness', 'mechanics'],
     expert: [],
     priorities: ['str', 'con', 'wis', 'agi', 'cha', 'int'],

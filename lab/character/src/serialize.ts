@@ -6,8 +6,13 @@ import { PROFICIENCIES, createCharacter, type Character, type Proficiency, type 
 import { SKILLS, type Skill } from './skills';
 import { TRAITS, temperament, type Temperament } from './temperament';
 
-/** Increment when the saved shape changes in a way older code cannot read. */
-export const CHARACTER_FORMAT = 1;
+/** Increment when the saved shape changes in a way older code cannot read, and add a migration below. */
+export const CHARACTER_FORMAT = 2;
+
+/** Format 1 to 2: backgrounds were renamed. */
+const RENAMED_BACKGROUNDS: Readonly<Record<string, BackgroundName>> = {
+  enforcer: 'fighter', gunman: 'marksman', racketeer: 'negotiator', 'con-artist': 'trickster', bookkeeper: 'accountant',
+};
 
 export interface SavedCharacter {
   readonly format: number;
@@ -33,10 +38,11 @@ export function saveCharacter(c: Character): SavedCharacter {
 
 /** Throws TypeError for data of the wrong shape and RangeError for out-of-range values. */
 export function loadCharacter(data: unknown): Character {
-  const d = record(data, 'a saved character');
+  const d = { ...record(data, 'a saved character') };
   if (typeof d.format !== 'number') throw new TypeError('a saved character needs a numeric format');
   if (d.format > CHARACTER_FORMAT) throw new TypeError(`saved with a newer format (${d.format}) than this version reads (${CHARACTER_FORMAT})`);
   if (typeof d.name !== 'string') throw new TypeError('a saved character needs a name');
+  if (d.format < 2) migrateFrom1(d);
   if (d.background !== undefined && !BACKGROUNDS.includes(d.background as BackgroundName)) throw new RangeError(`unknown background ${String(d.background)}`);
   if (d.proficiencyBonus !== undefined && typeof d.proficiencyBonus !== 'number') throw new TypeError('proficiencyBonus must be a number');
   return createCharacter({
@@ -47,6 +53,11 @@ export function loadCharacter(data: unknown): Character {
     ...(d.proficiencyBonus !== undefined && { proficiencyBonus: d.proficiencyBonus }),
     ...(d.temperament !== undefined && { temperament: temperament(numbers(d.temperament, 'temperament', TRAITS)) }),
   });
+}
+
+/** Renames format-1 background ids in place. */
+function migrateFrom1(d: Record<string, unknown>): void {
+  if (typeof d.background === 'string') d.background = RENAMED_BACKGROUNDS[d.background] ?? d.background;
 }
 
 function record(value: unknown, what: string): Record<string, unknown> {

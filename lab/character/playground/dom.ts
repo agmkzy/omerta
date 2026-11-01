@@ -21,13 +21,21 @@ export function segmented<T extends string>(options: readonly T[], current: T, p
   return h('div', { class: 'segmented', role: 'group' }, ...options.map((o) => h('button', { type: 'button', 'aria-pressed': String(o === current), onclick: () => pick(o) }, label(o))));
 }
 
-/** A slider with its value shown beside it. */
-export function slider(label: string, value: number, min: number, max: number, change: (v: number) => void, show: (v: number) => string = String): HTMLElement {
+/** A slider with its value shown beside it, and an optional explanation under the label. */
+export function slider(
+  label: string,
+  value: number,
+  min: number,
+  max: number,
+  change: (v: number) => void,
+  show: (v: number) => string = String,
+  hint?: string,
+): HTMLElement {
   const out = h('output', { class: 'value' }, show(value));
   const input = h('input', { type: 'range', min, max, step: 1, value, 'aria-label': label });
   input.addEventListener('input', () => {
     out.textContent = show(Number(input.value));
     change(Number(input.value));
   });
-  return h('label', { class: 'field' }, h('span', {}, label), h('div', { class: 'row' }, input, out));
+  return h('label', { class: 'field' }, h('span', {}, label), hint ? h('span', { class: 'hint' }, hint) : null, h('div', { class: 'row' }, input, out));
 }

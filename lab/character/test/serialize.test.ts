@@ -65,6 +65,12 @@ describe('loadCharacter', { tags: ['unit'] }, () => {
       assert.throws(() => loadCharacter(bad), TypeError, JSON.stringify(bad));
   });
 
+  test('migrates format 1 background names', () => {
+    assert.equal(loadCharacter({ format: 1, name: 'Old', background: 'enforcer' }).background, 'fighter');
+    assert.equal(loadCharacter({ format: 1, name: 'Old', background: 'bookkeeper' }).background, 'accountant');
+    assert.equal(loadCharacter({ format: 1, name: 'Old', background: 'driver' }).background, 'driver');
+  });
+
   test('rejects a newer format', () => {
     assert.throws(() => loadCharacter({ format: CHARACTER_FORMAT + 1, name: 'Future' }), /newer/);
   });

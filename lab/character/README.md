@@ -56,19 +56,20 @@ branch, function and line coverage.
 
 ### Contests
 
-A contest models a tug-of-war. A marker starts at 0 on a track from −N (defender wins) to +N (attacker wins). Each
-round is an opposed roll, and the marker moves one step per 5 points of difference (rounded up). Neither side chooses
-actions.
+A contest is a multi-round opposed check that resolves automatically; neither side chooses actions.
 
-- **Approaches:** `intimidate` (Intimidation vs Nerve), `gunpoint` (as intimidate, with attacker advantage and a DC 12
-  nerve check for the defender before round 1), `brawl` (Brawling vs Brawling; winning by 5+ lands a hit, each hit is −1
-  to later rolls, and 3 hits is a knockout).
-- **Nerve checks** are triggered by being pushed past halfway (DC 10, once per side), taking a hit (DC 10 + 2 per hit),
-  or a gun being drawn (DC 12). At most one per round.
-- **On a failed nerve check:** a high-temper character lashes out once and the contest becomes a brawl. A low-courage or
-  high-caution character flees. Anyone else yields.
-- **Other endings:** pushed to the end of the track, the attacker's optional walk-away line, or the round limit
+- **Lead.** Each round both characters roll. Whoever rolls higher gains lead points: 1 per 5 points of difference,
+  rounded up. A tie changes nothing. A character wins outright when their lead reaches the **winning lead** (default 5).
+- **Approaches:** `intimidation` (Intimidation vs Nerve), `armed-threat` (as intimidation, with attacker advantage and a
+  DC 12 nerve check for the defender before round 1), `fight` (Brawling vs Brawling; winning a round by 5+ lands a hit,
+  each hit is −1 to later rolls, and 3 hits is a knockout).
+- **Nerve checks** happen when a character falls behind by half the winning lead (DC 10, once per side), takes a hit
+  (DC 10 + 2 per hit), or has a weapon drawn on them (DC 12). At most one per round.
+- **A failed nerve check** ends the contest: a high-temper character escalates to a fight instead (once per contest), a
+  low-courage or high-caution character flees, and anyone else gives up.
+- **Other endings:** the attacker's optional withdraw setting (withdraws when behind by N) and the round limit
   (stalemate).
+- `ENDING_INFO` explains each kind of ending; the playground groups simulated results by winner and cause.
 
 ## Open questions
 
@@ -80,6 +81,6 @@ actions.
 - **Contest balance.** The step size, nerve DCs, hit threshold and temperament effects are first guesses, all
   defined as constants or in one table.
 - **Unused skills.** Reflexes, Firearms and others are defined but no contest uses them yet. For example, Reflexes
-  could decide who acts first when someone lashes out.
+  could decide who acts first when a contest escalates to a fight.
 - **Integration with the game.** Mapping the existing `Traits`/`Skills` onto this model, save migration, and replacing
   the game's existing ad-hoc checks in `src/` are not started.

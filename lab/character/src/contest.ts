@@ -1,25 +1,26 @@
-// Contests: an automatically resolved, multi-round opposed check modelled as a tug-of-war.
+// Contests: a multi-round opposed check that resolves automatically.
 //
-// A marker starts at 0 on a track from -track (defender wins) to +track (attacker wins). Each round both sides make an
-// opposed roll and the marker moves one step per POINTS_PER_STEP of the difference. Neither side chooses actions. Nerve checks
-// are triggered by events (being pushed past halfway, taking a hit, a gun being drawn); a failed nerve check ends the
-// contest in a way determined by temperament. Every step is recorded as an event.
+// Each round both characters roll. The difference between the rolls changes the lead: one point of lead per
+// POINTS_PER_LEAD points of difference, rounded up. The lead is positive when the attacker is ahead and negative when the
+// defender is. A character who gets `winningLead` points ahead wins. Neither side chooses actions. Nerve checks are
+// triggered by events (falling behind by half the winning lead, taking a hit, having a weapon drawn on them); a failed
+// nerve check ends the contest in a way decided by temperament. Every step is recorded as an event.
 import { resolveCheck, resolveOpposed, type CheckResult, type Modifier, type OpposedResult, type Roll } from './check';
 import { rollFor, type Character } from './character';
 import { DICE, type Dice } from './dice';
 import type { Roller } from './random';
 import { leaning, type Trait } from './temperament';
 
-export const APPROACHES = ['intimidate', 'gunpoint', 'brawl'] as const;
+export const APPROACHES = ['intimidation', 'armed-threat', 'fight'] as const;
 export type Approach = (typeof APPROACHES)[number];
 
 export const APPROACH_INFO: { readonly [A in Approach]: { readonly name: string; readonly description: string } } = {
-  intimidate: { name: 'Intimidate', description: 'Attacker’s Intimidation against the defender’s Nerve each round.' },
-  gunpoint: {
-    name: 'Gunpoint',
-    description: 'As Intimidate, but the attacker has advantage and the defender must pass a DC 12 nerve check before the first round.',
+  intimidation: { name: 'Intimidation', description: 'Each round: the attacker’s Intimidation against the defender’s Nerve.' },
+  'armed-threat': {
+    name: 'Armed threat',
+    description: 'As Intimidation, but the attacker has advantage, and the defender must pass a DC 12 nerve check before the first round.',
   },
-  brawl: { name: 'Brawl', description: 'Brawling against Brawling. Winning a round by 5 or more lands a hit (−1 to later rolls); three hits is a knockout.' },
+  fight: { name: 'Fight', description: 'Each round: Brawling against Brawling. Winning a round by 5 or more lands a hit (−1 to later rolls); three hits is a knockout.' },
 };
 
 export type Side = 'attacker' | 'defender';
@@ -29,65 +30,82 @@ export interface ContestSpec {
   readonly defender: Character;
   readonly approach: Approach;
   readonly dice?: Dice;
-  /** Steps from the centre to either end. Default 5. */
-  readonly track?: number;
-  /** If set, the attacker withdraws when the marker reaches -walkAwayAt. */
-  readonly walkAwayAt?: number;
+  /** How far ahead a character must get to win. Default 5. */
+  readonly winningLead?: number;
+  /** If set, the attacker withdraws when the defender is this far ahead. */
+  readonly withdrawAt?: number;
   /** Default 12. */
   readonly maxRounds?: number;
 }
 
-export type Trigger = 'gun-drawn' | 'pushed-back' | 'hit';
+export type Trigger = 'weapon-drawn' | 'falling-behind' | 'hit';
 
 export type Ending =
-  | { readonly how: 'pushed' | 'knocked-out' | 'yields' | 'flees' | 'walked-away'; readonly loser: Side }
+  | { readonly how: 'outscored' | 'knocked-out' | 'gives-up' | 'flees' | 'withdraws'; readonly loser: Side }
   | { readonly how: 'stalemate'; readonly loser: null };
 
 export type ContestEvent =
-  | { readonly kind: 'exchange'; readonly round: number; readonly approach: Approach; readonly result: OpposedResult; readonly moved: number; readonly marker: number }
+  | { readonly kind: 'round'; readonly round: number; readonly approach: Approach; readonly result: OpposedResult; readonly change: number; readonly lead: number }
   | { readonly kind: 'hit'; readonly round: number; readonly side: Side; readonly hits: number }
-  | { readonly kind: 'nerve'; readonly round: number; readonly side: Side; readonly trigger: Trigger; readonly result: CheckResult; readonly held: boolean }
-  | { readonly kind: 'lash-out'; readonly round: number; readonly side: Side }
+  | { readonly kind: 'nerve'; readonly round: number; readonly side: Side; readonly trigger: Trigger; readonly result: CheckResult; readonly passed: boolean }
+  | { readonly kind: 'escalation'; readonly round: number; readonly side: Side }
   | { readonly kind: 'end'; readonly round: number; readonly ending: Ending };
 
 export interface ContestResult {
   readonly events: readonly ContestEvent[];
   readonly ending: Ending;
-  readonly marker: number;
+  /** Positive: the attacker is ahead. */
+  readonly lead: number;
   readonly rounds: number;
   readonly hits: Readonly<Record<Side, number>>;
 }
 
+/** What each kind of ending means, for explaining results. */
+export const ENDING_INFO: { readonly [H in Ending['how']]: { readonly title: string; readonly explanation: string } } = {
+  outscored: {
+    title: 'Out-rolled',
+    explanation: 'The other side won enough rounds to reach the winning lead. Decided by skill bonuses and dice.',
+  },
+  'knocked-out': { title: 'Knocked out', explanation: 'Took three hits in a fight.' },
+  'gives-up': {
+    title: 'Lost their nerve and gave up',
+    explanation: 'Failed a nerve check (after falling behind by half the winning lead, taking a hit, or having a weapon drawn on them).',
+  },
+  flees: { title: 'Lost their nerve and fled', explanation: 'Failed a nerve check, and their low courage or high caution made them run.' },
+  withdraws: { title: 'Withdrew', explanation: 'The attacker fell as far behind as the withdraw setting allows.' },
+  stalemate: { title: 'Stalemate', explanation: 'Nobody won before the round limit.' },
+};
+
 /** How temperament decides the result of a failed nerve check (implemented in runContest). */
 export const NERVE_FAILURE: Readonly<Partial<Record<Trait, string>>> = {
-  temper: 'If high: lashes out on a failed nerve check (once per contest) and the contest becomes a brawl.',
+  temper: 'If high: on a failed nerve check, escalates to a fight instead of losing (once per contest).',
   courage: 'If low: flees on a failed nerve check.',
   caution: 'If high: flees on a failed nerve check.',
 };
 
-/** Points of roll difference per step of marker movement (rounded up). */
-export const POINTS_PER_STEP = 5;
-/** In a brawl, winning a round by at least this much lands a hit. */
+/** Points of roll difference per point of lead (rounded up). */
+export const POINTS_PER_LEAD = 5;
+/** In a fight, winning a round by at least this much lands a hit. */
 export const HIT_MARGIN = 5;
 export const HITS_TO_KNOCK_OUT = 3;
-export const NERVE_DC: Readonly<Record<Trigger, number>> = { 'gun-drawn': 12, 'pushed-back': 10, hit: 10 };
+export const NERVE_DC: Readonly<Record<Trigger, number>> = { 'weapon-drawn': 12, 'falling-behind': 10, hit: 10 };
 /** Added to the DC of the nerve check after a hit, per hit taken (including the current one). */
 export const HIT_DC_STEP = 2;
 
 export function runContest(spec: ContestSpec, roller: Roller): ContestResult {
   const dice = spec.dice ?? DICE.d20;
-  const track = spec.track ?? 5;
+  const winningLead = spec.winningLead ?? 5;
   const maxRounds = spec.maxRounds ?? 12;
-  assertTerms(track, maxRounds, spec.walkAwayAt);
-  const halfway = Math.ceil(track / 2);
+  assertOptions(winningLead, maxRounds, spec.withdrawAt);
+  const halfway = Math.ceil(winningLead / 2);
   const sides: Record<Side, Character> = { attacker: spec.attacker, defender: spec.defender };
 
   const events: ContestEvent[] = [];
   const hits: Record<Side, number> = { attacker: 0, defender: 0 };
-  const pushedBack: Record<Side, boolean> = { attacker: false, defender: false };
-  const lashedOut: Record<Side, boolean> = { attacker: false, defender: false };
+  const fellBehind: Record<Side, boolean> = { attacker: false, defender: false };
+  const escalated: Record<Side, boolean> = { attacker: false, defender: false };
   let approach = spec.approach;
-  let marker = 0;
+  let lead = 0;
   let round = 0;
 
   const injuryModifiers = (side: Side): Modifier[] => (hits[side] ? [{ value: -hits[side], reason: `Injured (${hits[side]})` }] : []);
@@ -95,76 +113,76 @@ export function runContest(spec: ContestSpec, roller: Roller): ContestResult {
   const roundRoll = (side: Side): Roll => {
     const c = sides[side];
     const modifiers = injuryModifiers(side);
-    if (approach === 'brawl') return rollFor(c, 'brawling', { dice, modifiers });
-    if (side === 'attacker') return rollFor(c, 'intimidation', { dice, modifiers, situations: ['intimidate'], edges: approach === 'gunpoint' ? ['advantage'] : [] });
+    if (approach === 'fight') return rollFor(c, 'brawling', { dice, modifiers });
+    if (side === 'attacker') return rollFor(c, 'intimidation', { dice, modifiers, situations: ['intimidate'], edges: approach === 'armed-threat' ? ['advantage'] : [] });
     return rollFor(c, 'nerve', { dice, modifiers, situations: ['hold-nerve', 'resist-intimidation'] });
   };
 
   const finish = (ending: Ending): ContestResult => {
     events.push({ kind: 'end', round, ending });
-    return { events, ending, marker, rounds: round, hits };
+    return { events, ending, lead, rounds: round, hits };
   };
 
   /**
-   * Makes a nerve check. Returns null if it passes. On a failure: a hot-tempered character lashes out (once per contest),
-   * which turns the contest into a brawl; a timid or cautious one flees; anyone else yields.
+   * Makes a nerve check. Returns null if it passes. On a failure: a hot-tempered character escalates to a fight (once per
+   * contest); a timid or cautious one flees; anyone else gives up.
    */
-  const nerveCheck = (side: Side, trigger: Trigger): Ending | 'lashed-out' | null => {
+  const nerveCheck = (side: Side, trigger: Trigger): Ending | 'escalated' | null => {
     const dc = NERVE_DC[trigger] + (trigger === 'hit' ? HIT_DC_STEP * hits[side] : 0);
     const result = resolveCheck({ ...rollFor(sides[side], 'nerve', { dice, situations: ['hold-nerve'], modifiers: injuryModifiers(side) }), dc }, roller);
-    const held = result.margin >= 0;
-    events.push({ kind: 'nerve', round, side, trigger, result, held });
-    if (held) return null;
+    const passed = result.margin >= 0;
+    events.push({ kind: 'nerve', round, side, trigger, result, passed });
+    if (passed) return null;
     const t = sides[side].temperament;
-    if (leaning(t.temper) === 'high' && !lashedOut[side]) {
-      lashedOut[side] = true;
-      approach = 'brawl';
-      events.push({ kind: 'lash-out', round, side });
-      return 'lashed-out';
+    if (leaning(t.temper) === 'high' && !escalated[side]) {
+      escalated[side] = true;
+      approach = 'fight';
+      events.push({ kind: 'escalation', round, side });
+      return 'escalated';
     }
-    return { how: leaning(t.courage) === 'low' || leaning(t.caution) === 'high' ? 'flees' : 'yields', loser: side };
+    return { how: leaning(t.courage) === 'low' || leaning(t.caution) === 'high' ? 'flees' : 'gives-up', loser: side };
   };
 
-  if (approach === 'gunpoint') {
-    const failed = nerveCheck('defender', 'gun-drawn');
-    if (failed && failed !== 'lashed-out') return finish(failed);
+  if (approach === 'armed-threat') {
+    const failed = nerveCheck('defender', 'weapon-drawn');
+    if (failed && failed !== 'escalated') return finish(failed);
   }
 
   while (round < maxRounds) {
     round++;
-    const brawling = approach === 'brawl';
+    const fighting = approach === 'fight';
     const result = resolveOpposed({ active: roundRoll('attacker'), passive: roundRoll('defender') }, roller);
     const difference = result.margin + 1;
-    const before = marker;
-    marker = Math.max(-track, Math.min(track, marker + Math.sign(difference) * Math.ceil(Math.abs(difference) / POINTS_PER_STEP)));
-    events.push({ kind: 'exchange', round, approach, result, moved: marker - before, marker });
+    const before = lead;
+    lead = Math.max(-winningLead, Math.min(winningLead, lead + Math.sign(difference) * Math.ceil(Math.abs(difference) / POINTS_PER_LEAD)));
+    events.push({ kind: 'round', round, approach, result, change: lead - before, lead });
     if (difference === 0) continue;
 
     const loser: Side = difference > 0 ? 'defender' : 'attacker';
     const triggers: Trigger[] = [];
-    if (brawling && Math.abs(difference) >= HIT_MARGIN) {
+    if (fighting && Math.abs(difference) >= HIT_MARGIN) {
       hits[loser]++;
       events.push({ kind: 'hit', round, side: loser, hits: hits[loser] });
       if (hits[loser] >= HITS_TO_KNOCK_OUT) return finish({ how: 'knocked-out', loser });
       triggers.push('hit');
     }
-    if (Math.abs(marker) === track) return finish({ how: 'pushed', loser });
-    if (!pushedBack[loser] && (loser === 'defender' ? marker >= halfway : marker <= -halfway)) {
-      pushedBack[loser] = true;
-      triggers.push('pushed-back');
+    if (Math.abs(lead) === winningLead) return finish({ how: 'outscored', loser });
+    if (!fellBehind[loser] && (loser === 'defender' ? lead >= halfway : lead <= -halfway)) {
+      fellBehind[loser] = true;
+      triggers.push('falling-behind');
     }
-    // At most one nerve check per round; a hit takes precedence over being pushed back.
+    // At most one nerve check per round; a hit takes precedence over falling behind.
     const trigger = triggers[0];
     if (trigger) {
       const failed = nerveCheck(loser, trigger);
-      if (failed && failed !== 'lashed-out') return finish(failed);
+      if (failed && failed !== 'escalated') return finish(failed);
     }
-    if (spec.walkAwayAt !== undefined && marker <= -spec.walkAwayAt) return finish({ how: 'walked-away', loser: 'attacker' });
+    if (spec.withdrawAt !== undefined && lead <= -spec.withdrawAt) return finish({ how: 'withdraws', loser: 'attacker' });
   }
   return finish({ how: 'stalemate', loser: null });
 }
 
-/** The key used by `tally` for an ending, e.g. "pushed:defender" or "stalemate". */
+/** The key used by `tally` for an ending, e.g. "outscored:defender" or "stalemate". */
 export function endingKey(ending: Ending): string {
   return ending.loser ? `${ending.how}:${ending.loser}` : ending.how;
 }
@@ -179,9 +197,9 @@ export function tally(spec: ContestSpec, roller: Roller, runs: number): Record<s
   return counts;
 }
 
-function assertTerms(track: number, maxRounds: number, walkAwayAt: number | undefined): void {
-  if (!Number.isInteger(track) || track < 1) throw new RangeError(`track must be a positive integer, got ${track}`);
+function assertOptions(winningLead: number, maxRounds: number, withdrawAt: number | undefined): void {
+  if (!Number.isInteger(winningLead) || winningLead < 1) throw new RangeError(`winningLead must be a positive integer, got ${winningLead}`);
   if (!Number.isInteger(maxRounds) || maxRounds < 1) throw new RangeError(`maxRounds must be a positive integer, got ${maxRounds}`);
-  if (walkAwayAt !== undefined && (!Number.isInteger(walkAwayAt) || walkAwayAt < 1 || walkAwayAt > track))
-    throw new RangeError(`walkAwayAt must be an integer from 1 to track (${track}), got ${walkAwayAt}`);
+  if (withdrawAt !== undefined && (!Number.isInteger(withdrawAt) || withdrawAt < 1 || withdrawAt > winningLead))
+    throw new RangeError(`withdrawAt must be an integer from 1 to winningLead (${winningLead}), got ${withdrawAt}`);
 }

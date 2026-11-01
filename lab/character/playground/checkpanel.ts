@@ -5,11 +5,13 @@ import { DICE, DICE_NAMES, type DiceName } from '../src/dice';
 import { describeCheck, describeOpposed, signed } from '../src/explain';
 import { roller, seeded } from '../src/random';
 import { SKILLS, SKILL_INFO, type Skill } from '../src/skills';
-import { SITUATIONS, type Situation } from '../src/temperament';
+import { ATTRIBUTE_INFO } from '../src/attributes';
+import { attributesFor } from '../src/skills';
+import { SITUATIONS, SITUATION_INFO, type Situation } from '../src/temperament';
 import { h, segmented, slider } from './dom';
 import { sideSelect } from './pickers';
 import { sideCharacter } from './store';
-import { modifiersView, oddsView, outcomeTag, type Panel } from './views';
+import { hint, modifiersView, oddsView, outcomeGuide, outcomeTag, type Panel } from './views';
 
 interface State {
   dice: DiceName;
@@ -59,6 +61,7 @@ export function checkPanel(): Panel {
           ? modifiersView(`${sideCharacter('defender').name}: ${SKILL_INFO[state.opponentSkill].name}`, opponent().modifiers)
           : h('div', { class: 'muted' }, `DC ${state.dc}`),
       ),
+      outcomeGuide(),
       h('div', { class: 'row' }, h('button', { type: 'button', class: 'primary', onclick: roll }, 'Roll')),
       h('ol', { class: 'log' }, ...state.log.map((l) => h('li', {}, outcomeTag(l.outcome), l.text))),
     );
@@ -80,26 +83,34 @@ export function checkPanel(): Panel {
         if (!on && i >= 0) chosen.splice(i, 1);
         describe();
         renderResults();
-      } }), ' ', s)));
+      } }), ' ', SITUATION_INFO[s].name, h('span', { class: 'hint' }, ` – ${SITUATION_INFO[s].description}`))),
+      hint('Ticked situations apply the character’s temperament modifiers (e.g. a proud character resisting intimidation gets +2).'));
   };
+
+  const skillHint = (s: Skill) => `${SKILL_INFO[s].covers} Based on ${attributesFor(s).map((a) => ATTRIBUTE_INFO[a].name).join(' or ')}.`;
 
   function render() {
     root.replaceChildren(
       h('h2', { id: 'check-title' }, 'Skill check'),
+      hint('A single roll: the character’s skill against a fixed difficulty (DC) or against another character’s roll.'),
       h('div', { class: 'grid' },
         h('div', {},
           sideSelect('attacker', 'Character'),
-          h('label', { class: 'field' }, h('span', {}, 'Skill'), skillSelect(state.skill, (s) => (state.skill = s), 'Skill')),
+          h('label', { class: 'field' }, h('span', {}, 'Skill'), skillSelect(state.skill, (s) => { state.skill = s; render(); }, 'Skill'), hint(skillHint(state.skill))),
           h('div', { class: 'field' }, h('span', {}, 'Against'), segmented(['dc', 'opponent'] as const, state.against, (a) => { state.against = a; render(); },
             (a) => (a === 'dc' ? 'DC' : 'Opponent'))),
           state.against === 'dc'
-            ? slider('DC', state.dc, 0, 30, (v) => { state.dc = v; renderResults(); })
+            ? slider('DC', state.dc, 0, 30, (v) => { state.dc = v; renderResults(); }, String,
+                'Difficulty class: the total needed. Roughly 10 is easy, 15 moderate, 20 hard, 25 very hard.')
             : h('div', {},
                 sideSelect('defender', 'Opponent'),
-                h('label', { class: 'field' }, h('span', {}, 'Opponent skill'), skillSelect(state.opponentSkill, (s) => (state.opponentSkill = s), 'Opponent skill'))),
+                h('label', { class: 'field' }, h('span', {}, 'Opponent skill'), skillSelect(state.opponentSkill, (s) => { state.opponentSkill = s; render(); }, 'Opponent skill'),
+                  hint(skillHint(state.opponentSkill))),
+                hint('Both roll. The character must beat the opponent’s total; a tie goes to the opponent.')),
           h('h3', {}, 'Options'),
-          slider('Situational modifier', state.situational, -5, 5, (v) => { state.situational = v; renderResults(); }, signed),
-          h('div', { class: 'field' }, h('span', {}, 'Dice'), segmented(DICE_NAMES, state.dice, (d) => { state.dice = d; render(); })),
+          slider('Situational modifier', state.situational, -5, 5, (v) => { state.situational = v; renderResults(); }, signed,
+            'Any other bonus or penalty, e.g. +2 for a good plan, −2 for being outnumbered.'),
+          h('div', { class: 'field' }, h('span', {}, 'Dice'), segmented(DICE_NAMES, state.dice, (d) => { state.dice = d; render(); }), hint(DICE[state.dice].description)),
           situationBoxes(state.situations, 'Temperament situations'),
           state.against === 'opponent' ? situationBoxes(state.opponentSituations, 'Opponent temperament situations') : null,
         ),
