@@ -12,12 +12,21 @@ import { describeFightEvent, describeRollRequest } from '../src/fight-log';
 import { NERVE_DC, type Side } from '../src/nerve';
 import { replay, roller, seeded } from '../src/random';
 import { notableTraits } from '../src/temperament';
+import { flickerSequence, slowingDelays } from './animation';
 import { h, segmented, slider } from './dom';
 import { assign, canFight, loadParties, reconcile, saveParties, type Parties } from './parties';
 import { characterById, getRoster, storage } from './store';
 import { hint, type Panel } from './views';
 
 const RUNS = 1000;
+/** The dice animation: how many faces it flickers through, how long that takes, and how long it rests on the result. */
+const FLICKERS = 14;
+const FLICKER_MS = 850;
+const SETTLE_MS = 200;
+/** Dice for the animation only, kept apart from the fight's dice so the animation can never change a result. */
+const showDice = roller(seeded(Date.now() >>> 0));
+const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+const reduceMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 const SIDES = ['attacker', 'defender'] as const;
 const SIDE_TITLE: Readonly<Record<Side, string>> = { attacker: 'Left', defender: 'Right' };
 const STATUS_LABEL: Readonly<Record<FighterStatus, string>> = {
@@ -170,20 +179,46 @@ export function fightPanel(): Panel {
       return null;
     };
     const faceLabel = (face: number) => (r.kind === 'target' ? `${face}: ${name(r.options[face - 1]!)}` : String(face));
-    return h('div', { class: 'roll-panel' },
+    const display = h('div', { class: 'die-display', 'aria-live': 'polite' }, h('span', { class: 'die-sides' }, `d${request.sides}`), h('span', { class: 'die-face' }, '?'));
+    const faceButtons = Array.from({ length: request.sides }, (_, i) => {
+      const face = i + 1;
+      const good = succeeds(face);
+      return h('button', { type: 'button', class: `face${good === true ? ' good' : good === false ? ' bad' : ''}`, onclick: () => setFaces([...faces, face]) }, faceLabel(face));
+    });
+    const show = (face: number, landed = false) => {
+      display.querySelector('.die-face')!.textContent = r.kind === 'target' ? faceLabel(face) : String(face);
+      display.classList.toggle('landed', landed);
+      faceButtons.forEach((b, i) => b.classList.toggle('showing', i === face - 1));
+    };
+
+    /** Decides the result at once, then flickers through faces, slowing down and landing on it. */
+    const animatedRoll = async () => {
+      const result = dice.roll(request.sides, r);
+      if (!reduceMotion()) {
+        for (const b of panel.querySelectorAll('button')) b.disabled = true;
+        const sequence = flickerSequence(request.sides, FLICKERS, result, showDice);
+        const delays = slowingDelays(sequence.length, FLICKER_MS);
+        for (const [i, face] of sequence.entries()) {
+          show(face);
+          await wait(delays[i]!);
+        }
+        show(result, true);
+        await wait(SETTLE_MS);
+      }
+      setFaces([...faces, result]);
+    };
+
+    const panel = h('div', { class: 'roll-panel' },
       h('div', { class: 'roll-count' }, `Roll ${faces.length + 1}`),
-      h('p', { class: 'prompt' }, describeRollRequest(request, fighters, fightDice)),
+      h('div', { class: 'roll-main' }, display, h('p', { class: 'prompt' }, describeRollRequest(request, fighters, fightDice))),
       h('div', { class: 'row' },
-        h('button', { type: 'button', class: 'primary', onclick: () => setFaces([...faces, dice.roll(request.sides, r)]) }, 'Roll'),
+        h('button', { type: 'button', class: 'primary', onclick: () => void animatedRoll() }, 'Roll'),
         h('button', { type: 'button', onclick: () => setFaces(playOut(s, faces)) }, 'Play the rest'),
         h('button', { type: 'button', disabled: faces.length === 0, onclick: () => setFaces(faces.slice(0, -1)) }, 'Back')),
       h('div', { class: 'hint' }, 'Or choose the result:'),
-      h('div', { class: 'faces' }, ...Array.from({ length: request.sides }, (_, i) => {
-        const face = i + 1;
-        const good = succeeds(face);
-        return h('button', { type: 'button', class: `face${good === true ? ' good' : good === false ? ' bad' : ''}`, onclick: () => setFaces([...faces, face]) }, faceLabel(face));
-      })),
+      h('div', { class: 'faces' }, ...faceButtons),
     );
+    return panel;
   }
 
   function renderFight() {

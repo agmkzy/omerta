@@ -175,3 +175,9 @@ table.fight-log tr.round-head td { font-size: 0.75rem; text-transform: uppercase
 .face { min-width: 2.4em; padding: 4px 6px; font-variant-numeric: tabular-nums; }
 .face.good { border-color: var(--success); }
 .face.bad { border-color: var(--critical-failure); color: var(--muted); }
+.roll-main { display: flex; gap: 14px; align-items: center; }
+.die-display { flex: none; min-width: 64px; height: 64px; padding: 0 8px; border: 2px solid var(--line); border-radius: 12px; display: grid; place-items: center; align-content: center; background: var(--bg); }
+.die-display .die-sides { font-size: 0.65rem; color: var(--muted); line-height: 1; }
+.die-display .die-face { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.die-display.landed { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
+.face.showing { background: var(--accent); border-color: var(--accent); color: #fff; }
