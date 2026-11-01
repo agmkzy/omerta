@@ -4,7 +4,7 @@ import { APPROACH_INFO, type ContestEvent, type ContestSpec, type Ending, type S
 const TRIGGER_TEXT: Readonly<Record<Trigger, string>> = {
   'weapon-drawn': 'weapon drawn on them',
   'falling-behind': 'fell behind by half the winning lead',
-  hurt: 'badly hurt',
+  hurt: 'dropped to half hit points',
 };
 
 /** "Fighter 1 leads by 2", "Shopkeeper 1 leads by 1" or "level". */

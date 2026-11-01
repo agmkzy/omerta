@@ -55,11 +55,11 @@ describe('describeEvent', { tags: ['unit'] }, () => {
     ]);
   });
 
-  test('describes natural 20s, natural 1s and the nerve check when badly hurt', () => {
+  test('describes natural 20s, natural 1s and the nerve check at half hit points', () => {
     assert.deepEqual(log(spec({ approach: 'fight' }), 15, 10, 20, 2, 3, 20, 1).slice(1, 4), [
       'Round 1: A attacks D: rolled 22 against Defence 10 (natural 20). Critical hit for 5 damage (D: 5 HP left).',
-      `D makes a nerve check (badly hurt): needed ${NERVE_DC.hurt}, rolled 18, passed.`,
-      'Round 1: D attacks A: rolled -1 against Defence 10 (natural 1). Miss.',
+      `D makes a nerve check (dropped to half hit points): needed ${NERVE_DC.hurt}, rolled 20, passed.`,
+      'Round 1: D attacks A: rolled 1 against Defence 10 (natural 1). Miss.',
     ]);
   });
 });

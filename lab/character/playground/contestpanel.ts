@@ -1,6 +1,6 @@
 // Contest tab: configure a contest between two saved characters, run it once to read the round-by-round log, or many
 // times to see how often each side wins and what decides it.
-import { APPROACHES, APPROACH_INFO, BADLY_HURT_PENALTY, ENDING_INFO, NERVE_DC, POINTS_PER_LEAD, UNARMED_DAMAGE_DIE, runContest, tally, type Approach, type ContestResult, type ContestSpec, type Ending, type Side } from '../src/contest';
+import { APPROACHES, APPROACH_INFO, ENDING_INFO, NERVE_DC, POINTS_PER_LEAD, UNARMED_DAMAGE_DIE, runContest, tally, type Approach, type ContestResult, type ContestSpec, type Ending, type Side } from '../src/contest';
 import { BASE_DEFENCE, BASE_HIT_POINTS } from '../src/character';
 import { describeEvent } from '../src/contest-log';
 import { DICE, DICE_NAMES, type DiceName } from '../src/dice';
@@ -103,7 +103,7 @@ export function contestPanel(): Panel {
               h('li', {}, `Each round, each character attacks in turn: d20 + Brawling bonus against the other’s Defence (${BASE_DEFENCE} + Reflexes bonus). Meeting or beating it is a hit for 1d${UNARMED_DAMAGE_DIE} + Strength modifier damage (at least 1).`),
               h('li', {}, 'A natural 20 always hits and is a critical hit: the damage dice are rolled twice. A natural 1 always misses.'),
               h('li', {}, `Each character has hit points: ${BASE_HIT_POINTS} + Constitution modifier, plus their proficiency bonus if trained in Toughness (twice if expert). At 0 they are knocked out and do not act.`),
-              h('li', {}, `At half hit points or below a character is badly hurt: they take ${BADLY_HURT_PENALTY} to rolls, and every hit they take after that (including the one that got them there) needs a DC ${NERVE_DC.hurt} nerve check. Failing it ends the fight: a timid or cautious character flees; anyone else gives up.`),
+              h('li', {}, `The first time a character drops to half hit points or below, they make one nerve check (DC ${NERVE_DC.hurt}): fight or flight. If they pass, they are committed and fight on with no further checks. If they fail, a timid or cautious character flees; anyone else gives up. This follows D&D’s optional morale rule.`),
               h('li', {}, 'If nobody has won by the round limit, it is a stalemate.'))
           : h('ul', {},
               h('li', {}, `It is played in rounds. Each round both characters roll, and whoever rolls higher gains lead points: 1 point for every ${POINTS_PER_LEAD} points they rolled higher by (rounded up). A tie changes nothing.`),

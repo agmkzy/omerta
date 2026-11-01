@@ -66,12 +66,12 @@ A contest is a multi-round opposed check that resolves automatically; neither si
   for initiative; the higher acts first each round (a tie goes to the defender). Each round each character attacks:
   d20 + Brawling bonus against the target's **Defence** (10 + Reflexes bonus, like D&D's unarmoured Armour Class). A
   hit deals 1d4 + Strength modifier (minimum 1). A natural 20 always hits and rolls the damage dice twice; a natural 1
-  always misses. 0 HP is a knockout, and a knocked-out character does not act. At half HP or below a character is
-  badly hurt: −2 to rolls.
+  always misses. 0 HP is a knockout, and a knocked-out character does not act. There are no wound penalties.
 - **Hit points** are 10 + Constitution modifier, plus the proficiency bonus if trained in Toughness (twice if expert):
   D&D's first-level d10 hit die plus its Tough feat.
-- **Nerve checks** happen when a character falls behind by half the winning lead (DC 10, once per side), is hit while
-  at half HP or below (DC 12, after every such hit), or has a weapon drawn on them (DC 12).
+- **Nerve checks** happen when a character falls behind by half the winning lead (DC 10, once per side), first drops to
+  half HP or below in a fight (DC 10, once per side: fight or flight, as in D&D's optional morale rule), or has a weapon
+  drawn on them (DC 12).
 - **A failed nerve check** ends the contest: a high-temper character escalates to a fight instead (once, and not when
   already fighting), a low-courage or high-caution character flees, and anyone else gives up.
 - **Other endings:** the attacker's optional withdraw setting (lead contests only) and the round limit (stalemate).
@@ -85,9 +85,8 @@ A contest is a multi-round opposed check that resolves automatically; neither si
 - **Knowledge.** The player should see an estimate of an NPC's abilities based on what they know, not the true values.
   This would sit on top of the exact odds.
 - **Contest balance.** The lead step, nerve DCs, damage and temperament effects are first guesses, all defined as
-  constants or in one table. Simulated fights last about 2–2.5 rounds (4–5 attacks) and end
-  about 25–40% by knockout and the rest by a failed nerve check. More HP or less damage mostly adds nerve failures,
-  because the repeated DC 12 nerve check at half HP ends most fights.
+  constants or in one table. Simulated fights last about 2.5 rounds (about 5 attacks) and end
+  about 50–60% by knockout and the rest by a failed nerve check.
 - **Unused skills.** Firearms and others are defined but no contest uses them yet. Armour and weapons are not
   modelled.
 - **Integration with the game.** Mapping the existing `Traits`/`Skills` onto this model, save migration, and replacing

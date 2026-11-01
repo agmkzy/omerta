@@ -9,10 +9,13 @@
 // Defence (10 + Reflexes bonus). A hit deals 1d4 + Strength modifier; a natural 20 always hits and rolls the damage dice
 // twice; a natural 1 always misses. A character at 0 hit points is knocked out and does not act.
 //
-// Nerve checks are triggered by events (falling behind by half the winning lead, taking damage at half hit points or
-// below, having a weapon drawn on them); a failed nerve check ends the contest in a way decided by temperament. Every
-// step is recorded as an event.
-import { resolveCheck, resolveOpposed, type CheckResult, type Modifier, type OpposedResult, type Roll } from './check';
+// Nerve follows D&D's optional morale rule: the first time a character drops to half hit points or below in a fight, they
+// make one nerve check (fight or flight). Passing commits them to the fight; there is no further check.
+//
+// Nerve checks are triggered by events (falling behind by half the winning lead, first dropping to half hit points,
+// having a weapon drawn on them); a failed nerve check ends the contest in a way decided by temperament. Every step is
+// recorded as an event.
+import { resolveCheck, resolveOpposed, type CheckResult, type OpposedResult, type Roll } from './check';
 import { abilityModifier } from './attributes';
 import { defence, maxHitPoints, rollFor, type Character } from './character';
 import { DICE, type Dice } from './dice';
@@ -98,7 +101,7 @@ export const ENDING_INFO: { readonly [H in Ending['how']]: { readonly title: str
   'knocked-out': { title: 'Knocked out', explanation: 'Reduced to 0 hit points in a fight.' },
   'gives-up': {
     title: 'Lost their nerve and gave up',
-    explanation: 'Failed a nerve check (after falling behind by half the winning lead, being hit while badly hurt, or having a weapon drawn on them).',
+    explanation: 'Failed a nerve check (after falling behind by half the winning lead, first dropping to half hit points in a fight, or having a weapon drawn on them).',
   },
   flees: { title: 'Lost their nerve and fled', explanation: 'Failed a nerve check, and their low courage or high caution made them run.' },
   withdraws: { title: 'Withdrew', explanation: 'The attacker fell as far behind as the withdraw setting allows.' },
@@ -116,10 +119,8 @@ export const NERVE_FAILURE: Readonly<Partial<Record<Trait, string>>> = {
 export const POINTS_PER_LEAD = 5;
 /** Unarmed damage: 1d4 + Strength modifier, minimum 1. */
 export const UNARMED_DAMAGE_DIE = 4;
-/** Nerve check DCs. `hurt` is the check after each hit that leaves a character at half hit points or below. */
-export const NERVE_DC: Readonly<Record<Trigger, number>> = { 'weapon-drawn': 12, 'falling-behind': 10, hurt: 12 };
-/** Roll penalty at half hit points or below. */
-export const BADLY_HURT_PENALTY = -2;
+/** Nerve check DCs. `hurt` is the single check when a character first drops to half hit points or below in a fight. */
+export const NERVE_DC: Readonly<Record<Trigger, number>> = { 'weapon-drawn': 12, 'falling-behind': 10, hurt: 10 };
 
 /** Damage dealt by a hit: 1d4 (2d4 on a critical) + Strength modifier, minimum 1. */
 export function rollDamage(c: Character, critical: boolean, roller: Roller): Damage {
@@ -145,14 +146,13 @@ export function runContest(spec: ContestSpec, roller: Roller): ContestResult {
   let lead = 0;
   let round = 0;
 
-  const badlyHurt = (side: Side) => hp[side] <= maxHp[side] / 2;
-  const injuryModifiers = (side: Side): Modifier[] => (badlyHurt(side) ? [{ value: BADLY_HURT_PENALTY, reason: 'Badly hurt' }] : []);
+  const atHalf = (side: Side) => hp[side] <= maxHp[side] / 2;
+  const nerveTested: Record<Side, boolean> = { attacker: false, defender: false };
 
   const roundRoll = (side: Side): Roll => {
     const c = sides[side];
-    const modifiers = injuryModifiers(side);
-    if (side === 'attacker') return rollFor(c, 'intimidation', { dice, modifiers, situations: ['intimidate'], edges: approach === 'armed-threat' ? ['advantage'] : [] });
-    return rollFor(c, 'nerve', { dice, modifiers, situations: ['hold-nerve', 'resist-intimidation'] });
+    if (side === 'attacker') return rollFor(c, 'intimidation', { dice, situations: ['intimidate'], edges: approach === 'armed-threat' ? ['advantage'] : [] });
+    return rollFor(c, 'nerve', { dice, situations: ['hold-nerve', 'resist-intimidation'] });
   };
 
   const finish = (ending: Ending): ContestResult => {
@@ -166,7 +166,7 @@ export function runContest(spec: ContestSpec, roller: Roller): ContestResult {
    * one flees; anyone else gives up.
    */
   const nerveCheck = (side: Side, trigger: Trigger): Ending | null => {
-    const result = resolveCheck({ ...rollFor(sides[side], 'nerve', { dice, situations: ['hold-nerve'], modifiers: injuryModifiers(side) }), dc: NERVE_DC[trigger] }, roller);
+    const result = resolveCheck({ ...rollFor(sides[side], 'nerve', { dice, situations: ['hold-nerve'] }), dc: NERVE_DC[trigger] }, roller);
     const passed = result.margin >= 0;
     events.push({ kind: 'nerve', round, side, trigger, result, passed });
     if (passed) return null;
@@ -197,7 +197,7 @@ export function runContest(spec: ContestSpec, roller: Roller): ContestResult {
   /** One attack. Returns an ending, or null to continue. */
   const attack = (by: Side): Ending | null => {
     const target: Side = by === 'attacker' ? 'defender' : 'attacker';
-    const result = resolveCheck({ ...rollFor(sides[by], 'brawling', { dice, modifiers: injuryModifiers(by) }), dc: defence(sides[target]) }, roller);
+    const result = resolveCheck({ ...rollFor(sides[by], 'brawling', { dice }), dc: defence(sides[target]) }, roller);
     const kept = result.roll.thrown.kept;
     const critical = kept === dice.count * dice.sides;
     const hit = critical || (kept !== dice.count && result.margin >= 0);
@@ -206,7 +206,9 @@ export function runContest(spec: ContestSpec, roller: Roller): ContestResult {
     events.push({ kind: 'attack', round, by, result, hit, critical, damage, hp: { ...hp } });
     if (!damage) return null;
     if (hp[target] === 0) return { how: 'knocked-out', loser: target };
-    return badlyHurt(target) ? nerveCheck(target, 'hurt') : null;
+    if (!atHalf(target) || nerveTested[target]) return null;
+    nerveTested[target] = true;
+    return nerveCheck(target, 'hurt');
   };
 
   /** A round decided by hit points: each character attacks in initiative order. Returns an ending, or null to continue. */
