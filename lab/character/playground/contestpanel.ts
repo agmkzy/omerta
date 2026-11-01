@@ -1,4 +1,4 @@
-// Contest panel: configure a contest between the two characters, run it once to see the event log, or many times for the
+// Contest tab: configure a contest between two saved characters, run it once to see the event log, or many times for the
 // distribution of endings.
 import { APPROACHES, runContest, tally, type Approach, type ContestResult, type ContestSpec, type Ending } from '../src/contest';
 import { describeEnding, describeEvent } from '../src/contest-log';
@@ -6,7 +6,9 @@ import { DICE, DICE_NAMES, type DiceName } from '../src/dice';
 import { describeOpposed, percent } from '../src/explain';
 import { roller, seeded } from '../src/random';
 import { h, segmented, slider } from './dom';
-import { character, onChange, swapSides } from './store';
+import { sideSelect, swapButton } from './pickers';
+import { sideCharacter } from './store';
+import type { Panel } from './views';
 
 const APPROACH_LABEL: Readonly<Record<Approach, string>> = { intimidate: 'Intimidate', gunpoint: 'Gunpoint', brawl: 'Brawl' };
 const RUNS = 1000;
@@ -21,14 +23,14 @@ interface State {
   tally: Record<string, number> | null;
 }
 
-export function contestPanel(): HTMLElement {
+export function contestPanel(): Panel {
   const state: State = { approach: 'intimidate', dice: 'd20', track: 5, walkAwayAt: 0, maxRounds: 12, run: null, tally: null };
   const dice = roller(seeded(1931));
   const root = h('section', { class: 'panel', id: 'contest', 'aria-labelledby': 'contest-title' });
   const results = h('div');
 
   const spec = (): ContestSpec => ({
-    attacker: character('attacker'), defender: character('defender'), approach: state.approach, dice: DICE[state.dice],
+    attacker: sideCharacter('attacker'), defender: sideCharacter('defender'), approach: state.approach, dice: DICE[state.dice],
     track: state.track, maxRounds: state.maxRounds, ...(state.walkAwayAt ? { walkAwayAt: state.walkAwayAt } : {}),
   });
 
@@ -68,9 +70,10 @@ export function contestPanel(): HTMLElement {
   function render() {
     root.replaceChildren(
       h('h2', { id: 'contest-title' }, 'Contest'),
-      h('p', { class: 'muted' }, `Attacker: ${character('attacker').name}. Defender: ${character('defender').name}. Rounds resolve automatically; nerve checks are triggered by events, and a failed check ends the contest according to temperament.`),
+      h('p', { class: 'muted' }, 'Rounds resolve automatically. Nerve checks are triggered by events, and a failed check ends the contest according to temperament.'),
       h('div', { class: 'grid' },
         h('div', {},
+          h('div', { class: 'row sides' }, sideSelect('attacker', 'Attacker'), swapButton(), sideSelect('defender', 'Defender')),
           h('div', { class: 'field' }, h('span', {}, 'Approach'), segmented(APPROACHES, state.approach, (a) => { state.approach = a; render(); }, (a) => APPROACH_LABEL[a])),
           slider('Track length (steps each way)', state.track, 1, 10, (v) => {
             state.track = v;
@@ -90,7 +93,6 @@ export function contestPanel(): HTMLElement {
               state.tally = tally(spec(), dice, RUNS);
               renderResults();
             } }, `Run ${RUNS} times`),
-            h('button', { type: 'button', onclick: () => swapSides('contest') }, 'Swap sides'),
           ),
         ),
         results,
@@ -99,10 +101,11 @@ export function contestPanel(): HTMLElement {
     renderResults();
   }
 
-  onChange(() => {
-    state.tally = null;
-    render();
-  });
-  render();
-  return root;
+  return {
+    element: root,
+    render() {
+      state.tally = null;
+      render();
+    },
+  };
 }

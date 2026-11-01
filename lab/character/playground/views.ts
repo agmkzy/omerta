@@ -32,3 +32,9 @@ export function modifiersView(title: string, modifiers: readonly Modifier[]): HT
 export function outcomeTag(o: Outcome): HTMLElement {
   return h('span', { class: `tag o-${o}` }, outcomeLabel(o));
 }
+
+/** A playground tab's content. `render` rebuilds it from the current state; it is called when the tab is shown. */
+export interface Panel {
+  readonly element: HTMLElement;
+  render(): void;
+}

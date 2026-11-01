@@ -7,7 +7,7 @@ connected to the game yet. The lab imports nothing from `src/`, and the game imp
 ## Running
 
 ```bash
-npm run lab:test        # all lab tests (~0.5 s)
+npm run lab:test        # all lab tests (under a second)
 npm run lab:watch       # tests in watch mode
 npm run lab:cov         # tests with coverage (thresholds: 100%)
 npm run lab:typecheck   # strict TypeScript (noUncheckedIndexedAccess, exactOptionalPropertyTypes)
@@ -29,7 +29,15 @@ npm run lab:dev         # playground at http://localhost:5180
 | `src/backgrounds.ts` | Backgrounds instead of classes: training, attribute priorities, temperament centres. `rollCharacter()` generates a character. |
 | `src/contest.ts` | Automatically resolved multi-round contests (see below). |
 | `src/contest-log.ts`, `src/explain.ts` | Plain-text descriptions of results and events. |
-| `playground/` | Framework-free browser page using the modules above. |
+| `src/serialize.ts` | Versioned JSON save/load for characters, with validation and defaults for missing fields. |
+| `playground/` | Framework-free browser page using the modules above (see below). |
+
+## Playground
+
+Four tabs: **Characters** (a list of saved characters and an editor for the selected one, split into attributes, skills
+and temperament), **Skill check**, **Contest** and **Dice and odds**. Characters are saved to `localStorage` in this
+browser after every change, as is the open tab. The check and contest tabs pick their two characters from the saved
+list. The roster logic (`playground/roster.ts`) is pure and tested like the library.
 
 Tests are in `test/`, one file per module. Each is tagged `unit` or `property` (fast-check). The suite has 100% statement,
 branch, function and line coverage.

@@ -1,19 +1,18 @@
-// Skill check panel: one character's skill against a DC or against the other character's skill, with every modifier listed.
+// Skill check tab: a character's skill against a DC or against an opponent's skill, with every modifier listed.
 import { checkOdds, opposedOdds, resolveCheck, resolveOpposed, type Outcome, type Roll } from '../src/check';
 import { rollFor } from '../src/character';
-import type { Side } from '../src/contest';
 import { DICE, DICE_NAMES, type DiceName } from '../src/dice';
 import { describeCheck, describeOpposed, signed } from '../src/explain';
 import { roller, seeded } from '../src/random';
 import { SKILLS, SKILL_INFO, type Skill } from '../src/skills';
 import { SITUATIONS, type Situation } from '../src/temperament';
 import { h, segmented, slider } from './dom';
-import { character, onChange } from './store';
-import { modifiersView, oddsView, outcomeTag } from './views';
+import { sideSelect } from './pickers';
+import { sideCharacter } from './store';
+import { modifiersView, oddsView, outcomeTag, type Panel } from './views';
 
 interface State {
   dice: DiceName;
-  roller: Side;
   skill: Skill;
   situations: Situation[];
   against: 'dc' | 'opponent';
@@ -24,20 +23,19 @@ interface State {
   log: { text: string; outcome: Outcome }[];
 }
 
-export function checkPanel(): HTMLElement {
+export function checkPanel(): Panel {
   const state: State = {
-    dice: 'd20', roller: 'attacker', skill: 'intimidation', situations: ['intimidate'], against: 'opponent', dc: 12,
+    dice: 'd20', skill: 'intimidation', situations: ['intimidate'], against: 'opponent', dc: 12,
     opponentSkill: 'nerve', opponentSituations: ['hold-nerve', 'resist-intimidation'], situational: 0, log: [],
   };
   const dice = roller(seeded(7));
   const root = h('section', { class: 'panel', id: 'check', 'aria-labelledby': 'check-title' });
   const results = h('div');
-  const opponentSide = (): Side => (state.roller === 'attacker' ? 'defender' : 'attacker');
 
-  const active = (): Roll => rollFor(character(state.roller), state.skill, {
+  const active = (): Roll => rollFor(sideCharacter('attacker'), state.skill, {
     dice: DICE[state.dice], situations: state.situations, modifiers: state.situational ? [{ value: state.situational, reason: 'Situational' }] : [],
   });
-  const opponent = (): Roll => rollFor(character(opponentSide()), state.opponentSkill, { dice: DICE[state.dice], situations: state.opponentSituations });
+  const opponent = (): Roll => rollFor(sideCharacter('defender'), state.opponentSkill, { dice: DICE[state.dice], situations: state.opponentSituations });
 
   function roll() {
     if (state.against === 'dc') {
@@ -56,9 +54,9 @@ export function checkPanel(): HTMLElement {
     results.replaceChildren(
       oddsView(odds),
       h('div', { class: 'grid' },
-        modifiersView(`${character(state.roller).name}: ${SKILL_INFO[state.skill].name}`, active().modifiers),
+        modifiersView(`${sideCharacter('attacker').name}: ${SKILL_INFO[state.skill].name}`, active().modifiers),
         state.against === 'opponent'
-          ? modifiersView(`${character(opponentSide()).name}: ${SKILL_INFO[state.opponentSkill].name}`, opponent().modifiers)
+          ? modifiersView(`${sideCharacter('defender').name}: ${SKILL_INFO[state.opponentSkill].name}`, opponent().modifiers)
           : h('div', { class: 'muted' }, `DC ${state.dc}`),
       ),
       h('div', { class: 'row' }, h('button', { type: 'button', class: 'primary', onclick: roll }, 'Roll')),
@@ -70,33 +68,40 @@ export function checkPanel(): HTMLElement {
     h('select', { 'aria-label': label, onchange: (e: Event) => { set((e.target as HTMLSelectElement).value as Skill); renderResults(); } },
       ...SKILLS.map((s) => h('option', { value: s, selected: s === value }, SKILL_INFO[s].name)));
 
-  const situationBoxes = (chosen: Situation[], label: string) =>
-    h('fieldset', { class: 'situations' }, h('legend', {}, label),
+  const situationBoxes = (chosen: Situation[], label: string) => {
+    const summary = h('summary', {});
+    const describe = () => (summary.textContent = `${label} (${chosen.length ? chosen.join(', ') : 'none'})`);
+    describe();
+    return h('details', { class: 'situations' }, summary,
       ...SITUATIONS.map((s) => h('label', {}, h('input', { type: 'checkbox', checked: chosen.includes(s), onchange: (e: Event) => {
         const on = (e.target as HTMLInputElement).checked;
         const i = chosen.indexOf(s);
         if (on && i < 0) chosen.push(s);
         if (!on && i >= 0) chosen.splice(i, 1);
+        describe();
         renderResults();
       } }), ' ', s)));
+  };
 
   function render() {
     root.replaceChildren(
       h('h2', { id: 'check-title' }, 'Skill check'),
       h('div', { class: 'grid' },
         h('div', {},
-          h('div', { class: 'field' }, h('span', {}, 'Roller'), segmented(['attacker', 'defender'] as const, state.roller, (s) => { state.roller = s; render(); }, (s) => character(s).name)),
+          sideSelect('attacker', 'Character'),
           h('label', { class: 'field' }, h('span', {}, 'Skill'), skillSelect(state.skill, (s) => (state.skill = s), 'Skill')),
-          situationBoxes(state.situations, 'Temperament situations'),
-          slider('Situational modifier', state.situational, -5, 5, (v) => { state.situational = v; renderResults(); }, signed),
           h('div', { class: 'field' }, h('span', {}, 'Against'), segmented(['dc', 'opponent'] as const, state.against, (a) => { state.against = a; render(); },
-            (a) => (a === 'dc' ? 'DC' : character(opponentSide()).name))),
+            (a) => (a === 'dc' ? 'DC' : 'Opponent'))),
           state.against === 'dc'
             ? slider('DC', state.dc, 0, 30, (v) => { state.dc = v; renderResults(); })
             : h('div', {},
-                h('label', { class: 'field' }, h('span', {}, 'Opponent skill'), skillSelect(state.opponentSkill, (s) => (state.opponentSkill = s), 'Opponent skill')),
-                situationBoxes(state.opponentSituations, 'Opponent temperament situations')),
+                sideSelect('defender', 'Opponent'),
+                h('label', { class: 'field' }, h('span', {}, 'Opponent skill'), skillSelect(state.opponentSkill, (s) => (state.opponentSkill = s), 'Opponent skill'))),
+          h('h3', {}, 'Options'),
+          slider('Situational modifier', state.situational, -5, 5, (v) => { state.situational = v; renderResults(); }, signed),
           h('div', { class: 'field' }, h('span', {}, 'Dice'), segmented(DICE_NAMES, state.dice, (d) => { state.dice = d; render(); })),
+          situationBoxes(state.situations, 'Temperament situations'),
+          state.against === 'opponent' ? situationBoxes(state.opponentSituations, 'Opponent temperament situations') : null,
         ),
         results,
       ),
@@ -104,7 +109,5 @@ export function checkPanel(): HTMLElement {
     renderResults();
   }
 
-  onChange(() => render());
-  render();
-  return root;
+  return { element: root, render };
 }

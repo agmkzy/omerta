@@ -65,20 +65,40 @@ tr.current td { font-weight: 600; }
 .tag { display: inline-block; padding: 0 6px; border-radius: 3px; color: #fff; font-family: inherit; margin-right: 6px; }
 .tag.o-partial { color: #2a2410; }
 .muted { color: var(--muted); }
-.nav { display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.9rem; }
-.nav a { color: var(--accent); text-decoration: none; }
 .grid.two { grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); }
-.sheet { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; }
-.sheet-head .row { flex-wrap: wrap; }
-.sheet input.name { font: inherit; font-family: Georgia, serif; font-size: 1.15rem; padding: 4px 6px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--ink); flex: 1; min-width: 8em; }
-.description { margin: 6px 0 0; font-size: 0.85rem; }
-.summary { margin: 6px 0 0; font-style: italic; }
+.tab-content > * { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+.tab-content h2 { font-family: Georgia, serif; font-size: 1.2rem; margin: 0 0 12px; }
+.tab-content h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 16px 0 8px; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.tabs button { border: 1px solid transparent; border-bottom: 0; border-radius: var(--radius) var(--radius) 0 0; background: transparent; color: var(--muted); padding: 8px 14px; white-space: nowrap; }
+.tabs button[aria-selected='true'] { background: var(--panel); border-color: var(--line); color: var(--ink); font-weight: 600; margin-bottom: -1px; }
+.tab-content { margin-top: -16px; }
+.tab-content > * { border-top-left-radius: 0; }
+.characters-layout { display: grid; gap: 20px; grid-template-columns: 240px 1fr; }
+@media (max-width: 720px) { .characters-layout { grid-template-columns: 1fr; } }
+.roster-list { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 4px; }
+.roster-item { width: 100%; text-align: left; display: grid; gap: 2px; }
+.roster-item.selected { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.roster-name { font-weight: 600; }
+.roster-meta { font-size: 0.8rem; }
+.new-character { border-top: 1px solid var(--line); padding-top: 12px; display: grid; gap: 6px; }
+.small { font-size: 0.8rem; }
+.editor { min-width: 0; display: grid; gap: 12px; align-content: start; }
+.editor-head { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.summary { display: grid; gap: 2px; font-size: 0.9rem; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+td.num { font-variant-numeric: tabular-nums; }
+.row.sides { align-items: end; flex-wrap: wrap; }
+.row.sides .field { flex: 1; min-width: 140px; margin-bottom: 0; }
+.row.sides > button { margin-bottom: 2px; }
+input.name { font: inherit; font-family: Georgia, serif; font-size: 1.15rem; padding: 4px 6px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--ink); flex: 1; min-width: 8em; }
 table.skills td, table.skills th { padding: 3px 6px; }
 table.skills tr.trained td:first-child { font-weight: 600; }
 table.skills td:last-child { cursor: help; font-variant-numeric: tabular-nums; }
 .modifiers ul { margin: 4px 0; padding-left: 18px; }
-fieldset.situations { border: 1px solid var(--line); border-radius: var(--radius); margin: 0 0 10px; padding: 6px 10px; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 0.85rem; }
-fieldset.situations legend { color: var(--muted); padding: 0 4px; }
+details.situations { border: 1px solid var(--line); border-radius: var(--radius); margin: 0 0 10px; padding: 6px 10px; font-size: 0.85rem; }
+details.situations summary { color: var(--muted); cursor: pointer; }
+details.situations label { display: inline-block; margin: 4px 12px 0 0; }
 .event-log { padding-left: 0; list-style: none; }
 .event-log li { padding: 6px 0; border-bottom: 1px dashed var(--line); }
 .event-log li.ev-end { font-weight: 600; border-bottom: 0; }

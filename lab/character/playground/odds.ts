@@ -4,7 +4,7 @@ import { DICE, DICE_NAMES, EDGES, type DiceName, type Edge } from '../src/dice';
 import { describeCheck, describeOpposed, percent, signed } from '../src/explain';
 import { roller, seeded, type Roller } from '../src/random';
 import { h, segmented, slider } from './dom';
-import { oddsView, outcomeTag } from './views';
+import { oddsView, outcomeTag, type Panel } from './views';
 
 type Against = 'dc' | 'opponent';
 
@@ -22,7 +22,7 @@ interface State {
 
 const EDGE_LABEL: Readonly<Record<Edge, string>> = { none: 'None', advantage: 'Advantage', disadvantage: 'Disadvantage' };
 
-export function oddsPanel(): HTMLElement {
+export function oddsPanel(): Panel {
   const state: State = { dice: 'd20', against: 'dc', bonus: 3, edge: 'none', dc: 13, opponentBonus: 2, opponentEdge: 'none', seed: 1970, log: [] };
   let dice: Roller = roller(seeded(state.seed));
 
@@ -99,5 +99,5 @@ export function oddsPanel(): HTMLElement {
   }
 
   render();
-  return root;
+  return { element: root, render: () => undefined };
 }
