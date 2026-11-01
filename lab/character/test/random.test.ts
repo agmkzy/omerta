@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fc from 'fast-check';
 import { describe, test } from 'vitest';
-import { roller, seeded } from '../src/random';
+import { replay, roller, seeded } from '../src/random';
 
 const draws = (seed: number, n: number) => {
   const rng = seeded(seed);
@@ -33,6 +33,25 @@ describe('roller', { tags: ['unit'] }, () => {
   test('throws for a non-positive or non-integer number of sides', () => {
     assert.throws(() => roller(seeded(1)).roll(0), RangeError);
     assert.throws(() => roller(seeded(1)).roll(2.5), RangeError);
+  });
+});
+
+describe('replay', { tags: ['unit'] }, () => {
+  test('returns the given faces first, then rolls with the fallback, recording every face', () => {
+    const r = replay([3, 5], roller({ next: () => 0.5 }));
+    assert.deepEqual([r.roll(6), r.roll(6), r.roll(6)], [3, 5, 4]);
+    assert.deepEqual(r.faces, [3, 5, 4]);
+  });
+
+  test('passes the reason for a roll on to the fallback', () => {
+    const reasons: unknown[] = [];
+    const r = replay([], { roll: (_sides, reason) => (reasons.push(reason), 1) });
+    r.roll(20, { kind: 'attack' });
+    assert.deepEqual(reasons, [{ kind: 'attack' }]);
+  });
+
+  test('rejects a given face that is not on the die', () => {
+    assert.throws(() => replay([7], roller(seeded(1))).roll(6), RangeError);
   });
 });
 

@@ -12,8 +12,12 @@ import { abilityModifier } from './attributes';
 import { bonusOf, resolveCheck, throwRoll, type CheckResult, type RollResult } from './check';
 import { defence, maxHitPoints, rollFor, type Character } from './character';
 import { DICE, type Dice } from './dice';
-import { nerveCheck, nerveCheckSpec, otherSide, type NerveCheck, type Side } from './nerve';
-import type { Roller } from './random';
+import { NERVE_DC, nerveCheck, nerveCheckSpec, otherSide, type NerveCheck, type Side } from './nerve';
+import { replay, type Roller } from './random';
+import { diceDistribution } from './distribution';
+
+/** Omit applied to each member of a union separately. */
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
 export interface FightSpec {
   readonly attackers: readonly Character[];
@@ -115,6 +119,36 @@ export function fightStats(c: Character): FightStats {
   };
 }
 
+/** What a die in a fight is rolled for, with the numbers involved. `die` counts the dice of a multi-dice roll. */
+export type FightRollReason = (
+  | { readonly kind: 'initiative'; readonly id: string; readonly bonus: number }
+  | { readonly kind: 'target'; readonly id: string; readonly options: readonly string[] }
+  | { readonly kind: 'attack'; readonly id: string; readonly target: string; readonly bonus: number; readonly dc: number }
+  | { readonly kind: 'damage'; readonly id: string; readonly target: string; readonly modifier: number; readonly critical: boolean }
+  | { readonly kind: 'nerve'; readonly id: string; readonly trigger: 'hurt' | 'allies-down'; readonly bonus: number; readonly dc: number }
+) & { readonly die: number; readonly of: number };
+
+/** A roll the fight is waiting for. */
+export interface RollRequest {
+  readonly sides: number;
+  readonly reason: FightRollReason;
+}
+
+/** A fight replayed from some rolls: either finished, or waiting for the next roll with the fight so far. */
+export type FightStep =
+  | { readonly done: true; readonly result: FightResult }
+  | { readonly done: false; readonly request: RollRequest; readonly events: readonly FightEvent[]; readonly fighters: readonly Fighter[] };
+
+/** The chance an attack with this bonus hits this Defence: natural 20s (the highest roll) always hit, natural 1s never do. */
+export function attackHitChance(dice: Dice, bonus: number, dc: number): number {
+  const d = diceDistribution(dice, 'none');
+  const highest = dice.count * dice.sides;
+  return d.probabilities.reduce((sum, p, i) => {
+    const kept = d.min + i;
+    return kept === highest || (kept !== dice.count && kept + bonus >= dc) ? sum + p : sum;
+  }, 0);
+}
+
 interface FighterState {
   id: string;
   side: Side;
@@ -126,6 +160,44 @@ interface FighterState {
 }
 
 export function runFight(spec: FightSpec, roller: Roller): FightResult {
+  return fight(spec, roller, { events: [], fighters: [] });
+}
+
+/** Raised by stepFight's roller when it runs out of given faces. */
+class AwaitingRoll {
+  constructor(readonly request: RollRequest) {}
+}
+
+/**
+ * Replays a fight from the faces rolled so far (in the order the fight asks for them). If the faces run out before the
+ * fight ends, returns the roll it is waiting for, with the events and fighters so far. Throws if a face is not on its die.
+ */
+export function stepFight(spec: FightSpec, faces: readonly number[]): FightStep {
+  const record: FightRecord = { events: [], fighters: [] };
+  const given = replay(faces, {
+    roll(sides, reason) {
+      throw new AwaitingRoll({ sides, reason: reason as FightRollReason });
+    },
+  });
+  try {
+    return { done: true, result: fight(spec, given, record) };
+  } catch (e) {
+    if (!(e instanceof AwaitingRoll)) throw e;
+    return { done: false, request: e.request, events: [...record.events], fighters: record.fighters.map(publicFighter) };
+  }
+}
+
+/** Where a fight keeps its events and fighters, so stepFight can show them if the fight stops partway. */
+interface FightRecord {
+  events: FightEvent[];
+  fighters: FighterState[];
+}
+
+function publicFighter({ nerveTested: _, ...f }: FighterState): Fighter {
+  return { ...f };
+}
+
+function fight(spec: FightSpec, roller: Roller, record: FightRecord): FightResult {
   const dice = spec.dice ?? DICE.d20;
   const maxRounds = spec.maxRounds ?? 12;
   if (!Number.isInteger(maxRounds) || maxRounds < 1) throw new RangeError(`maxRounds must be a positive integer, got ${maxRounds}`);
@@ -136,18 +208,28 @@ export function runFight(spec: FightSpec, roller: Roller): FightResult {
     return { id: `${prefix}${i + 1}`, side, character, hp: maxHp, maxHp, status: 'fighting', nerveTested: false };
   };
   const fighters = [...spec.attackers.map(make('attacker', 'A')), ...spec.defenders.map(make('defender', 'B'))];
-  const events: FightEvent[] = [];
+  const { events } = record;
+  record.fighters = fighters;
+
+  /** A roller that tells whoever is rolling what each die is for. */
+  const rollingFor = (reason: DistributiveOmit<FightRollReason, 'die' | 'of'>, of: number): Roller => {
+    let die = 0;
+    return { roll: (sides) => roller.roll(sides, { ...reason, die: ++die, of } as FightRollReason) };
+  };
   const groupChecked: Record<Side, boolean> = { attacker: false, defender: false };
   let round = 0;
 
   const fightingOn = (side: Side) => fighters.filter((f) => f.side === side && f.status === 'fighting');
   const finish = (winner: Side | null): FightResult => {
     events.push({ kind: 'end', round, winner });
-    return { events, winner, rounds: round, fighters: fighters.map(({ nerveTested: _, ...f }) => f) };
+    return { events, winner, rounds: round, fighters: fighters.map(publicFighter) };
   };
 
   // Initiative: everyone rolls in list order; highest first, defenders first on a tie, then list order.
-  const rolls = fighters.map((f, index) => ({ f, index, roll: throwRoll(rollFor(f.character, 'reflexes', { dice }), roller) }));
+  const rolls = fighters.map((f, index) => {
+    const reflexes = rollFor(f.character, 'reflexes', { dice });
+    return { f, index, roll: throwRoll(reflexes, rollingFor({ kind: 'initiative', id: f.id, bonus: bonusOf(reflexes.modifiers) }, dice.count)) };
+  });
   const sideRank = (side: Side) => (side === 'defender' ? 0 : 1);
   rolls.sort((a, b) => b.roll.total - a.roll.total || sideRank(a.f.side) - sideRank(b.f.side) || a.index - b.index);
   events.push({ kind: 'initiative', order: rolls.map(({ f, roll }) => ({ id: f.id, roll })) });
@@ -160,7 +242,8 @@ export function runFight(spec: FightSpec, roller: Roller): FightResult {
 
   /** A nerve check; a failure takes the fighter out of the fight. */
   const testNerve = (f: FighterState, trigger: 'hurt' | 'allies-down') => {
-    const check = nerveCheck(f.character, trigger, false, dice, roller);
+    const bonus = bonusOf(nerveCheckSpec(f.character, trigger, dice).modifiers);
+    const check = nerveCheck(f.character, trigger, false, dice, rollingFor({ kind: 'nerve', id: f.id, trigger, bonus, dc: NERVE_DC[trigger] }, dice.count));
     events.push({ kind: 'nerve', round, id: f.id, trigger, check });
     if (check.response === 'flees') takeOut(f, 'fled');
     else if (check.response) takeOut(f, f.side === 'defender' ? 'surrendered' : 'backed-off');
@@ -177,12 +260,16 @@ export function runFight(spec: FightSpec, roller: Roller): FightResult {
 
   const attack = (by: FighterState) => {
     const enemies = fightingOn(otherSide(by.side));
-    const target = enemies.length === 1 ? enemies[0]! : enemies[roller.roll(enemies.length) - 1]!;
-    const result = resolveCheck({ ...rollFor(by.character, 'brawling', { dice }), dc: defence(target.character) }, roller);
+    const options = enemies.map((e) => e.id);
+    const target = enemies.length === 1 ? enemies[0]! : enemies[rollingFor({ kind: 'target', id: by.id, options }, 1).roll(enemies.length) - 1]!;
+    const brawling = rollFor(by.character, 'brawling', { dice });
+    const dc = defence(target.character);
+    const result = resolveCheck({ ...brawling, dc }, rollingFor({ kind: 'attack', id: by.id, target: target.id, bonus: bonusOf(brawling.modifiers), dc }, dice.count));
     const kept = result.roll.thrown.kept;
     const critical = kept === dice.count * dice.sides;
     const hit = critical || (kept !== dice.count && result.margin >= 0);
-    const damage = hit ? rollDamage(by.character, critical, roller) : null;
+    const modifier = abilityModifier(by.character.attributes.str);
+    const damage = hit ? rollDamage(by.character, critical, rollingFor({ kind: 'damage', id: by.id, target: target.id, modifier, critical }, critical ? 2 : 1)) : null;
     if (damage) target.hp = Math.max(0, target.hp - damage.total);
     events.push({ kind: 'attack', round, by: by.id, target: target.id, result, hit, critical, damage, hp: target.hp });
     if (!damage) return;

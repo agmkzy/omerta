@@ -5,10 +5,10 @@ import { attributeScores } from '../src/attributes';
 import { BACKGROUNDS, rollCharacter, type BackgroundName } from '../src/backgrounds';
 import { createCharacter, type Character } from '../src/character';
 import { DICE } from '../src/dice';
-import { FIGHTER_STATUSES, FIGHTER_STATUS_INFO, fightStats, rollDamage, runFight, tallyFights, type FightEvent, type FightResult, type FightSpec } from '../src/fight';
+import { FIGHTER_STATUSES, FIGHTER_STATUS_INFO, attackHitChance, fightStats, rollDamage, runFight, stepFight, tallyFights, type FightEvent, type FightResult, type FightSpec } from '../src/fight';
 import { describeFightEvent } from '../src/fight-log';
 import { NERVE_DC } from '../src/nerve';
-import { roller, seeded } from '../src/random';
+import { replay, roller, seeded } from '../src/random';
 import { temperament } from '../src/temperament';
 import { scripted } from './support';
 
@@ -195,6 +195,76 @@ describe('runFight: parties', { tags: ['unit'] }, () => {
     assert.equal(r.events.filter((e) => e.kind === 'nerve').length, 1);
     assert.deepEqual(r.fighters.map((f) => f.status), ['fighting', 'knocked-out', 'knocked-out', 'knocked-out']);
     assert.equal(r.winner, 'attacker');
+  });
+});
+
+describe('stepFight', { tags: ['unit'] }, () => {
+  const next = (s: FightSpec, ...faces: number[]) => {
+    const step = stepFight(s, faces);
+    assert.ok(!step.done, 'expected the fight to be waiting for a roll');
+    return step;
+  };
+
+  test('with no rolls yet, asks for the first initiative roll and shows everyone at full health', () => {
+    const step = next(duel());
+    assert.deepEqual(step.request, { sides: 20, reason: { kind: 'initiative', id: 'A1', bonus: 0, die: 1, of: 1 } });
+    assert.deepEqual(step.events, []);
+    assert.deepEqual(step.fighters.map((f) => [f.id, f.hp, f.status]), [['A1', 10, 'fighting'], ['B1', 10, 'fighting']]);
+  });
+
+  test('asks for each roll in turn, saying what it is for', () => {
+    assert.deepEqual(next(duel(), 15).request.reason, { kind: 'initiative', id: 'B1', bonus: 0, die: 1, of: 1 });
+    assert.deepEqual(next(duel(), 15, 10).request.reason, { kind: 'attack', id: 'A1', target: 'B1', bonus: 2, dc: 10, die: 1, of: 1 });
+    assert.deepEqual(next(duel(), 15, 10, 8).request, { sides: 4, reason: { kind: 'damage', id: 'A1', target: 'B1', modifier: 0, critical: false, die: 1, of: 1 } });
+    assert.deepEqual(next(duel(), 15, 10, 8, 3).request.reason, { kind: 'attack', id: 'B1', target: 'A1', bonus: 0, dc: 10, die: 1, of: 1 });
+  });
+
+  test('shows the fight so far', () => {
+    const step = next(duel(), 15, 10, 8, 3);
+    assert.deepEqual(kinds(step.events), ['initiative', 'attack']);
+    assert.equal(step.fighters.find((f) => f.id === 'B1')!.hp, 7);
+  });
+
+  test('asks for a target only when there is a choice, listing the options', () => {
+    const step = next({ attackers: [attacker()], defenders: [defender({}, 'C'), defender({}, 'D')], maxRounds: 1 }, 15, 10, 10);
+    assert.deepEqual(step.request, { sides: 2, reason: { kind: 'target', id: 'A1', options: ['B1', 'B2'], die: 1, of: 1 } });
+  });
+
+  test('asks for each damage die of a critical hit, and for nerve checks with their bonus and DC', () => {
+    assert.deepEqual(next(duel(), 15, 10, 20).request.reason, { kind: 'damage', id: 'A1', target: 'B1', modifier: 0, critical: true, die: 1, of: 2 });
+    assert.deepEqual(next(duel(), 15, 10, 20, 2).request.reason, { kind: 'damage', id: 'A1', target: 'B1', modifier: 0, critical: true, die: 2, of: 2 });
+    assert.deepEqual(next(duel(), 15, 10, 20, 2, 3).request.reason, { kind: 'nerve', id: 'B1', trigger: 'hurt', bonus: 0, dc: NERVE_DC.hurt, die: 1, of: 1 });
+  });
+
+  test('asks for each die of a multi-dice roll', () => {
+    assert.deepEqual(next(duel({ dice: DICE['3d6'] }), 4, 4).request.reason, { kind: 'initiative', id: 'A1', bonus: 0, die: 3, of: 3 });
+  });
+
+  test('with every roll given, finishes with the same result as runFight', () => {
+    const spec: FightSpec = { attackers: [attacker(), attacker('B')], defenders: [defender(), frail('F')] };
+    const dice = replay([], roller(seeded(4)));
+    const full = runFight(spec, dice);
+    const step = stepFight(spec, dice.faces);
+    assert.ok(step.done);
+    assert.deepEqual(step.result, full);
+  });
+
+  test('rejects a face that is not on the die', () => {
+    assert.throws(() => stepFight(duel(), [21]), RangeError);
+  });
+});
+
+describe('attackHitChance', { tags: ['unit'] }, () => {
+  test('counts the d20 faces that hit, with a natural 20 always hitting and a natural 1 always missing', () => {
+    const close = (actual: number, expected: number) => assert.ok(Math.abs(actual - expected) < 1e-12, `${actual} vs ${expected}`);
+    close(attackHitChance(DICE.d20, 2, 10), 13 / 20); // 8 to 20
+    close(attackHitChance(DICE.d20, 30, 10), 19 / 20);
+    close(attackHitChance(DICE.d20, -30, 10), 1 / 20);
+  });
+
+  test('works on other dice, using the highest and lowest possible rolls', () => {
+    assert.ok(Math.abs(attackHitChance(DICE['3d6'], 0, 30) - 1 / 216) < 1e-12);
+    assert.ok(Math.abs(attackHitChance(DICE['3d6'], 30, 0) - 215 / 216) < 1e-12);
   });
 });
 
