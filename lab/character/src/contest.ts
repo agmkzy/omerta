@@ -35,7 +35,7 @@ export type ContestEvent =
   | { readonly kind: 'hit'; readonly round: number; readonly side: Side; readonly hurts: number }
   | { readonly kind: 'nerve'; readonly round: number; readonly side: Side; readonly trigger: Trigger; readonly result: CheckResult; readonly held: boolean }
   | { readonly kind: 'lash-out'; readonly round: number; readonly side: Side }
-  | { readonly kind: 'end'; readonly round: number; readonly ending: Ending };
+  | { readonly kind: 'end'; readonly round: number; readonly ending: Ending; readonly approach: Approach };
 
 export interface ContestResult {
   readonly events: readonly ContestEvent[];
@@ -82,7 +82,7 @@ export function runContest(spec: ContestSpec, roller: Roller): ContestResult {
   };
 
   const finish = (ending: Ending): ContestResult => {
-    events.push({ kind: 'end', round, ending });
+    events.push({ kind: 'end', round, ending, approach });
     return { events, ending, marker, rounds: round, hurts };
   };
 
