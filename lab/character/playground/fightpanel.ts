@@ -1,4 +1,4 @@
-// Fight tab, in two views. Set-up: click characters to add them to Side A or Side B; each fighter is shown once as a card
+// Fight tab, in two views. Set-up: click characters to add them to the left or right side; each fighter is shown once as a card
 // with the numbers the fight uses. Fight: the same cards with how each fighter ended up, then the log, one short line per
 // action, grouped by round. Roll breakdowns are shown on hover rather than repeated in the log.
 import { BACKGROUND_INFO } from '../src/backgrounds';
@@ -17,7 +17,7 @@ import { hint, type Panel } from './views';
 
 const RUNS = 1000;
 const SIDES = ['attacker', 'defender'] as const;
-const SIDE_TITLE: Readonly<Record<Side, string>> = { attacker: 'Side A', defender: 'Side B' };
+const SIDE_TITLE: Readonly<Record<Side, string>> = { attacker: 'Left', defender: 'Right' };
 const STATUS_LABEL: Readonly<Record<FighterStatus, string>> = {
   fighting: 'Still fighting', 'knocked-out': 'Knocked out', surrendered: 'Surrendered', 'backed-off': 'Backed off', fled: 'Fled',
 };
@@ -98,11 +98,11 @@ export function fightPanel(): Panel {
   const guide = () =>
     h('details', { class: 'guide' }, h('summary', {}, 'How a fight works'),
       h('ul', {},
-        h('li', {}, 'Everyone rolls Initiative. The highest acts first, and so on down (on a tie, Side B first). This order is used every round.'),
+        h('li', {}, 'Everyone rolls Initiative. The highest acts first, and so on down (on a tie, the right side first). This order is used every round.'),
         h('li', {}, `On their turn, each fighter attacks a random enemy who is still fighting: d20 + Attack against the target’s Defence. Meeting or beating it is a hit for their Damage (at least 1).`),
         h('li', {}, 'A natural 20 always hits and is a critical hit: the damage dice are rolled twice. A natural 1 always misses.'),
         h('li', {}, `Hit points are ${BASE_HIT_POINTS} + Constitution modifier, plus the proficiency bonus if trained in Toughness. At 0 a fighter is knocked out.`),
-        h('li', {}, `Nerve: a fighter makes one nerve check (d20 + Nerve, DC ${NERVE_DC.hurt}) the first time they drop to half HP, and everyone left on a side makes one (DC ${NERVE_DC['allies-down']}) the first time half of that side is out. Failing takes them out: a timid or cautious fighter flees; otherwise they surrender (Side B) or back off (Side A).`),
+        h('li', {}, `Nerve: a fighter makes one nerve check (d20 + Nerve, DC ${NERVE_DC.hurt}) the first time they drop to half HP, and everyone left on a side makes one (DC ${NERVE_DC['allies-down']}) the first time half of that side is out. Failing takes them out: a timid or cautious fighter flees; otherwise they surrender (right side) or back off (left side).`),
         h('li', {}, 'A side loses when nobody on it is still fighting. If both sides are still fighting at the round limit, it is a stalemate.')));
 
   function renderSetup() {
@@ -174,7 +174,7 @@ export function fightPanel(): Panel {
         h('tbody', {},
           ...r.fighters.map((f) => {
             const s = t.statuses[f.id]!;
-            return h('tr', {}, h('td', {}, `${f.character.name} `, h('span', { class: 'muted' }, f.side === 'attacker' ? '(A)' : '(B)')),
+            return h('tr', {}, h('td', {}, `${f.character.name} `, h('span', { class: 'muted' }, f.side === 'attacker' ? '(left)' : '(right)')),
               h('td', { class: 'num' }, share(s.fighting)), h('td', { class: 'num' }, share(s['knocked-out'])), h('td', { class: 'num' }, share(s.surrendered + s['backed-off'] + s.fled)));
           }))));
   }

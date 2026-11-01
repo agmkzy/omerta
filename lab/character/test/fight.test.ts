@@ -248,9 +248,9 @@ describe('describeFightEvent', { tags: ['unit'] }, () => {
       'F is knocked out.',
       'D sees half their side out of the fight and loses their nerve (rolled 1 vs 10).',
       'D surrenders.',
-      'Side A wins.',
+      'Left wins.',
     ]);
-    assert.equal(log(duel(), 5, 15, 20, 2, 3, 1).slice(-2).join(' '), 'A backs off. Side B wins.');
+    assert.equal(log(duel(), 5, 15, 20, 2, 3, 1).slice(-2).join(' '), 'A backs off. Right wins.');
     assert.equal(log(duel({ defenders: [defender({ courage: 0.1 })] }), 15, 10, 20, 2, 3, 9).at(-2), 'D flees.');
   });
 });

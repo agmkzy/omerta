@@ -2,7 +2,7 @@
 // each line (a log groups lines by round), and roll breakdowns are left to whoever shows the detail.
 import type { FightEvent, FightResult } from './fight';
 
-const SIDE_LETTER = { attacker: 'A', defender: 'B' } as const;
+const SIDE_NAME = { attacker: 'Left', defender: 'Right' } as const;
 
 /** Describes an event, naming fighters from the fight's result. */
 export function describeFightEvent(event: FightEvent, fight: FightResult): string {
@@ -28,6 +28,6 @@ export function describeFightEvent(event: FightEvent, fight: FightResult): strin
     case 'out':
       return `${name(event.id)} ${{ 'knocked-out': 'is knocked out', surrendered: 'surrenders', 'backed-off': 'backs off', fled: 'flees' }[event.status]}.`;
     case 'end':
-      return event.winner === null ? 'Stalemate: the round limit was reached.' : `Side ${SIDE_LETTER[event.winner]} wins.`;
+      return event.winner === null ? 'Stalemate: the round limit was reached.' : `${SIDE_NAME[event.winner]} wins.`;
   }
 }
