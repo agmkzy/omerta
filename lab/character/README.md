@@ -29,6 +29,7 @@ npm run lab:dev         # playground at http://localhost:5180
 | `src/backgrounds.ts` | Backgrounds instead of classes: training, attribute priorities, temperament centres. `rollCharacter()` generates a character. |
 | `src/fight.ts`, `src/fight-log.ts` | Fights: initiative, attack rolls, damage, hit points and morale (see below). |
 | `src/nerve.ts` | The nerve check shared by fights and threats. |
+| `src/social.ts` | Social actions (intimidate, persuade, deceive) as single checks, with outcome meanings and exact odds. |
 | `src/explain.ts` | Plain-text descriptions of rolls and checks. |
 | `src/serialize.ts` | Versioned JSON save/load for characters, with validation and defaults for missing fields. |
 | `playground/` | Framework-free browser page using the modules above (see below). |
@@ -36,7 +37,7 @@ npm run lab:dev         # playground at http://localhost:5180
 ## Playground
 
 Four tabs: **Characters** (a list of saved characters and an editor for the selected one, split into attributes, skills
-and temperament), **Skill check**, **Fight** and **Dice and odds**. Characters are saved to `localStorage` in this
+and temperament), **Skill check** (intimidate, persuade, deceive, or any skill), **Fight** and **Dice and odds**. Characters are saved to `localStorage` in this
 browser after every change, as is the open tab. The check and fight tabs pick their two characters from the saved
 list. The roster logic (`playground/roster.ts`) is pure and tested like the library.
 
@@ -54,6 +55,19 @@ branch, function and line coverage.
 - **Explainable modifiers.** Every modifier has a reason, so any result can be broken down.
 - **Exact odds.** `checkOdds`/`opposedOdds` give exact probabilities. Intended for NPC decision-making.
 - **Deterministic.** All randomness comes from an injected source; the same seed gives the same results.
+
+### Social actions
+
+As in D&D, getting someone to do something without force is a single check, not a multi-round contest:
+
+- **Intimidate:** Intimidation against the target's Nerve. **Persuade:** Persuasion against Insight. **Deceive:**
+  Deception against Insight. Temperament modifiers apply automatically (e.g. a proud target resists intimidation).
+- Each of the five outcomes has a meaning for that action, e.g. a partial success at intimidation means the target
+  complies but resents it; a critical failure at deception means they see through it.
+- **Armed intimidation:** the target first makes a DC 12 nerve check. Failing it, they comply at once, flee (timid or
+  cautious) or fight back (hot-tempered). If they hold, the intimidation is rolled with advantage.
+- A critical failure at intimidating a hot-tempered target provokes a fight.
+- `socialOdds` gives the exact chance of every result, including the nerve check.
 
 ### Fights
 

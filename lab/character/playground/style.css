@@ -125,3 +125,7 @@ details.situations label { display: block; margin: 4px 0 0; }
 .outcome-head, .outcome-row { display: grid; grid-template-columns: 1fr 4em; gap: 8px; align-items: center; }
 .outcome-row { grid-template-columns: 1fr 4em 30%; }
 .outcome-head .num, .outcome-row .num { text-align: right; font-variant-numeric: tabular-nums; }
+table.social-odds { margin: 8px 0 12px; }
+table.social-odds td:first-child { width: 18px; }
+table.social-odds td.num { text-align: right; width: 4em; }
+.field.checkbox > span:first-child { color: var(--ink); }
