@@ -188,3 +188,5 @@ table.fight-log tr.round-head td { font-size: 0.75rem; text-transform: uppercase
 .odds-bar.bad { background: var(--critical-failure); }
 .odds-label { font-size: 0.7rem; color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
 .odds-lines { margin: 0; padding-left: 18px; }
+.breakdown { display: grid; gap: 2px; font-size: 0.9rem; }
+.breakdown p.hint { margin: 0 0 4px; }

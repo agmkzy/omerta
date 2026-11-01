@@ -6,9 +6,10 @@
 import { BACKGROUND_INFO } from '../src/backgrounds';
 import { BASE_DEFENCE, BASE_HIT_POINTS, type Character } from '../src/character';
 import { DICE, DICE_NAMES, facesForTotal, type DiceName } from '../src/dice';
-import { compactRoll, percent, signed } from '../src/explain';
+import { compactRoll, describeModifier, percent, signed } from '../src/explain';
+import { bonusOf } from '../src/check';
 import { UNARMED_DAMAGE_DIE, fightStats, rollOdds, runFight, stepFight, tallyFights, type FightEvent, type FightSpec, type FightTally, type Fighter, type FighterStatus, type RollOdds, type RollRequest } from '../src/fight';
-import { describeFightEvent, describeRollRequest } from '../src/fight-log';
+import { describeFightEvent, describeRollRequest, explainRoll } from '../src/fight-log';
 import { NERVE_DC, type Side } from '../src/nerve';
 import { replay, roller, seeded } from '../src/random';
 import { notableTraits } from '../src/temperament';
@@ -218,6 +219,7 @@ export function fightPanel(): Panel {
     const panel = h('div', { class: 'roll-panel' },
       h('div', { class: 'roll-count' }, `Roll ${rollStarts(s, faces).length + 1}`),
       h('p', { class: 'prompt' }, describeRollRequest(request, fighters, fightDice)),
+      breakdown(request, fighters),
       h('div', { class: 'row' },
         h('button', { type: 'button', class: 'primary', onclick: () => void animatedRoll() }, 'Roll'),
         h('button', { type: 'button', onclick: () => setFaces(playOut(s, faces)) }, 'Play the rest'),
@@ -228,6 +230,22 @@ export function fightPanel(): Panel {
       state.showOdds ? oddsView(rollOdds(request, fighters, fightDice), request) : null,
     );
     return panel;
+  }
+
+  /** What a roll is for and where its numbers come from: the roller's bonus and, for an attack, the target's Defence. */
+  function breakdown(request: RollRequest, fighters: readonly Fighter[]): HTMLElement {
+    const e = explainRoll(request, fighters);
+    const r = request.reason;
+    const who = fighters.find((f) => f.id === r.id)!.character.name;
+    const kind = { initiative: 'initiative bonus', attack: 'attack bonus', damage: 'damage bonus', nerve: 'nerve bonus', target: '' }[r.kind];
+    const parts = (mods: readonly { value: number; reason: string }[]) => mods.map(describeModifier).join(', ');
+    return h('div', { class: 'breakdown' },
+      h('p', { class: 'hint' }, e.purpose),
+      e.bonus.length ? h('div', {}, h('strong', {}, `${who}’s ${kind} ${signed(bonusOf(e.bonus))}: `), parts(e.bonus)) : null,
+      e.against
+        ? h('div', {}, h('strong', {}, `${e.against.label} ${e.against.total}: `),
+            [`${e.against.parts[0]!.value} ${e.against.parts[0]!.reason.toLowerCase()}`, parts(e.against.parts.slice(1))].filter(Boolean).join(', '))
+        : null);
   }
 
   /** The odds of the roll: a bar for every possible result, then the averages and chances in words. */

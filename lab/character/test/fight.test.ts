@@ -6,7 +6,7 @@ import { BACKGROUNDS, rollCharacter, type BackgroundName } from '../src/backgrou
 import { createCharacter, type Character } from '../src/character';
 import { DICE } from '../src/dice';
 import { FIGHTER_STATUSES, FIGHTER_STATUS_INFO, attackHitChance, fightStats, rollDamage, rollOdds, runFight, stepFight, tallyFights, type FightEvent, type FightResult, type FightSpec } from '../src/fight';
-import { describeFightEvent, describeRollRequest } from '../src/fight-log';
+import { describeFightEvent, describeRollRequest, explainRoll } from '../src/fight-log';
 import { NERVE_DC } from '../src/nerve';
 import { replay, roller, seeded } from '../src/random';
 import { temperament } from '../src/temperament';
@@ -305,6 +305,55 @@ describe('describeRollRequest', { tags: ['unit'] }, () => {
   test('says when a nerve check cannot fail', () => {
     const steady = createCharacter({ name: 'Steady', attributes: attributeScores({ wis: 20 }), training: { nerve: 'expert' }, temperament: temperament({ courage: 0.9 }) }); // +11
     assert.equal(ask(duel({ defenders: [steady] }), 15, 10, 20, 4, 4), 'Steady is at half HP and must hold their nerve: d20 + 11 against 10. Holds whatever the roll.');
+  });
+});
+
+describe('explainRoll', { tags: ['unit'] }, () => {
+  const explain = (s: FightSpec, ...faces: number[]) => {
+    const step = stepFight(s, faces);
+    assert.ok(!step.done);
+    return explainRoll(step.request, step.fighters);
+  };
+
+  test('initiative: what it is for, and where the bonus comes from', () => {
+    const slow = createCharacter({ name: 'Slow', attributes: attributeScores({ agi: 8 }), training: { reflexes: 'trained' } });
+    const e = explain(duel({ attackers: [slow] }));
+    assert.match(e.purpose, /^Initiative decides who acts first/);
+    assert.deepEqual(e.bonus, [{ value: -1, reason: 'Agility 8' }, { value: 2, reason: 'Trained in Reflexes' }]);
+    assert.equal(e.against, null);
+  });
+
+  test('an attack: the Brawling bonus and the target’s Defence, each part with its reason', () => {
+    const nimble = createCharacter({ name: 'Nimble', attributes: attributeScores({ agi: 14 }), training: { reflexes: 'trained' } });
+    const e = explain(duel({ defenders: [nimble] }), 15, 10);
+    assert.match(e.purpose, /hits if/);
+    assert.deepEqual(e.bonus, [{ value: 0, reason: 'Strength 10' }, { value: 2, reason: 'Trained in Brawling' }]);
+    assert.deepEqual(e.against, {
+      label: 'Nimble’s Defence',
+      total: 14,
+      parts: [{ value: 10, reason: 'Base' }, { value: 2, reason: 'Agility 14' }, { value: 2, reason: 'Trained in Reflexes' }],
+    });
+  });
+
+  test('damage: the Strength modifier', () => {
+    const strong = createCharacter({ name: 'S', attributes: attributeScores({ str: 16 }), training: { brawling: 'trained' } });
+    const e = explain(duel({ attackers: [strong] }), 15, 10, 8);
+    assert.match(e.purpose, /^Damage is/);
+    assert.deepEqual(e.bonus, [{ value: 3, reason: 'Strength 16' }]);
+  });
+
+  test('a nerve check: Nerve and temperament', () => {
+    const e = explain(duel({ defenders: [defender({ courage: 0.1 })] }), 15, 10, 20, 2, 3);
+    assert.match(e.purpose, /half HP/);
+    assert.deepEqual(e.bonus, [{ value: 0, reason: 'Wisdom 10' }, { value: -2, reason: 'Timid' }]);
+    const group = explain({ attackers: [attacker()], defenders: [frail('F'), defender({}, 'E')], maxRounds: 2 }, 15, 10, 10, 1, 20, 4, 4);
+    assert.match(group.purpose, /half their side/);
+  });
+
+  test('choosing a target: no bonus', () => {
+    const e = explain({ attackers: [attacker()], defenders: [defender({}, 'C'), defender({}, 'E')], maxRounds: 1 }, 15, 10, 10);
+    assert.match(e.purpose, /random enemy/);
+    assert.deepEqual(e.bonus, []);
   });
 });
 

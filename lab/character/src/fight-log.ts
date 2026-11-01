@@ -1,8 +1,12 @@
 // Plain-text descriptions of fight events, one short line each, for logs and the playground. Rounds are not repeated in
 // each line (a log groups lines by round), and roll breakdowns are left to whoever shows the detail.
-import type { Dice } from './dice';
+import { abilityModifier } from './attributes';
+import { bonusOf, type Modifier } from './check';
+import { defenceModifiers, rollFor } from './character';
+import { DICE, type Dice } from './dice';
 import { atLeast, diceDistribution } from './distribution';
 import { percent } from './explain';
+import { nerveCheckSpec } from './nerve';
 import { UNARMED_DAMAGE_DIE, attackHitChance, type Fighter, type FightEvent, type FightResult, type RollRequest } from './fight';
 
 const SIDE_NAME = { attacker: 'Left', defender: 'Right' } as const;
@@ -80,5 +84,55 @@ export function describeRollRequest(request: RollRequest, fighters: readonly Fig
       const chance = percent(atLeast(diceDistribution(dice, 'none'), needs));
       return d20 ? `${roll}. Needs ${needs} or more (${chance}).` : `${roll}. ${chance} to hold.`;
     }
+  }
+}
+
+export interface RollExplanation {
+  /** What the roll is for, in a sentence. */
+  readonly purpose: string;
+  /** The parts of the roller's bonus, each with its reason. */
+  readonly bonus: readonly Modifier[];
+  /** For an attack, the target's Defence and its parts. */
+  readonly against: { readonly label: string; readonly total: number; readonly parts: readonly Modifier[] } | null;
+}
+
+/** Why a roll is being made and where its numbers come from. */
+export function explainRoll(request: RollRequest, fighters: readonly Fighter[]): RollExplanation {
+  const r = request.reason;
+  const fighter = (id: string) => fighters.find((f) => f.id === id)!.character;
+  const c = fighter(r.id);
+  switch (r.kind) {
+    case 'initiative':
+      return {
+        purpose: 'Initiative decides who acts first each round: d20 + Reflexes (the Agility modifier, plus any Reflexes training).',
+        bonus: rollFor(c, 'reflexes').modifiers,
+        against: null,
+      };
+    case 'target':
+      return { purpose: 'Each fighter attacks a random enemy who is still fighting; the die picks which.', bonus: [], against: null };
+    case 'attack': {
+      const target = fighter(r.target);
+      const parts = defenceModifiers(target);
+      return {
+        purpose: 'An attack hits if d20 + Brawling (the Strength modifier, plus any Brawling training) meets the target’s Defence. A natural 20 always hits and is a critical hit; a natural 1 always misses.',
+        bonus: rollFor(c, 'brawling').modifiers,
+        against: { label: `${target.name}’s Defence`, total: bonusOf(parts), parts },
+      };
+    }
+    case 'damage':
+      return {
+        purpose: 'Damage is 1d4 plus the Strength modifier, at least 1. A critical hit rolls the dice twice.',
+        bonus: [{ value: abilityModifier(c.attributes.str), reason: `Strength ${c.attributes.str}` }],
+        against: null,
+      };
+    case 'nerve':
+      return {
+        purpose:
+          r.trigger === 'hurt'
+            ? 'The first time a fighter drops to half HP, they make one nerve check: d20 + Nerve (Wisdom or Constitution, training and temperament). Failing takes them out of the fight.'
+            : 'The first time half their side is out of the fight, everyone left makes one nerve check: d20 + Nerve (Wisdom or Constitution, training and temperament). Failing takes them out of the fight.',
+        bonus: nerveCheckSpec(c, r.trigger, DICE.d20).modifiers,
+        against: null,
+      };
   }
 }
