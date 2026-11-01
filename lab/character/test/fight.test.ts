@@ -5,7 +5,7 @@ import { attributeScores } from '../src/attributes';
 import { BACKGROUNDS, rollCharacter, type BackgroundName } from '../src/backgrounds';
 import { createCharacter, type Character } from '../src/character';
 import { DICE } from '../src/dice';
-import { FIGHTER_STATUSES, FIGHTER_STATUS_INFO, rollDamage, runFight, tallyFights, type FightEvent, type FightResult, type FightSpec } from '../src/fight';
+import { FIGHTER_STATUSES, FIGHTER_STATUS_INFO, fightStats, rollDamage, runFight, tallyFights, type FightEvent, type FightResult, type FightSpec } from '../src/fight';
 import { describeFightEvent } from '../src/fight-log';
 import { NERVE_DC } from '../src/nerve';
 import { roller, seeded } from '../src/random';
@@ -45,6 +45,18 @@ describe('rollDamage', { tags: ['unit'] }, () => {
   test('is at least 1', () => {
     const weak = createCharacter({ name: 'W', attributes: attributeScores({ str: 3 }) });
     assert.equal(rollDamage(weak, false, scripted(1)).total, 1);
+  });
+});
+
+describe('fightStats', { tags: ['unit'] }, () => {
+  test('lists the numbers a fight uses for a character', () => {
+    const c = createCharacter({
+      name: 'S',
+      attributes: attributeScores({ str: 16, agi: 14, con: 14, wis: 12 }),
+      training: { brawling: 'trained', reflexes: 'trained' },
+      temperament: temperament({ courage: 0.9 }),
+    });
+    assert.deepEqual(fightStats(c), { hitPoints: 12, attack: 5, defence: 14, damageDie: 4, damageModifier: 3, initiative: 4, nerve: 4 });
   });
 });
 
@@ -205,28 +217,28 @@ describe('describeFightEvent', { tags: ['unit'] }, () => {
     return r.events.map((e) => describeFightEvent(e, r));
   };
 
-  test('describes initiative, hits, misses and stalemate', () => {
+  test('says each thing once: turn order, hits, misses and the result', () => {
     assert.deepEqual(log(duel(), 15, 10, 8, 3, 9), [
-      'Initiative order: A (15), D (10).',
-      'Round 1: A attacks D: rolled 10 against Defence 10. Hit for 3 damage (D: 7 HP left).',
-      'Round 1: D attacks A: rolled 9 against Defence 10. Miss.',
-      'Stalemate: the round limit was reached with no winner.',
+      'Turn order: A (15), D (10).',
+      'A hits D: 3 damage, 7 HP left (rolled 10 vs Defence 10).',
+      'D misses A (rolled 9 vs Defence 10).',
+      'Stalemate: the round limit was reached.',
     ]);
   });
 
-  test('describes natural 20s, natural 1s and nerve checks', () => {
+  test('names natural 20s and 1s instead of the total, and describes nerve checks', () => {
     assert.deepEqual(log(duel(), 15, 10, 20, 2, 3, 20, 1).slice(1, 4), [
-      'Round 1: A attacks D: rolled 22 against Defence 10 (natural 20). Critical hit for 5 damage (D: 5 HP left).',
-      `D has dropped to half hit points and makes a nerve check: needed ${NERVE_DC.hurt}, rolled 20, passed.`,
-      'Round 1: D attacks A: rolled 1 against Defence 10 (natural 1). Miss.',
+      'A lands a critical hit on D: 5 damage, 5 HP left (natural 20).',
+      'D is at half HP and holds their nerve (rolled 20 vs 10).',
+      'D misses A (natural 1).',
     ]);
-    assert.equal(log(duel(), 15, 10, 20, 2, 3, 1)[2], `D has dropped to half hit points and makes a nerve check: needed ${NERVE_DC.hurt}, rolled 1, failed.`);
+    assert.equal(log(duel(), 15, 10, 20, 2, 3, 1)[2], 'D is at half HP and loses their nerve (rolled 1 vs 10).');
   });
 
-  test('describes the highest and lowest possible rolls on other dice', () => {
+  test('names the highest and lowest possible rolls on other dice', () => {
     assert.deepEqual(log(duel({ dice: DICE['3d6'] }), 4, 4, 4, 3, 3, 3, 6, 6, 6, 1, 1, 1, 1, 1).slice(1, 3), [
-      'Round 1: A attacks D: rolled 20 against Defence 10 (highest possible roll). Critical hit for 2 damage (D: 8 HP left).',
-      'Round 1: D attacks A: rolled 3 against Defence 10 (lowest possible roll). Miss.',
+      'A lands a critical hit on D: 2 damage, 8 HP left (highest possible roll).',
+      'D misses A (lowest possible roll).',
     ]);
   });
 
@@ -234,11 +246,11 @@ describe('describeFightEvent', { tags: ['unit'] }, () => {
     const party = { attackers: [attacker()], defenders: [frail('F'), defender({}, 'D')], maxRounds: 2 };
     assert.deepEqual(log(party, 15, 10, 10, 1, 20, 4, 4, 1).slice(2), [
       'F is knocked out.',
-      `D sees half their side out of the fight and makes a nerve check: needed ${NERVE_DC['allies-down']}, rolled 1, failed.`,
+      'D sees half their side out of the fight and loses their nerve (rolled 1 vs 10).',
       'D surrenders.',
-      'Side A wins: nobody on side B is still fighting.',
+      'Side A wins.',
     ]);
-    assert.equal(log(duel(), 5, 15, 20, 2, 3, 1).slice(-2).join(' '), 'A backs off. Side B wins: nobody on side A is still fighting.');
+    assert.equal(log(duel(), 5, 15, 20, 2, 3, 1).slice(-2).join(' '), 'A backs off. Side B wins.');
     assert.equal(log(duel({ defenders: [defender({ courage: 0.1 })] }), 15, 10, 20, 2, 3, 9).at(-2), 'D flees.');
   });
 });

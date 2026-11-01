@@ -9,10 +9,10 @@
 // failure takes that fighter out of the fight: they flee (timid or cautious) or yield (a defender surrenders, an attacker
 // backs off). A side loses when none of its fighters is still fighting. Every step is recorded as an event.
 import { abilityModifier } from './attributes';
-import { resolveCheck, throwRoll, type CheckResult, type RollResult } from './check';
+import { bonusOf, resolveCheck, throwRoll, type CheckResult, type RollResult } from './check';
 import { defence, maxHitPoints, rollFor, type Character } from './character';
 import { DICE, type Dice } from './dice';
-import { nerveCheck, otherSide, type NerveCheck, type Side } from './nerve';
+import { nerveCheck, nerveCheckSpec, otherSide, type NerveCheck, type Side } from './nerve';
 import type { Roller } from './random';
 
 export interface FightSpec {
@@ -86,6 +86,33 @@ export function rollDamage(c: Character, critical: boolean, roller: Roller): Dam
   const faces = Array.from({ length: critical ? 2 : 1 }, () => roller.roll(UNARMED_DAMAGE_DIE));
   const modifier = abilityModifier(c.attributes.str);
   return { faces, modifier, total: Math.max(1, faces.reduce((a, b) => a + b, 0) + modifier) };
+}
+
+export interface FightStats {
+  readonly hitPoints: number;
+  /** Added to the d20 when attacking (the Brawling bonus). */
+  readonly attack: number;
+  /** What an attack must reach to hit them. */
+  readonly defence: number;
+  readonly damageDie: number;
+  readonly damageModifier: number;
+  /** Added to the d20 for initiative (the Reflexes bonus). */
+  readonly initiative: number;
+  /** Added to the d20 for nerve checks, including temperament. */
+  readonly nerve: number;
+}
+
+/** The numbers a fight uses for a character, for showing on screen. */
+export function fightStats(c: Character): FightStats {
+  return {
+    hitPoints: maxHitPoints(c),
+    attack: bonusOf(rollFor(c, 'brawling').modifiers),
+    defence: defence(c),
+    damageDie: UNARMED_DAMAGE_DIE,
+    damageModifier: abilityModifier(c.attributes.str),
+    initiative: bonusOf(rollFor(c, 'reflexes').modifiers),
+    nerve: bonusOf(nerveCheckSpec(c, 'hurt', DICE.d20).modifiers),
+  };
 }
 
 interface FighterState {

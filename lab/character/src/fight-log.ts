@@ -1,4 +1,5 @@
-// Plain-text descriptions of fight events, for logs and the playground.
+// Plain-text descriptions of fight events, one short line each, for logs and the playground. Rounds are not repeated in
+// each line (a log groups lines by round), and roll breakdowns are left to whoever shows the detail.
 import type { FightEvent, FightResult } from './fight';
 
 const SIDE_LETTER = { attacker: 'A', defender: 'B' } as const;
@@ -8,27 +9,25 @@ export function describeFightEvent(event: FightEvent, fight: FightResult): strin
   const name = (id: string) => fight.fighters.find((f) => f.id === id)!.character.name;
   switch (event.kind) {
     case 'initiative':
-      return `Initiative order: ${event.order.map((o) => `${name(o.id)} (${o.roll.total})`).join(', ')}.`;
+      return `Turn order: ${event.order.map((o) => `${name(o.id)} (${o.roll.total})`).join(', ')}.`;
     case 'attack': {
       const { roll } = event.result;
       const d20 = roll.dice.count === 1 && roll.dice.sides === 20;
       const highest = roll.thrown.kept === roll.dice.count * roll.dice.sides;
       const lowest = roll.thrown.kept === roll.dice.count;
-      const natural = highest ? (d20 ? ' (natural 20)' : ' (highest possible roll)') : lowest ? (d20 ? ' (natural 1)' : ' (lowest possible roll)') : '';
-      const outcome = event.damage
-        ? `${event.critical ? 'Critical hit' : 'Hit'} for ${event.damage.total} damage (${name(event.target)}: ${event.hp} HP left).`
-        : 'Miss.';
-      return `Round ${event.round}: ${name(event.by)} attacks ${name(event.target)}: rolled ${roll.total} against Defence ${event.result.dc}${natural}. ${outcome}`;
+      const why = highest ? (d20 ? 'natural 20' : 'highest possible roll') : lowest ? (d20 ? 'natural 1' : 'lowest possible roll') : `rolled ${roll.total} vs Defence ${event.result.dc}`;
+      if (!event.damage) return `${name(event.by)} misses ${name(event.target)} (${why}).`;
+      const hits = event.critical ? `lands a critical hit on ${name(event.target)}` : `hits ${name(event.target)}`;
+      return `${name(event.by)} ${hits}: ${event.damage.total} damage, ${event.hp} HP left (${why}).`;
     }
     case 'nerve': {
-      const why = event.trigger === 'hurt' ? 'has dropped to half hit points' : 'sees half their side out of the fight';
+      const situation = event.trigger === 'hurt' ? 'is at half HP' : 'sees half their side out of the fight';
       const { result, passed } = event.check;
-      return `${name(event.id)} ${why} and makes a nerve check: needed ${result.dc}, rolled ${result.roll.total}, ${passed ? 'passed' : 'failed'}.`;
+      return `${name(event.id)} ${situation} and ${passed ? 'holds' : 'loses'} their nerve (rolled ${result.roll.total} vs ${result.dc}).`;
     }
     case 'out':
       return `${name(event.id)} ${{ 'knocked-out': 'is knocked out', surrendered: 'surrenders', 'backed-off': 'backs off', fled: 'flees' }[event.status]}.`;
     case 'end':
-      if (event.winner === null) return 'Stalemate: the round limit was reached with no winner.';
-      return `Side ${SIDE_LETTER[event.winner]} wins: nobody on side ${SIDE_LETTER[event.winner === 'attacker' ? 'defender' : 'attacker']} is still fighting.`;
+      return event.winner === null ? 'Stalemate: the round limit was reached.' : `Side ${SIDE_LETTER[event.winner]} wins.`;
   }
 }
