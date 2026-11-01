@@ -45,7 +45,9 @@ export interface OpposedSpec {
 }
 
 export interface RollResult {
-  readonly dice: DiceRoll;
+  readonly dice: Dice;
+  readonly edge: Edge;
+  readonly thrown: DiceRoll;
   readonly modifiers: readonly Modifier[];
   readonly bonus: number;
   readonly total: number;
@@ -115,9 +117,9 @@ export function opposedOdds(spec: OpposedSpec): Odds {
 }
 
 function throwRoll(roll: Roll, roller: Roller): RollResult {
-  const dice = rollDice(roll.dice, roll.edge, roller);
+  const thrown = rollDice(roll.dice, roll.edge, roller);
   const bonus = bonusOf(roll.modifiers);
-  return { dice, modifiers: roll.modifiers, bonus, total: dice.kept + bonus };
+  return { dice: roll.dice, edge: roll.edge, thrown, modifiers: roll.modifiers, bonus, total: thrown.kept + bonus };
 }
 
 function totalDistribution(roll: Roll): Distribution {

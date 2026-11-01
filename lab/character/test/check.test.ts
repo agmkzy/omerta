@@ -70,7 +70,7 @@ describe('a check against a difficulty', { tags: ['unit'] }, () => {
 
   test('rolls with its edge', () => {
     const result = resolveCheck({ ...plain(), edge: 'disadvantage', dc: 10 }, scripted(18, 3));
-    assert.equal(result.roll.dice.kept, 3);
+    assert.equal(result.roll.thrown.kept, 3);
     assert.equal(result.outcome, 'botch');
   });
 
