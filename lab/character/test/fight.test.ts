@@ -5,7 +5,7 @@ import { attributeScores } from '../src/attributes';
 import { BACKGROUNDS, rollCharacter, type BackgroundName } from '../src/backgrounds';
 import { createCharacter, type Character } from '../src/character';
 import { DICE } from '../src/dice';
-import { FIGHTER_STATUSES, FIGHTER_STATUS_INFO, attackHitChance, fightStats, rollDamage, runFight, stepFight, tallyFights, type FightEvent, type FightResult, type FightSpec } from '../src/fight';
+import { FIGHTER_STATUSES, FIGHTER_STATUS_INFO, attackHitChance, fightStats, rollDamage, rollOdds, runFight, stepFight, tallyFights, type FightEvent, type FightResult, type FightSpec } from '../src/fight';
 import { describeFightEvent, describeRollRequest } from '../src/fight-log';
 import { NERVE_DC } from '../src/nerve';
 import { replay, roller, seeded } from '../src/random';
@@ -305,6 +305,67 @@ describe('describeRollRequest', { tags: ['unit'] }, () => {
   test('says when a nerve check cannot fail', () => {
     const steady = createCharacter({ name: 'Steady', attributes: attributeScores({ wis: 20 }), training: { nerve: 'expert' }, temperament: temperament({ courage: 0.9 }) }); // +11
     assert.equal(ask(duel({ defenders: [steady] }), 15, 10, 20, 4, 4), 'Steady is at half HP and must hold their nerve: d20 + 11 against 10. Holds whatever the roll.');
+  });
+});
+
+describe('rollOdds', { tags: ['unit'] }, () => {
+  const close = (actual: number, expected: number) => assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} vs ${expected}`);
+  const oddsAt = (s: FightSpec, ...faces: number[]) => {
+    const step = stepFight(s, faces);
+    assert.ok(!step.done);
+    return rollOdds(step.request, step.fighters, s.dice ?? DICE.d20);
+  };
+
+  test('for an attack: every result, which ones hit, the chances, the average roll and the expected damage', () => {
+    const o = oddsAt(duel(), 15, 10); // A attacks at +2 against Defence 10, for 1d4
+    assert.equal(o.bars.length, 20);
+    assert.deepEqual([1, 7, 8, 20].map((f) => [o.bars[f - 1]!.dice, o.bars[f - 1]!.total, o.bars[f - 1]!.success]), [[1, 3, false], [7, 9, false], [8, 10, true], [20, 22, true]]);
+    close(o.bars[0]!.probability, 1 / 20);
+    close(o.average, 12.5);
+    close(o.success!.chance, 0.65);
+    assert.equal(o.success!.label, 'to hit');
+    close(o.critical!, 0.05);
+    close(o.damage!.average, 2.5);
+    close(o.damage!.criticalAverage, 5);
+    close(o.damage!.expected, 0.6 * 2.5 + 0.05 * 5);
+  });
+
+  test('for damage: the totals, with the minimum of 1, and their average', () => {
+    const o = oddsAt(duel(), 15, 10, 8);
+    assert.deepEqual(o.bars.map((b) => b.total), [1, 2, 3, 4]);
+    close(o.average, 2.5);
+    assert.equal(o.success, null);
+    const weak = createCharacter({ name: 'W', attributes: attributeScores({ str: 3 }), training: { brawling: 'trained' } }); // −4
+    const w = oddsAt(duel({ attackers: [weak] }), 15, 10, 15); // 15 − 2 = 13 hits
+    assert.deepEqual(w.bars.map((b) => b.total), [1, 1, 1, 1]);
+    close(w.average, 1);
+  });
+
+  test('for critical damage: the whole two-dice roll', () => {
+    const o = oddsAt(duel(), 15, 10, 20);
+    assert.equal(o.bars.length, 7); // 2 to 8
+    close(o.average, 5);
+  });
+
+  test('for a nerve check: the chance to hold', () => {
+    const o = oddsAt(duel(), 15, 10, 20, 2, 3);
+    assert.equal(o.success!.label, 'to hold');
+    close(o.success!.chance, 0.55);
+    assert.equal(o.critical, null);
+    assert.equal(o.damage, null);
+  });
+
+  test('for initiative and choosing a target: the average, and equal chances', () => {
+    close(oddsAt(duel()).average, 10.5);
+    const t = oddsAt({ attackers: [attacker()], defenders: [defender({}, 'C'), defender({}, 'E')], maxRounds: 1 }, 15, 10, 10);
+    assert.deepEqual(t.bars.map((b) => [b.dice, b.probability, b.success]), [[1, 0.5, null], [2, 0.5, null]]);
+  });
+
+  test('on other dice, for the whole roll', () => {
+    const o = oddsAt(duel({ dice: DICE['3d6'] }), 4, 4, 4, 3, 3, 3);
+    assert.equal(o.bars.length, 16); // 3 to 18
+    close(o.bars.reduce((sum, b) => sum + b.probability, 0), 1);
+    close(o.success!.chance, attackHitChance(DICE['3d6'], 2, 10));
   });
 });
 

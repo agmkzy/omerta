@@ -12,7 +12,8 @@ export function pointAt(value: number): Distribution {
   return { min: value, probabilities: [1] };
 }
 
-export function diceDistribution(dice: Dice, edge: Edge): Distribution {
+/** The distribution of a roll: any number of dice of any size (e.g. the fight's dice, or damage dice). */
+export function diceDistribution(dice: Pick<Dice, 'count' | 'sides'>, edge: Edge): Distribution {
   const face: Distribution = { min: 1, probabilities: Array.from({ length: dice.sides }, () => 1 / dice.sides) };
   let once = pointAt(0);
   for (let i = 0; i < dice.count; i++) once = plus(once, face);

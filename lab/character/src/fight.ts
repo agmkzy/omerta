@@ -146,6 +146,57 @@ export type FightStep =
       readonly fighters: readonly Fighter[];
     };
 
+export interface RollOdds {
+  /** Every possible result of the whole roll: the dice, the total with bonuses, its chance, and whether it succeeds. */
+  readonly bars: readonly { readonly dice: number; readonly total: number; readonly probability: number; readonly success: boolean | null }[];
+  /** The average total. */
+  readonly average: number;
+  /** For an attack or nerve check, the chance it succeeds. */
+  readonly success: { readonly label: 'to hit' | 'to hold'; readonly chance: number } | null;
+  /** For an attack, the chance of a critical hit. */
+  readonly critical: number | null;
+  /** For an attack: average damage on a hit and on a critical hit, and the damage the attack is expected to do. */
+  readonly damage: { readonly average: number; readonly criticalAverage: number; readonly expected: number } | null;
+}
+
+/** The exact odds of a roll a fight is waiting for, over the whole roll (all its dice). */
+export function rollOdds(request: RollRequest, fighters: readonly Fighter[], dice: Dice): RollOdds {
+  const r = request.reason;
+  const strength = (id: string) => abilityModifier(fighters.find((f) => f.id === id)!.character.attributes.str);
+  const none = { success: null, critical: null, damage: null };
+  if (r.kind === 'target') {
+    const n = r.options.length;
+    const bars = r.options.map((_, i) => ({ dice: i + 1, total: i + 1, probability: 1 / n, success: null }));
+    return { bars, average: (n + 1) / 2, ...none };
+  }
+  if (r.kind === 'damage') {
+    const bars = damageBars(r.of, r.modifier);
+    return { bars, average: bars.reduce((sum, b) => sum + b.probability * b.total, 0), ...none };
+  }
+  const d = diceDistribution(dice, 'none');
+  const highest = dice.count * dice.sides;
+  const succeeds = (kept: number): boolean | null => {
+    if (r.kind === 'attack') return kept === highest || (kept !== dice.count && kept + r.bonus >= r.dc);
+    if (r.kind === 'nerve') return kept + r.bonus >= r.dc;
+    return null;
+  };
+  const bars = d.probabilities.map((probability, i) => ({ dice: d.min + i, total: d.min + i + r.bonus, probability, success: succeeds(d.min + i) }));
+  const average = bars.reduce((sum, b) => sum + b.probability * b.total, 0);
+  if (r.kind === 'initiative') return { bars, average, ...none };
+  const chance = bars.reduce((sum, b) => (b.success ? sum + b.probability : sum), 0);
+  if (r.kind === 'nerve') return { bars, average, success: { label: 'to hold', chance }, critical: null, damage: null };
+  const critical = bars.at(-1)!.probability;
+  const mean = (count: number) => damageBars(count, strength(r.id)).reduce((sum, b) => sum + b.probability * b.total, 0);
+  const damage = { average: mean(1), criticalAverage: mean(2), expected: (chance - critical) * mean(1) + critical * mean(2) };
+  return { bars, average, success: { label: 'to hit', chance }, critical, damage };
+}
+
+/** Every damage result for this many d4s and modifier, with the minimum of 1. */
+function damageBars(count: number, modifier: number): RollOdds['bars'] {
+  const d = diceDistribution({ count, sides: UNARMED_DAMAGE_DIE }, 'none');
+  return d.probabilities.map((probability, i) => ({ dice: d.min + i, total: Math.max(1, d.min + i + modifier), probability, success: null }));
+}
+
 /** The chance an attack with this bonus hits this Defence: natural 20s (the highest roll) always hit, natural 1s never do. */
 export function attackHitChance(dice: Dice, bonus: number, dc: number): number {
   const d = diceDistribution(dice, 'none');
