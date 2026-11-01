@@ -8,44 +8,44 @@ import { roller, seeded } from '../src/random';
 const close = (actual: number, expected: number, tolerance = 1e-12) =>
   assert.ok(Math.abs(actual - expected) <= tolerance, `${actual} is not within ${tolerance} of ${expected}`);
 
-describe('the distribution of a roll', { tags: ['unit'] }, () => {
-  test('a d20 is flat: each face 1 in 20', () => {
+describe('diceDistribution and helpers', { tags: ['unit'] }, () => {
+  test('d20: each face has probability 1/20', () => {
     const d = diceDistribution(DICE.d20, 'none');
     for (let face = 1; face <= 20; face++) close(probabilityOf(d, face), 1 / 20);
     assert.equal(probabilityOf(d, 0), 0);
     assert.equal(probabilityOf(d, 21), 0);
   });
 
-  test('3d6 is a bell: 10 is 27 in 216, 3 is 1 in 216', () => {
+  test('3d6: P(10) = 27/216, P(3) = P(18) = 1/216', () => {
     const d = diceDistribution(DICE['3d6'], 'none');
     close(probabilityOf(d, 10), 27 / 216);
     close(probabilityOf(d, 3), 1 / 216);
     close(probabilityOf(d, 18), 1 / 216);
   });
 
-  test('advantage on a d20: a 20 is 39 in 400, a 1 is 1 in 400', () => {
+  test('d20 with advantage: P(20) = 39/400, P(1) = 1/400', () => {
     const d = diceDistribution(DICE.d20, 'advantage');
     close(probabilityOf(d, 20), 39 / 400);
     close(probabilityOf(d, 1), 1 / 400);
   });
 
-  test('disadvantage mirrors advantage', () => {
+  test('disadvantage is the mirror image of advantage', () => {
     const adv = diceDistribution(DICE.d20, 'advantage');
     const dis = diceDistribution(DICE.d20, 'disadvantage');
     for (let face = 1; face <= 20; face++) close(probabilityOf(dis, face), probabilityOf(adv, 21 - face));
   });
 
-  test('a point is certain', () => {
+  test('pointAt has a single value with probability 1', () => {
     assert.deepEqual(pointAt(5), { min: 5, probabilities: [1] });
   });
 
-  test('shifting adds a constant to every outcome', () => {
+  test('shift adds a constant to every value', () => {
     const d = shift(diceDistribution(DICE.d20, 'none'), 3);
     assert.equal(d.min, 4);
     close(probabilityOf(d, 23), 1 / 20);
   });
 
-  test('the difference of two d20s runs from -19 to 19, most often 0', () => {
+  test('minus of two d20s ranges from -19 to 19 with mode 0', () => {
     const d20 = diceDistribution(DICE.d20, 'none');
     const d = minus(d20, d20);
     assert.equal(d.min, -19);
@@ -54,7 +54,7 @@ describe('the distribution of a roll', { tags: ['unit'] }, () => {
     close(probabilityOf(d, 19), 1 / 400);
   });
 
-  test('the chance of rolling at least a number', () => {
+  test('atLeast returns P(X ≥ k)', () => {
     const d20 = diceDistribution(DICE.d20, 'none');
     close(atLeast(d20, 11), 0.5);
     close(atLeast(d20, 1), 1);
@@ -62,20 +62,20 @@ describe('the distribution of a roll', { tags: ['unit'] }, () => {
     close(atLeast(d20, 21), 0);
   });
 
-  test('the mean of a d20 is 10.5, of 2d10 is 11', () => {
+  test('mean of d20 is 10.5 and of 2d10 is 11', () => {
     close(mean(diceDistribution(DICE.d20, 'none')), 10.5);
     close(mean(diceDistribution(DICE['2d10'], 'none')), 11);
   });
 });
 
-describe('distributions', { tags: ['property'] }, () => {
+describe('diceDistribution', { tags: ['property'] }, () => {
   const kinds = fc.tuple(fc.constantFrom(...DICE_NAMES), fc.constantFrom(...EDGES));
 
-  test('always sum to one', () => {
+  test('sums to 1', () => {
     fc.assert(fc.property(kinds, ([name, edge]) => Math.abs(total(diceDistribution(DICE[name], edge)) - 1) < 1e-12));
   });
 
-  test('advantage always helps and disadvantage always hurts', () => {
+  test('mean is ordered disadvantage < none < advantage', () => {
     fc.assert(
       fc.property(fc.constantFrom(...DICE_NAMES), (name) => {
         const [dis, none, adv] = (['disadvantage', 'none', 'advantage'] as const).map((e) => mean(diceDistribution(DICE[name], e)));
@@ -84,7 +84,7 @@ describe('distributions', { tags: ['property'] }, () => {
     );
   });
 
-  test('the chance of at least k never rises as k rises', () => {
+  test('atLeast is non-increasing in k', () => {
     fc.assert(
       fc.property(kinds, fc.integer({ min: -5, max: 40 }), ([name, edge], k) => {
         const d = diceDistribution(DICE[name], edge);
@@ -93,7 +93,7 @@ describe('distributions', { tags: ['property'] }, () => {
     );
   });
 
-  test('match what the dice actually turn up', () => {
+  test('matches sampled frequencies from rollDice', () => {
     for (const name of DICE_NAMES)
       for (const edge of EDGES) {
         const d = diceDistribution(DICE[name], edge);

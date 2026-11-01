@@ -5,38 +5,38 @@ import { DICE } from '../src/dice';
 import { describeCheck, describeOpposed, describeRoll, percent, signed } from '../src/explain';
 import { scripted } from './support';
 
-describe('explaining in words', { tags: ['unit'] }, () => {
-  test('signed numbers', () => {
+describe('explain', { tags: ['unit'] }, () => {
+  test('signed prefixes + or −', () => {
     assert.deepEqual([3, 0, -2].map(signed), ['+3', '+0', '−2']);
   });
 
-  test('percentages never claim certainty that isn’t there', () => {
+  test('percent shows <1% and >99% instead of rounding to 0% or 100%', () => {
     assert.deepEqual([0, 0.001, 0.25, 0.6249, 0.996, 1].map(percent), ['0%', '<1%', '25%', '62%', '>99%', '100%']);
   });
 
-  test('a roll shows its faces and each modifier with its reason', () => {
+  test('describeRoll lists the faces and each modifier with its reason', () => {
     const { roll } = resolveCheck(
-      { dice: DICE['3d6'], edge: 'none', modifiers: [{ value: 3, reason: 'Presence 16' }, { value: -2, reason: 'He has friends here' }], dc: 12 },
+      { dice: DICE['3d6'], edge: 'none', modifiers: [{ value: 3, reason: 'Charisma 16' }, { value: -2, reason: 'Outnumbered' }], dc: 12 },
       scripted(2, 5, 6),
     );
-    assert.equal(describeRoll(roll), '3d6 [2 5 6] = 13, +3 Presence 16, −2 He has friends here: 14');
+    assert.equal(describeRoll(roll), '3d6 [2 5 6] = 13, +3 Charisma 16, −2 Outnumbered: 14');
   });
 
-  test('a roll with an edge shows both throws and which was kept', () => {
+  test('describeRoll shows both throws and the kept total with advantage', () => {
     const { roll } = resolveCheck({ dice: DICE.d20, edge: 'advantage', modifiers: [], dc: 10 }, scripted(4, 17));
     assert.equal(describeRoll(roll), 'd20 with advantage [4] [17] keeps 17: 17');
   });
 
-  test('a check against a difficulty', () => {
+  test('describeCheck includes the DC, outcome and margin', () => {
     const result = resolveCheck({ dice: DICE.d20, edge: 'none', modifiers: [{ value: 5, reason: 'Skill' }], dc: 15 }, scripted(12));
     assert.equal(describeCheck(result), 'd20 [12] = 12, +5 Skill: 17 against 15: partial (by 2)');
   });
 
-  test('an opposed check', () => {
+  test('describeOpposed includes both rolls, outcome and margin', () => {
     const result = resolveOpposed(
       { active: { dice: DICE.d20, edge: 'none', modifiers: [] }, passive: { dice: DICE.d20, edge: 'none', modifiers: [] } },
       scripted(8, 15),
     );
-    assert.equal(describeOpposed(result), 'd20 [8] = 8: 8 against d20 [15] = 15: 15: botch (short by 8)');
+    assert.equal(describeOpposed(result), 'd20 [8] = 8: 8 against d20 [15] = 15: 15: critical-failure (short by 8)');
   });
 });

@@ -1,5 +1,5 @@
-// The dice a check is rolled on. D&D uses a flat d20; 2d10 and 3d6 cover the same range on a curve, so an expert fails less
-// often. Which feels right is for the playground to show, so the dice are a setting, not a constant.
+// Dice used for checks. D&D uses a flat d20; 2d10 and 3d6 cover a similar range with a bell curve, which reduces variance.
+// The dice are a parameter so the options can be compared in the playground.
 import type { Roller } from './random';
 
 export const DICE_NAMES = ['d20', '2d10', '3d6'] as const;
@@ -17,14 +17,14 @@ export const DICE: { readonly [N in DiceName]: Dice & { readonly name: N } } = {
   '3d6': { name: '3d6', count: 3, sides: 6 },
 };
 
-/** D&D's advantage and disadvantage: throw twice, keep the better or the worse total. */
+/** D&D's advantage and disadvantage: roll twice and keep the higher or lower total. */
 export const EDGES = ['none', 'advantage', 'disadvantage'] as const;
 export type Edge = (typeof EDGES)[number];
 
 export interface DiceRoll {
-  /** The faces of each throw: one throw, or two with an edge. */
+  /** The faces of each throw: one throw, or two with advantage/disadvantage. */
   readonly throws: readonly (readonly number[])[];
-  /** The total that counts. */
+  /** The total that is used. */
   readonly kept: number;
 }
 

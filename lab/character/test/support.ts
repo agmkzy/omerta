@@ -1,4 +1,4 @@
-// Test doubles. A scripted roller turns up the faces a test names, in order, so a check's arithmetic can be read straight off the test.
+// Test doubles. A scripted roller returns predetermined faces in order, so a test can state the dice results explicitly.
 import type { Roller } from '../src/random';
 
 export function scripted(...faces: number[]): Roller & { readonly remaining: number } {

@@ -1,5 +1,5 @@
-// Exact odds. A roll's outcomes as a table of probabilities, so the chance of a check succeeding is computed, not sampled: the
-// playground can show it, and a man deciding what to try (later, the game's utility AI) can weigh it without rolling.
+// Exact probability distributions for rolls, so the chance of a check succeeding is calculated rather than sampled. This lets
+// the playground display odds and will let NPC decision-making (the game's utility AI) weigh options without rolling.
 import type { Dice, Edge } from './dice';
 
 /** probabilities[i] is the chance of the value min + i. */
@@ -17,7 +17,7 @@ export function diceDistribution(dice: Dice, edge: Edge): Distribution {
   let once = pointAt(0);
   for (let i = 0; i < dice.count; i++) once = plus(once, face);
   if (edge === 'none') return once;
-  // The better of two throws is at most k when both are; the worse is at least k when both are.
+  // max(X, Y) ≤ k when both are ≤ k; min(X, Y) ≥ k when both are ≥ k.
   const below = cumulative(once);
   const probabilities = once.probabilities.map((_, i) => {
     const upTo = below[i + 1]!;

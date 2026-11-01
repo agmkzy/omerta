@@ -1,17 +1,17 @@
-// Randomness comes in from outside. Nothing in the lab calls Math.random, so the same seed always tells the same story.
+// Randomness is injected. Nothing in the lab calls Math.random, so results are reproducible from a seed.
 
 /** A stream of numbers in [0, 1). The game's `Rng` (src/rng.ts) already has this shape, so it can be passed in as it is. */
 export interface RandomSource {
   next(): number;
 }
 
-/** Rolls one die. Tests substitute a scripted roller to name the faces that turn up. */
+/** Rolls one die. Tests use a scripted roller that returns predetermined faces. */
 export interface Roller {
   /** A face from 1 to `sides`. */
   roll(sides: number): number;
 }
 
-/** A seeded source: mulberry32, the same generator the game uses, so a seed means the same thing in both. */
+/** A seeded source using mulberry32, the same generator as the game, so a seed produces the same sequence in both. */
 export function seeded(seed: number): RandomSource {
   let state = seed >>> 0;
   return {

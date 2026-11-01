@@ -1,30 +1,30 @@
-// A check: dice plus modifiers against a difficulty (DC), or against another man's roll. The result is graded, not pass/fail,
-// because a success that costs something makes more story than a clean one.
+// Checks: dice plus modifiers against a difficulty class (DC), or against an opposing roll. Results are graded into five
+// outcomes rather than pass/fail, so a success can carry a cost.
 import { rollDice, type Dice, type DiceRoll, type Edge } from './dice';
 import { atLeast, diceDistribution, minus, shift, type Distribution } from './distribution';
 import type { Roller } from './random';
 
-/** A bonus or penalty, with the reason for it in words, so a result can always be explained. */
+/** A bonus or penalty with a human-readable reason, so every result can be explained. */
 export interface Modifier {
   readonly value: number;
   readonly reason: string;
 }
 
-export const OUTCOMES = ['botch', 'failure', 'partial', 'success', 'triumph'] as const;
+export const OUTCOMES = ['critical-failure', 'failure', 'partial', 'success', 'critical-success'] as const;
 export type Outcome = (typeof OUTCOMES)[number];
 
-/** The least margin for each outcome. Below `failure` is a botch. */
+/** The minimum margin for each outcome. Anything below `failure` is a critical failure. */
 export interface Bands {
-  readonly triumph: number;
+  readonly criticalSuccess: number;
   readonly success: number;
   readonly partial: number;
   readonly failure: number;
 }
 
-/** Meet the DC: done, at a cost. Beat it by 5: clean. By 10: better than hoped. Miss by 6 or more: it goes badly wrong. */
-export const DEFAULT_BANDS: Bands = { triumph: 10, success: 5, partial: 0, failure: -5 };
+/** Meet the DC: partial success. Beat it by 5: success. By 10: critical success. Miss by 6 or more: critical failure. */
+export const DEFAULT_BANDS: Bands = { criticalSuccess: 10, success: 5, partial: 0, failure: -5 };
 
-/** One side's roll: what it is thrown on, and what is added to it. */
+/** One side's roll: the dice, any advantage/disadvantage, and the modifiers. */
 export interface Roll {
   readonly dice: Dice;
   readonly edge: Edge;
@@ -37,9 +37,9 @@ export interface CheckSpec extends Roll {
 }
 
 export interface OpposedSpec {
-  /** The side trying to change things. */
+  /** The side attempting the action. */
   readonly active: Roll;
-  /** The side resisting. It holds on a tie. */
+  /** The side resisting. Ties go to this side. */
   readonly passive: Roll;
   readonly bands?: Bands;
 }
@@ -63,7 +63,7 @@ export interface CheckResult {
 export interface OpposedResult {
   readonly active: RollResult;
   readonly passive: RollResult;
-  /** How far the active side cleared what it had to beat (the passive total + 1). */
+  /** The active total minus the target (the passive total + 1). */
   readonly margin: number;
   readonly outcome: Outcome;
 }
@@ -72,19 +72,19 @@ export type Odds = Readonly<Record<Outcome, number>>;
 
 export function grade(margin: number, bands: Bands = DEFAULT_BANDS): Outcome {
   assertOrdered(bands);
-  if (margin >= bands.triumph) return 'triumph';
+  if (margin >= bands.criticalSuccess) return 'critical-success';
   if (margin >= bands.success) return 'success';
   if (margin >= bands.partial) return 'partial';
   if (margin >= bands.failure) return 'failure';
-  return 'botch';
+  return 'critical-failure';
 }
 
-/** A partial success or better: it got done. */
+/** True for a partial success or better. */
 export function succeeded(outcome: Outcome): boolean {
   return OUTCOMES.indexOf(outcome) >= OUTCOMES.indexOf('partial');
 }
 
-/** Several sources of edge, combined as D&D does: they don't stack, and any advantage cancels any disadvantage. */
+/** Combines advantage/disadvantage from several sources as D&D does: they don't stack, and one of each cancels out. */
 export function combineEdges(edges: readonly Edge[]): Edge {
   const up = edges.includes('advantage');
   const down = edges.includes('disadvantage');
@@ -126,20 +126,20 @@ function totalDistribution(roll: Roll): Distribution {
   return shift(diceDistribution(roll.dice, roll.edge), bonusOf(roll.modifiers));
 }
 
-/** The chance of each outcome, from the distribution of the margin. */
+/** The probability of each outcome, from the distribution of the margin. */
 function oddsOf(margin: Distribution, bands: Bands = DEFAULT_BANDS): Odds {
   assertOrdered(bands);
   const from = (k: number) => atLeast(margin, k);
   return {
-    triumph: from(bands.triumph),
-    success: from(bands.success) - from(bands.triumph),
+    'critical-success': from(bands.criticalSuccess),
+    success: from(bands.success) - from(bands.criticalSuccess),
     partial: from(bands.partial) - from(bands.success),
     failure: from(bands.failure) - from(bands.partial),
-    botch: 1 - from(bands.failure),
+    'critical-failure': 1 - from(bands.failure),
   };
 }
 
 function assertOrdered(b: Bands): void {
-  if (!(b.triumph > b.success && b.success > b.partial && b.partial > b.failure))
-    throw new RangeError(`bands must fall from triumph to failure, got ${JSON.stringify(b)}`);
+  if (!(b.criticalSuccess > b.success && b.success > b.partial && b.partial > b.failure))
+    throw new RangeError(`bands must be in descending order from criticalSuccess to failure, got ${JSON.stringify(b)}`);
 }

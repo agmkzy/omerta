@@ -7,46 +7,46 @@ import { roller, seeded } from '../src/random';
 import { temperament } from '../src/temperament';
 
 describe('backgrounds', { tags: ['unit'] }, () => {
-  test('cover the trades of the life, and the people it preys on', () => {
-    assert.deepEqual(BACKGROUNDS, ['legbreaker', 'wheelman', 'shooter', 'earner', 'hustler', 'bookkeeper', 'shopkeeper', 'labourer']);
+  test('are the expected list', () => {
+    assert.deepEqual(BACKGROUNDS, ['enforcer', 'driver', 'gunman', 'racketeer', 'con-artist', 'bookkeeper', 'shopkeeper', 'labourer']);
   });
 
-  test('each is whole: a name, three or more skills, each attribute ranked once, sensible leanings', () => {
+  test('are each valid: name, at least three skills, no duplicates, all six priorities, valid temperament', () => {
     for (const b of BACKGROUNDS) {
       const info = BACKGROUND_INFO[b];
-      assert.ok(info.name && info.blurb, b);
-      assert.ok(info.trained.length + info.expert.length >= 3, `${b} teaches too little`);
+      assert.ok(info.name && info.description, b);
+      assert.ok(info.trained.length + info.expert.length >= 3, `${b} has fewer than three skills`);
       assert.ok(!info.expert.some((s) => info.trained.includes(s)), `${b} lists a skill twice`);
       assert.deepEqual([...info.priorities].sort(), [...ATTRIBUTES].sort(), b);
-      assert.doesNotThrow(() => temperament(info.leanings), b);
+      assert.doesNotThrow(() => temperament(info.temperament), b);
     }
   });
 
-  test('give their training', () => {
-    assert.deepEqual(trainingFor('wheelman'), { driving: 'expert', reflexes: 'trained', notice: 'trained', mechanics: 'trained' });
+  test('trainingFor returns trained and expert skills', () => {
+    assert.deepEqual(trainingFor('driver'), { driving: 'expert', reflexes: 'trained', notice: 'trained', mechanics: 'trained' });
   });
 });
 
-describe('a rolled character', { tags: ['unit'] }, () => {
-  test('is the same man every time from the same seed', () => {
-    assert.deepEqual(rollCharacter('Vinnie', 'shooter', roller(seeded(3))), rollCharacter('Vinnie', 'shooter', roller(seeded(3))));
+describe('rollCharacter', { tags: ['unit'] }, () => {
+  test('is deterministic for a seed', () => {
+    assert.deepEqual(rollCharacter('A', 'gunman', roller(seeded(3))), rollCharacter('A', 'gunman', roller(seeded(3))));
   });
 
-  test('has his background’s training and records it', () => {
-    const c = rollCharacter('Sal', 'bookkeeper', roller(seeded(1)));
-    assert.equal(c.name, 'Sal');
+  test('sets the name, background, training and default proficiency bonus', () => {
+    const c = rollCharacter('A', 'bookkeeper', roller(seeded(1)));
+    assert.equal(c.name, 'A');
     assert.equal(c.background, 'bookkeeper');
     assert.deepEqual(c.training, trainingFor('bookkeeper'));
     assert.equal(c.proficiencyBonus, 2);
   });
 
-  test('can be seasoned', () => {
-    assert.equal(rollCharacter('Old Joe', 'earner', roller(seeded(1)), { proficiencyBonus: 4 }).proficiencyBonus, 4);
+  test('accepts a proficiency bonus', () => {
+    assert.equal(rollCharacter('A', 'racketeer', roller(seeded(1)), { proficiencyBonus: 4 }).proficiencyBonus, 4);
   });
 });
 
-describe('rolled characters', { tags: ['property'] }, () => {
-  test('have their best score where their background puts it', () => {
+describe('rollCharacter', { tags: ['property'] }, () => {
+  test('puts the highest score in the background’s first-priority attribute', () => {
     fc.assert(
       fc.property(fc.integer(), fc.constantFrom(...BACKGROUNDS), (seed, b) => {
         const c = rollCharacter('X', b, roller(seeded(seed)));
@@ -56,12 +56,12 @@ describe('rolled characters', { tags: ['property'] }, () => {
     );
   });
 
-  test('lean the way their trade does', () => {
+  test('centres temperament on the background’s values', () => {
     const r = roller(seeded(4));
-    const avg = (b: 'legbreaker' | 'bookkeeper') => {
-      const men = Array.from({ length: 500 }, () => rollCharacter('X', b, r));
-      return men.reduce((s, c) => s + c.temperament.violence, 0) / men.length;
+    const meanViolence = (b: 'enforcer' | 'bookkeeper') => {
+      const cs = Array.from({ length: 500 }, () => rollCharacter('X', b, r));
+      return cs.reduce((s, c) => s + c.temperament.violence, 0) / cs.length;
     };
-    assert.ok(avg('legbreaker') > avg('bookkeeper') + 0.3);
+    assert.ok(meanViolence('enforcer') > meanViolence('bookkeeper') + 0.3);
   });
 });

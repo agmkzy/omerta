@@ -1,4 +1,4 @@
-// A character: attributes, training and the bonus training gives. Players and NPCs alike.
+// Characters (player and NPC): attributes, skill training, proficiency bonus and temperament.
 import { ATTRIBUTE_INFO, abilityModifier, attributeScores, type Attribute, type AttributeScores } from './attributes';
 import type { BackgroundName } from './backgrounds';
 import { combineEdges, type Modifier, type Roll } from './check';
@@ -15,7 +15,7 @@ export interface Character {
   readonly background?: BackgroundName;
   readonly attributes: AttributeScores;
   readonly training: Training;
-  /** Added to trained skills, twice to expert ones. D&D's runs from 2 to 6 as a character grows. */
+  /** Added once to trained skills and twice to expert skills. Ranges from 2 to 6, as in D&D. */
   readonly proficiencyBonus: number;
   readonly temperament: Temperament;
 }
@@ -46,14 +46,14 @@ export function createCharacter(input: CharacterInput): Character {
   };
 }
 
-/** The attribute a man brings to a skill: the best it allows, its own on a tie. */
+/** The attribute a character uses for a skill: the highest of those allowed, preferring the primary one on a tie. */
 export function attributeUsed(c: Character, skill: Skill): Attribute {
   return attributesFor(skill).reduce((best, a) => (c.attributes[a] > c.attributes[best] ? a : best));
 }
 
 /**
- * What a man adds to a roll of the skill: his attribute modifier and his training, each with its reason. Unless told which, he
- * uses the best of the attributes the skill allows.
+ * The modifiers a character adds to a skill roll: the attribute modifier and any proficiency bonus, each with a reason. Uses
+ * `attributeUsed` unless a specific allowed attribute is given.
  */
 export function skillModifiers(c: Character, skill: Skill, using?: Attribute): Modifier[] {
   if (using !== undefined && !attributesFor(skill).includes(using))
@@ -69,16 +69,16 @@ export function skillModifiers(c: Character, skill: Skill, using?: Attribute): M
 }
 
 export interface RollOptions {
-  /** The moments his temperament may bear on. */
+  /** Situations in which temperament modifiers apply. */
   readonly situations?: readonly Situation[];
-  /** What the moment adds: a gun, a crowd, a debt. */
+  /** Situational modifiers. */
   readonly modifiers?: readonly Modifier[];
   readonly edges?: readonly Edge[];
   readonly dice?: Dice;
   readonly using?: Attribute;
 }
 
-/** A man's roll of a skill: his skill, then his temperament in the situation, then what the moment adds. */
+/** Builds a skill roll: skill modifiers, then temperament modifiers for the situations, then situational modifiers. */
 export function rollFor(c: Character, skill: Skill, options: RollOptions = {}): Roll {
   return {
     dice: options.dice ?? DICE.d20,

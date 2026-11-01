@@ -1,16 +1,16 @@
-// The six attributes: what a man is made of. D&D's six, named for 1970 New York.
+// The six core attributes, as in D&D.
 import type { Roller } from './random';
 
 export const ATTRIBUTES = ['str', 'agi', 'con', 'int', 'wis', 'cha'] as const;
 export type Attribute = (typeof ATTRIBUTES)[number];
 
 export const ATTRIBUTE_INFO: { readonly [A in Attribute]: { readonly name: string; readonly short: string; readonly covers: string } } = {
-  str: { name: 'Strength', short: 'STR', covers: 'Force: lifting, hitting, holding a man down.' },
-  agi: { name: 'Agility', short: 'AGI', covers: 'Hands and speed: a fast draw, a steady wheel, light fingers.' },
-  con: { name: 'Grit', short: 'CON', covers: 'Taking punishment: a beating, a long night, a bottle.' },
-  int: { name: 'Wits', short: 'INT', covers: 'Reasoning, memory and numbers: books, plans, angles.' },
-  wis: { name: 'Savvy', short: 'WIS', covers: 'Instinct and perception: spotting the cop, reading the room.' },
-  cha: { name: 'Presence', short: 'CHA', covers: 'Force of personality: charm and menace alike.' },
+  str: { name: 'Strength', short: 'STR', covers: 'Physical power.' },
+  agi: { name: 'Agility', short: 'AGI', covers: 'Speed, coordination and manual dexterity.' },
+  con: { name: 'Constitution', short: 'CON', covers: 'Endurance and resistance to injury.' },
+  int: { name: 'Intelligence', short: 'INT', covers: 'Reasoning, memory and numeracy.' },
+  wis: { name: 'Wisdom', short: 'WIS', covers: 'Perception, intuition and judgement.' },
+  cha: { name: 'Charisma', short: 'CHA', covers: 'Force of personality, for persuasion or intimidation.' },
 };
 
 export type AttributeScores = Readonly<Record<Attribute, number>>;
@@ -32,7 +32,7 @@ export function attributeScores(given: Partial<AttributeScores>): AttributeScore
   return scores;
 }
 
-/** Six scores, each the best three of four d6, as D&D rolls them. */
+/** Six scores, each 4d6 dropping the lowest die (the standard D&D method). */
 export function rollScores(roller: Roller): number[] {
   return ATTRIBUTES.map(() => {
     const faces = [roller.roll(6), roller.roll(6), roller.roll(6), roller.roll(6)].sort((a, b) => b - a);
@@ -40,7 +40,7 @@ export function rollScores(roller: Roller): number[] {
   });
 }
 
-/** Puts the best score in the first attribute named, the next best in the second, and so on. */
+/** Assigns the highest score to the first attribute in `priorities`, the next highest to the second, and so on. */
 export function assignScores(scores: readonly number[], priorities: readonly Attribute[]): AttributeScores {
   if (scores.length !== ATTRIBUTES.length) throw new RangeError(`need ${ATTRIBUTES.length} scores, got ${scores.length}`);
   if (new Set(priorities).size !== ATTRIBUTES.length || priorities.length !== ATTRIBUTES.length)

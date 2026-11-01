@@ -1,4 +1,4 @@
-// Results in words, so a roll can always be read back: what was thrown, what was added and why, and how it came out.
+// Text descriptions of rolls and checks: the dice faces, each modifier with its reason, the total and the outcome.
 import type { CheckResult, Modifier, OpposedResult, RollResult } from './check';
 
 export function signed(n: number): string {

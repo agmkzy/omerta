@@ -8,107 +8,109 @@ import { DICE } from '../src/dice';
 import { SKILLS } from '../src/skills';
 import { temperament } from '../src/temperament';
 
-const vinnie = createCharacter({
-  name: 'Vinnie',
+const subject = createCharacter({
+  name: 'Subject',
   attributes: attributeScores({ str: 16, cha: 12, agi: 13 }),
   training: { intimidation: 'trained', driving: 'expert' },
 });
 
-describe('a character’s skill', { tags: ['unit'] }, () => {
-  test('is the attribute modifier plus training, each with its reason', () => {
-    assert.deepEqual(skillModifiers(vinnie, 'driving'), [
+describe('skillModifiers', { tags: ['unit'] }, () => {
+  test('returns the attribute modifier and proficiency bonus with reasons', () => {
+    assert.deepEqual(skillModifiers(subject, 'driving'), [
       { value: 1, reason: 'Agility 13' },
       { value: 4, reason: 'Expert at Driving' },
     ]);
   });
 
-  test('untrained, it is the attribute alone', () => {
-    assert.deepEqual(skillModifiers(vinnie, 'firearms'), [{ value: 1, reason: 'Agility 13' }]);
+  test('returns only the attribute modifier for an untrained skill', () => {
+    assert.deepEqual(skillModifiers(subject, 'firearms'), [{ value: 1, reason: 'Agility 13' }]);
   });
 
-  test('uses the better of the attributes the skill allows', () => {
-    assert.deepEqual(skillModifiers(vinnie, 'intimidation'), [
+  test('uses the higher of the allowed attributes', () => {
+    assert.deepEqual(skillModifiers(subject, 'intimidation'), [
       { value: 3, reason: 'Strength 16' },
       { value: 2, reason: 'Trained in Intimidation' },
     ]);
   });
 
-  test('says which attribute he uses', () => {
-    assert.equal(attributeUsed(vinnie, 'intimidation'), 'str');
-    assert.equal(attributeUsed(vinnie, 'bookkeeping'), 'int');
+  test('uses a specific attribute when given one', () => {
+    assert.deepEqual(skillModifiers(subject, 'intimidation', 'cha')[0], { value: 1, reason: 'Charisma 12' });
   });
 
-  test('keeps to the skill’s own attribute on a tie', () => {
-    assert.equal(attributeUsed(createCharacter({ name: 'Even' }), 'intimidation'), 'cha');
+  test('throws for an attribute the skill does not allow', () => {
+    assert.throws(() => skillModifiers(subject, 'bookkeeping', 'str'), RangeError);
   });
 
-  test('can be made to use a particular allowed attribute', () => {
-    assert.deepEqual(skillModifiers(vinnie, 'intimidation', 'cha')[0], { value: 1, reason: 'Presence 12' });
-  });
-
-  test('cannot use an attribute the skill does not allow', () => {
-    assert.throws(() => skillModifiers(vinnie, 'bookkeeping', 'str'), RangeError);
-  });
-
-  test('training grows with the proficiency bonus', () => {
-    const veteran = createCharacter({ ...vinnie, proficiencyBonus: 4 });
-    assert.equal(bonusOf(skillModifiers(veteran, 'driving')), 1 + 8);
+  test('scales proficiency with the proficiency bonus', () => {
+    const experienced = createCharacter({ ...subject, proficiencyBonus: 4 });
+    assert.equal(bonusOf(skillModifiers(experienced, 'driving')), 1 + 8);
   });
 });
 
-describe('creating a character', { tags: ['unit'] }, () => {
-  test('starts average and untrained, with a proficiency bonus of 2', () => {
-    const nobody = createCharacter({ name: 'Nobody' });
-    assert.deepEqual(nobody.attributes, attributeScores({}));
-    assert.deepEqual(nobody.training, {});
-    assert.equal(nobody.proficiencyBonus, 2);
-    assert.deepEqual(nobody.temperament, temperament({}));
+describe('attributeUsed', { tags: ['unit'] }, () => {
+  test('returns the highest allowed attribute', () => {
+    assert.equal(attributeUsed(subject, 'intimidation'), 'str');
+    assert.equal(attributeUsed(subject, 'bookkeeping'), 'int');
   });
 
-  test('refuses a proficiency bonus outside D&D’s 2 to 6', () => {
+  test('prefers the primary attribute on a tie', () => {
+    assert.equal(attributeUsed(createCharacter({ name: 'Average' }), 'intimidation'), 'cha');
+  });
+});
+
+describe('createCharacter', { tags: ['unit'] }, () => {
+  test('defaults to average attributes and temperament, no training and proficiency bonus 2', () => {
+    const c = createCharacter({ name: 'Default' });
+    assert.deepEqual(c.attributes, attributeScores({}));
+    assert.deepEqual(c.training, {});
+    assert.equal(c.proficiencyBonus, 2);
+    assert.deepEqual(c.temperament, temperament({}));
+  });
+
+  test('throws for a proficiency bonus outside 2–6', () => {
     assert.throws(() => createCharacter({ name: 'X', proficiencyBonus: 1 }), RangeError);
     assert.throws(() => createCharacter({ name: 'X', proficiencyBonus: 7 }), RangeError);
   });
 });
 
-describe('a character’s roll', { tags: ['unit'] }, () => {
-  const sal = createCharacter({ name: 'Sal', attributes: attributeScores({ wis: 14 }), training: { nerve: 'trained' }, temperament: temperament({ pride: 0.9, courage: 0.1 }) });
+describe('rollFor', { tags: ['unit'] }, () => {
+  const c = createCharacter({ name: 'Subject', attributes: attributeScores({ wis: 14 }), training: { nerve: 'trained' }, temperament: temperament({ pride: 0.9, courage: 0.1 }) });
 
-  test('is his skill, then his temperament in the situation, then what the moment adds', () => {
-    const roll = rollFor(sal, 'nerve', {
+  test('orders modifiers as skill, then temperament, then situational', () => {
+    const roll = rollFor(c, 'nerve', {
       situations: ['hold-nerve', 'resist-intimidation'],
-      modifiers: [{ value: -2, reason: 'A gun in his face' }],
+      modifiers: [{ value: -2, reason: 'Threatened with a gun' }],
     });
     assert.deepEqual(roll.modifiers, [
-      { value: 2, reason: 'Savvy 14' },
+      { value: 2, reason: 'Wisdom 14' },
       { value: 2, reason: 'Trained in Nerve' },
       { value: -2, reason: 'Timid' },
-      { value: 2, reason: 'Too proud to be pushed around' },
-      { value: -2, reason: 'A gun in his face' },
+      { value: 2, reason: 'Proud' },
+      { value: -2, reason: 'Threatened with a gun' },
     ]);
     assert.equal(roll.dice, DICE.d20);
     assert.equal(roll.edge, 'none');
   });
 
-  test('combines the edges the moment gives, on the dice asked for', () => {
-    const roll = rollFor(sal, 'reflexes', { edges: ['advantage', 'advantage'], dice: DICE['3d6'] });
+  test('combines edges and uses the given dice', () => {
+    const roll = rollFor(c, 'reflexes', { edges: ['advantage', 'advantage'], dice: DICE['3d6'] });
     assert.equal(roll.edge, 'advantage');
     assert.equal(roll.dice, DICE['3d6']);
     assert.deepEqual(roll.modifiers, [{ value: 0, reason: 'Agility 10' }]);
   });
 
-  test('can be made with a particular attribute', () => {
-    assert.deepEqual(rollFor(sal, 'nerve', { using: 'con' }).modifiers[0], { value: 0, reason: 'Grit 10' });
+  test('passes a specific attribute through', () => {
+    assert.deepEqual(rollFor(c, 'nerve', { using: 'con' }).modifiers[0], { value: 0, reason: 'Constitution 10' });
   });
 });
 
-describe('skill bonuses', { tags: ['property'] }, () => {
+describe('skillModifiers', { tags: ['property'] }, () => {
   const scores = fc.record({
     str: fc.integer({ min: 1, max: 20 }), agi: fc.integer({ min: 1, max: 20 }), con: fc.integer({ min: 1, max: 20 }),
     int: fc.integer({ min: 1, max: 20 }), wis: fc.integer({ min: 1, max: 20 }), cha: fc.integer({ min: 1, max: 20 }),
   });
 
-  test('training never makes a man worse, and expertise beats training', () => {
+  test('untrained < trained < expert for every skill', () => {
     fc.assert(
       fc.property(scores, fc.constantFrom(...SKILLS), (attributes, skill) => {
         const at = (p: 'trained' | 'expert' | undefined) => bonusOf(skillModifiers(createCharacter({ name: 'T', attributes, training: p ? { [skill]: p } : {} }), skill));
