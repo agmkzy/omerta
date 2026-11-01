@@ -37,8 +37,9 @@ npm run lab:dev         # playground at http://localhost:5180
 ## Playground
 
 Four tabs: **Characters** (a list of saved characters and an editor for the selected one, split into attributes, skills
-and temperament), **Skill check** (intimidate, persuade, deceive, or any skill), **Fight** (any saved characters on two sides) and
-**Dice and odds**. Characters are saved to `localStorage` in this
+and temperament), **Skill check** (intimidate, persuade, deceive, or any skill), **Fight** (a set-up page where saved characters are added to
+two sides, then the fight: each fighter's card with their stats and result, and a short log by round) and **Dice
+and odds**. Characters are saved to `localStorage` in this
 browser after every change, as is the open tab. The check tab picks its two characters from the saved list; the fight line-up is also saved. The roster and line-up logic (`playground/roster.ts`, `playground/parties.ts`) is pure and tested like the library.
 
 Tests are in `test/`, one file per module. Each is tagged `unit` or `property` (fast-check). The suite has 100% statement,

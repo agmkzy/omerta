@@ -129,7 +129,39 @@ table.social-odds { margin: 8px 0 12px; }
 table.social-odds td:first-child { width: 18px; }
 table.social-odds td.num { text-align: right; width: 4em; }
 .field.checkbox > span:first-child { color: var(--ink); }
-.line-up table td { vertical-align: middle; padding: 4px 6px; }
-.line-up .segmented button { padding: 4px 8px; font-size: 0.85rem; }
 table.fighters td.num, table.fighters th.num { text-align: right; }
 ul.final-state { margin: 4px 0 10px; padding-left: 18px; }
+
+.sides .side { display: grid; gap: 8px; align-content: start; }
+.sides .side h3 { margin-top: 0; }
+.fighter-card { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; display: grid; gap: 8px; background: var(--panel); }
+.fighter-card.out { opacity: 0.7; }
+.fighter-head { display: flex; gap: 8px; align-items: flex-start; }
+.fighter-head > div:first-child { flex: 1; }
+.fighter-name { font-weight: 600; }
+.fighter-card .remove { padding: 0 8px; line-height: 1.6; }
+.status { font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; }
+.status-fighting { color: var(--success); border-color: var(--success); }
+.status-knocked-out { color: var(--critical-failure); border-color: var(--critical-failure); }
+.status-surrendered, .status-backed-off, .status-fled { color: var(--muted); }
+.hp { display: flex; gap: 8px; align-items: center; }
+.hp-bar { flex: 1; height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.hp-fill { height: 100%; background: var(--success); }
+.hp-text { font-size: 0.8rem; font-variant-numeric: tabular-nums; color: var(--muted); }
+.stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.stat { display: grid; text-align: center; border: 1px solid var(--line); border-radius: var(--radius); padding: 4px 2px; cursor: help; }
+.stat-label { font-size: 0.7rem; color: var(--muted); }
+.stat-value { font-weight: 600; font-variant-numeric: tabular-nums; }
+@media (max-width: 420px) { .stats { grid-template-columns: repeat(3, 1fr); } }
+.add .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.chip { border-radius: 999px; padding: 3px 10px; font-size: 0.85rem; }
+.fight-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
+.fight-head h2 { margin: 0; }
+p.result { font-weight: 600; margin: 8px 0; }
+ul.fight-log { list-style: none; margin: 0; padding: 0; }
+ul.fight-log li { padding: 3px 0; cursor: default; }
+ul.fight-log li.ev-nerve, ul.fight-log li.ev-out { padding-left: 16px; color: var(--muted); }
+ul.fight-log li.ev-out { font-weight: 600; }
+.log-round { margin-top: 8px; }
+.round-head { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); border-bottom: 1px solid var(--line); padding-bottom: 2px; margin-bottom: 2px; }
+.simulation table td.num, .simulation table th.num { text-align: right; }
