@@ -6,7 +6,7 @@ import { BACKGROUNDS, rollCharacter, type BackgroundName } from '../src/backgrou
 import { createCharacter, type Character } from '../src/character';
 import { DICE } from '../src/dice';
 import { FIGHTER_STATUSES, FIGHTER_STATUS_INFO, attackHitChance, fightStats, rollDamage, runFight, stepFight, tallyFights, type FightEvent, type FightResult, type FightSpec } from '../src/fight';
-import { describeFightEvent } from '../src/fight-log';
+import { describeFightEvent, describeRollRequest } from '../src/fight-log';
 import { NERVE_DC } from '../src/nerve';
 import { replay, roller, seeded } from '../src/random';
 import { temperament } from '../src/temperament';
@@ -251,6 +251,54 @@ describe('stepFight', { tags: ['unit'] }, () => {
 
   test('rejects a face that is not on the die', () => {
     assert.throws(() => stepFight(duel(), [21]), RangeError);
+  });
+});
+
+describe('describeRollRequest', { tags: ['unit'] }, () => {
+  const ask = (s: FightSpec, ...faces: number[]) => {
+    const step = stepFight(s, faces);
+    assert.ok(!step.done);
+    return describeRollRequest(step.request, step.fighters, s.dice ?? DICE.d20);
+  };
+
+  test('says what each roll is for, what it needs and the chance', () => {
+    assert.equal(ask(duel()), 'A rolls initiative: d20 + 0.');
+    assert.equal(ask(duel(), 15, 10), 'A attacks D: d20 + 2 against Defence 10. Needs 8 or more to hit (65%).');
+    assert.equal(ask(duel(), 15, 10, 8), 'A rolls damage against D: 1d4.');
+    assert.equal(ask(duel(), 15, 10, 20), 'A rolls damage for a critical hit against D: 2d4 (die 1 of 2).');
+    assert.equal(ask(duel(), 15, 10, 20, 2, 3), 'D is at half HP and must hold their nerve: d20 + 0 against 10. Needs 10 or more (55%).');
+  });
+
+  test('lists the options when choosing a target', () => {
+    assert.equal(ask({ attackers: [attacker()], defenders: [defender({}, 'C'), defender({}, 'E')], maxRounds: 1 }, 15, 10, 10), 'A picks who to attack: 1 = C, 2 = E.');
+  });
+
+  test('describes the group nerve check and damage with a modifier', () => {
+    const strong = createCharacter({ name: 'S', attributes: attributeScores({ str: 16 }), training: { brawling: 'trained' } });
+    assert.equal(ask(duel({ attackers: [strong] }), 15, 10, 8), 'S rolls damage against D: 1d4 + 3.');
+    assert.equal(ask({ attackers: [attacker()], defenders: [frail('F'), defender({}, 'E')], maxRounds: 2 }, 15, 10, 10, 1, 20, 4, 4),
+      'E sees half their side out of the fight and must hold their nerve: d20 + 0 against 10. Needs 10 or more (55%).');
+  });
+
+  test('gives the chance but no single number to roll on other dice, and nothing midway through a multi-dice roll', () => {
+    assert.equal(ask(duel({ dice: DICE['3d6'] }), 4, 4, 4, 3, 3, 3), 'A attacks D: 3d6 + 2 against Defence 10. 84% to hit.');
+    assert.equal(ask(duel({ dice: DICE['3d6'] }), 4, 4, 4, 3, 3, 3, 3), 'A attacks D: 3d6 + 2 against Defence 10 (die 2 of 3).');
+  });
+
+  test('shows a negative bonus as a subtraction', () => {
+    const slow = createCharacter({ name: 'Slow', attributes: attributeScores({ agi: 8 }) });
+    assert.equal(ask(duel({ attackers: [slow] })), 'Slow rolls initiative: d20 − 1.');
+  });
+
+  test('gives a nerve check on other dice as a chance, and nothing midway through the roll', () => {
+    const s = duel({ dice: DICE['3d6'] }); // A hits with 18 (the highest roll) for 8: D drops to 2 HP
+    assert.equal(ask(s, 4, 4, 4, 3, 3, 3, 6, 6, 6, 4, 4), 'D is at half HP and must hold their nerve: 3d6 + 0 against 10. 63% to hold.');
+    assert.equal(ask(s, 4, 4, 4, 3, 3, 3, 6, 6, 6, 4, 4, 5), 'D is at half HP and must hold their nerve: 3d6 + 0 against 10 (die 2 of 3).');
+  });
+
+  test('says when a nerve check cannot fail', () => {
+    const steady = createCharacter({ name: 'Steady', attributes: attributeScores({ wis: 20 }), training: { nerve: 'expert' }, temperament: temperament({ courage: 0.9 }) }); // +11
+    assert.equal(ask(duel({ defenders: [steady] }), 15, 10, 20, 4, 4), 'Steady is at half HP and must hold their nerve: d20 + 11 against 10. Holds whatever the roll.');
   });
 });
 

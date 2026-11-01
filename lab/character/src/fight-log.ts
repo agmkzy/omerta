@@ -1,6 +1,9 @@
 // Plain-text descriptions of fight events, one short line each, for logs and the playground. Rounds are not repeated in
 // each line (a log groups lines by round), and roll breakdowns are left to whoever shows the detail.
-import type { FightEvent, FightResult } from './fight';
+import type { Dice } from './dice';
+import { atLeast, diceDistribution } from './distribution';
+import { percent } from './explain';
+import { UNARMED_DAMAGE_DIE, attackHitChance, type Fighter, type FightEvent, type FightResult, type RollRequest } from './fight';
 
 const SIDE_NAME = { attacker: 'Left', defender: 'Right' } as const;
 
@@ -37,5 +40,45 @@ export function describeFightEvent(event: FightEvent, fight: FightResult, option
       return `${name(event.id)} ${{ 'knocked-out': 'is knocked out', surrendered: 'surrenders', 'backed-off': 'backs off', fled: 'flees' }[event.status]}.`;
     case 'end':
       return event.winner === null ? 'Stalemate: the round limit was reached.' : `${SIDE_NAME[event.winner]} wins.`;
+  }
+}
+
+/**
+ * Describes a roll the fight is waiting for: what it is for, and for an attack or nerve check, what it needs and the
+ * chance. On a d20 it gives the number needed; on other dice only the chance. Midway through a multi-dice roll it gives
+ * neither, as the earlier dice have already changed the odds.
+ */
+export function describeRollRequest(request: RollRequest, fighters: readonly Fighter[], dice: Dice): string {
+  const r = request.reason;
+  const name = (id: string) => fighters.find((f) => f.id === id)!.character.name;
+  const plus = (n: number) => (n < 0 ? ` − ${-n}` : ` + ${n}`);
+  const which = r.of > 1 ? ` (die ${r.die} of ${r.of})` : '';
+  const d20 = dice.count === 1 && dice.sides === 20;
+  switch (r.kind) {
+    case 'initiative':
+      return `${name(r.id)} rolls initiative: ${dice.name}${plus(r.bonus)}${which}.`;
+    case 'target':
+      return `${name(r.id)} picks who to attack: ${r.options.map((id, i) => `${i + 1} = ${name(id)}`).join(', ')}.`;
+    case 'damage': {
+      const modifier = r.modifier ? plus(r.modifier) : '';
+      const what = r.critical ? 'damage for a critical hit' : 'damage';
+      return `${name(r.id)} rolls ${what} against ${name(r.target)}: ${r.of}d${UNARMED_DAMAGE_DIE}${modifier}${which}.`;
+    }
+    case 'attack': {
+      const roll = `${name(r.id)} attacks ${name(r.target)}: ${dice.name}${plus(r.bonus)} against Defence ${r.dc}`;
+      if (r.die > 1) return `${roll}${which}.`;
+      const chance = percent(attackHitChance(dice, r.bonus, r.dc));
+      if (!d20) return `${roll}. ${chance} to hit.`;
+      return `${roll}. Needs ${Math.min(20, Math.max(2, r.dc - r.bonus))} or more to hit (${chance}).`;
+    }
+    case 'nerve': {
+      const situation = r.trigger === 'hurt' ? 'is at half HP' : 'sees half their side out of the fight';
+      const roll = `${name(r.id)} ${situation} and must hold their nerve: ${dice.name}${plus(r.bonus)} against ${r.dc}`;
+      if (r.die > 1) return `${roll}${which}.`;
+      const needs = r.dc - r.bonus;
+      if (needs <= dice.count) return `${roll}. Holds whatever the roll.`;
+      const chance = percent(atLeast(diceDistribution(dice, 'none'), needs));
+      return d20 ? `${roll}. Needs ${needs} or more (${chance}).` : `${roll}. ${chance} to hold.`;
+    }
   }
 }
