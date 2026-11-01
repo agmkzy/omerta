@@ -1,10 +1,10 @@
 // Contest tab: configure a contest between two saved characters, run it once to read the round-by-round log, or many
 // times to see how often each side wins and what decides it.
-import { APPROACHES, APPROACH_INFO, BADLY_HURT_PENALTY, CRITICAL_MARGIN, ENDING_INFO, HIT_MARGIN, NERVE_DC, POINTS_PER_LEAD, UNARMED_DAMAGE_DIE, runContest, tally, type Approach, type ContestResult, type ContestSpec, type Ending, type Side } from '../src/contest';
-import { BASE_HIT_POINTS } from '../src/character';
+import { APPROACHES, APPROACH_INFO, BADLY_HURT_PENALTY, ENDING_INFO, NERVE_DC, POINTS_PER_LEAD, UNARMED_DAMAGE_DIE, runContest, tally, type Approach, type ContestResult, type ContestSpec, type Ending, type Side } from '../src/contest';
+import { BASE_DEFENCE, BASE_HIT_POINTS } from '../src/character';
 import { describeEvent } from '../src/contest-log';
 import { DICE, DICE_NAMES, type DiceName } from '../src/dice';
-import { describeOpposed, percent } from '../src/explain';
+import { describeRoll, percent } from '../src/explain';
 import { roller, seeded } from '../src/random';
 import { h, segmented, slider } from './dom';
 import { sideSelect, swapButton } from './pickers';
@@ -81,9 +81,10 @@ export function contestPanel(): Panel {
         hint(`At the end: ${hpLine}.`),
         h('ol', { class: 'event-log' }, ...result.events.map((e) =>
           h('li', { class: `ev-${e.kind}` }, describeEvent(e, s),
-            e.kind === 'round' || e.kind === 'fight-round' ? h('div', { class: 'detail' }, describeOpposed(e.result)) : null,
-            e.kind === 'fight-round' && e.hit
-              ? h('div', { class: 'detail' }, `Damage: ${e.hit.damage.faces.length}d${UNARMED_DAMAGE_DIE} [${e.hit.damage.faces.join(' ')}] ${e.hit.damage.modifier >= 0 ? '+' : ''}${e.hit.damage.modifier} Strength = ${e.hit.damage.total}`)
+            e.kind === 'round' || e.kind === 'initiative' ? h('div', { class: 'detail' }, `${describeRoll(e.result.active)} vs ${describeRoll(e.result.passive)}`) : null,
+            e.kind === 'attack' ? h('div', { class: 'detail' }, `${describeRoll(e.result.roll)} against Defence ${e.result.dc}`) : null,
+            e.kind === 'attack' && e.damage
+              ? h('div', { class: 'detail' }, `Damage: ${e.damage.faces.length}d${UNARMED_DAMAGE_DIE} [${e.damage.faces.join(' ')}] ${e.damage.modifier >= 0 ? '+' : ''}${e.damage.modifier} Strength = ${e.damage.total}`)
               : null,
             e.kind === 'nerve' ? h('div', { class: 'detail' }, e.result.roll.modifiers.map((m) => `${m.value >= 0 ? '+' : ''}${m.value} ${m.reason}`).join(', ')) : null))),
       );
@@ -98,9 +99,10 @@ export function contestPanel(): Panel {
       h('details', { class: 'guide', open: true }, h('summary', {}, 'How a contest works'),
         state.approach === 'fight'
           ? h('ul', {},
-              h('li', {}, `It is played in rounds. Each round both characters roll Brawling. Whoever wins by ${HIT_MARGIN} or more hits for 1d${UNARMED_DAMAGE_DIE} + Strength modifier damage (at least 1). A narrower win or a tie is no hit.`),
-              h('li', {}, `Winning a round by ${CRITICAL_MARGIN} or more is a critical hit: the damage dice are rolled twice.`),
-              h('li', {}, `Each character has hit points: ${BASE_HIT_POINTS} + Constitution modifier, plus their proficiency bonus if trained in Toughness (twice if expert). At 0 they are knocked out.`),
+              h('li', {}, 'At the start, both characters roll Reflexes. The higher roll acts first every round (a tie goes to the defender).'),
+              h('li', {}, `Each round, each character attacks in turn: d20 + Brawling bonus against the other’s Defence (${BASE_DEFENCE} + Reflexes bonus). Meeting or beating it is a hit for 1d${UNARMED_DAMAGE_DIE} + Strength modifier damage (at least 1).`),
+              h('li', {}, 'A natural 20 always hits and is a critical hit: the damage dice are rolled twice. A natural 1 always misses.'),
+              h('li', {}, `Each character has hit points: ${BASE_HIT_POINTS} + Constitution modifier, plus their proficiency bonus if trained in Toughness (twice if expert). At 0 they are knocked out and do not act.`),
               h('li', {}, `At half hit points or below a character is badly hurt: they take ${BADLY_HURT_PENALTY} to rolls, and every hit they take after that (including the one that got them there) needs a DC ${NERVE_DC.hurt} nerve check. Failing it ends the fight: a timid or cautious character flees; anyone else gives up.`),
               h('li', {}, 'If nobody has won by the round limit, it is a stalemate.'))
           : h('ul', {},

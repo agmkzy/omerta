@@ -4,16 +4,17 @@
 // of lead per POINTS_PER_LEAD points of difference, rounded up. The lead is positive when the attacker is ahead. A character
 // who gets `winningLead` points ahead wins.
 //
-// Fights are decided by hit points instead. Each round both characters roll Brawling. Winning by HIT_MARGIN or more deals
-// damage (1d4 + Strength modifier; dice rolled twice when winning by CRITICAL_MARGIN or more). A character at 0 hit points
-// is knocked out.
+// Fights are decided by hit points instead, following D&D. Both characters roll Reflexes for initiative when the fight
+// starts; the higher acts first each round. Each round each character attacks: d20 + Brawling against the target's
+// Defence (10 + Reflexes bonus). A hit deals 1d4 + Strength modifier; a natural 20 always hits and rolls the damage dice
+// twice; a natural 1 always misses. A character at 0 hit points is knocked out and does not act.
 //
 // Nerve checks are triggered by events (falling behind by half the winning lead, taking damage at half hit points or
 // below, having a weapon drawn on them); a failed nerve check ends the contest in a way decided by temperament. Every
 // step is recorded as an event.
 import { resolveCheck, resolveOpposed, type CheckResult, type Modifier, type OpposedResult, type Roll } from './check';
 import { abilityModifier } from './attributes';
-import { maxHitPoints, rollFor, type Character } from './character';
+import { defence, maxHitPoints, rollFor, type Character } from './character';
 import { DICE, type Dice } from './dice';
 import type { Roller } from './random';
 import { leaning, type Trait } from './temperament';
@@ -29,7 +30,7 @@ export const APPROACH_INFO: { readonly [A in Approach]: { readonly name: string;
   },
   fight: {
     name: 'Fight',
-    description: 'Each round: Brawling against Brawling. Winning by 5 or more deals 1d4 + Strength modifier damage (dice doubled when winning by 10 or more). 0 hit points is a knockout.',
+    description: 'Each round each character attacks: d20 + Brawling against the other’s Defence (10 + Reflexes). A hit deals 1d4 + Strength modifier damage. 0 hit points is a knockout.',
   },
 };
 
@@ -60,15 +61,20 @@ export interface Damage {
   readonly total: number;
 }
 
-export interface Hit {
-  readonly by: Side;
-  readonly damage: Damage;
-  readonly critical: boolean;
-}
-
 export type ContestEvent =
   | { readonly kind: 'round'; readonly round: number; readonly approach: Approach; readonly result: OpposedResult; readonly change: number; readonly lead: number }
-  | { readonly kind: 'fight-round'; readonly round: number; readonly result: OpposedResult; readonly hit: Hit | null; readonly hp: Readonly<Record<Side, number>> }
+  | { readonly kind: 'initiative'; readonly round: number; readonly result: OpposedResult; readonly first: Side }
+  | {
+      readonly kind: 'attack';
+      readonly round: number;
+      readonly by: Side;
+      /** The attack roll against the target's Defence (the DC). */
+      readonly result: CheckResult;
+      readonly hit: boolean;
+      readonly critical: boolean;
+      readonly damage: Damage | null;
+      readonly hp: Readonly<Record<Side, number>>;
+    }
   | { readonly kind: 'nerve'; readonly round: number; readonly side: Side; readonly trigger: Trigger; readonly result: CheckResult; readonly passed: boolean }
   | { readonly kind: 'escalation'; readonly round: number; readonly side: Side }
   | { readonly kind: 'end'; readonly round: number; readonly ending: Ending };
@@ -108,10 +114,6 @@ export const NERVE_FAILURE: Readonly<Partial<Record<Trait, string>>> = {
 
 /** Points of roll difference per point of lead (rounded up). */
 export const POINTS_PER_LEAD = 5;
-/** In a fight, winning a round by at least this much lands a hit; a narrower win is no hit. */
-export const HIT_MARGIN = 5;
-/** In a fight, winning a round by at least this much is a critical hit. */
-export const CRITICAL_MARGIN = 10;
 /** Unarmed damage: 1d4 + Strength modifier, minimum 1. */
 export const UNARMED_DAMAGE_DIE = 4;
 /** Nerve check DCs. `hurt` is the check after each hit that leaves a character at half hit points or below. */
@@ -149,7 +151,6 @@ export function runContest(spec: ContestSpec, roller: Roller): ContestResult {
   const roundRoll = (side: Side): Roll => {
     const c = sides[side];
     const modifiers = injuryModifiers(side);
-    if (approach === 'fight') return rollFor(c, 'brawling', { dice, modifiers });
     if (side === 'attacker') return rollFor(c, 'intimidation', { dice, modifiers, situations: ['intimidate'], edges: approach === 'armed-threat' ? ['advantage'] : [] });
     return rollFor(c, 'nerve', { dice, modifiers, situations: ['hold-nerve', 'resist-intimidation'] });
   };
@@ -184,22 +185,38 @@ export function runContest(spec: ContestSpec, roller: Roller): ContestResult {
     if (failed) return finish(failed);
   }
 
-  /** A round decided by hit points. Returns an ending, or null to continue. */
-  const fightRound = (): Ending | null => {
-    const result = resolveOpposed({ active: roundRoll('attacker'), passive: roundRoll('defender') }, roller);
-    const difference = result.margin + 1;
-    if (Math.abs(difference) < HIT_MARGIN) {
-      events.push({ kind: 'fight-round', round, result, hit: null, hp: { ...hp } });
-      return null;
-    }
-    const by: Side = difference > 0 ? 'attacker' : 'defender';
+  /** Rolls initiative when a fight starts: opposed Reflexes, a tie going to the defender. */
+  let order: readonly Side[] | null = null;
+  const rollInitiative = (): readonly Side[] => {
+    const result = resolveOpposed({ active: rollFor(sides.attacker, 'reflexes', { dice }), passive: rollFor(sides.defender, 'reflexes', { dice }) }, roller);
+    const first: Side = result.margin >= 0 ? 'attacker' : 'defender';
+    events.push({ kind: 'initiative', round, result, first });
+    return first === 'attacker' ? ['attacker', 'defender'] : ['defender', 'attacker'];
+  };
+
+  /** One attack. Returns an ending, or null to continue. */
+  const attack = (by: Side): Ending | null => {
     const target: Side = by === 'attacker' ? 'defender' : 'attacker';
-    const critical = Math.abs(difference) >= CRITICAL_MARGIN;
-    const damage = rollDamage(sides[by], critical, roller);
-    hp[target] = Math.max(0, hp[target] - damage.total);
-    events.push({ kind: 'fight-round', round, result, hit: { by, damage, critical }, hp: { ...hp } });
+    const result = resolveCheck({ ...rollFor(sides[by], 'brawling', { dice, modifiers: injuryModifiers(by) }), dc: defence(sides[target]) }, roller);
+    const kept = result.roll.thrown.kept;
+    const critical = kept === dice.count * dice.sides;
+    const hit = critical || (kept !== dice.count && result.margin >= 0);
+    const damage = hit ? rollDamage(sides[by], critical, roller) : null;
+    if (damage) hp[target] = Math.max(0, hp[target] - damage.total);
+    events.push({ kind: 'attack', round, by, result, hit, critical, damage, hp: { ...hp } });
+    if (!damage) return null;
     if (hp[target] === 0) return { how: 'knocked-out', loser: target };
     return badlyHurt(target) ? nerveCheck(target, 'hurt') : null;
+  };
+
+  /** A round decided by hit points: each character attacks in initiative order. Returns an ending, or null to continue. */
+  const fightRound = (): Ending | null => {
+    order ??= rollInitiative();
+    for (const side of order) {
+      const ending = attack(side);
+      if (ending) return ending;
+    }
+    return null;
   };
 
   /** A round decided by the lead. Returns an ending, or null to continue. */

@@ -2,7 +2,7 @@
 import { ATTRIBUTES, ATTRIBUTE_INFO, SCORE_MAX, SCORE_MIN, abilityModifier } from '../src/attributes';
 import { BACKGROUNDS, BACKGROUND_INFO, type BackgroundName } from '../src/backgrounds';
 import { bonusOf } from '../src/check';
-import { PROFICIENCIES, PROFICIENCY_MAX, PROFICIENCY_MIN, attributeUsed, createCharacter, hitPointModifiers, maxHitPoints, skillModifiers, type Character, type Proficiency } from '../src/character';
+import { PROFICIENCIES, PROFICIENCY_MAX, PROFICIENCY_MIN, attributeUsed, createCharacter, defence, defenceModifiers, hitPointModifiers, maxHitPoints, skillModifiers, type Character, type Proficiency } from '../src/character';
 import { describeModifier, signed } from '../src/explain';
 import { NERVE_FAILURE } from '../src/contest';
 import { SKILLS, SKILL_INFO, attributesFor, skillsUsing } from '../src/skills';
@@ -92,6 +92,8 @@ export function charactersPanel(): Panel {
       h('div', {}, h('span', { class: 'muted' }, 'Background: '), c.background ? `${BACKGROUND_INFO[c.background].name}. ${BACKGROUND_INFO[c.background].description}` : 'none'),
       h('div', {}, h('span', { class: 'muted' }, 'Hit points: '), `${maxHitPoints(c)} `,
         h('span', { class: 'muted' }, `(${hitPointModifiers(c).map((m, i) => (i === 0 ? `${m.value} ${m.reason.toLowerCase()}` : describeModifier(m))).join(', ')})`)),
+      h('div', {}, h('span', { class: 'muted' }, 'Defence: '), `${defence(c)} `,
+        h('span', { class: 'muted' }, `(${defenceModifiers(c).map((m, i) => (i === 0 ? `${m.value} ${m.reason.toLowerCase()}` : describeModifier(m))).join(', ')}; what an attack must reach to hit)`)),
       h('div', {}, h('span', { class: 'muted' }, 'Best skills: '), best.map((b) => `${SKILL_INFO[b.s].name} ${signed(b.bonus)}`).join(', ')),
       h('div', {}, h('span', { class: 'muted' }, 'Notable traits: '), traits.length ? traits.join(', ') : 'none'),
     );

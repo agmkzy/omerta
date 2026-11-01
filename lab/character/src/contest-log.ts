@@ -22,13 +22,21 @@ export function describeEvent(event: ContestEvent, spec: ContestSpec): string {
       const change = event.change === 0 ? 'No change' : `${gainer} gains ${Math.abs(event.change)}`;
       return `Round ${event.round} (${APPROACH_INFO[event.approach].name}): ${name('attacker')} rolled ${active.total}, ${name('defender')} rolled ${passive.total}. ${change}; ${describeLead(event.lead, spec)}.`;
     }
-    case 'fight-round': {
+    case 'initiative': {
       const { active, passive } = event.result;
-      const rolls = `Round ${event.round} (Fight): ${name('attacker')} rolled ${active.total}, ${name('defender')} rolled ${passive.total}.`;
-      if (!event.hit) return `${rolls} No hit.`;
-      const target: Side = event.hit.by === 'attacker' ? 'defender' : 'attacker';
-      const hit = event.hit.critical ? 'lands a critical hit' : 'hits';
-      return `${rolls} ${name(event.hit.by)} ${hit} for ${event.hit.damage.total} damage (${name(target)}: ${event.hp[target]} HP left).`;
+      return `${name(event.first)} acts first (Reflexes: ${name('attacker')} rolled ${active.total}, ${name('defender')} rolled ${passive.total}).`;
+    }
+    case 'attack': {
+      const target: Side = event.by === 'attacker' ? 'defender' : 'attacker';
+      const { roll } = event.result;
+      const d20 = roll.dice.count === 1 && roll.dice.sides === 20;
+      const highest = roll.thrown.kept === roll.dice.count * roll.dice.sides;
+      const lowest = roll.thrown.kept === roll.dice.count;
+      const natural = highest ? (d20 ? ' (natural 20)' : ' (highest possible roll)') : lowest ? (d20 ? ' (natural 1)' : ' (lowest possible roll)') : '';
+      const outcome = event.damage
+        ? `${event.critical ? 'Critical hit' : 'Hit'} for ${event.damage.total} damage (${name(target)}: ${event.hp[target]} HP left).`
+        : 'Miss.';
+      return `Round ${event.round}: ${name(event.by)} attacks ${name(target)}: rolled ${roll.total} against Defence ${event.result.dc}${natural}. ${outcome}`;
     }
     case 'nerve':
       return `${name(event.side)} makes a nerve check (${TRIGGER_TEXT[event.trigger]}): needed ${event.result.dc}, rolled ${event.result.roll.total}, ${event.passed ? 'passed' : 'failed'}.`;

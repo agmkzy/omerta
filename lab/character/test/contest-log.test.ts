@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'vitest';
 import { createCharacter } from '../src/character';
+import { DICE } from '../src/dice';
 import { NERVE_DC, runContest, type ContestSpec } from '../src/contest';
 import { describeEnding, describeEvent, describeLead } from '../src/contest-log';
 import { temperament } from '../src/temperament';
@@ -35,17 +36,31 @@ describe('describeEvent', { tags: ['unit'] }, () => {
 
   test('describes weapon-drawn checks and escalation', () => {
     assert.equal(log(spec({ approach: 'armed-threat' }), 5)[0], 'D makes a nerve check (weapon drawn on them): needed 12, rolled 5, failed.');
-    assert.equal(log(spec({ maxRounds: 2, defender: defender({ temper: 0.9 }) }), 15, 10, 9, 10, 10)[2], 'D escalates. The contest becomes a fight.');
+    assert.equal(log(spec({ maxRounds: 2, defender: defender({ temper: 0.9 }) }), 15, 10, 9, 10, 10, 1, 1)[2], 'D escalates. The contest becomes a fight.');
   });
 
-  test('describes fight rounds: hits, critical hits, misses and the nerve check after damage', () => {
-    assert.equal(log(spec({ approach: 'fight' }), 15, 10, 3)[0], 'Round 1 (Fight): A rolled 17, D rolled 10. A hits for 3 damage (D: 7 HP left).');
-    assert.deepEqual(log(spec({ approach: 'fight' }), 20, 5, 2, 3, 20).slice(0, 2), [
-      'Round 1 (Fight): A rolled 22, D rolled 5. A lands a critical hit for 5 damage (D: 5 HP left).',
-      `D makes a nerve check (badly hurt): needed ${NERVE_DC.hurt}, rolled 18, passed.`,
+  test('describes initiative, hits and misses in a fight', () => {
+    assert.deepEqual(log(spec({ approach: 'fight' }), 15, 10, 8, 3, 9), [
+      'A acts first (Reflexes: A rolled 15, D rolled 10).',
+      'Round 1: A attacks D: rolled 10 against Defence 10. Hit for 3 damage (D: 7 HP left).',
+      'Round 1: D attacks A: rolled 9 against Defence 10. Miss.',
+      'Stalemate: the round limit was reached with no winner.',
     ]);
-    assert.equal(log(spec({ approach: 'fight' }), 12, 10)[0], 'Round 1 (Fight): A rolled 14, D rolled 10. No hit.');
-    assert.equal(log(spec({ approach: 'fight' }), 5, 15, 2)[0], 'Round 1 (Fight): A rolled 7, D rolled 15. D hits for 2 damage (A: 8 HP left).');
+  });
+
+  test('describes the highest and lowest possible rolls on other dice', () => {
+    assert.deepEqual(log(spec({ approach: 'fight', dice: DICE['3d6'] }), 4, 4, 4, 3, 3, 3, 6, 6, 6, 1, 1, 1, 1, 1).slice(1, 3), [
+      'Round 1: A attacks D: rolled 20 against Defence 10 (highest possible roll). Critical hit for 2 damage (D: 8 HP left).',
+      'Round 1: D attacks A: rolled 3 against Defence 10 (lowest possible roll). Miss.',
+    ]);
+  });
+
+  test('describes natural 20s, natural 1s and the nerve check when badly hurt', () => {
+    assert.deepEqual(log(spec({ approach: 'fight' }), 15, 10, 20, 2, 3, 20, 1).slice(1, 4), [
+      'Round 1: A attacks D: rolled 22 against Defence 10 (natural 20). Critical hit for 5 damage (D: 5 HP left).',
+      `D makes a nerve check (badly hurt): needed ${NERVE_DC.hurt}, rolled 18, passed.`,
+      'Round 1: D attacks A: rolled -1 against Defence 10 (natural 1). Miss.',
+    ]);
   });
 });
 

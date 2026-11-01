@@ -86,16 +86,17 @@ describe('runContest: nerve checks', { tags: ['unit'] }, () => {
   });
 
   test('high temper: escalates on failure and the contest becomes a fight', () => {
-    // Round 2 is a fight: 12 vs 10, not a win by 5, so no hit.
-    const r = run(spec({ winningLead: 4, maxRounds: 2, defender: defender({ temper: 0.9 }) }), 15, 10, 9, 10, 10);
-    assert.deepEqual(kinds(r.events), ['round', 'nerve', 'escalation', 'fight-round', 'end']);
+    // Round 2 is a fight: initiative (a tie, so the defender goes first), then both attacks miss.
+    const r = run(spec({ winningLead: 4, maxRounds: 2, defender: defender({ temper: 0.9 }) }), 15, 10, 9, 10, 10, 1, 1);
+    assert.deepEqual(kinds(r.events), ['round', 'nerve', 'escalation', 'initiative', 'attack', 'attack', 'end']);
     assert.equal(r.ending.how, 'stalemate');
   });
 
   test('high temper: does not escalate during a fight; a failed nerve check gives up', () => {
-    // Round 1: lead 3 of 6, nerve fails, escalates. Round 2 (fight): critical hit for 5 (10 → 5 HP, badly hurt), nerve fails again.
-    const r = run(spec({ winningLead: 6, maxRounds: 2, defender: defender({ temper: 0.9 }) }), 20, 10, 1, 20, 5, 2, 3, 1);
-    assert.deepEqual(kinds(r.events), ['round', 'nerve', 'escalation', 'fight-round', 'nerve', 'end']);
+    // Round 1: lead 3 of 6, nerve fails, escalates. Round 2 (fight): the attacker wins initiative and lands a critical
+    // hit for 5 (10 → 5 HP, badly hurt); the defender's nerve fails again.
+    const r = run(spec({ winningLead: 6, maxRounds: 2, defender: defender({ temper: 0.9 }) }), 20, 10, 1, 15, 10, 20, 2, 3, 1);
+    assert.deepEqual(kinds(r.events), ['round', 'nerve', 'escalation', 'initiative', 'attack', 'nerve', 'end']);
     assert.deepEqual(r.ending, { how: 'gives-up', loser: 'defender' });
   });
 });
@@ -134,70 +135,99 @@ describe('rollDamage', { tags: ['unit'] }, () => {
 });
 
 describe('runContest: fight', { tags: ['unit'] }, () => {
-  // Both characters have 10 HP, so 5 HP or below is badly hurt.
+  // The attacker attacks at +2 (trained Brawling); the defender at +0. Both have Defence 10 and 10 HP (badly hurt at 5).
+  // Dice order: initiative (attacker, then defender), then each attack in turn: attack roll, damage, any nerve check.
   const fight = (over: Partial<ContestSpec> = {}) => spec({ approach: 'fight', ...over });
-  const fightRounds = (events: readonly ContestEvent[]) => events.filter((e) => e.kind === 'fight-round');
+  const attacks = (events: readonly ContestEvent[]) => events.filter((e) => e.kind === 'attack');
+
+  test('starts with initiative: both roll Reflexes and the higher acts first', () => {
+    const first = (faces: number[]) => {
+      const r = run(fight(), ...faces, 1, 1);
+      const e = r.events[0];
+      assert.ok(e?.kind === 'initiative');
+      return [e.first, ...attacks(r.events).map((a) => (a.kind === 'attack' ? a.by : ''))];
+    };
+    assert.deepEqual(first([15, 10]), ['attacker', 'attacker', 'defender']);
+    assert.deepEqual(first([5, 15]), ['defender', 'defender', 'attacker']);
+    assert.deepEqual(first([10, 10]), ['defender', 'defender', 'attacker']); // a tie goes to the defender
+  });
 
   test('each side starts with its maximum hit points', () => {
-    const r = run(fight(), 8, 10);
+    const r = run(fight(), 15, 10, 1, 1);
     assert.deepEqual(r.maxHp, { attacker: 10, defender: 10 });
     assert.deepEqual(r.hp, { attacker: 10, defender: 10 });
   });
 
-  test('winning a round by 5 or more hits for 1d4 + Strength modifier', () => {
-    const r = run(fight(), 15, 10, 3); // 17 vs 10; 3 damage
-    const round = fightRounds(r.events)[0];
-    assert.ok(round?.kind === 'fight-round' && round.hit?.by === 'attacker' && round.hit.damage.total === 3 && !round.hit.critical);
+  test('an attack hits when d20 + Brawling meets the target’s Defence, for 1d4 + Strength modifier', () => {
+    const r = run(fight(), 15, 10, 8, 3, 9); // attacker: 8 + 2 = 10 vs 10, hit for 3; defender: 9 vs 10, miss
+    const [mine, theirs] = attacks(r.events);
+    assert.ok(mine?.kind === 'attack' && mine.hit && mine.result.dc === 10 && mine.damage?.total === 3 && !mine.critical);
+    assert.ok(theirs?.kind === 'attack' && !theirs.hit && theirs.damage === null);
     assert.equal(r.hp.defender, 7);
   });
 
-  test('winning by less than 5, or a tie, is no hit', () => {
-    for (const faces of [[12, 10], [8, 10]]) {
-      const round = fightRounds(run(fight(), ...faces).events)[0];
-      assert.ok(round?.kind === 'fight-round' && round.hit === null, faces.join(','));
-    }
+  test('Defence includes the target’s Reflexes', () => {
+    const nimble = createCharacter({ name: 'Nimble', training: { reflexes: 'trained' } }); // Defence 12
+    const r = run(fight({ defender: nimble }), 15, 10, 9, 1); // 9 + 2 = 11 vs 12
+    const mine = attacks(r.events)[0];
+    assert.ok(mine?.kind === 'attack' && mine.result.dc === 12 && !mine.hit);
   });
 
-  test('the defender can hit the attacker', () => {
-    const r = run(fight(), 5, 15, 2); // 7 vs 15: a hit for 2
-    assert.equal(r.hp.attacker, 8);
+  test('both sides can hit in the same round', () => {
+    const r = run(fight(), 15, 10, 15, 2, 15, 3);
+    assert.deepEqual(r.hp, { attacker: 7, defender: 8 });
   });
 
-  test('winning by 10 or more is a critical hit', () => {
-    const r = run(fight(), 20, 5, 4, 4, 20); // 22 vs 5; 8 damage, then a nerve check at 2 HP
-    const round = fightRounds(r.events)[0];
-    assert.ok(round?.kind === 'fight-round' && round.hit?.critical === true);
+  test('a natural 20 is a critical hit: the damage dice are rolled twice', () => {
+    const r = run(fight(), 15, 10, 20, 4, 4, 20, 1); // 8 damage leaves 2 HP, so a nerve check follows
+    const mine = attacks(r.events)[0];
+    assert.ok(mine?.kind === 'attack' && mine.critical && mine.damage?.total === 8);
     assert.equal(r.hp.defender, 2);
   });
 
-  test('no nerve check while above half hit points', () => {
-    assert.deepEqual(kinds(run(fight(), 15, 10, 4).events), ['fight-round', 'end']); // 10 → 6 HP
+  test('a natural 1 always misses', () => {
+    const brute = createCharacter({ name: 'Brute', attributes: attributeScores({ str: 20 }), training: { brawling: 'expert' } }); // +9
+    const r = run(fight({ attacker: brute }), 15, 10, 1, 1);
+    const mine = attacks(r.events)[0];
+    assert.ok(mine?.kind === 'attack' && mine.result.roll.total === 10 && !mine.hit);
   });
 
-  test('each hit taken at half hit points or below triggers a nerve check, and gives −2 to rolls', () => {
-    const r = run(fight({ maxRounds: 3 }), 15, 10, 4, 15, 10, 1, 20, 10, 10);
-    assert.deepEqual(kinds(r.events), ['fight-round', 'fight-round', 'nerve', 'fight-round', 'end']);
-    const nerve = r.events[2];
+  test('a knocked-out character does not get to attack', () => {
+    const r = run(fight({ defender: createCharacter({ name: 'Frail', attributes: attributeScores({ con: 1 }) }) }), 15, 10, 20, 4, 4); // 5 HP
+    assert.deepEqual(kinds(r.events), ['initiative', 'attack', 'end']);
+    assert.deepEqual(r.ending, { how: 'knocked-out', loser: 'defender' });
+    assert.equal(r.hp.defender, 0);
+  });
+
+  test('no nerve check while above half hit points', () => {
+    assert.deepEqual(kinds(run(fight(), 15, 10, 15, 4, 1).events), ['initiative', 'attack', 'attack', 'end']); // 10 → 6 HP
+  });
+
+  test('each hit taken at half hit points or below triggers a nerve check, and badly hurt characters get −2 to rolls', () => {
+    // Round 1: the attacker hits for 4 (10 → 6 HP); the defender misses. Round 2: the attacker hits for 1 (→ 5 HP, badly
+    // hurt), the nerve check passes, and the defender attacks at −2.
+    const r = run(fight({ maxRounds: 2 }), 15, 10, 15, 4, 1, 15, 1, 20, 1);
+    assert.deepEqual(kinds(r.events), ['initiative', 'attack', 'attack', 'attack', 'nerve', 'attack', 'end']);
+    const nerve = r.events.find((e) => e.kind === 'nerve');
     assert.ok(nerve?.kind === 'nerve' && nerve.trigger === 'hurt' && nerve.result.dc === NERVE_DC.hurt && nerve.result.roll.modifiers.some((m) => m.reason === 'Badly hurt'));
-    const third = fightRounds(r.events)[2];
-    assert.ok(third?.kind === 'fight-round');
-    assert.deepEqual(third.result.passive.modifiers.at(-1), { value: -2, reason: 'Badly hurt' });
-    assert.equal(r.hp.defender, 5);
+    const last = attacks(r.events).at(-1);
+    assert.ok(last?.kind === 'attack' && last.by === 'defender');
+    assert.deepEqual(last.result.roll.modifiers.at(-1), { value: -2, reason: 'Badly hurt' });
   });
 
   test('failing the nerve check when badly hurt ends the fight', () => {
-    assert.deepEqual(run(fight({ maxRounds: 2 }), 15, 10, 4, 15, 10, 1, 1).ending, { how: 'gives-up', loser: 'defender' });
+    const r = run(fight(), 15, 10, 20, 2, 3, 1); // critical for 5: 10 → 5 HP; nerve fails
+    assert.deepEqual(r.ending, { how: 'gives-up', loser: 'defender' });
   });
 
   test('reaching 0 hit points is a knockout', () => {
-    const r = run(fight({ maxRounds: 3 }), 20, 5, 4, 4, 20, 15, 10, 2);
+    const r = run(fight({ maxRounds: 3 }), 15, 10, 20, 4, 4, 20, 1, 15, 4);
     assert.deepEqual(r.ending, { how: 'knocked-out', loser: 'defender' });
-    assert.equal(r.hp.defender, 0);
     assert.equal(r.rounds, 2);
   });
 
   test('does not use the lead', () => {
-    assert.equal(run(fight(), 15, 10, 1).lead, 0);
+    assert.equal(run(fight(), 15, 10, 1, 1).lead, 0);
   });
 });
 
