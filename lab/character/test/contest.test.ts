@@ -4,7 +4,7 @@ import { describe, test } from 'vitest';
 import { BACKGROUNDS, rollCharacter, type BackgroundName } from '../src/backgrounds';
 import { attributeScores } from '../src/attributes';
 import { createCharacter, type Character } from '../src/character';
-import { APPROACHES, APPROACH_INFO, ENDING_INFO, NERVE_FAILURE, endingKey, rollDamage, runContest, tally, type Approach, type ContestEvent, type ContestSpec } from '../src/contest';
+import { APPROACHES, APPROACH_INFO, ENDING_INFO, NERVE_DC, NERVE_FAILURE, endingKey, rollDamage, runContest, tally, type Approach, type ContestEvent, type ContestSpec } from '../src/contest';
 import { roller, seeded } from '../src/random';
 import { temperament } from '../src/temperament';
 import { scripted } from './support';
@@ -86,15 +86,15 @@ describe('runContest: nerve checks', { tags: ['unit'] }, () => {
   });
 
   test('high temper: escalates on failure and the contest becomes a fight', () => {
-    // Round 2 is a fight: 12 vs 10, a hit for 2, then a nerve check (DC 10) that passes.
-    const r = run(spec({ winningLead: 4, maxRounds: 2, defender: defender({ temper: 0.9 }) }), 15, 10, 9, 10, 10, 2, 15);
-    assert.deepEqual(kinds(r.events), ['round', 'nerve', 'escalation', 'fight-round', 'nerve', 'end']);
+    // Round 2 is a fight: 12 vs 10, a hit for 2 (8 → 6 HP, not badly hurt, so no nerve check).
+    const r = run(spec({ winningLead: 4, maxRounds: 2, defender: defender({ temper: 0.9 }) }), 15, 10, 9, 10, 10, 2);
+    assert.deepEqual(kinds(r.events), ['round', 'nerve', 'escalation', 'fight-round', 'end']);
     assert.equal(r.ending.how, 'stalemate');
   });
 
   test('high temper: does not escalate during a fight; a failed nerve check gives up', () => {
-    // Round 1: lead 3 of 6, nerve fails, escalates. Round 2 (fight): hit for 3, nerve fails again.
-    const r = run(spec({ winningLead: 6, maxRounds: 2, defender: defender({ temper: 0.9 }) }), 20, 10, 1, 15, 10, 3, 1);
+    // Round 1: lead 3 of 6, nerve fails, escalates. Round 2 (fight): hit for 4 (8 → 4 HP, badly hurt), nerve fails again.
+    const r = run(spec({ winningLead: 6, maxRounds: 2, defender: defender({ temper: 0.9 }) }), 20, 10, 1, 15, 10, 4, 1);
     assert.deepEqual(kinds(r.events), ['round', 'nerve', 'escalation', 'fight-round', 'nerve', 'end']);
     assert.deepEqual(r.ending, { how: 'gives-up', loser: 'defender' });
   });
@@ -143,14 +143,15 @@ describe('runContest: fight', { tags: ['unit'] }, () => {
     assert.deepEqual(r.hp, { attacker: 8, defender: 8 });
   });
 
-  test('the higher roll hits for 1d4 + Strength modifier, then the target makes a DC 10 nerve check', () => {
-    const r = run(fight(), 15, 10, 3, 10); // 17 vs 10; 3 damage; nerve 10 vs DC 10
-    assert.deepEqual(kinds(r.events), ['fight-round', 'nerve', 'end']);
+  test('the higher roll hits for 1d4 + Strength modifier', () => {
+    const r = run(fight(), 15, 10, 3); // 17 vs 10; 3 damage
     const round = fightRounds(r.events)[0];
     assert.ok(round?.kind === 'fight-round' && round.hit?.by === 'attacker' && round.hit.damage.total === 3 && !round.hit.critical);
-    const nerve = r.events[1];
-    assert.ok(nerve?.kind === 'nerve' && nerve.trigger === 'hurt' && nerve.result.dc === 10 && nerve.passed);
     assert.equal(r.hp.defender, 5);
+  });
+
+  test('no nerve check while above half hit points', () => {
+    assert.deepEqual(kinds(run(fight(), 15, 10, 3).events), ['fight-round', 'end']); // 8 → 5 HP
   });
 
   test('a tie is no hit', () => {
@@ -161,7 +162,7 @@ describe('runContest: fight', { tags: ['unit'] }, () => {
   });
 
   test('the defender can hit the attacker', () => {
-    const r = run(fight(), 5, 15, 2, 20); // 7 vs 15: a normal hit for 2
+    const r = run(fight(), 5, 15, 2); // 7 vs 15: a normal hit for 2
     assert.equal(r.hp.attacker, 6);
   });
 
@@ -172,10 +173,11 @@ describe('runContest: fight', { tags: ['unit'] }, () => {
     assert.deepEqual(r.ending, { how: 'knocked-out', loser: 'defender' });
   });
 
-  test('at half hit points or below: nerve DC 15 and −2 to rolls', () => {
+  test('each hit taken at half hit points or below triggers a nerve check, and gives −2 to rolls', () => {
     const r = run(fight({ maxRounds: 2 }), 15, 10, 4, 20, 10, 10, 1, 20);
+    assert.deepEqual(kinds(r.events), ['fight-round', 'nerve', 'fight-round', 'nerve', 'end']);
     const nerve = r.events[1];
-    assert.ok(nerve?.kind === 'nerve' && nerve.result.dc === 15 && nerve.result.roll.modifiers.some((m) => m.reason === 'Badly hurt'));
+    assert.ok(nerve?.kind === 'nerve' && nerve.trigger === 'hurt' && nerve.result.dc === NERVE_DC.hurt && nerve.result.roll.modifiers.some((m) => m.reason === 'Badly hurt'));
     const second = fightRounds(r.events)[1];
     assert.ok(second?.kind === 'fight-round');
     assert.deepEqual(second.result.passive.modifiers.at(-1), { value: -2, reason: 'Badly hurt' });
@@ -183,7 +185,7 @@ describe('runContest: fight', { tags: ['unit'] }, () => {
   });
 
   test('failing the nerve check when badly hurt ends the fight', () => {
-    assert.deepEqual(run(fight(), 15, 10, 4, 15).ending, { how: 'gives-up', loser: 'defender' }); // 15 − 2 < 15
+    assert.deepEqual(run(fight(), 15, 10, 4, 1).ending, { how: 'gives-up', loser: 'defender' });
   });
 
   test('reaching 0 hit points is a knockout', () => {
@@ -194,7 +196,7 @@ describe('runContest: fight', { tags: ['unit'] }, () => {
   });
 
   test('does not use the lead', () => {
-    assert.equal(run(fight(), 15, 10, 1, 20).lead, 0);
+    assert.equal(run(fight(), 15, 10, 1).lead, 0);
   });
 });
 

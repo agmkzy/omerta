@@ -7,8 +7,9 @@
 // Fights are decided by hit points instead. Each round both characters roll Brawling, and the higher roll deals damage
 // (1d4 + Strength modifier; dice rolled twice on a critical hit). A character at 0 hit points is knocked out.
 //
-// Nerve checks are triggered by events (falling behind by half the winning lead, taking damage, having a weapon drawn on
-// them); a failed nerve check ends the contest in a way decided by temperament. Every step is recorded as an event.
+// Nerve checks are triggered by events (falling behind by half the winning lead, taking damage at half hit points or
+// below, having a weapon drawn on them); a failed nerve check ends the contest in a way decided by temperament. Every
+// step is recorded as an event.
 import { resolveCheck, resolveOpposed, type CheckResult, type Modifier, type OpposedResult, type Roll } from './check';
 import { abilityModifier } from './attributes';
 import { maxHitPoints, rollFor, type Character } from './character';
@@ -90,7 +91,7 @@ export const ENDING_INFO: { readonly [H in Ending['how']]: { readonly title: str
   'knocked-out': { title: 'Knocked out', explanation: 'Reduced to 0 hit points in a fight.' },
   'gives-up': {
     title: 'Lost their nerve and gave up',
-    explanation: 'Failed a nerve check (after falling behind by half the winning lead, taking damage, or having a weapon drawn on them).',
+    explanation: 'Failed a nerve check (after falling behind by half the winning lead, being hit while badly hurt, or having a weapon drawn on them).',
   },
   flees: { title: 'Lost their nerve and fled', explanation: 'Failed a nerve check, and their low courage or high caution made them run.' },
   withdraws: { title: 'Withdrew', explanation: 'The attacker fell as far behind as the withdraw setting allows.' },
@@ -110,9 +111,8 @@ export const POINTS_PER_LEAD = 5;
 export const CRITICAL_MARGIN = 10;
 /** Unarmed damage: 1d4 + Strength modifier, minimum 1. */
 export const UNARMED_DAMAGE_DIE = 4;
-export const NERVE_DC: Readonly<Record<Trigger, number>> = { 'weapon-drawn': 12, 'falling-behind': 10, hurt: 10 };
-/** The nerve check after taking damage when at half hit points or below. */
-export const BADLY_HURT_NERVE_DC = 15;
+/** Nerve check DCs. `hurt` is the check after each hit that leaves a character at half hit points or below. */
+export const NERVE_DC: Readonly<Record<Trigger, number>> = { 'weapon-drawn': 12, 'falling-behind': 10, hurt: 12 };
 /** Roll penalty at half hit points or below. */
 export const BADLY_HURT_PENALTY = -2;
 
@@ -162,8 +162,7 @@ export function runContest(spec: ContestSpec, roller: Roller): ContestResult {
    * one flees; anyone else gives up.
    */
   const nerveCheck = (side: Side, trigger: Trigger): Ending | null => {
-    const dc = trigger === 'hurt' && badlyHurt(side) ? BADLY_HURT_NERVE_DC : NERVE_DC[trigger];
-    const result = resolveCheck({ ...rollFor(sides[side], 'nerve', { dice, situations: ['hold-nerve'], modifiers: injuryModifiers(side) }), dc }, roller);
+    const result = resolveCheck({ ...rollFor(sides[side], 'nerve', { dice, situations: ['hold-nerve'], modifiers: injuryModifiers(side) }), dc: NERVE_DC[trigger] }, roller);
     const passed = result.margin >= 0;
     events.push({ kind: 'nerve', round, side, trigger, result, passed });
     if (passed) return null;
@@ -197,7 +196,7 @@ export function runContest(spec: ContestSpec, roller: Roller): ContestResult {
     hp[target] = Math.max(0, hp[target] - damage.total);
     events.push({ kind: 'fight-round', round, result, hit: { by, damage, critical }, hp: { ...hp } });
     if (hp[target] === 0) return { how: 'knocked-out', loser: target };
-    return nerveCheck(target, 'hurt');
+    return badlyHurt(target) ? nerveCheck(target, 'hurt') : null;
   };
 
   /** A round decided by the lead. Returns an ending, or null to continue. */
