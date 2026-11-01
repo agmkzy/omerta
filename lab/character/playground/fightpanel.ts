@@ -5,7 +5,7 @@
 // action, grouped by round, with the dice for each line in a column on the right.
 import { BACKGROUND_INFO } from '../src/backgrounds';
 import { BASE_DEFENCE, BASE_HIT_POINTS, type Character } from '../src/character';
-import { DICE, DICE_NAMES, type DiceName } from '../src/dice';
+import { DICE, DICE_NAMES, facesForTotal, type DiceName } from '../src/dice';
 import { compactRoll, percent, signed } from '../src/explain';
 import { UNARMED_DAMAGE_DIE, fightStats, rollOdds, runFight, stepFight, tallyFights, type FightEvent, type FightSpec, type FightTally, type Fighter, type FighterStatus, type RollOdds, type RollRequest } from '../src/fight';
 import { describeFightEvent, describeRollRequest } from '../src/fight-log';
@@ -168,58 +168,63 @@ export function fightPanel(): Panel {
     );
   }
 
+  /**
+   * Where each whole roll starts in a fight's faces: a roll of several dice (3d6, or 2d4 on a critical hit) is one roll,
+   * chosen or rolled as a total and undone together.
+   */
+  const rollStarts = (s: FightSpec, faces: readonly number[]): number[] =>
+    faces.map((_, i) => i).filter((i) => {
+      const step = stepFight(s, faces.slice(0, i));
+      return !step.done && step.request.reason.die === 1;
+    });
+  /** The faces with the last whole roll removed. */
+  const backOneRoll = (s: FightSpec, faces: readonly number[]) => faces.slice(0, rollStarts(s, faces).at(-1) ?? 0);
+
   /** The roll the fight is waiting for: what it is, and buttons to roll it, choose its result, go back or finish. */
   function rollPanel(request: RollRequest, fighters: readonly Fighter[], s: FightSpec, faces: number[]): HTMLElement {
     const fightDice = s.dice ?? DICE.d20;
     const r = request.reason;
     const name = (id: string) => fighters.find((f) => f.id === id)!.character.name;
-    // On a single die, mark which faces would succeed.
-    const succeeds = (face: number): boolean | null => {
-      if (fightDice.count !== 1 || r.of !== 1) return null;
-      if (r.kind === 'attack') return face === fightDice.sides || (face !== 1 && face + r.bonus >= r.dc);
-      if (r.kind === 'nerve') return face + r.bonus >= r.dc;
-      return null;
-    };
-    const faceLabel = (face: number) => (r.kind === 'target' ? `${face}: ${name(r.options[face - 1]!)}` : String(face));
-    const faceButtons = Array.from({ length: request.sides }, (_, i) => {
-      const face = i + 1;
-      const good = succeeds(face);
-      return h('button', { type: 'button', class: `face${good === true ? ' good' : good === false ? ' bad' : ''}`, onclick: () => setFaces([...faces, face]) }, faceLabel(face));
-    });
-    const show = (face: number, landed = false) =>
-      faceButtons.forEach((b, i) => {
-        b.classList.toggle('showing', i === face - 1);
-        b.classList.toggle('landed', landed && i === face - 1);
+    // One choice per possible result of the whole roll (the totals of all its dice), marked where it would succeed.
+    const choices = rollOdds(request, fighters, fightDice).bars;
+    const choose = (total: number) => setFaces([...faces, ...facesForTotal(total, r.of, request.sides)]);
+    const label = (total: number) => (r.kind === 'target' ? `${total}: ${name(r.options[total - 1]!)}` : String(total));
+    const buttons = choices.map((c) =>
+      h('button', { type: 'button', class: `face${c.success === true ? ' good' : c.success === false ? ' bad' : ''}`, onclick: () => choose(c.dice) }, label(c.dice)));
+    const show = (index: number, landed = false) =>
+      buttons.forEach((b, i) => {
+        b.classList.toggle('showing', i === index);
+        b.classList.toggle('landed', landed && i === index);
       });
 
-    /** Decides the result at once, then sweeps left to right along the faces like a roulette wheel, slowing down onto it. */
+    /** Rolls all the dice at once, then sweeps left to right along the choices like a roulette wheel, slowing down onto the result. */
     const animatedRoll = async () => {
-      const result = dice.roll(request.sides, r);
+      const rolled = Array.from({ length: r.of }, () => dice.roll(request.sides, r));
+      const result = choices.findIndex((c) => c.dice === rolled.reduce((a, b) => a + b, 0));
       if (!reduceMotion()) {
         for (const b of panel.querySelectorAll('button')) b.disabled = true;
-        const start = showDice.roll(request.sides);
-        const sequence = sweepSequence(request.sides, start, result, Math.max(SWEEP_MIN_STEPS, request.sides + 4));
+        const sequence = sweepSequence(choices.length, showDice.roll(choices.length), result + 1, Math.max(SWEEP_MIN_STEPS, choices.length + 4));
         const delays = slowingDelays(sequence.length, SWEEP_MS);
-        for (const [i, face] of sequence.entries()) {
-          show(face);
+        for (const [i, position] of sequence.entries()) {
+          show(position - 1);
           await wait(delays[i]!);
         }
         show(result, true);
         await wait(SETTLE_MS);
       }
-      setFaces([...faces, result]);
+      setFaces([...faces, ...rolled]);
     };
 
     const panel = h('div', { class: 'roll-panel' },
-      h('div', { class: 'roll-count' }, `Roll ${faces.length + 1}`),
+      h('div', { class: 'roll-count' }, `Roll ${rollStarts(s, faces).length + 1}`),
       h('p', { class: 'prompt' }, describeRollRequest(request, fighters, fightDice)),
       h('div', { class: 'row' },
         h('button', { type: 'button', class: 'primary', onclick: () => void animatedRoll() }, 'Roll'),
         h('button', { type: 'button', onclick: () => setFaces(playOut(s, faces)) }, 'Play the rest'),
-        h('button', { type: 'button', disabled: faces.length === 0, onclick: () => setFaces(faces.slice(0, -1)) }, 'Back'),
+        h('button', { type: 'button', disabled: faces.length === 0, onclick: () => setFaces(backOneRoll(s, faces)) }, 'Back'),
         h('button', { type: 'button', 'aria-pressed': String(state.showOdds), onclick: () => { state.showOdds = !state.showOdds; render(); } }, state.showOdds ? 'Hide odds' : 'Show odds')),
-      h('div', { class: 'hint' }, 'Or choose the result:'),
-      h('div', { class: 'faces' }, ...faceButtons),
+      h('div', { class: 'hint' }, r.of > 1 ? `Or choose the total of the ${r.of} dice:` : 'Or choose the result:'),
+      h('div', { class: 'faces' }, ...buttons),
       state.showOdds ? oddsView(rollOdds(request, fighters, fightDice), request) : null,
     );
     return panel;
@@ -239,7 +244,6 @@ export function fightPanel(): Panel {
       lines.push(`Damage if it hits: ${n(o.damage.average)} on average (${n(o.damage.criticalAverage)} on a critical hit).`);
       lines.push(`Expected damage from this attack: ${n(o.damage.expected)}.`);
     }
-    if (r.of > 1) lines.push(`These are the odds for the whole ${r.of}-dice roll.`);
     return h('div', { class: 'odds-view' },
       h('div', { class: 'odds-chart', role: 'img', 'aria-label': o.bars.map((b) => `${b.dice}: ${percent(b.probability)}`).join(', ') },
         ...o.bars.map((b) =>
@@ -279,7 +283,7 @@ export function fightPanel(): Panel {
             ? [
                 h('button', { type: 'button', class: 'primary', onclick: () => startFight('auto') }, 'Auto fight again'),
                 h('button', { type: 'button', onclick: () => startFight('step') }, 'Step through again'),
-                h('button', { type: 'button', onclick: () => setFaces(faces.slice(0, -1)) }, 'Back one roll'),
+                h('button', { type: 'button', onclick: () => setFaces(backOneRoll(s, faces)) }, 'Back one roll'),
                 h('button', { type: 'button', onclick: () => startFight('simulate') }, `Simulate ${RUNS.toLocaleString()} fights`),
               ]
             : []),

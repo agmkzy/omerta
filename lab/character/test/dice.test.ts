@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fc from 'fast-check';
 import { describe, test } from 'vitest';
-import { DICE, DICE_NAMES, EDGES, EDGE_INFO, rollDice } from '../src/dice';
+import { DICE, DICE_NAMES, EDGES, EDGE_INFO, facesForTotal, rollDice } from '../src/dice';
 import { roller, seeded } from '../src/random';
 import { scripted } from './support';
 
@@ -33,6 +33,33 @@ describe('descriptions', { tags: ['unit'] }, () => {
   test('describe every dice option and advantage setting', () => {
     for (const n of DICE_NAMES) assert.ok(DICE[n].description, n);
     for (const e of EDGES) assert.ok(EDGE_INFO[e].name && EDGE_INFO[e].description, e);
+  });
+});
+
+describe('facesForTotal', { tags: ['unit'] }, () => {
+  test('splits a total into dice as evenly as possible', () => {
+    assert.deepEqual(facesForTotal(10, 3, 6), [4, 3, 3]);
+    assert.deepEqual(facesForTotal(18, 3, 6), [6, 6, 6]);
+    assert.deepEqual(facesForTotal(3, 3, 6), [1, 1, 1]);
+    assert.deepEqual(facesForTotal(7, 1, 20), [7]);
+  });
+
+  test('throws for a total the dice cannot make', () => {
+    assert.throws(() => facesForTotal(2, 3, 6), RangeError);
+    assert.throws(() => facesForTotal(19, 3, 6), RangeError);
+    assert.throws(() => facesForTotal(4.5, 1, 6), RangeError);
+  });
+});
+
+describe('facesForTotal', { tags: ['property'] }, () => {
+  test('gives faces on the die that add up to the total', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 1, max: 4 }), fc.integer({ min: 2, max: 20 }), fc.nat(), (count, sides, pick) => {
+        const total = count + (pick % (count * (sides - 1) + 1));
+        const faces = facesForTotal(total, count, sides);
+        return faces.length === count && faces.every((f) => f >= 1 && f <= sides) && faces.reduce((a, b) => a + b, 0) === total;
+      }),
+    );
   });
 });
 

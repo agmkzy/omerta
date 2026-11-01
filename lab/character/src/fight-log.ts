@@ -45,14 +45,14 @@ export function describeFightEvent(event: FightEvent, fight: FightResult, option
 
 /**
  * Describes a roll the fight is waiting for: what it is for, and for an attack or nerve check, what it needs and the
- * chance. On a d20 it gives the number needed; on other dice only the chance. Midway through a multi-dice roll it gives
- * neither, as the earlier dice have already changed the odds.
+ * chance. On a d20 it gives the number needed; on other dice only the chance. Midway through a multi-dice roll (when
+ * stepping die by die) it names the die and gives neither, as the earlier dice have already changed the odds.
  */
 export function describeRollRequest(request: RollRequest, fighters: readonly Fighter[], dice: Dice): string {
   const r = request.reason;
   const name = (id: string) => fighters.find((f) => f.id === id)!.character.name;
   const plus = (n: number) => (n < 0 ? ` − ${-n}` : ` + ${n}`);
-  const which = r.of > 1 ? ` (die ${r.die} of ${r.of})` : '';
+  const which = r.die > 1 ? ` (die ${r.die} of ${r.of})` : '';
   const d20 = dice.count === 1 && dice.sides === 20;
   switch (r.kind) {
     case 'initiative':

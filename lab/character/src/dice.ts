@@ -44,3 +44,11 @@ export function rollDice(dice: Dice, edge: Edge, roller: Roller): DiceRoll {
 }
 
 const sum = (xs: readonly number[]) => xs.reduce((a, b) => a + b, 0);
+
+/** Faces for `count` dice of `sides` that add up to `total`, as even as possible (e.g. 10 on 3d6 is 4, 3, 3). */
+export function facesForTotal(total: number, count: number, sides: number): number[] {
+  if (!Number.isInteger(total) || total < count || total > count * sides) throw new RangeError(`${count}d${sides} cannot make ${total}`);
+  const base = Math.floor(total / count);
+  const extra = total - base * count;
+  return Array.from({ length: count }, (_, i) => base + (i < extra ? 1 : 0));
+}

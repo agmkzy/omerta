@@ -271,7 +271,7 @@ describe('describeRollRequest', { tags: ['unit'] }, () => {
     assert.equal(ask(duel()), 'A rolls initiative: d20 + 0.');
     assert.equal(ask(duel(), 15, 10), 'A attacks D: d20 + 2 against Defence 10. Needs 8 or more to hit (65%).');
     assert.equal(ask(duel(), 15, 10, 8), 'A rolls damage against D: 1d4.');
-    assert.equal(ask(duel(), 15, 10, 20), 'A rolls damage for a critical hit against D: 2d4 (die 1 of 2).');
+    assert.equal(ask(duel(), 15, 10, 20), 'A rolls damage for a critical hit against D: 2d4.');
     assert.equal(ask(duel(), 15, 10, 20, 2, 3), 'D is at half HP and must hold their nerve: d20 + 0 against 10. Needs 10 or more (55%).');
   });
 
