@@ -1,5 +1,6 @@
 // A character: attributes, training and the bonus training gives. Players and NPCs alike.
 import { ATTRIBUTE_INFO, abilityModifier, attributeScores, type Attribute, type AttributeScores } from './attributes';
+import type { BackgroundName } from './backgrounds';
 import { combineEdges, type Modifier, type Roll } from './check';
 import { DICE, type Dice, type Edge } from './dice';
 import { SKILL_INFO, attributesFor, type Skill } from './skills';
@@ -11,6 +12,7 @@ export type Training = Readonly<Partial<Record<Skill, Proficiency>>>;
 
 export interface Character {
   readonly name: string;
+  readonly background?: BackgroundName;
   readonly attributes: AttributeScores;
   readonly training: Training;
   /** Added to trained skills, twice to expert ones. D&D's runs from 2 to 6 as a character grows. */
@@ -20,6 +22,7 @@ export interface Character {
 
 export interface CharacterInput {
   readonly name: string;
+  readonly background?: BackgroundName;
   readonly attributes?: AttributeScores;
   readonly training?: Training;
   readonly proficiencyBonus?: number;
@@ -35,6 +38,7 @@ export function createCharacter(input: CharacterInput): Character {
     throw new RangeError(`the proficiency bonus runs from ${PROFICIENCY_MIN} to ${PROFICIENCY_MAX}, got ${proficiencyBonus}`);
   return {
     name: input.name,
+    ...(input.background && { background: input.background }),
     attributes: attributeScores(input.attributes ?? {}),
     training: { ...input.training },
     proficiencyBonus,
