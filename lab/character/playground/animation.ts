@@ -1,6 +1,5 @@
 // Timing and faces for the dice animation. The result of a roll is decided before the animation starts; this only
 // decides what is shown on the way there.
-import type { Roller } from '../src/random';
 
 /** `count` delays in milliseconds, each longer than the last, adding up to `total`: a flicker that slows down. */
 export function slowingDelays(count: number, total: number): number[] {
@@ -10,14 +9,12 @@ export function slowingDelays(count: number, total: number): number[] {
   return weights.map((w) => (w / sum) * total);
 }
 
-/** `count` faces to flicker through, ending on `result`, never showing the same face twice in a row. */
-export function flickerSequence(sides: number, count: number, result: number, roller: Roller): number[] {
-  if (sides === 1) return Array.from({ length: count }, () => 1);
-  const faces = [result];
-  while (faces.length < count) {
-    const after = faces[0]!;
-    const face = roller.roll(sides - 1);
-    faces.unshift(face >= after ? face + 1 : face);
-  }
-  return faces;
+/**
+ * The faces a roulette-style sweep passes over: one step to the right at a time from `start`, wrapping from the last face
+ * to the first, going round until it has taken at least `minSteps` and reaches `result`.
+ */
+export function sweepSequence(sides: number, start: number, result: number, minSteps: number): number[] {
+  const distance = ((result - start - 1 + sides) % sides) + 1;
+  const length = distance + sides * Math.max(0, Math.ceil((minSteps - distance) / sides));
+  return Array.from({ length }, (_, i) => ((start + i) % sides) + 1);
 }

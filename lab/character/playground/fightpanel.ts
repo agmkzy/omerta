@@ -12,18 +12,18 @@ import { describeFightEvent, describeRollRequest } from '../src/fight-log';
 import { NERVE_DC, type Side } from '../src/nerve';
 import { replay, roller, seeded } from '../src/random';
 import { notableTraits } from '../src/temperament';
-import { flickerSequence, slowingDelays } from './animation';
+import { slowingDelays, sweepSequence } from './animation';
 import { h, segmented, slider } from './dom';
 import { assign, canFight, loadParties, reconcile, saveParties, type Parties } from './parties';
 import { characterById, getRoster, storage } from './store';
 import { hint, type Panel } from './views';
 
 const RUNS = 1000;
-/** The dice animation: how many faces it flickers through, how long that takes, and how long it rests on the result. */
-const FLICKERS = 14;
-const FLICKER_MS = 850;
+/** The dice animation, a roulette-style sweep: at least this many steps (and more than once round), over this long, then a short rest on the result. */
+const SWEEP_MIN_STEPS = 16;
+const SWEEP_MS = 850;
 const SETTLE_MS = 200;
-/** Dice for the animation only, kept apart from the fight's dice so the animation can never change a result. */
+/** Dice for the animation only (where the sweep starts), kept apart from the fight's dice so it can never change a result. */
 const showDice = roller(seeded(Date.now() >>> 0));
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 const reduceMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
@@ -191,13 +191,14 @@ export function fightPanel(): Panel {
       faceButtons.forEach((b, i) => b.classList.toggle('showing', i === face - 1));
     };
 
-    /** Decides the result at once, then flickers through faces, slowing down and landing on it. */
+    /** Decides the result at once, then sweeps left to right along the faces like a roulette wheel, slowing down onto it. */
     const animatedRoll = async () => {
       const result = dice.roll(request.sides, r);
       if (!reduceMotion()) {
         for (const b of panel.querySelectorAll('button')) b.disabled = true;
-        const sequence = flickerSequence(request.sides, FLICKERS, result, showDice);
-        const delays = slowingDelays(sequence.length, FLICKER_MS);
+        const start = showDice.roll(request.sides);
+        const sequence = sweepSequence(request.sides, start, result, Math.max(SWEEP_MIN_STEPS, request.sides + 4));
+        const delays = slowingDelays(sequence.length, SWEEP_MS);
         for (const [i, face] of sequence.entries()) {
           show(face);
           await wait(delays[i]!);

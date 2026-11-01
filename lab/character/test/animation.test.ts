@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
 import fc from 'fast-check';
 import { describe, test } from 'vitest';
-import { flickerSequence, slowingDelays } from '../playground/animation';
-import { roller, seeded } from '../src/random';
+import { slowingDelays, sweepSequence } from '../playground/animation';
 
 describe('slowingDelays', { tags: ['unit'] }, () => {
   test('gives the requested number of delays, each longer than the last, adding up to the total', () => {
@@ -17,27 +16,29 @@ describe('slowingDelays', { tags: ['unit'] }, () => {
   });
 });
 
-describe('flickerSequence', { tags: ['unit'] }, () => {
-  test('ends on the result', () => {
-    assert.equal(flickerSequence(20, 12, 7, roller(seeded(1))).at(-1), 7);
+describe('sweepSequence', { tags: ['unit'] }, () => {
+  test('moves one face to the right each step, wrapping round, and ends on the result', () => {
+    assert.deepEqual(sweepSequence(6, 5, 2, 4), [6, 1, 2, 3, 4, 5, 6, 1, 2]);
   });
 
-  test('on a two-sided die it alternates', () => {
-    assert.deepEqual(flickerSequence(2, 4, 1, roller(seeded(1))), [2, 1, 2, 1]);
-  });
-
-  test('on a one-sided die it can only show the result', () => {
-    assert.deepEqual(flickerSequence(1, 3, 1, roller(seeded(1))), [1, 1, 1]);
+  test('goes round at least the minimum number of steps, then stops at the first pass over the result', () => {
+    assert.equal(sweepSequence(20, 1, 1, 18).length, 20);
+    assert.equal(sweepSequence(20, 1, 20, 18).length, 19);
+    assert.equal(sweepSequence(2, 1, 2, 18).length, 19);
   });
 });
 
-describe('flickerSequence', { tags: ['property'] }, () => {
-  test('shows only faces on the die, never the same face twice in a row, and ends on the result', () => {
+describe('sweepSequence', { tags: ['property'] }, () => {
+  test('steps right one face at a time from the start, ending on the result, in at least the minimum steps', () => {
     fc.assert(
-      fc.property(fc.integer(), fc.integer({ min: 2, max: 20 }), fc.integer({ min: 1, max: 30 }), fc.integer({ min: 1, max: 20 }), (seed, sides, count, pick) => {
-        const result = ((pick - 1) % sides) + 1;
-        const seq = flickerSequence(sides, count, result, roller(seeded(seed)));
-        return seq.length === count && seq.at(-1) === result && seq.every((f, i) => f >= 1 && f <= sides && (i === 0 || f !== seq[i - 1]));
+      fc.property(fc.integer({ min: 1, max: 20 }), fc.integer({ min: 1, max: 20 }), fc.integer({ min: 1, max: 20 }), fc.integer({ min: 1, max: 30 }), (sides, a, b, min) => {
+        const start = ((a - 1) % sides) + 1;
+        const result = ((b - 1) % sides) + 1;
+        const seq = sweepSequence(sides, start, result, min);
+        const next = (f: number) => (f % sides) + 1;
+        return (
+          seq.at(-1) === result && seq.length >= min && seq.length < min + sides && seq[0] === next(start) && seq.every((f, i) => i === 0 || f === next(seq[i - 1]!))
+        );
       }),
     );
   });
