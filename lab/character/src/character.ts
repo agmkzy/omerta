@@ -46,15 +46,19 @@ export function createCharacter(input: CharacterInput): Character {
   };
 }
 
+/** The attribute a man brings to a skill: the best it allows, its own on a tie. */
+export function attributeUsed(c: Character, skill: Skill): Attribute {
+  return attributesFor(skill).reduce((best, a) => (c.attributes[a] > c.attributes[best] ? a : best));
+}
+
 /**
  * What a man adds to a roll of the skill: his attribute modifier and his training, each with its reason. Unless told which, he
  * uses the best of the attributes the skill allows.
  */
 export function skillModifiers(c: Character, skill: Skill, using?: Attribute): Modifier[] {
-  const allowed = attributesFor(skill);
-  if (using !== undefined && !allowed.includes(using))
+  if (using !== undefined && !attributesFor(skill).includes(using))
     throw new RangeError(`${SKILL_INFO[skill].name} cannot be done with ${ATTRIBUTE_INFO[using].name}`);
-  const attribute = using ?? allowed.reduce((best, a) => (c.attributes[a] > c.attributes[best] ? a : best));
+  const attribute = using ?? attributeUsed(c, skill);
   const score = c.attributes[attribute];
   const modifiers: Modifier[] = [{ value: abilityModifier(score), reason: `${ATTRIBUTE_INFO[attribute].name} ${score}` }];
   const proficiency = c.training[skill] ?? 'untrained';

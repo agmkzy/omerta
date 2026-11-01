@@ -3,7 +3,7 @@ import fc from 'fast-check';
 import { describe, test } from 'vitest';
 import { attributeScores } from '../src/attributes';
 import { bonusOf } from '../src/check';
-import { createCharacter, rollFor, skillModifiers } from '../src/character';
+import { attributeUsed, createCharacter, rollFor, skillModifiers } from '../src/character';
 import { DICE } from '../src/dice';
 import { SKILLS } from '../src/skills';
 import { temperament } from '../src/temperament';
@@ -31,6 +31,15 @@ describe('a character’s skill', { tags: ['unit'] }, () => {
       { value: 3, reason: 'Strength 16' },
       { value: 2, reason: 'Trained in Intimidation' },
     ]);
+  });
+
+  test('says which attribute he uses', () => {
+    assert.equal(attributeUsed(vinnie, 'intimidation'), 'str');
+    assert.equal(attributeUsed(vinnie, 'bookkeeping'), 'int');
+  });
+
+  test('keeps to the skill’s own attribute on a tie', () => {
+    assert.equal(attributeUsed(createCharacter({ name: 'Even' }), 'intimidation'), 'cha');
   });
 
   test('can be made to use a particular allowed attribute', () => {
