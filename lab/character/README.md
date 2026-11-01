@@ -58,17 +58,20 @@ branch, function and line coverage.
 
 A contest is a multi-round opposed check that resolves automatically; neither side chooses actions.
 
-- **Lead.** Each round both characters roll. Whoever rolls higher gains lead points: 1 per 5 points of difference,
-  rounded up. A tie changes nothing. A character wins outright when their lead reaches the **winning lead** (default 5).
-- **Approaches:** `intimidation` (Intimidation vs Nerve), `armed-threat` (as intimidation, with attacker advantage and a
-  DC 12 nerve check for the defender before round 1), `fight` (Brawling vs Brawling; winning a round by 5+ lands a hit,
-  each hit is −1 to later rolls, and 3 hits is a knockout).
-- **Nerve checks** happen when a character falls behind by half the winning lead (DC 10, once per side), takes a hit
-  (DC 10 + 2 per hit), or has a weapon drawn on them (DC 12). At most one per round.
-- **A failed nerve check** ends the contest: a high-temper character escalates to a fight instead (once per contest), a
-  low-courage or high-caution character flees, and anyone else gives up.
-- **Other endings:** the attacker's optional withdraw setting (withdraws when behind by N) and the round limit
-  (stalemate).
+- **Intimidation and armed threats are decided by a lead.** Each round both characters roll. Whoever rolls higher gains
+  lead points: 1 per 5 points of difference, rounded up. A tie changes nothing. A character wins outright when their
+  lead reaches the **winning lead** (default 5). `intimidation` is Intimidation vs Nerve; `armed-threat` is the same
+  with attacker advantage and a DC 12 nerve check for the defender before round 1.
+- **Fights are decided by hit points.** Each round is Brawling vs Brawling; the higher roll deals 1d4 + Strength
+  modifier damage (minimum 1), with the dice rolled twice when winning by 10 or more (critical hit). 0 HP is a
+  knockout. At half HP or below a character is badly hurt: −2 to rolls.
+- **Hit points** are 8 + Constitution modifier, plus the proficiency bonus if trained in Toughness (twice if expert):
+  D&D's first-level d8 hit die plus its Tough feat.
+- **Nerve checks** happen when a character falls behind by half the winning lead (DC 10, once per side), takes damage
+  (DC 10, or 15 when badly hurt), or has a weapon drawn on them (DC 12).
+- **A failed nerve check** ends the contest: a high-temper character escalates to a fight instead (once, and not when
+  already fighting), a low-courage or high-caution character flees, and anyone else gives up.
+- **Other endings:** the attacker's optional withdraw setting (lead contests only) and the round limit (stalemate).
 - `ENDING_INFO` explains each kind of ending; the playground groups simulated results by winner and cause.
 
 ## Open questions
@@ -78,9 +81,10 @@ A contest is a multi-round opposed check that resolves automatically; neither si
 - **Progression.** XP/levels versus improvement through use. Not implemented; only the proficiency bonus can be set.
 - **Knowledge.** The player should see an estimate of an NPC's abilities based on what they know, not the true values.
   This would sit on top of the exact odds.
-- **Contest balance.** The step size, nerve DCs, hit threshold and temperament effects are first guesses, all
-  defined as constants or in one table.
+- **Contest balance.** The lead step, nerve DCs, damage and temperament effects are first guesses, all defined as
+  constants or in one table. Fights are currently short (under 2 rounds on average) and mostly end with a failed nerve
+  check, because one is made after every hit.
 - **Unused skills.** Reflexes, Firearms and others are defined but no contest uses them yet. For example, Reflexes
-  could decide who acts first when a contest escalates to a fight.
+  could decide who strikes first in a fight.
 - **Integration with the game.** Mapping the existing `Traits`/`Skills` onto this model, save migration, and replacing
   the game's existing ad-hoc checks in `src/` are not started.

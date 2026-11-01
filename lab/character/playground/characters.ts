@@ -2,7 +2,7 @@
 import { ATTRIBUTES, ATTRIBUTE_INFO, SCORE_MAX, SCORE_MIN, abilityModifier } from '../src/attributes';
 import { BACKGROUNDS, BACKGROUND_INFO, type BackgroundName } from '../src/backgrounds';
 import { bonusOf } from '../src/check';
-import { PROFICIENCIES, PROFICIENCY_MAX, PROFICIENCY_MIN, attributeUsed, createCharacter, skillModifiers, type Character, type Proficiency } from '../src/character';
+import { PROFICIENCIES, PROFICIENCY_MAX, PROFICIENCY_MIN, attributeUsed, createCharacter, hitPointModifiers, maxHitPoints, skillModifiers, type Character, type Proficiency } from '../src/character';
 import { describeModifier, signed } from '../src/explain';
 import { NERVE_FAILURE } from '../src/contest';
 import { SKILLS, SKILL_INFO, attributesFor, skillsUsing } from '../src/skills';
@@ -27,7 +27,8 @@ function attributeUse(a: (typeof ATTRIBUTES)[number]): string {
   const uses = skillsUsing(a);
   const primary = uses.filter((u) => u.primary).map((u) => SKILL_INFO[u.skill].name);
   const alternative = uses.filter((u) => !u.primary).map((u) => SKILL_INFO[u.skill].name);
-  return `Used by: ${primary.join(', ')}${alternative.length ? `; alternative for ${alternative.join(', ')}` : ''}.`;
+  const hp = a === 'con' ? ' Also adds to hit points.' : '';
+  return `Used by: ${primary.join(', ')}${alternative.length ? `; alternative for ${alternative.join(', ')}` : ''}.${hp}`;
 }
 
 /** What a trait does to rolls and in contests, if anything. */
@@ -89,6 +90,8 @@ export function charactersPanel(): Panel {
     const traits = notableTraits(c.temperament);
     summary.replaceChildren(
       h('div', {}, h('span', { class: 'muted' }, 'Background: '), c.background ? `${BACKGROUND_INFO[c.background].name}. ${BACKGROUND_INFO[c.background].description}` : 'none'),
+      h('div', {}, h('span', { class: 'muted' }, 'Hit points: '), `${maxHitPoints(c)} `,
+        h('span', { class: 'muted' }, `(${hitPointModifiers(c).map((m, i) => (i === 0 ? `${m.value} ${m.reason.toLowerCase()}` : describeModifier(m))).join(', ')})`)),
       h('div', {}, h('span', { class: 'muted' }, 'Best skills: '), best.map((b) => `${SKILL_INFO[b.s].name} ${signed(b.bonus)}`).join(', ')),
       h('div', {}, h('span', { class: 'muted' }, 'Notable traits: '), traits.length ? traits.join(', ') : 'none'),
     );

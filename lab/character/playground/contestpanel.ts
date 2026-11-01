@@ -1,6 +1,7 @@
 // Contest tab: configure a contest between two saved characters, run it once to read the round-by-round log, or many
 // times to see how often each side wins and what decides it.
-import { APPROACHES, APPROACH_INFO, ENDING_INFO, POINTS_PER_LEAD, runContest, tally, type Approach, type ContestResult, type ContestSpec, type Ending, type Side } from '../src/contest';
+import { APPROACHES, APPROACH_INFO, BADLY_HURT_NERVE_DC, BADLY_HURT_PENALTY, CRITICAL_MARGIN, ENDING_INFO, NERVE_DC, POINTS_PER_LEAD, UNARMED_DAMAGE_DIE, runContest, tally, type Approach, type ContestResult, type ContestSpec, type Ending, type Side } from '../src/contest';
+import { BASE_HIT_POINTS } from '../src/character';
 import { describeEvent } from '../src/contest-log';
 import { DICE, DICE_NAMES, type DiceName } from '../src/dice';
 import { describeOpposed, percent } from '../src/explain';
@@ -74,11 +75,16 @@ export function contestPanel(): Panel {
     if (state.tally) parts.push(...tallyView(state.tally.spec, state.tally.counts));
     if (state.run) {
       const { spec: s, result } = state.run;
+      const hpLine = (['attacker', 'defender'] as const).map((side) => `${s[side].name} ${result.hp[side]}/${result.maxHp[side]} HP`).join(' · ');
       parts.push(
         h('h3', {}, 'One contest, round by round'),
+        hint(`At the end: ${hpLine}.`),
         h('ol', { class: 'event-log' }, ...result.events.map((e) =>
           h('li', { class: `ev-${e.kind}` }, describeEvent(e, s),
-            e.kind === 'round' ? h('div', { class: 'detail' }, describeOpposed(e.result)) : null,
+            e.kind === 'round' || e.kind === 'fight-round' ? h('div', { class: 'detail' }, describeOpposed(e.result)) : null,
+            e.kind === 'fight-round' && e.hit
+              ? h('div', { class: 'detail' }, `Damage: ${e.hit.damage.faces.length}d${UNARMED_DAMAGE_DIE} [${e.hit.damage.faces.join(' ')}] ${e.hit.damage.modifier >= 0 ? '+' : ''}${e.hit.damage.modifier} Strength = ${e.hit.damage.total}`)
+              : null,
             e.kind === 'nerve' ? h('div', { class: 'detail' }, e.result.roll.modifiers.map((m) => `${m.value >= 0 ? '+' : ''}${m.value} ${m.reason}`).join(', ')) : null))),
       );
     }
@@ -90,24 +96,31 @@ export function contestPanel(): Panel {
     root.replaceChildren(
       h('h2', { id: 'contest-title' }, 'Contest'),
       h('details', { class: 'guide', open: true }, h('summary', {}, 'How a contest works'),
-        h('ul', {},
-          h('li', {}, `It is played in rounds. Each round both characters roll, and whoever rolls higher gains lead points: 1 point for every ${POINTS_PER_LEAD} points they rolled higher by (rounded up). A tie changes nothing.`),
-          h('li', {}, 'A character wins outright when their lead reaches the winning lead.'),
-          h('li', {}, 'A character can also lose their nerve. They make a nerve check when they fall behind by half the winning lead (DC 10, once per contest), take a hit in a fight (DC 10 + 2 per hit), or have a weapon drawn on them (DC 12).'),
-          h('li', {}, 'Failing a nerve check ends the contest: a hot-tempered character escalates to a fight instead (once); a timid or cautious one flees; anyone else gives up.'),
-          h('li', {}, 'If neither side has won by the round limit, it is a stalemate.'))),
+        state.approach === 'fight'
+          ? h('ul', {},
+              h('li', {}, `It is played in rounds. Each round both characters roll Brawling. The higher roll hits for 1d${UNARMED_DAMAGE_DIE} + Strength modifier damage (at least 1). A tie is no hit.`),
+              h('li', {}, `Winning a round by ${CRITICAL_MARGIN} or more is a critical hit: the damage dice are rolled twice.`),
+              h('li', {}, `Each character has hit points: ${BASE_HIT_POINTS} + Constitution modifier, plus their proficiency bonus if trained in Toughness (twice if expert). At 0 they are knocked out.`),
+              h('li', {}, `After taking damage, a character makes a nerve check: DC ${NERVE_DC.hurt}, or DC ${BADLY_HURT_NERVE_DC} at half hit points or below, where they also take ${BADLY_HURT_PENALTY} to rolls. Failing it ends the fight: a timid or cautious character flees; anyone else gives up.`),
+              h('li', {}, 'If nobody has won by the round limit, it is a stalemate.'))
+          : h('ul', {},
+              h('li', {}, `It is played in rounds. Each round both characters roll, and whoever rolls higher gains lead points: 1 point for every ${POINTS_PER_LEAD} points they rolled higher by (rounded up). A tie changes nothing.`),
+              h('li', {}, 'A character wins outright when their lead reaches the winning lead.'),
+              h('li', {}, `A character can also lose their nerve. They make a nerve check when they fall behind by half the winning lead (DC ${NERVE_DC['falling-behind']}, once per contest) or have a weapon drawn on them (DC ${NERVE_DC['weapon-drawn']}).`),
+              h('li', {}, 'Failing a nerve check ends the contest: a hot-tempered character escalates to a fight instead (once, decided by hit points from then on); a timid or cautious one flees; anyone else gives up.'),
+              h('li', {}, 'If neither side has won by the round limit, it is a stalemate.'))),
       h('div', { class: 'grid' },
         h('div', {},
           h('div', { class: 'row sides' }, sideSelect('attacker', 'Attacker'), swapButton(), sideSelect('defender', 'Defender')),
           h('div', { class: 'field' }, h('span', {}, 'Approach'), segmented(APPROACHES, state.approach, (a) => { state.approach = a; render(); }, (a) => APPROACH_INFO[a].name),
             hint(APPROACH_INFO[state.approach].description)),
-          slider('Winning lead', state.winningLead, 1, 10, (v) => {
+          state.approach === 'fight' ? null : slider('Winning lead', state.winningLead, 1, 10, (v) => {
             state.winningLead = v;
             state.withdrawAt = Math.min(state.withdrawAt, v);
             render();
           }, String, 'How many points ahead a character must get to win. Higher values make contests longer and less dependent on one lucky roll.'),
-          slider('Attacker withdraws when behind by (0 = never)', state.withdrawAt, 0, state.winningLead, (v) => (state.withdrawAt = v), String,
-            'Lets the attacker cut their losses instead of fighting on.'),
+          state.approach === 'fight' ? null : slider('Attacker withdraws when behind by (0 = never)', state.withdrawAt, 0, state.winningLead, (v) => (state.withdrawAt = v), String,
+            'Lets the attacker cut their losses instead of carrying on.'),
           slider('Round limit', state.maxRounds, 1, 30, (v) => (state.maxRounds = v), String, 'The contest is a stalemate if nobody has won after this many rounds.'),
           h('div', { class: 'field' }, h('span', {}, 'Dice'), segmented(DICE_NAMES, state.dice, (d) => { state.dice = d; render(); }), hint(DICE[state.dice].description)),
           h('div', { class: 'row' },
