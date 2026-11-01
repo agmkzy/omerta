@@ -13,7 +13,7 @@ export default defineConfig({
     ],
     coverage: {
       provider: 'v8',
-      include: ['src/**/*.ts', 'playground/roster.ts'],
+      include: ['src/**/*.ts', 'playground/roster.ts', 'playground/parties.ts'],
       reporter: ['text', 'html'],
       reportsDirectory: 'coverage',
       thresholds: { lines: 100, statements: 100, branches: 100, functions: 100 },

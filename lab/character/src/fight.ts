@@ -1,21 +1,23 @@
-// Fights, following D&D's combat rules. When a fight starts both characters roll Reflexes for initiative; the higher acts
-// first each round (a tie goes to the defender). Each round each character attacks: d20 + Brawling against the target's
-// Defence (10 + Reflexes bonus). A hit deals 1d4 + Strength modifier, at least 1; a natural 20 always hits and rolls the
-// damage dice twice; a natural 1 always misses. A character at 0 hit points is knocked out and does not act.
+// Fights between two sides of one or more fighters, following D&D's combat rules. Every fighter rolls Reflexes for
+// initiative; the order is highest first (defenders first on a tie, then list order). On their turn, each fighter still in
+// the fight attacks a random enemy who is still fighting: d20 + Brawling against the target's Defence (10 + Reflexes
+// bonus). A hit deals 1d4 + Strength modifier, at least 1; a natural 20 always hits and rolls the damage dice twice; a
+// natural 1 always misses. A fighter at 0 hit points is knocked out.
 //
-// Nerve follows D&D's optional morale rule: the first time a character drops to half hit points or below, they make one
-// nerve check (fight or flight). Passing commits them to the fight. Failing ends it: they flee, or yield (a defender
-// surrenders, an attacker backs off). Every step is recorded as an event.
+// Nerve follows D&D's optional morale rules. The first time a fighter drops to half hit points or below, they make one
+// nerve check. The first time at least half of a side is out of the fight, everyone left on that side makes one. A
+// failure takes that fighter out of the fight: they flee (timid or cautious) or yield (a defender surrenders, an attacker
+// backs off). A side loses when none of its fighters is still fighting. Every step is recorded as an event.
 import { abilityModifier } from './attributes';
-import { resolveCheck, resolveOpposed, type CheckResult, type OpposedResult } from './check';
+import { resolveCheck, throwRoll, type CheckResult, type RollResult } from './check';
 import { defence, maxHitPoints, rollFor, type Character } from './character';
 import { DICE, type Dice } from './dice';
 import { nerveCheck, otherSide, type NerveCheck, type Side } from './nerve';
 import type { Roller } from './random';
 
 export interface FightSpec {
-  readonly attacker: Character;
-  readonly defender: Character;
+  readonly attackers: readonly Character[];
+  readonly defenders: readonly Character[];
   readonly dice?: Dice;
   /** Default 12. */
   readonly maxRounds?: number;
@@ -27,52 +29,54 @@ export interface Damage {
   readonly total: number;
 }
 
-export type FightEnding =
-  | { readonly how: 'knocked-out' | 'flees'; readonly loser: Side }
-  /** The defender lost their nerve and stopped resisting. */
-  | { readonly how: 'surrenders'; readonly loser: 'defender' }
-  /** The attacker lost their nerve and stopped attacking. */
-  | { readonly how: 'backs-off'; readonly loser: 'attacker' }
-  | { readonly how: 'stalemate'; readonly loser: null };
+export const FIGHTER_STATUSES = ['fighting', 'knocked-out', 'surrendered', 'backed-off', 'fled'] as const;
+export type FighterStatus = (typeof FIGHTER_STATUSES)[number];
+
+export const FIGHTER_STATUS_INFO: { readonly [S in FighterStatus]: { readonly title: string; readonly explanation: string } } = {
+  fighting: { title: 'Still fighting', explanation: 'Was still in the fight at the end.' },
+  'knocked-out': { title: 'Knocked out', explanation: 'Reduced to 0 hit points.' },
+  surrendered: { title: 'Lost their nerve and surrendered', explanation: 'A defender who failed a nerve check and stopped resisting. Still there and conscious.' },
+  'backed-off': { title: 'Lost their nerve and backed off', explanation: 'An attacker who failed a nerve check and stopped attacking.' },
+  fled: { title: 'Lost their nerve and fled', explanation: 'Failed a nerve check, and their low courage or high caution made them run.' },
+};
+
+export interface Fighter {
+  /** A1, A2… for attackers; B1, B2… for defenders. */
+  readonly id: string;
+  readonly side: Side;
+  readonly character: Character;
+  readonly hp: number;
+  readonly maxHp: number;
+  readonly status: FighterStatus;
+}
 
 export type FightEvent =
-  | { readonly kind: 'initiative'; readonly result: OpposedResult; readonly first: Side }
+  | { readonly kind: 'initiative'; readonly order: readonly { readonly id: string; readonly roll: RollResult }[] }
   | {
       readonly kind: 'attack';
       readonly round: number;
-      readonly by: Side;
+      readonly by: string;
+      readonly target: string;
       /** The attack roll against the target's Defence (the DC). */
       readonly result: CheckResult;
       readonly hit: boolean;
       readonly critical: boolean;
       readonly damage: Damage | null;
-      readonly hp: Readonly<Record<Side, number>>;
+      /** The target's hit points after the attack. */
+      readonly hp: number;
     }
-  | { readonly kind: 'nerve'; readonly round: number; readonly side: Side; readonly check: NerveCheck }
-  | { readonly kind: 'end'; readonly round: number; readonly ending: FightEnding };
+  | { readonly kind: 'nerve'; readonly round: number; readonly id: string; readonly trigger: 'hurt' | 'allies-down'; readonly check: NerveCheck }
+  | { readonly kind: 'out'; readonly round: number; readonly id: string; readonly status: Exclude<FighterStatus, 'fighting'> }
+  | { readonly kind: 'end'; readonly round: number; readonly winner: Side | null };
 
 export interface FightResult {
   readonly events: readonly FightEvent[];
-  readonly ending: FightEnding;
+  /** The side with someone still fighting, or null for a stalemate. */
+  readonly winner: Side | null;
   readonly rounds: number;
-  readonly hp: Readonly<Record<Side, number>>;
-  readonly maxHp: Readonly<Record<Side, number>>;
+  /** Every fighter as they finished: attackers, then defenders. */
+  readonly fighters: readonly Fighter[];
 }
-
-/** What each kind of ending means, for explaining results. */
-export const FIGHT_ENDING_INFO: { readonly [H in FightEnding['how']]: { readonly title: string; readonly explanation: string } } = {
-  'knocked-out': { title: 'Knocked out', explanation: 'Reduced to 0 hit points.' },
-  surrenders: {
-    title: 'Lost their nerve and surrendered',
-    explanation: 'Failed the nerve check at half hit points and stopped resisting. Still there and conscious.',
-  },
-  'backs-off': {
-    title: 'Lost their nerve and backed off',
-    explanation: 'Failed the nerve check at half hit points and stopped attacking, without getting what they came for.',
-  },
-  flees: { title: 'Lost their nerve and fled', explanation: 'Failed the nerve check at half hit points, and their low courage or high caution made them run.' },
-  stalemate: { title: 'Stalemate', explanation: 'Nobody won before the round limit.' },
-};
 
 /** Unarmed damage: 1d4 + Strength modifier, minimum 1. */
 export const UNARMED_DAMAGE_DIE = 4;
@@ -84,69 +88,113 @@ export function rollDamage(c: Character, critical: boolean, roller: Roller): Dam
   return { faces, modifier, total: Math.max(1, faces.reduce((a, b) => a + b, 0) + modifier) };
 }
 
+interface FighterState {
+  id: string;
+  side: Side;
+  character: Character;
+  hp: number;
+  maxHp: number;
+  status: FighterStatus;
+  nerveTested: boolean;
+}
+
 export function runFight(spec: FightSpec, roller: Roller): FightResult {
   const dice = spec.dice ?? DICE.d20;
   const maxRounds = spec.maxRounds ?? 12;
   if (!Number.isInteger(maxRounds) || maxRounds < 1) throw new RangeError(`maxRounds must be a positive integer, got ${maxRounds}`);
-  const sides: Record<Side, Character> = { attacker: spec.attacker, defender: spec.defender };
-  const maxHp: Record<Side, number> = { attacker: maxHitPoints(spec.attacker), defender: maxHitPoints(spec.defender) };
-  const hp: Record<Side, number> = { ...maxHp };
-  const nerveTested: Record<Side, boolean> = { attacker: false, defender: false };
+  if (!spec.attackers.length || !spec.defenders.length) throw new RangeError('each side needs at least one fighter');
+
+  const make = (side: Side, prefix: string) => (character: Character, i: number): FighterState => {
+    const maxHp = maxHitPoints(character);
+    return { id: `${prefix}${i + 1}`, side, character, hp: maxHp, maxHp, status: 'fighting', nerveTested: false };
+  };
+  const fighters = [...spec.attackers.map(make('attacker', 'A')), ...spec.defenders.map(make('defender', 'B'))];
   const events: FightEvent[] = [];
+  const groupChecked: Record<Side, boolean> = { attacker: false, defender: false };
   let round = 0;
 
-  const finish = (ending: FightEnding): FightResult => {
-    events.push({ kind: 'end', round, ending });
-    return { events, ending, rounds: round, hp, maxHp };
+  const fightingOn = (side: Side) => fighters.filter((f) => f.side === side && f.status === 'fighting');
+  const finish = (winner: Side | null): FightResult => {
+    events.push({ kind: 'end', round, winner });
+    return { events, winner, rounds: round, fighters: fighters.map(({ nerveTested: _, ...f }) => f) };
   };
 
-  const initiative = resolveOpposed({ active: rollFor(sides.attacker, 'reflexes', { dice }), passive: rollFor(sides.defender, 'reflexes', { dice }) }, roller);
-  const first: Side = initiative.margin >= 0 ? 'attacker' : 'defender';
-  events.push({ kind: 'initiative', result: initiative, first });
-  const order: readonly Side[] = [first, otherSide(first)];
+  // Initiative: everyone rolls in list order; highest first, defenders first on a tie, then list order.
+  const rolls = fighters.map((f, index) => ({ f, index, roll: throwRoll(rollFor(f.character, 'reflexes', { dice }), roller) }));
+  const sideRank = (side: Side) => (side === 'defender' ? 0 : 1);
+  rolls.sort((a, b) => b.roll.total - a.roll.total || sideRank(a.f.side) - sideRank(b.f.side) || a.index - b.index);
+  events.push({ kind: 'initiative', order: rolls.map(({ f, roll }) => ({ id: f.id, roll })) });
+  const order = rolls.map((r) => r.f);
 
-  /** One attack. Returns an ending, or null to continue. */
-  const attack = (by: Side): FightEnding | null => {
-    const target = otherSide(by);
-    const result = resolveCheck({ ...rollFor(sides[by], 'brawling', { dice }), dc: defence(sides[target]) }, roller);
+  const takeOut = (f: FighterState, status: Exclude<FighterStatus, 'fighting'>) => {
+    f.status = status;
+    events.push({ kind: 'out', round, id: f.id, status });
+  };
+
+  /** A nerve check; a failure takes the fighter out of the fight. */
+  const testNerve = (f: FighterState, trigger: 'hurt' | 'allies-down') => {
+    const check = nerveCheck(f.character, trigger, false, dice, roller);
+    events.push({ kind: 'nerve', round, id: f.id, trigger, check });
+    if (check.response === 'flees') takeOut(f, 'fled');
+    else if (check.response) takeOut(f, f.side === 'defender' ? 'surrendered' : 'backed-off');
+  };
+
+  /** The first time at least half a side is out, everyone left on it makes a nerve check. */
+  const groupMorale = (side: Side) => {
+    const all = fighters.filter((f) => f.side === side);
+    const left = fightingOn(side);
+    if (groupChecked[side] || all.length < 2 || left.length === 0 || (all.length - left.length) * 2 < all.length) return;
+    groupChecked[side] = true;
+    for (const f of left) testNerve(f, 'allies-down');
+  };
+
+  const attack = (by: FighterState) => {
+    const enemies = fightingOn(otherSide(by.side));
+    const target = enemies.length === 1 ? enemies[0]! : enemies[roller.roll(enemies.length) - 1]!;
+    const result = resolveCheck({ ...rollFor(by.character, 'brawling', { dice }), dc: defence(target.character) }, roller);
     const kept = result.roll.thrown.kept;
     const critical = kept === dice.count * dice.sides;
     const hit = critical || (kept !== dice.count && result.margin >= 0);
-    const damage = hit ? rollDamage(sides[by], critical, roller) : null;
-    if (damage) hp[target] = Math.max(0, hp[target] - damage.total);
-    events.push({ kind: 'attack', round, by, result, hit, critical, damage, hp: { ...hp } });
-    if (!damage) return null;
-    if (hp[target] === 0) return { how: 'knocked-out', loser: target };
-    if (hp[target] > maxHp[target] / 2 || nerveTested[target]) return null;
-    nerveTested[target] = true;
-    const check = nerveCheck(sides[target], 'hurt', false, dice, roller);
-    events.push({ kind: 'nerve', round, side: target, check });
-    if (check.response === 'flees') return { how: 'flees', loser: target };
-    if (check.response === null) return null;
-    return target === 'defender' ? { how: 'surrenders', loser: 'defender' } : { how: 'backs-off', loser: 'attacker' };
+    const damage = hit ? rollDamage(by.character, critical, roller) : null;
+    if (damage) target.hp = Math.max(0, target.hp - damage.total);
+    events.push({ kind: 'attack', round, by: by.id, target: target.id, result, hit, critical, damage, hp: target.hp });
+    if (!damage) return;
+    if (target.hp === 0) takeOut(target, 'knocked-out');
+    else if (target.hp <= target.maxHp / 2 && !target.nerveTested) {
+      target.nerveTested = true;
+      testNerve(target, 'hurt');
+    }
+    if (target.status !== 'fighting') groupMorale(target.side);
   };
 
   while (round < maxRounds) {
     round++;
-    for (const side of order) {
-      const ending = attack(side);
-      if (ending) return finish(ending);
+    for (const f of order) {
+      if (f.status !== 'fighting') continue;
+      attack(f);
+      for (const side of ['attacker', 'defender'] as const) if (!fightingOn(side).length) return finish(otherSide(side));
     }
   }
-  return finish({ how: 'stalemate', loser: null });
+  return finish(null);
 }
 
-/** A key for counting endings, e.g. "knocked-out:defender" or "stalemate". */
-export function fightEndingKey(ending: FightEnding): string {
-  return ending.loser ? `${ending.how}:${ending.loser}` : ending.how;
+export interface FightTally {
+  readonly wins: Readonly<Record<Side | 'stalemate', number>>;
+  /** For each fighter id, how often they finished with each status. */
+  readonly statuses: Readonly<Record<string, Readonly<Record<FighterStatus, number>>>>;
 }
 
-/** Runs the fight `runs` times and counts the endings by `fightEndingKey`. */
-export function tallyFights(spec: FightSpec, roller: Roller, runs: number): Record<string, number> {
-  const counts: Record<string, number> = {};
+/** Runs the fight `runs` times and counts the winners and each fighter's final status. */
+export function tallyFights(spec: FightSpec, roller: Roller, runs: number): FightTally {
+  const wins: Record<Side | 'stalemate', number> = { attacker: 0, defender: 0, stalemate: 0 };
+  const statuses: Record<string, Record<FighterStatus, number>> = {};
   for (let i = 0; i < runs; i++) {
-    const key = fightEndingKey(runFight(spec, roller).ending);
-    counts[key] = (counts[key] ?? 0) + 1;
+    const r = runFight(spec, roller);
+    wins[r.winner ?? 'stalemate']++;
+    for (const f of r.fighters) {
+      statuses[f.id] ??= Object.fromEntries(FIGHTER_STATUSES.map((s) => [s, 0])) as Record<FighterStatus, number>;
+      statuses[f.id]![f.status]++;
+    }
   }
-  return counts;
+  return { wins, statuses };
 }

@@ -37,9 +37,9 @@ npm run lab:dev         # playground at http://localhost:5180
 ## Playground
 
 Four tabs: **Characters** (a list of saved characters and an editor for the selected one, split into attributes, skills
-and temperament), **Skill check** (intimidate, persuade, deceive, or any skill), **Fight** and **Dice and odds**. Characters are saved to `localStorage` in this
-browser after every change, as is the open tab. The check and fight tabs pick their two characters from the saved
-list. The roster logic (`playground/roster.ts`) is pure and tested like the library.
+and temperament), **Skill check** (intimidate, persuade, deceive, or any skill), **Fight** (any saved characters on two sides) and
+**Dice and odds**. Characters are saved to `localStorage` in this
+browser after every change, as is the open tab. The check tab picks its two characters from the saved list; the fight line-up is also saved. The roster and line-up logic (`playground/roster.ts`, `playground/parties.ts`) is pure and tested like the library.
 
 Tests are in `test/`, one file per module. Each is tagged `unit` or `property` (fast-check). The suite has 100% statement,
 branch, function and line coverage.
@@ -71,19 +71,23 @@ As in D&D, getting someone to do something without force is a single check, not 
 
 ### Fights
 
-Fights follow D&D's combat rules; neither side chooses actions.
+Fights are between two sides (attackers and defenders) of one or more fighters, following D&D's combat rules; nobody
+chooses actions.
 
-- **Initiative:** both characters roll Reflexes; the higher acts first each round (a tie goes to the defender).
-- **Attacks:** each round each character attacks: d20 + Brawling bonus against the target's **Defence** (10 + Reflexes
-  bonus, like D&D's unarmoured Armour Class). A hit deals 1d4 + Strength modifier (minimum 1). A natural 20 always hits
-  and rolls the damage dice twice; a natural 1 always misses. There are no wound penalties.
+- **Initiative:** everyone rolls Reflexes; the order is highest first (defenders first on a tie, then list order) and
+  is used every round.
+- **Attacks:** on their turn each fighter still in the fight attacks a random enemy who is still fighting (no die is
+  rolled when there is only one): d20 + Brawling bonus against the target's **Defence** (10 + Reflexes bonus, like D&D's
+  unarmoured Armour Class). A hit deals 1d4 + Strength modifier (minimum 1). A natural 20 always hits and rolls the
+  damage dice twice; a natural 1 always misses. There are no wound penalties.
 - **Hit points** are 10 + Constitution modifier, plus the proficiency bonus if trained in Toughness (twice if expert):
-  D&D's first-level d10 hit die plus its Tough feat. 0 HP is a knockout, and a knocked-out character does not act.
-- **Nerve (morale):** the first time a character drops to half HP or below, they make one nerve check (DC 10), as in
-  D&D's optional morale rule. Passing commits them to the fight. Failing ends it: a low-courage or high-caution
-  character flees; otherwise the defender surrenders or the attacker backs off.
-- **Other ending:** the round limit (stalemate).
-- `FIGHT_ENDING_INFO` explains each ending; the playground groups simulated results by winner and cause.
+  D&D's first-level d10 hit die plus its Tough feat. 0 HP is a knockout.
+- **Nerve (morale)**, following D&D's optional morale rules: a fighter makes one nerve check (DC 10) the first time they
+  drop to half HP or below, and everyone left on a side makes one (DC 10) the first time half of that side is out of
+  the fight. A failure takes that fighter out: a low-courage or high-caution fighter flees; otherwise a defender
+  surrenders or an attacker backs off.
+- **Ending:** a side loses when none of its fighters is still fighting; otherwise the round limit gives a stalemate.
+- `tallyFights` counts wins per side and how each fighter ended up (`FIGHTER_STATUS_INFO` explains each status).
 
 The nerve check itself (`src/nerve.ts`) is shared: it is also made when a weapon is drawn on someone (DC 12).
 

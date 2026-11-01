@@ -124,7 +124,8 @@ export function opposedOdds(spec: OpposedSpec): Odds {
   return oddsOf(shift(minus(totalDistribution(spec.active), totalDistribution(spec.passive)), -1), spec.bands);
 }
 
-function throwRoll(roll: Roll, roller: Roller): RollResult {
+/** Rolls the dice and adds the modifiers, without a target to grade against. */
+export function throwRoll(roll: Roll, roller: Roller): RollResult {
   const thrown = rollDice(roll.dice, roll.edge, roller);
   const bonus = bonusOf(roll.modifiers);
   return { dice: roll.dice, edge: roll.edge, thrown, modifiers: roll.modifiers, bonus, total: thrown.kept + bonus };

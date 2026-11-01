@@ -5,21 +5,24 @@ import { attributeScores } from '../src/attributes';
 import { BACKGROUNDS, rollCharacter, type BackgroundName } from '../src/backgrounds';
 import { createCharacter, type Character } from '../src/character';
 import { DICE } from '../src/dice';
-import { FIGHT_ENDING_INFO, fightEndingKey, rollDamage, runFight, tallyFights, type FightEvent, type FightSpec } from '../src/fight';
-import { describeFightEnding, describeFightEvent } from '../src/fight-log';
+import { FIGHTER_STATUSES, FIGHTER_STATUS_INFO, rollDamage, runFight, tallyFights, type FightEvent, type FightResult, type FightSpec } from '../src/fight';
+import { describeFightEvent } from '../src/fight-log';
 import { NERVE_DC } from '../src/nerve';
 import { roller, seeded } from '../src/random';
 import { temperament } from '../src/temperament';
 import { scripted } from './support';
 
-// The attacker attacks at +2 (trained Brawling); the defender at +0. Both have Defence 10 and 10 HP (half is 5), Reflexes +0
-// and average temperament unless stated. Dice order: initiative (attacker, then defender), then each attack in turn:
-// attack roll, damage, any nerve check.
-const attacker = createCharacter({ name: 'A', training: { brawling: 'trained' } });
-const defender = (t: Parameters<typeof temperament>[0] = {}): Character => createCharacter({ name: 'D', temperament: temperament(t) });
-const fight = (over: Partial<FightSpec> = {}): FightSpec => ({ attacker, defender: defender(), maxRounds: 1, ...over });
+// Attackers attack at +2 (trained Brawling); defenders at +0. Everyone has Defence 10, 10 HP (half is 5), Reflexes +0 and
+// average temperament unless stated. Fighters are A1, A2… (attackers) and B1, B2… (defenders).
+// Dice order: initiative (attackers, then defenders, in list order), then each turn in initiative order: the target (a
+// die with one face per enemy still fighting, rolled only when there is a choice), the attack roll, damage, nerve checks.
+const attacker = (name = 'A') => createCharacter({ name, training: { brawling: 'trained' } });
+const defender = (t: Parameters<typeof temperament>[0] = {}, name = 'D'): Character => createCharacter({ name, temperament: temperament(t) });
+const frail = (name: string) => createCharacter({ name, attributes: attributeScores({ con: 1 }) }); // 5 HP
+const duel = (over: Partial<FightSpec> = {}): FightSpec => ({ attackers: [attacker()], defenders: [defender()], maxRounds: 1, ...over });
 const kinds = (events: readonly FightEvent[]) => events.map((e) => e.kind);
 const attacks = (events: readonly FightEvent[]) => events.filter((e) => e.kind === 'attack');
+const fighter = (r: FightResult, id: string) => r.fighters.find((f) => f.id === id)!;
 
 /** Runs a fight on scripted faces and checks that every face was used. */
 function run(s: FightSpec, ...faces: number[]) {
@@ -36,7 +39,7 @@ describe('rollDamage', { tags: ['unit'] }, () => {
   });
 
   test('rolls the dice twice on a critical hit', () => {
-    assert.deepEqual(rollDamage(attacker, true, scripted(3, 4)), { faces: [3, 4], modifier: 0, total: 7 });
+    assert.deepEqual(rollDamage(attacker(), true, scripted(3, 4)), { faces: [3, 4], modifier: 0, total: 7 });
   });
 
   test('is at least 1', () => {
@@ -45,171 +48,207 @@ describe('rollDamage', { tags: ['unit'] }, () => {
   });
 });
 
-describe('runFight', { tags: ['unit'] }, () => {
+describe('runFight: one against one', { tags: ['unit'] }, () => {
   test('starts with initiative: both roll Reflexes and the higher acts first; a tie goes to the defender', () => {
     const order = (faces: number[]) => {
-      const r = run(fight(), ...faces, 1, 1);
-      const e = r.events[0];
-      assert.ok(e?.kind === 'initiative');
-      return [e.first, ...attacks(r.events).map((a) => (a.kind === 'attack' ? a.by : ''))];
+      const r = run(duel(), ...faces, 1, 1);
+      return attacks(r.events).map((a) => (a.kind === 'attack' ? a.by : ''));
     };
-    assert.deepEqual(order([15, 10]), ['attacker', 'attacker', 'defender']);
-    assert.deepEqual(order([5, 15]), ['defender', 'defender', 'attacker']);
-    assert.deepEqual(order([10, 10]), ['defender', 'defender', 'attacker']);
+    assert.deepEqual(order([15, 10]), ['A1', 'B1']);
+    assert.deepEqual(order([5, 15]), ['B1', 'A1']);
+    assert.deepEqual(order([10, 10]), ['B1', 'A1']);
   });
 
-  test('each side starts with its maximum hit points', () => {
-    const r = run(fight(), 15, 10, 1, 1);
-    assert.deepEqual(r.maxHp, { attacker: 10, defender: 10 });
-    assert.deepEqual(r.hp, { attacker: 10, defender: 10 });
+  test('each fighter starts with their maximum hit points', () => {
+    const r = run(duel(), 15, 10, 1, 1);
+    assert.deepEqual(r.fighters.map((f) => [f.id, f.hp, f.maxHp, f.status]), [['A1', 10, 10, 'fighting'], ['B1', 10, 10, 'fighting']]);
   });
 
   test('an attack hits when d20 + Brawling meets the target’s Defence, for 1d4 + Strength modifier', () => {
-    const r = run(fight(), 15, 10, 8, 3, 9); // attacker: 8 + 2 = 10 vs 10, hit for 3; defender: 9 vs 10, miss
+    const r = run(duel(), 15, 10, 8, 3, 9); // A1: 8 + 2 = 10 vs 10, hit for 3; B1: 9 vs 10, miss
     const [mine, theirs] = attacks(r.events);
-    assert.ok(mine?.kind === 'attack' && mine.hit && mine.result.dc === 10 && mine.damage?.total === 3 && !mine.critical);
+    assert.ok(mine?.kind === 'attack' && mine.target === 'B1' && mine.hit && mine.result.dc === 10 && mine.damage?.total === 3 && mine.hp === 7);
     assert.ok(theirs?.kind === 'attack' && !theirs.hit && theirs.damage === null);
-    assert.equal(r.hp.defender, 7);
+    assert.equal(fighter(r, 'B1').hp, 7);
   });
 
   test('Defence includes the target’s Reflexes', () => {
     const nimble = createCharacter({ name: 'Nimble', training: { reflexes: 'trained' } }); // Defence 12
-    const mine = attacks(run(fight({ defender: nimble }), 15, 10, 9, 1).events)[0]; // 9 + 2 = 11 vs 12
+    const mine = attacks(run(duel({ defenders: [nimble] }), 15, 10, 9, 1).events)[0];
     assert.ok(mine?.kind === 'attack' && mine.result.dc === 12 && !mine.hit);
   });
 
   test('both sides can hit in the same round', () => {
-    assert.deepEqual(run(fight(), 15, 10, 15, 2, 15, 3).hp, { attacker: 7, defender: 8 });
+    const r = run(duel(), 15, 10, 15, 2, 15, 3);
+    assert.deepEqual([fighter(r, 'A1').hp, fighter(r, 'B1').hp], [7, 8]);
   });
 
   test('a natural 20 is a critical hit: the damage dice are rolled twice', () => {
-    const r = run(fight(), 15, 10, 20, 4, 4, 20, 1); // 8 damage leaves 2 HP, so a nerve check follows
+    const r = run(duel(), 15, 10, 20, 4, 4, 20, 1); // 8 damage leaves 2 HP, so a nerve check follows
     const mine = attacks(r.events)[0];
     assert.ok(mine?.kind === 'attack' && mine.critical && mine.damage?.total === 8);
-    assert.equal(r.hp.defender, 2);
   });
 
   test('a natural 1 always misses', () => {
     const brute = createCharacter({ name: 'Brute', attributes: attributeScores({ str: 20 }), training: { brawling: 'expert' } }); // +9
-    const mine = attacks(run(fight({ attacker: brute }), 15, 10, 1, 1).events)[0];
+    const mine = attacks(run(duel({ attackers: [brute] }), 15, 10, 1, 1).events)[0];
     assert.ok(mine?.kind === 'attack' && mine.result.roll.total === 10 && !mine.hit);
   });
 
-  test('a knocked-out character does not get to attack', () => {
-    const frail = createCharacter({ name: 'Frail', attributes: attributeScores({ con: 1 }) }); // 5 HP
-    const r = run(fight({ defender: frail }), 15, 10, 20, 4, 4);
-    assert.deepEqual(kinds(r.events), ['initiative', 'attack', 'end']);
-    assert.deepEqual(r.ending, { how: 'knocked-out', loser: 'defender' });
+  test('0 hit points is a knockout; the knocked-out fighter does not act and their side loses', () => {
+    const r = run(duel({ defenders: [frail('F')] }), 15, 10, 20, 4, 4);
+    assert.deepEqual(kinds(r.events), ['initiative', 'attack', 'out', 'end']);
+    assert.equal(fighter(r, 'B1').status, 'knocked-out');
+    assert.equal(r.winner, 'attacker');
   });
 
   test('no nerve check while above half hit points', () => {
-    assert.deepEqual(kinds(run(fight(), 15, 10, 15, 4, 1).events), ['initiative', 'attack', 'attack', 'end']); // 10 → 6 HP
+    assert.deepEqual(kinds(run(duel(), 15, 10, 15, 4, 1).events), ['initiative', 'attack', 'attack', 'end']);
   });
 
-  test('the first time a character drops to half hit points or below, they make one DC 10 nerve check', () => {
-    // Round 1: hit for 4 (10 → 6). Round 2: hit for 1 (→ 5, half): the check passes. Round 3: hit for 1 (→ 4): no check.
-    const r = run(fight({ maxRounds: 3 }), 15, 10, 15, 4, 1, 15, 1, 10, 1, 15, 1, 1);
+  test('the first time a fighter drops to half hit points or below, they make one DC 10 nerve check', () => {
+    const r = run(duel({ maxRounds: 3 }), 15, 10, 15, 4, 1, 15, 1, 10, 1, 15, 1, 1);
     assert.deepEqual(kinds(r.events), ['initiative', 'attack', 'attack', 'attack', 'nerve', 'attack', 'attack', 'attack', 'end']);
     const nerve = r.events.find((e) => e.kind === 'nerve');
-    assert.ok(nerve?.kind === 'nerve' && nerve.check.trigger === 'hurt' && nerve.check.result.dc === 10 && nerve.check.passed);
+    assert.ok(nerve?.kind === 'nerve' && nerve.trigger === 'hurt' && nerve.check.result.dc === NERVE_DC.hurt && nerve.check.passed);
   });
 
   test('being hurt carries no roll penalty', () => {
-    const r = run(fight({ maxRounds: 2 }), 15, 10, 20, 2, 3, 20, 1, 1, 15, 1);
+    const r = run(duel({ maxRounds: 2 }), 15, 10, 20, 2, 3, 20, 1, 1, 15, 1);
     for (const e of r.events) {
       if (e.kind === 'attack') assert.deepEqual(e.result.roll.modifiers.filter((m) => m.value < 0), []);
       if (e.kind === 'nerve') assert.deepEqual(e.check.result.roll.modifiers.filter((m) => m.value < 0), []);
     }
   });
 
-  test('a defender who fails the nerve check surrenders; an attacker backs off', () => {
-    assert.deepEqual(run(fight(), 15, 10, 20, 2, 3, 1).ending, { how: 'surrenders', loser: 'defender' });
-    assert.deepEqual(run(fight(), 5, 15, 20, 2, 3, 1).ending, { how: 'backs-off', loser: 'attacker' });
-  });
-
-  test('a timid character flees; a hot-tempered one does not fight harder, it surrenders', () => {
-    assert.deepEqual(run(fight({ defender: defender({ courage: 0.1 }) }), 15, 10, 20, 2, 3, 9).ending, { how: 'flees', loser: 'defender' });
-    assert.deepEqual(run(fight({ defender: defender({ temper: 0.9 }) }), 15, 10, 20, 2, 3, 1).ending, { how: 'surrenders', loser: 'defender' });
-  });
-
-  test('reaching 0 hit points is a knockout', () => {
-    const r = run(fight({ maxRounds: 3 }), 15, 10, 20, 4, 4, 20, 1, 15, 4);
-    assert.deepEqual(r.ending, { how: 'knocked-out', loser: 'defender' });
-    assert.equal(r.rounds, 2);
+  test('failing the nerve check: a defender surrenders, an attacker backs off, a timid fighter flees', () => {
+    assert.equal(fighter(run(duel(), 15, 10, 20, 2, 3, 1), 'B1').status, 'surrendered');
+    assert.equal(fighter(run(duel(), 5, 15, 20, 2, 3, 1), 'A1').status, 'backed-off');
+    assert.equal(fighter(run(duel({ defenders: [defender({ courage: 0.1 })] }), 15, 10, 20, 2, 3, 9), 'B1').status, 'fled');
+    assert.equal(fighter(run(duel({ defenders: [defender({ temper: 0.9 })] }), 15, 10, 20, 2, 3, 1), 'B1').status, 'surrendered');
   });
 
   test('ends in a stalemate after maxRounds', () => {
-    assert.deepEqual(run(fight({ maxRounds: 2 }), 15, 10, 1, 1, 1, 1).ending, { how: 'stalemate', loser: null });
+    const r = run(duel({ maxRounds: 2 }), 15, 10, 1, 1, 1, 1);
+    assert.equal(r.winner, null);
+    assert.equal(r.rounds, 2);
   });
 
-  test('defaults to d20 and 12 rounds, and rejects an invalid round limit', () => {
-    assert.ok(runFight({ attacker, defender: defender() }, roller(seeded(1))).rounds <= 12);
-    assert.throws(() => runFight(fight({ maxRounds: 0 }), scripted()), RangeError);
+  test('defaults to d20 and 12 rounds, and rejects an invalid round limit or an empty side', () => {
+    assert.ok(runFight({ attackers: [attacker()], defenders: [defender()] }, roller(seeded(1))).rounds <= 12);
+    assert.throws(() => runFight(duel({ maxRounds: 0 }), scripted()), RangeError);
+    assert.throws(() => runFight(duel({ defenders: [] }), scripted()), RangeError);
   });
 });
 
-describe('fight endings', { tags: ['unit'] }, () => {
-  test('FIGHT_ENDING_INFO explains every ending', () => {
-    for (const how of ['knocked-out', 'surrenders', 'backs-off', 'flees', 'stalemate'] as const)
-      assert.ok(FIGHT_ENDING_INFO[how].title && FIGHT_ENDING_INFO[how].explanation, how);
+describe('runFight: parties', { tags: ['unit'] }, () => {
+  test('everyone rolls initiative; the order is highest first, defenders first on a tie, then list order', () => {
+    const r = run({ attackers: [attacker('A'), attacker('B')], defenders: [defender({}, 'C'), defender({}, 'D')], maxRounds: 1 }, 12, 8, 15, 8, 1, 1, 1, 1, 1, 1, 1, 1);
+    const init = r.events[0];
+    assert.ok(init?.kind === 'initiative');
+    assert.deepEqual(init.order.map((o) => o.id), ['B1', 'A1', 'B2', 'A2']);
+    assert.deepEqual(attacks(r.events).map((a) => (a.kind === 'attack' ? a.by : '')), ['B1', 'A1', 'B2', 'A2']);
   });
 
-  test('fightEndingKey names the ending and who lost', () => {
-    assert.equal(fightEndingKey({ how: 'flees', loser: 'attacker' }), 'flees:attacker');
-    assert.equal(fightEndingKey({ how: 'stalemate', loser: null }), 'stalemate');
+  test('each fighter attacks a random enemy who is still fighting', () => {
+    const r = run({ attackers: [attacker()], defenders: [defender({}, 'C'), defender({}, 'D')], maxRounds: 1 }, 15, 10, 10, 2, 1, 1, 1);
+    const targets = attacks(r.events).map((a) => (a.kind === 'attack' ? `${a.by}→${a.target}` : ''));
+    assert.deepEqual(targets, ['A1→B2', 'B1→A1', 'B2→A1']);
   });
 
-  test('tallyFights counts endings and the counts sum to the number of runs', () => {
-    const t = tallyFights(fight({ maxRounds: 12 }), roller(seeded(2)), 200);
-    assert.equal(Object.values(t).reduce((a, b) => a + b, 0), 200);
+  test('a knocked-out fighter is not attacked; when half a side is out, the rest of that side make a nerve check', () => {
+    // A1 knocks out B1 (5 HP). Half the defenders are out, so B2 makes a nerve check and passes. In round 2 B2 is A1's
+    // only target, so no die is rolled to choose.
+    const r = run({ attackers: [attacker()], defenders: [frail('F'), defender({}, 'D')], maxRounds: 2 }, 15, 10, 10, 1, 20, 4, 4, 20, 1, 1, 1);
+    assert.deepEqual(kinds(r.events), ['initiative', 'attack', 'out', 'nerve', 'attack', 'attack', 'attack', 'end']);
+    const nerve = r.events.find((e) => e.kind === 'nerve');
+    assert.ok(nerve?.kind === 'nerve' && nerve.id === 'B2' && nerve.trigger === 'allies-down' && nerve.check.result.dc === NERVE_DC['allies-down']);
+    const later = attacks(r.events).filter((a) => a.kind === 'attack' && a.by === 'A1');
+    assert.ok(later.every((a) => a.kind === 'attack' && a.target === 'B2' || a.kind === 'attack' && a.round === 1));
+    assert.equal(fighter(r, 'B1').status, 'knocked-out');
+    assert.equal(r.winner, null);
+  });
+
+  test('a side loses when none of its fighters is still fighting', () => {
+    const r = run({ attackers: [attacker()], defenders: [frail('F'), defender({}, 'D')], maxRounds: 2 }, 15, 10, 10, 1, 20, 4, 4, 1);
+    assert.deepEqual(kinds(r.events), ['initiative', 'attack', 'out', 'nerve', 'out', 'end']);
+    assert.deepEqual(r.fighters.map((f) => f.status), ['fighting', 'knocked-out', 'surrendered']);
+    assert.equal(r.winner, 'attacker');
+  });
+
+  test('the group nerve check happens once per side, when at least half the side is out', () => {
+    // Three frail defenders. B1 out: 1 of 3, no check. B2 out: 2 of 3, B3 checks. B3 out: no further check.
+    const r = run({ attackers: [attacker()], defenders: [frail('F'), frail('G'), frail('H')], maxRounds: 3 },
+      20, 1, 1, 1, 1, 20, 4, 4, 1, 1, 1, 20, 4, 4, 20, 1, 20, 4, 4);
+    assert.equal(r.events.filter((e) => e.kind === 'nerve').length, 1);
+    assert.deepEqual(r.fighters.map((f) => f.status), ['fighting', 'knocked-out', 'knocked-out', 'knocked-out']);
+    assert.equal(r.winner, 'attacker');
+  });
+});
+
+describe('fighter statuses', { tags: ['unit'] }, () => {
+  test('FIGHTER_STATUS_INFO explains every status', () => {
+    for (const s of FIGHTER_STATUSES) assert.ok(FIGHTER_STATUS_INFO[s].title && FIGHTER_STATUS_INFO[s].explanation, s);
+  });
+
+  test('tallyFights counts wins per side and each fighter’s final status', () => {
+    const t = tallyFights({ attackers: [attacker(), attacker('B')], defenders: [defender()], maxRounds: 12 }, roller(seeded(2)), 200);
+    assert.equal(t.wins.attacker + t.wins.defender + t.wins.stalemate, 200);
+    for (const id of ['A1', 'A2', 'B1']) assert.equal(Object.values(t.statuses[id]!).reduce((a, b) => a + b, 0), 200, id);
+    assert.ok(tallyFights(duel({ maxRounds: 1 }), roller(seeded(3)), 50).wins.stalemate > 0);
   });
 });
 
 describe('describeFightEvent', { tags: ['unit'] }, () => {
-  const log = (s: FightSpec, ...faces: number[]) => runFight(s, scripted(...faces)).events.map((e) => describeFightEvent(e, s));
+  const log = (s: FightSpec, ...faces: number[]) => {
+    const r = runFight(s, scripted(...faces));
+    return r.events.map((e) => describeFightEvent(e, r));
+  };
 
   test('describes initiative, hits, misses and stalemate', () => {
-    assert.deepEqual(log(fight(), 15, 10, 8, 3, 9), [
-      'A acts first (Reflexes: A rolled 15, D rolled 10).',
+    assert.deepEqual(log(duel(), 15, 10, 8, 3, 9), [
+      'Initiative order: A (15), D (10).',
       'Round 1: A attacks D: rolled 10 against Defence 10. Hit for 3 damage (D: 7 HP left).',
       'Round 1: D attacks A: rolled 9 against Defence 10. Miss.',
       'Stalemate: the round limit was reached with no winner.',
     ]);
   });
 
-  test('describes natural 20s, natural 1s and the nerve check', () => {
-    assert.deepEqual(log(fight(), 15, 10, 20, 2, 3, 20, 1).slice(1, 4), [
+  test('describes natural 20s, natural 1s and nerve checks', () => {
+    assert.deepEqual(log(duel(), 15, 10, 20, 2, 3, 20, 1).slice(1, 4), [
       'Round 1: A attacks D: rolled 22 against Defence 10 (natural 20). Critical hit for 5 damage (D: 5 HP left).',
       `D has dropped to half hit points and makes a nerve check: needed ${NERVE_DC.hurt}, rolled 20, passed.`,
       'Round 1: D attacks A: rolled 1 against Defence 10 (natural 1). Miss.',
     ]);
-  });
-
-  test('describes a failed nerve check', () => {
-    assert.equal(log(fight(), 15, 10, 20, 2, 3, 1)[2], `D has dropped to half hit points and makes a nerve check: needed ${NERVE_DC.hurt}, rolled 1, failed.`);
+    assert.equal(log(duel(), 15, 10, 20, 2, 3, 1)[2], `D has dropped to half hit points and makes a nerve check: needed ${NERVE_DC.hurt}, rolled 1, failed.`);
   });
 
   test('describes the highest and lowest possible rolls on other dice', () => {
-    assert.deepEqual(log(fight({ dice: DICE['3d6'] }), 4, 4, 4, 3, 3, 3, 6, 6, 6, 1, 1, 1, 1, 1).slice(1, 3), [
+    assert.deepEqual(log(duel({ dice: DICE['3d6'] }), 4, 4, 4, 3, 3, 3, 6, 6, 6, 1, 1, 1, 1, 1).slice(1, 3), [
       'Round 1: A attacks D: rolled 20 against Defence 10 (highest possible roll). Critical hit for 2 damage (D: 8 HP left).',
       'Round 1: D attacks A: rolled 3 against Defence 10 (lowest possible roll). Miss.',
     ]);
   });
 
-  test('describes every ending', () => {
-    const s = fight();
-    assert.equal(describeFightEnding({ how: 'knocked-out', loser: 'defender' }, s), 'D loses: knocked out (0 HP).');
-    assert.equal(describeFightEnding({ how: 'surrenders', loser: 'defender' }, s), 'D loses: failed a nerve check and surrendered.');
-    assert.equal(describeFightEnding({ how: 'backs-off', loser: 'attacker' }, s), 'A loses: failed a nerve check and backed off.');
-    assert.equal(describeFightEnding({ how: 'flees', loser: 'defender' }, s), 'D loses: failed a nerve check and fled.');
+  test('describes fighters leaving, the group nerve check and the winner', () => {
+    const party = { attackers: [attacker()], defenders: [frail('F'), defender({}, 'D')], maxRounds: 2 };
+    assert.deepEqual(log(party, 15, 10, 10, 1, 20, 4, 4, 1).slice(2), [
+      'F is knocked out.',
+      `D sees half their side out of the fight and makes a nerve check: needed ${NERVE_DC['allies-down']}, rolled 1, failed.`,
+      'D surrenders.',
+      'Side A wins: nobody on side B is still fighting.',
+    ]);
+    assert.equal(log(duel(), 5, 15, 20, 2, 3, 1).slice(-2).join(' '), 'A backs off. Side B wins: nobody on side A is still fighting.');
+    assert.equal(log(duel({ defenders: [defender({ courage: 0.1 })] }), 15, 10, 20, 2, 3, 9).at(-2), 'D flees.');
   });
 });
 
 describe('runFight', { tags: ['property'] }, () => {
-  const fightOf = fc.record({ seed: fc.integer(), a: fc.constantFrom(...BACKGROUNDS), d: fc.constantFrom(...BACKGROUNDS), maxRounds: fc.integer({ min: 1, max: 20 }) });
-  const build = (c: { seed: number; a: BackgroundName; d: BackgroundName; maxRounds: number }): FightSpec => {
+  const party = fc.array(fc.constantFrom(...BACKGROUNDS), { minLength: 1, maxLength: 3 });
+  const fightOf = fc.record({ seed: fc.integer(), a: party, d: party, maxRounds: fc.integer({ min: 1, max: 20 }) });
+  const build = (c: { seed: number; a: BackgroundName[]; d: BackgroundName[]; maxRounds: number }): FightSpec => {
     const r = roller(seeded(c.seed));
-    return { attacker: rollCharacter('A', c.a, r), defender: rollCharacter('D', c.d, r), maxRounds: c.maxRounds };
+    return { attackers: c.a.map((b, i) => rollCharacter(`A${i}`, b, r)), defenders: c.d.map((b, i) => rollCharacter(`D${i}`, b, r)), maxRounds: c.maxRounds };
   };
 
   test('ends within maxRounds with exactly one end event, which is last', () => {
@@ -221,12 +260,21 @@ describe('runFight', { tags: ['property'] }, () => {
     );
   });
 
-  test('keeps hit points between 0 and the maximum', () => {
+  test('the winning side has someone still fighting and the losing side has nobody', () => {
     fc.assert(
       fc.property(fightOf, (c) => {
         const r = runFight(build(c), roller(seeded(c.seed)));
-        return (['attacker', 'defender'] as const).every((side) => r.hp[side] >= 0 && r.hp[side] <= r.maxHp[side]);
+        const standing = (side: 'attacker' | 'defender') => r.fighters.some((f) => f.side === side && f.status === 'fighting');
+        if (r.winner === null) return standing('attacker') && standing('defender');
+        return standing(r.winner) && !standing(r.winner === 'attacker' ? 'defender' : 'attacker');
       }),
+    );
+  });
+
+  test('keeps hit points between 0 and the maximum, and only knocked-out fighters at 0', () => {
+    fc.assert(
+      fc.property(fightOf, (c) =>
+        runFight(build(c), roller(seeded(c.seed))).fighters.every((f) => f.hp >= 0 && f.hp <= f.maxHp && (f.hp === 0) === (f.status === 'knocked-out'))),
     );
   });
 
@@ -234,13 +282,13 @@ describe('runFight', { tags: ['property'] }, () => {
     fc.assert(fc.property(fightOf, (c) => assert.deepEqual(runFight(build(c), roller(seeded(c.seed))), runFight(build(c), roller(seeded(c.seed))))));
   });
 
-  test('a fighter beats an accountant more often than the reverse', () => {
+  test('two fighters beat one more often than not', () => {
     const r = roller(seeded(8));
-    const wins = (a: BackgroundName, d: BackgroundName) => {
-      let n = 0;
-      for (let i = 0; i < 300; i++) if (runFight({ attacker: rollCharacter('A', a, r), defender: rollCharacter('D', d, r) }, r).ending.loser === 'defender') n++;
-      return n;
-    };
-    assert.ok(wins('fighter', 'accountant') > wins('accountant', 'fighter') + 60);
+    let wins = 0;
+    for (let i = 0; i < 300; i++) {
+      const out = runFight({ attackers: [rollCharacter('A', 'labourer', r), rollCharacter('B', 'labourer', r)], defenders: [rollCharacter('C', 'labourer', r)] }, r);
+      if (out.winner === 'attacker') wins++;
+    }
+    assert.ok(wins > 200, `${wins} of 300`);
   });
 });

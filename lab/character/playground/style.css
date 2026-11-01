@@ -129,3 +129,7 @@ table.social-odds { margin: 8px 0 12px; }
 table.social-odds td:first-child { width: 18px; }
 table.social-odds td.num { text-align: right; width: 4em; }
 .field.checkbox > span:first-child { color: var(--ink); }
+.line-up table td { vertical-align: middle; padding: 4px 6px; }
+.line-up .segmented button { padding: 4px 8px; font-size: 0.85rem; }
+table.fighters td.num, table.fighters th.num { text-align: right; }
+ul.final-state { margin: 4px 0 10px; padding-left: 18px; }

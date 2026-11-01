@@ -12,10 +12,13 @@ export function otherSide(side: Side): Side {
   return side === 'attacker' ? 'defender' : 'attacker';
 }
 
-/** What prompts a nerve check: a weapon drawn on them, or first dropping to half hit points in a fight. */
-export type Trigger = 'weapon-drawn' | 'hurt';
+/**
+ * What prompts a nerve check: a weapon drawn on them, first dropping to half hit points in a fight, or seeing half their
+ * side out of a fight.
+ */
+export type Trigger = 'weapon-drawn' | 'hurt' | 'allies-down';
 
-export const NERVE_DC: Readonly<Record<Trigger, number>> = { 'weapon-drawn': 12, hurt: 10 };
+export const NERVE_DC: Readonly<Record<Trigger, number>> = { 'weapon-drawn': 12, hurt: 10, 'allies-down': 10 };
 
 /** How a character reacts to failing a nerve check. */
 export type NerveResponse = 'flees' | 'fights' | 'yields';
