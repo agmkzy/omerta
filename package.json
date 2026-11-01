@@ -6,7 +6,7 @@
   "engines": {
     "node": ">=26"
   },
-  "description": "OMERT\u00c0 - a single-player sandbox mafia RPG simulation (engine + text UI)",
+  "description": "OMERTÀ - a single-player sandbox mafia RPG simulation (engine + text UI)",
   "scripts": {
     "sim": "tsx src/cli.ts sim",
     "play": "tsx src/cli.ts play",
@@ -22,11 +22,17 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "playtest": "tsx playtest/pt.ts"
+    "playtest": "tsx playtest/pt.ts",
+    "lab:test": "vitest run --config lab/character/vitest.config.ts",
+    "lab:watch": "vitest --config lab/character/vitest.config.ts",
+    "lab:cov": "vitest run --config lab/character/vitest.config.ts --coverage",
+    "lab:typecheck": "tsc -p lab/character",
+    "lab:dev": "vite --config lab/character/vite.config.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
     "@vitest/coverage-v8": "^5.0.5",
+    "fast-check": "^4.10.2",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
     "vite": "^8.3.4",
