@@ -190,13 +190,17 @@ table.fight-log tr.round-head td { font-size: 0.75rem; text-transform: uppercase
 .odds-lines { margin: 0; padding-left: 18px; }
 .breakdown { display: grid; gap: 2px; font-size: 0.9rem; }
 .breakdown p.hint { margin: 0 0 4px; }
-.guide-page { max-width: 900px; line-height: 1.6; }
-.guide-page h3 { font-size: 1.05rem; text-transform: none; letter-spacing: 0; color: var(--ink); margin: 28px 0 8px; }
+.guide-page { line-height: 1.6; }
+.guide-page p, .guide-page ul { max-width: 85ch; }
+.guide-section { border: 1px solid var(--line); border-radius: var(--radius); margin: 8px 0; }
+.guide-section > summary { cursor: pointer; padding: 10px 14px; font-weight: 600; list-style: none; display: flex; justify-content: space-between; }
+.guide-section > summary::-webkit-details-marker { display: none; }
+.guide-section > summary::after { content: '+'; color: var(--muted); font-weight: 400; }
+.guide-section[open] > summary { border-bottom: 1px solid var(--line); }
+.guide-section[open] > summary::after { content: '−'; }
+.guide-body { padding: 4px 14px 14px; }
+.guide-next { margin-top: 12px; }
 .guide-page p { margin: 8px 0; }
-.guide-contents { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px; margin: 12px 0; }
-.guide-contents ol { margin: 6px 0 0; padding-left: 22px; columns: 2; }
-@media (max-width: 600px) { .guide-contents ol { columns: 1; } }
-.guide-contents a { color: var(--accent); text-decoration: none; }
 .guide-example { border-left: 3px solid var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); padding: 6px 12px; margin: 12px 0; border-radius: 0 var(--radius) var(--radius) 0; }
 .guide-example-title { font-weight: 600; font-size: 0.85rem; color: var(--accent); margin-top: 4px; }
 .guide-example p { margin: 4px 0; }

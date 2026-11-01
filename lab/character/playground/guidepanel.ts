@@ -241,17 +241,34 @@ const SECTIONS: readonly Section[] = [
 
 export function guidePanel(): Panel {
   const root = h('section', { class: 'panel guide-page', id: 'guide', 'aria-labelledby': 'guide-title' });
-  const render = () =>
+  /** The open section; only one is open at a time. Kept while the page is open. */
+  let open = SECTIONS[0]!.id;
+
+  const render = () => {
+    const panels = SECTIONS.map((section, i) => {
+      const next = SECTIONS[i + 1];
+      const details = h('details', { class: 'guide-section', id: `guide-${section.id}`, open: section.id === open },
+        h('summary', {}, section.title),
+        h('div', { class: 'guide-body' },
+          ...section.body(),
+          next ? h('button', { type: 'button', class: 'guide-next', onclick: () => openSection(next.id) }, `Next: ${next.title.replace(/^\d+\. /, '')} →`) : null));
+      details.addEventListener('toggle', () => {
+        if (details.open && open !== section.id) openSection(section.id);
+      });
+      return details;
+    });
+    /** Opens one section and closes the rest, keeping the opened section's heading in view. */
+    const openSection = (id: string) => {
+      open = id;
+      for (const d of panels) d.open = d.id === `guide-${id}`;
+      document.getElementById(`guide-${id}`)?.scrollIntoView({ block: 'nearest' });
+    };
     root.replaceChildren(
       h('h2', { id: 'guide-title' }, 'How it works'),
-      p('A step-by-step introduction to how characters, checks and fights work in the lab, with examples. No previous knowledge of Dungeons & Dragons is needed. The numbers in the examples are worked out live by the lab’s own rules.'),
-      h('nav', { class: 'guide-contents' }, h('strong', {}, 'Contents'),
-        h('ol', {}, ...SECTIONS.map((s) => h('li', {}, h('a', { href: `#guide-${s.id}`, onclick: (e: Event) => {
-          e.preventDefault();
-          document.getElementById(`guide-${s.id}`)?.scrollIntoView({ behavior: 'smooth' });
-        } }, s.title.replace(/^\d+\. /, '')))))),
-      ...SECTIONS.map((s) => h('section', { class: 'guide-section', id: `guide-${s.id}` }, h('h3', {}, s.title), ...s.body())),
+      p('A step-by-step introduction to how characters, checks and fights work in the lab, with examples. No previous knowledge of Dungeons & Dragons is needed. The numbers in the examples are worked out live by the lab’s own rules. Open one section at a time, in order.'),
+      ...panels,
     );
+  };
   render();
   return { element: root, render };
 }
