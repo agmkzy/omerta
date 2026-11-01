@@ -219,6 +219,12 @@ describe('stepFight', { tags: ['unit'] }, () => {
     assert.deepEqual(next(duel(), 15, 10, 8, 3).request.reason, { kind: 'attack', id: 'B1', target: 'A1', bonus: 0, dc: 10, die: 1, of: 1 });
   });
 
+  test('says which round the fight is in, 0 while rolling initiative', () => {
+    assert.equal(next(duel({ maxRounds: 2 })).round, 0);
+    assert.equal(next(duel({ maxRounds: 2 }), 15, 10).round, 1);
+    assert.equal(next(duel({ maxRounds: 2 }), 15, 10, 1, 1).round, 2); // both missed in round 1; A1 now attacks in round 2
+  });
+
   test('shows the fight so far', () => {
     const step = next(duel(), 15, 10, 8, 3);
     assert.deepEqual(kinds(step.events), ['initiative', 'attack']);

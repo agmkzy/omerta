@@ -137,7 +137,14 @@ export interface RollRequest {
 /** A fight replayed from some rolls: either finished, or waiting for the next roll with the fight so far. */
 export type FightStep =
   | { readonly done: true; readonly result: FightResult }
-  | { readonly done: false; readonly request: RollRequest; readonly events: readonly FightEvent[]; readonly fighters: readonly Fighter[] };
+  | {
+      readonly done: false;
+      readonly request: RollRequest;
+      /** The round the roll is for; 0 while rolling initiative. */
+      readonly round: number;
+      readonly events: readonly FightEvent[];
+      readonly fighters: readonly Fighter[];
+    };
 
 /** The chance an attack with this bonus hits this Defence: natural 20s (the highest roll) always hit, natural 1s never do. */
 export function attackHitChance(dice: Dice, bonus: number, dc: number): number {
@@ -160,7 +167,7 @@ interface FighterState {
 }
 
 export function runFight(spec: FightSpec, roller: Roller): FightResult {
-  return fight(spec, roller, { events: [], fighters: [] });
+  return fight(spec, roller, { events: [], fighters: [], round: 0 });
 }
 
 /** Raised by stepFight's roller when it runs out of given faces. */
@@ -173,7 +180,7 @@ class AwaitingRoll {
  * fight ends, returns the roll it is waiting for, with the events and fighters so far. Throws if a face is not on its die.
  */
 export function stepFight(spec: FightSpec, faces: readonly number[]): FightStep {
-  const record: FightRecord = { events: [], fighters: [] };
+  const record: FightRecord = { events: [], fighters: [], round: 0 };
   const given = replay(faces, {
     roll(sides, reason) {
       throw new AwaitingRoll({ sides, reason: reason as FightRollReason });
@@ -183,7 +190,7 @@ export function stepFight(spec: FightSpec, faces: readonly number[]): FightStep 
     return { done: true, result: fight(spec, given, record) };
   } catch (e) {
     if (!(e instanceof AwaitingRoll)) throw e;
-    return { done: false, request: e.request, events: [...record.events], fighters: record.fighters.map(publicFighter) };
+    return { done: false, request: e.request, round: record.round, events: [...record.events], fighters: record.fighters.map(publicFighter) };
   }
 }
 
@@ -191,6 +198,7 @@ export function stepFight(spec: FightSpec, faces: readonly number[]): FightStep 
 interface FightRecord {
   events: FightEvent[];
   fighters: FighterState[];
+  round: number;
 }
 
 function publicFighter({ nerveTested: _, ...f }: FighterState): Fighter {
@@ -282,7 +290,7 @@ function fight(spec: FightSpec, roller: Roller, record: FightRecord): FightResul
   };
 
   while (round < maxRounds) {
-    round++;
+    record.round = ++round;
     for (const f of order) {
       if (f.status !== 'fighting') continue;
       attack(f);

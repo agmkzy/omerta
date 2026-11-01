@@ -38,7 +38,8 @@ npm run lab:dev         # playground at http://localhost:5180
 
 Four tabs: **Characters** (a list of saved characters and an editor for the selected one, split into attributes, skills
 and temperament), **Skill check** (intimidate, persuade, deceive, or any skill), **Fight** (a set-up page where saved characters are added to
-two sides, then the fight: each fighter's card with their stats and result, and a short log by round) and **Dice
+two sides, then the fight, either played automatically or stepped through roll by roll, rolling or choosing each
+result; each fighter's card shows their stats and state, with a short log by round) and **Dice
 and odds**. Characters are saved to `localStorage` in this
 browser after every change, as is the open tab. The check tab picks its two characters from the saved list; the fight line-up is also saved. The roster and line-up logic (`playground/roster.ts`, `playground/parties.ts`) is pure and tested like the library.
 
@@ -89,6 +90,10 @@ chooses actions.
   surrenders or an attacker backs off.
 - **Ending:** a side loses when none of its fighters is still fighting; otherwise the round limit gives a stalemate.
 - `tallyFights` counts wins per side and how each fighter ended up (`FIGHTER_STATUS_INFO` explains each status).
+- **Stepping through:** every die in a fight says what it is for (initiative, target, attack, damage, nerve, with the
+  numbers involved). `stepFight(spec, faces)` replays a fight from the rolls so far and returns the next roll it is
+  waiting for, with the fight so far; `describeRollRequest` says what that roll needs and its chance. A fight is fully
+  rebuilt from its rolls, so going back is dropping the last one.
 
 The nerve check itself (`src/nerve.ts`) is shared: it is also made when a weapon is drawn on someone (DC 12).
 

@@ -1,14 +1,16 @@
-// Fight tab, in two views. Set-up: click characters to add them to the left or right side; each fighter is shown once as a card
+// Fight tab, in two views. A fight is kept as the rolls made so far: Auto plays it out at once, Step through stops at
+// every roll so the player can roll or choose the result, Back drops the last roll, and Play the rest finishes it.
+// Set-up: click characters to add them to the left or right side; each fighter is shown once as a card
 // with the numbers the fight uses. Fight: the same cards with how each fighter ended up, then the log, one short line per
 // action, grouped by round, with the dice for each line in a column on the right.
 import { BACKGROUND_INFO } from '../src/backgrounds';
 import { BASE_DEFENCE, BASE_HIT_POINTS, type Character } from '../src/character';
 import { DICE, DICE_NAMES, type DiceName } from '../src/dice';
 import { compactRoll, percent, signed } from '../src/explain';
-import { UNARMED_DAMAGE_DIE, fightStats, runFight, tallyFights, type FightEvent, type FightResult, type FightSpec, type FightTally, type FighterStatus } from '../src/fight';
-import { describeFightEvent } from '../src/fight-log';
+import { UNARMED_DAMAGE_DIE, fightStats, runFight, stepFight, tallyFights, type FightEvent, type FightSpec, type FightTally, type Fighter, type FighterStatus, type RollRequest } from '../src/fight';
+import { describeFightEvent, describeRollRequest } from '../src/fight-log';
 import { NERVE_DC, type Side } from '../src/nerve';
-import { roller, seeded } from '../src/random';
+import { replay, roller, seeded } from '../src/random';
 import { notableTraits } from '../src/temperament';
 import { h, segmented, slider } from './dom';
 import { assign, canFight, loadParties, reconcile, saveParties, type Parties } from './parties';
@@ -27,7 +29,8 @@ interface State {
   parties: Parties;
   dice: DiceName;
   maxRounds: number;
-  fight: FightResult | null;
+  /** The fight in progress or finished: its line-up and every roll so far. */
+  fight: { spec: FightSpec; faces: number[] } | null;
   tally: FightTally | null;
 }
 
@@ -97,10 +100,21 @@ export function fightPanel(): Panel {
   };
   const members = (side: Side) => (side === 'attacker' ? state.parties.attackers : state.parties.defenders);
   const spec = (): FightSpec => ({ attackers: members('attacker').map(characterById), defenders: members('defender').map(characterById), dice: DICE[state.dice], maxRounds: state.maxRounds });
-  const fight = (simulate: boolean) => {
-    state.fight = runFight(spec(), dice);
-    state.tally = simulate ? tallyFights(spec(), dice, RUNS) : null;
+  /** Plays a fight to the end with random dice, from the given rolls on, recording every roll. */
+  const playOut = (s: FightSpec, faces: readonly number[]): number[] => {
+    const rolls = replay(faces, dice);
+    runFight(s, rolls);
+    return rolls.faces;
+  };
+  const startFight = (how: 'auto' | 'step' | 'simulate') => {
+    const s = spec();
+    state.fight = { spec: s, faces: how === 'step' ? [] : playOut(s, []) };
+    state.tally = how === 'simulate' ? tallyFights(s, dice, RUNS) : null;
     state.view = 'fight';
+    render();
+  };
+  const setFaces = (faces: number[]) => {
+    state.fight = { ...state.fight!, faces };
     render();
   };
 
@@ -136,48 +150,94 @@ export function fightPanel(): Panel {
         h('div', { class: 'field' }, h('span', {}, 'Dice'), segmented(DICE_NAMES, state.dice, (d) => { state.dice = d; render(); }), hint(DICE[state.dice].description))),
       guide(),
       h('div', { class: 'row' },
-        h('button', { type: 'button', class: 'primary', disabled: !ready, onclick: () => fight(false) }, 'Start fight'),
-        h('button', { type: 'button', disabled: !ready, onclick: () => fight(true) }, `Simulate ${RUNS.toLocaleString()} fights`),
+        h('button', { type: 'button', class: 'primary', disabled: !ready, onclick: () => startFight('auto') }, 'Auto fight'),
+        h('button', { type: 'button', disabled: !ready, onclick: () => startFight('step') }, 'Step through'),
+        h('button', { type: 'button', disabled: !ready, onclick: () => startFight('simulate') }, `Simulate ${RUNS.toLocaleString()} fights`),
         ready ? null : h('span', { class: 'hint' }, 'Put at least one character on each side.')),
     );
   }
 
+  /** The roll the fight is waiting for: what it is, and buttons to roll it, choose its result, go back or finish. */
+  function rollPanel(request: RollRequest, fighters: readonly Fighter[], s: FightSpec, faces: number[]): HTMLElement {
+    const fightDice = s.dice ?? DICE.d20;
+    const r = request.reason;
+    const name = (id: string) => fighters.find((f) => f.id === id)!.character.name;
+    // On a single die, mark which faces would succeed.
+    const succeeds = (face: number): boolean | null => {
+      if (fightDice.count !== 1 || r.of !== 1) return null;
+      if (r.kind === 'attack') return face === fightDice.sides || (face !== 1 && face + r.bonus >= r.dc);
+      if (r.kind === 'nerve') return face + r.bonus >= r.dc;
+      return null;
+    };
+    const faceLabel = (face: number) => (r.kind === 'target' ? `${face}: ${name(r.options[face - 1]!)}` : String(face));
+    return h('div', { class: 'roll-panel' },
+      h('div', { class: 'roll-count' }, `Roll ${faces.length + 1}`),
+      h('p', { class: 'prompt' }, describeRollRequest(request, fighters, fightDice)),
+      h('div', { class: 'row' },
+        h('button', { type: 'button', class: 'primary', onclick: () => setFaces([...faces, dice.roll(request.sides, r)]) }, 'Roll'),
+        h('button', { type: 'button', onclick: () => setFaces(playOut(s, faces)) }, 'Play the rest'),
+        h('button', { type: 'button', disabled: faces.length === 0, onclick: () => setFaces(faces.slice(0, -1)) }, 'Back')),
+      h('div', { class: 'hint' }, 'Or choose the result:'),
+      h('div', { class: 'faces' }, ...Array.from({ length: request.sides }, (_, i) => {
+        const face = i + 1;
+        const good = succeeds(face);
+        return h('button', { type: 'button', class: `face${good === true ? ' good' : good === false ? ' bad' : ''}`, onclick: () => setFaces([...faces, face]) }, faceLabel(face));
+      })),
+    );
+  }
+
   function renderFight() {
-    const r = state.fight!;
-    const names = (side: Side) => r.fighters.filter((f) => f.side === side).map((f) => f.character.name).join(', ');
-    const result = r.winner ? `${SIDE_TITLE[r.winner]} wins after ${r.rounds} ${r.rounds === 1 ? 'round' : 'rounds'}.` : `Stalemate after ${r.rounds} rounds.`;
+    const { spec: s, faces } = state.fight!;
+    const step = stepFight(s, faces);
+    const events = step.done ? step.result.events : step.events;
+    const fighters = step.done ? step.result.fighters : step.fighters;
+    const names = (side: Side) => fighters.filter((f) => f.side === side).map((f) => f.character.name).join(', ');
+    const lastRound = events.reduce((n, e) => ('round' in e ? Math.max(n, e.round) : n), 0);
+    const status = step.done
+      ? step.result.winner ? `${SIDE_TITLE[step.result.winner]} wins after ${step.result.rounds} ${step.result.rounds === 1 ? 'round' : 'rounds'}.` : `Stalemate after ${step.result.rounds} rounds.`
+      : step.round ? `In progress: round ${step.round}.` : 'In progress: rolling initiative.';
 
     // The log: the turn order, then each round's lines under a heading.
+    const forLog = { events, fighters, winner: null, rounds: lastRound };
     const rounds = new Map<number, FightEvent[]>();
-    for (const e of r.events) if (e.kind !== 'initiative' && e.kind !== 'end') rounds.set(e.round, [...(rounds.get(e.round) ?? []), e]);
-    const nameOf = (id: string) => r.fighters.find((f) => f.id === id)!.character.name;
+    for (const e of events) if (e.kind !== 'initiative' && e.kind !== 'end') rounds.set(e.round, [...(rounds.get(e.round) ?? []), e]);
+    const nameOf = (id: string) => fighters.find((f) => f.id === id)!.character.name;
     const row = (e: FightEvent) =>
-      h('tr', { class: `ev-${e.kind}` }, h('td', { class: 'action' }, describeFightEvent(e, r, { rolls: false })),
+      h('tr', { class: `ev-${e.kind}` }, h('td', { class: 'action' }, describeFightEvent(e, forLog, { rolls: false })),
         h('td', { class: 'dice' }, ...eventDice(e, nameOf).map((d) => h('div', {}, d))));
-    const initiative = r.events.find((e) => e.kind === 'initiative')!;
+    const initiative = events.find((e) => e.kind === 'initiative');
 
     root.replaceChildren(
       h('div', { class: 'fight-head' },
         h('h2', { id: 'fight-title' }, `${names('attacker')} vs ${names('defender')}`),
         h('div', { class: 'row' },
-          h('button', { type: 'button', class: 'primary', onclick: () => fight(false) }, 'Fight again'),
-          h('button', { type: 'button', onclick: () => fight(true) }, `Simulate ${RUNS.toLocaleString()} fights`),
+          ...(step.done
+            ? [
+                h('button', { type: 'button', class: 'primary', onclick: () => startFight('auto') }, 'Auto fight again'),
+                h('button', { type: 'button', onclick: () => startFight('step') }, 'Step through again'),
+                h('button', { type: 'button', onclick: () => setFaces(faces.slice(0, -1)) }, 'Back one roll'),
+                h('button', { type: 'button', onclick: () => startFight('simulate') }, `Simulate ${RUNS.toLocaleString()} fights`),
+              ]
+            : []),
           h('button', { type: 'button', onclick: () => { state.view = 'setup'; render(); } }, 'Change line-up'))),
-      h('p', { class: 'result' }, result),
+      h('p', { class: 'result' }, status),
       h('div', { class: 'grid two sides' }, ...SIDES.map((side) =>
         h('div', { class: 'side' }, h('h3', {}, SIDE_TITLE[side]),
-          ...r.fighters.filter((f) => f.side === side).map((f) => fighterCard(f.character, { result: { hp: f.hp, status: f.status } }))))),
-      ...(state.tally ? [tallyView(r)] : []),
+          ...fighters.filter((f) => f.side === side).map((f) => fighterCard(f.character, { result: { hp: f.hp, status: f.status } }))))),
+      ...(step.done ? [] : [rollPanel(step.request, fighters, s, faces)]),
+      ...(state.tally ? [tallyView(fighters)] : []),
       h('h3', {}, 'Log'),
-      h('table', { class: 'fight-log' },
-        h('thead', {}, h('tr', {}, h('th', {}, 'What happened'), h('th', { class: 'dice' }, 'Dice'))),
-        h('tbody', {}, row(initiative)),
-        ...[...rounds].map(([round, events]) =>
-          h('tbody', {}, h('tr', { class: 'round-head' }, h('td', { colspan: 2 }, `Round ${round}`)), ...events.map(row)))),
+      events.length
+        ? h('table', { class: 'fight-log' },
+            h('thead', {}, h('tr', {}, h('th', {}, 'What happened'), h('th', { class: 'dice' }, 'Dice'))),
+            ...(initiative ? [h('tbody', {}, row(initiative))] : []),
+            ...[...rounds].map(([round, roundEvents]) =>
+              h('tbody', {}, h('tr', { class: 'round-head' }, h('td', { colspan: 2 }, `Round ${round}`)), ...roundEvents.map(row))))
+        : hint('Nothing has happened yet: everyone is rolling initiative.'),
     );
   }
 
-  function tallyView(r: FightResult): HTMLElement {
+  function tallyView(fighters: readonly Fighter[]): HTMLElement {
     const t = state.tally!;
     const share = (n: number) => percent(n / RUNS);
     return h('div', { class: 'simulation' },
@@ -186,7 +246,7 @@ export function fightPanel(): Panel {
       h('table', {},
         h('thead', {}, h('tr', {}, h('th', {}, 'How each fighter ended up'), h('th', { class: 'num' }, 'Still fighting'), h('th', { class: 'num' }, 'Knocked out'), h('th', { class: 'num' }, 'Lost their nerve'))),
         h('tbody', {},
-          ...r.fighters.map((f) => {
+          ...fighters.map((f) => {
             const s = t.statuses[f.id]!;
             return h('tr', {}, h('td', {}, `${f.character.name} `, h('span', { class: 'muted' }, f.side === 'attacker' ? '(left)' : '(right)')),
               h('td', { class: 'num' }, share(s.fighting)), h('td', { class: 'num' }, share(s['knocked-out'])), h('td', { class: 'num' }, share(s.surrendered + s['backed-off'] + s.fled)));
