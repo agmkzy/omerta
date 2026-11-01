@@ -1,7 +1,9 @@
 // A character: attributes, training and the bonus training gives. Players and NPCs alike.
 import { ATTRIBUTE_INFO, abilityModifier, attributeScores, type Attribute, type AttributeScores } from './attributes';
-import type { Modifier } from './check';
+import { combineEdges, type Modifier, type Roll } from './check';
+import { DICE, type Dice, type Edge } from './dice';
 import { SKILL_INFO, attributesFor, type Skill } from './skills';
+import { temperament as fullTemperament, temperamentModifiers, type Situation, type Temperament } from './temperament';
 
 export const PROFICIENCIES = ['untrained', 'trained', 'expert'] as const;
 export type Proficiency = (typeof PROFICIENCIES)[number];
@@ -13,6 +15,7 @@ export interface Character {
   readonly training: Training;
   /** Added to trained skills, twice to expert ones. D&D's runs from 2 to 6 as a character grows. */
   readonly proficiencyBonus: number;
+  readonly temperament: Temperament;
 }
 
 export interface CharacterInput {
@@ -20,6 +23,7 @@ export interface CharacterInput {
   readonly attributes?: AttributeScores;
   readonly training?: Training;
   readonly proficiencyBonus?: number;
+  readonly temperament?: Temperament;
 }
 
 export const PROFICIENCY_MIN = 2;
@@ -34,6 +38,7 @@ export function createCharacter(input: CharacterInput): Character {
     attributes: attributeScores(input.attributes ?? {}),
     training: { ...input.training },
     proficiencyBonus,
+    temperament: input.temperament ?? fullTemperament({}),
   };
 }
 
@@ -53,4 +58,23 @@ export function skillModifiers(c: Character, skill: Skill, using?: Attribute): M
   if (proficiency === 'trained') modifiers.push({ value: c.proficiencyBonus, reason: `Trained in ${name}` });
   if (proficiency === 'expert') modifiers.push({ value: 2 * c.proficiencyBonus, reason: `Expert at ${name}` });
   return modifiers;
+}
+
+export interface RollOptions {
+  /** The moments his temperament may bear on. */
+  readonly situations?: readonly Situation[];
+  /** What the moment adds: a gun, a crowd, a debt. */
+  readonly modifiers?: readonly Modifier[];
+  readonly edges?: readonly Edge[];
+  readonly dice?: Dice;
+  readonly using?: Attribute;
+}
+
+/** A man's roll of a skill: his skill, then his temperament in the situation, then what the moment adds. */
+export function rollFor(c: Character, skill: Skill, options: RollOptions = {}): Roll {
+  return {
+    dice: options.dice ?? DICE.d20,
+    edge: combineEdges(options.edges ?? []),
+    modifiers: [...skillModifiers(c, skill, options.using), ...temperamentModifiers(c.temperament, options.situations ?? []), ...(options.modifiers ?? [])],
+  };
 }
