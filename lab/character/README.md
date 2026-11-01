@@ -1,0 +1,77 @@
+# Character lab
+
+An exploratory, self-contained prototype of a D&D-style character system: attributes, skills, temperament, checks and
+contests. It is intended to eventually replace the game's `Traits`/`Skills` (`src/types.ts`), but nothing here is
+connected to the game yet. The lab imports nothing from `src/`, and the game imports nothing from the lab.
+
+## Running
+
+```bash
+npm run lab:test        # all lab tests (~0.5 s)
+npm run lab:watch       # tests in watch mode
+npm run lab:cov         # tests with coverage (thresholds: 100%)
+npm run lab:typecheck   # strict TypeScript (noUncheckedIndexedAccess, exactOptionalPropertyTypes)
+npm run lab:dev         # playground at http://localhost:5180
+```
+
+## Structure
+
+| Module | Purpose |
+|---|---|
+| `src/random.ts` | Injected randomness. `seeded()` is mulberry32, matching the game's `Rng`, which already satisfies `RandomSource`. |
+| `src/dice.ts` | d20, 2d10 and 3d6 as interchangeable options; advantage/disadvantage. |
+| `src/distribution.ts` | Exact probability distributions, so odds are calculated rather than sampled. |
+| `src/check.ts` | DC checks and opposed checks; modifiers carry a reason; five graded outcomes; exact odds. |
+| `src/attributes.ts` | STR, AGI, CON, INT, WIS, CHA on a 1–20 scale with the D&D modifier; 4d6-drop-lowest rolling. |
+| `src/skills.ts` | 18 skills, each based on one attribute, some with an alternative (e.g. Intimidation with STR). |
+| `src/character.ts` | Characters: attributes, training (untrained/trained/expert), proficiency bonus (2–6), temperament. `rollFor()` builds a roll. |
+| `src/temperament.ts` | 12 traits (the game's 7 plus loyalty, pride, temper, honesty, cruelty), 0–1. One table lists where temperament modifies rolls. |
+| `src/backgrounds.ts` | Backgrounds instead of classes: training, attribute priorities, temperament centres. `rollCharacter()` generates a character. |
+| `src/contest.ts` | Automatically resolved multi-round contests (see below). |
+| `src/contest-log.ts`, `src/explain.ts` | Plain-text descriptions of results and events. |
+| `playground/` | Framework-free browser page using the modules above. |
+
+Tests are in `test/`, one file per module. Each is tagged `unit` or `property` (fast-check). The suite has 100% statement,
+branch, function and line coverage.
+
+## Design decisions
+
+- **Three layers.** Attributes (innate ability), skills (training) and temperament (inclination) are separate, so a
+  character's ability to do something is independent of whether they want to.
+- **D&D arithmetic.** A check is dice + attribute modifier + proficiency (doubled for expertise) + situational
+  modifiers, against a DC or an opposing total. In opposed checks, ties go to the passive side.
+- **Graded outcomes.** Margin bands give critical failure / failure / partial / success / critical success
+  (defaults: < −5, −5 to −1, 0 to 4, 5 to 9, ≥ 10). Bands are configurable.
+- **Explainable modifiers.** Every modifier has a reason, so any result can be broken down.
+- **Exact odds.** `checkOdds`/`opposedOdds` give exact probabilities. Intended for NPC decision-making.
+- **Deterministic.** All randomness comes from an injected source; the same seed gives the same results.
+
+### Contests
+
+A contest models a tug-of-war. A marker starts at 0 on a track from −N (defender wins) to +N (attacker wins). Each
+round is an opposed roll, and the marker moves one step per 5 points of difference (rounded up). Neither side chooses
+actions.
+
+- **Approaches:** `intimidate` (Intimidation vs Nerve), `gunpoint` (as intimidate, with attacker advantage and a DC 12
+  nerve check for the defender before round 1), `brawl` (Brawling vs Brawling; winning by 5+ lands a hit, each hit is −1
+  to later rolls, and 3 hits is a knockout).
+- **Nerve checks** are triggered by being pushed past halfway (DC 10, once per side), taking a hit (DC 10 + 2 per hit),
+  or a gun being drawn (DC 12). At most one per round.
+- **On a failed nerve check:** a high-temper character lashes out once and the contest becomes a brawl. A low-courage or
+  high-caution character flees. Anyone else yields.
+- **Other endings:** pushed to the end of the track, the attacker's optional walk-away line, or the round limit
+  (stalemate).
+
+## Open questions
+
+- **Dice.** d20 is swingy: an untrained character beats a +11 expert in an opposed check 9% of the time (under 1% on
+  3d6). Compare in the playground's dice panel.
+- **Progression.** XP/levels versus improvement through use. Not implemented; only the proficiency bonus can be set.
+- **Knowledge.** The player should see an estimate of an NPC's abilities based on what they know, not the true values.
+  This would sit on top of the exact odds.
+- **Contest balance.** The step size, nerve DCs, hit threshold and temperament effects are first guesses, all
+  defined as constants or in one table.
+- **Unused skills.** Reflexes, Firearms and others are defined but no contest uses them yet. For example, Reflexes
+  could decide who acts first when someone lashes out.
+- **Integration with the game.** Mapping the existing `Traits`/`Skills` onto this model, save migration, and replacing
+  the game's existing ad-hoc checks in `src/` are not started.
