@@ -3,12 +3,14 @@ import { charactersPanel } from './characters';
 import { checkPanel } from './checkpanel';
 import { fightPanel } from './fightpanel';
 import { h } from './dom';
+import { guidePanel } from './guidepanel';
 import { oddsPanel } from './odds';
 import { onChange, storage } from './store';
 import type { Panel } from './views';
 
 const TAB_KEY = 'character-lab:tab';
 const tabs: readonly { id: string; label: string; panel: Panel }[] = [
+  { id: 'guide', label: 'How it works', panel: guidePanel() },
   { id: 'characters', label: 'Characters', panel: charactersPanel() },
   { id: 'check', label: 'Skill check', panel: checkPanel() },
   { id: 'fight', label: 'Fight', panel: fightPanel() },

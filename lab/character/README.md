@@ -36,7 +36,7 @@ npm run lab:dev         # playground at http://localhost:5180
 
 ## Playground
 
-Four tabs: **Characters** (a list of saved characters and an editor for the selected one, split into attributes, skills
+Tabs: **How it works** (a step-by-step introduction with worked examples whose numbers are calculated live), **Characters** (a list of saved characters and an editor for the selected one, split into attributes, skills
 and temperament), **Skill check** (intimidate, persuade, deceive, or any skill), **Fight** (a set-up page where saved characters are added to
 two sides, then the fight, either played automatically or stepped through roll by roll, rolling or choosing each
 result; each fighter's card shows their stats and state, with a short log by round) and **Dice
