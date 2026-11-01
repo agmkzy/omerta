@@ -1,10 +1,10 @@
 // Fight tab, in two views. Set-up: click characters to add them to the left or right side; each fighter is shown once as a card
 // with the numbers the fight uses. Fight: the same cards with how each fighter ended up, then the log, one short line per
-// action, grouped by round. Roll breakdowns are shown on hover rather than repeated in the log.
+// action, grouped by round, with the dice for each line in a column on the right.
 import { BACKGROUND_INFO } from '../src/backgrounds';
 import { BASE_DEFENCE, BASE_HIT_POINTS, type Character } from '../src/character';
 import { DICE, DICE_NAMES, type DiceName } from '../src/dice';
-import { describeRoll, percent, signed } from '../src/explain';
+import { compactRoll, percent, signed } from '../src/explain';
 import { UNARMED_DAMAGE_DIE, fightStats, runFight, tallyFights, type FightEvent, type FightResult, type FightSpec, type FightTally, type FighterStatus } from '../src/fight';
 import { describeFightEvent } from '../src/fight-log';
 import { NERVE_DC, type Side } from '../src/nerve';
@@ -56,12 +56,21 @@ function fighterCard(c: Character, options: { result?: { hp: number; status: Fig
   );
 }
 
-/** The roll breakdown for an event, shown on hover. */
-function eventDetail(e: FightEvent): string {
-  if (e.kind === 'attack') return [`${describeRoll(e.result.roll)} vs Defence ${e.result.dc}`, e.damage ? `Damage: ${e.damage.faces.length}d${UNARMED_DAMAGE_DIE} [${e.damage.faces.join(' ')}] ${signed(e.damage.modifier)} Strength = ${e.damage.total}` : ''].filter(Boolean).join('\n');
-  if (e.kind === 'nerve') return `${describeRoll(e.check.result.roll)} vs ${e.check.result.dc}`;
-  if (e.kind === 'initiative') return e.order.map((o) => describeRoll(o.roll)).join('\n');
-  return '';
+/** The dice behind an event, in short form, for the right-hand column of the log. */
+function eventDice(e: FightEvent, nameOf: (id: string) => string): string[] {
+  if (e.kind === 'attack') {
+    const lines = [`${compactRoll(e.result.roll)} vs ${e.result.dc}`];
+    if (e.damage) {
+      const { faces, modifier, total } = e.damage;
+      const sum = `${faces.join('+')}${modifier ? ` ${modifier < 0 ? '−' : '+'} ${Math.abs(modifier)}` : ''}`;
+      const result = modifier || faces.length > 1 ? `${sum} = ${total}` : sum;
+      lines.push(`damage ${faces.length}d${UNARMED_DAMAGE_DIE}: ${result}${total !== faces.reduce((a, b) => a + b, 0) + modifier ? ' (minimum 1)' : ''}`);
+    }
+    return lines;
+  }
+  if (e.kind === 'nerve') return [`${compactRoll(e.check.result.roll)} vs ${e.check.result.dc}`];
+  if (e.kind === 'initiative') return e.order.map((o) => `${nameOf(o.id)}: ${compactRoll(o.roll)}`);
+  return [];
 }
 
 export function fightPanel(): Panel {
@@ -141,7 +150,10 @@ export function fightPanel(): Panel {
     // The log: the turn order, then each round's lines under a heading.
     const rounds = new Map<number, FightEvent[]>();
     for (const e of r.events) if (e.kind !== 'initiative' && e.kind !== 'end') rounds.set(e.round, [...(rounds.get(e.round) ?? []), e]);
-    const line = (e: FightEvent) => h('li', { class: `ev-${e.kind}`, title: eventDetail(e) }, describeFightEvent(e, r));
+    const nameOf = (id: string) => r.fighters.find((f) => f.id === id)!.character.name;
+    const row = (e: FightEvent) =>
+      h('tr', { class: `ev-${e.kind}` }, h('td', { class: 'action' }, describeFightEvent(e, r, { rolls: false })),
+        h('td', { class: 'dice' }, ...eventDice(e, nameOf).map((d) => h('div', {}, d))));
     const initiative = r.events.find((e) => e.kind === 'initiative')!;
 
     root.replaceChildren(
@@ -157,9 +169,11 @@ export function fightPanel(): Panel {
           ...r.fighters.filter((f) => f.side === side).map((f) => fighterCard(f.character, { result: { hp: f.hp, status: f.status } }))))),
       ...(state.tally ? [tallyView(r)] : []),
       h('h3', {}, 'Log'),
-      hint('Hover a line to see the dice.'),
-      h('ul', { class: 'fight-log' }, line(initiative)),
-      ...[...rounds].map(([round, events]) => h('div', { class: 'log-round' }, h('div', { class: 'round-head' }, `Round ${round}`), h('ul', { class: 'fight-log' }, ...events.map(line)))),
+      h('table', { class: 'fight-log' },
+        h('thead', {}, h('tr', {}, h('th', {}, 'What happened'), h('th', { class: 'dice' }, 'Dice'))),
+        h('tbody', {}, row(initiative)),
+        ...[...rounds].map(([round, events]) =>
+          h('tbody', {}, h('tr', { class: 'round-head' }, h('td', { colspan: 2 }, `Round ${round}`)), ...events.map(row)))),
     );
   }
 

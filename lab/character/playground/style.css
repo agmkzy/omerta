@@ -26,10 +26,10 @@
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink); line-height: 1.45; }
-.masthead { padding: 24px 16px 8px; max-width: 1100px; margin: 0 auto; }
+.masthead { padding: 24px 16px 8px; max-width: 1440px; margin: 0 auto; }
 .masthead h1 { margin: 0; font-size: 1.9rem; letter-spacing: 0.02em; }
 .masthead p { margin: 4px 0 0; color: var(--muted); }
-main { max-width: 1100px; margin: 0 auto; padding: 8px 16px 48px; display: grid; gap: 16px; }
+main { max-width: 1440px; margin: 0 auto; padding: 8px 16px 48px; display: grid; gap: 16px; }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
 .panel h2 { font-size: 1.2rem; margin: 0 0 12px; }
 .panel h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 16px 0 8px; }
@@ -158,10 +158,13 @@ ul.final-state { margin: 4px 0 10px; padding-left: 18px; }
 .fight-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
 .fight-head h2 { margin: 0; }
 p.result { font-weight: 600; margin: 8px 0; }
-ul.fight-log { list-style: none; margin: 0; padding: 0; }
-ul.fight-log li { padding: 3px 0; cursor: default; }
-ul.fight-log li.ev-nerve, ul.fight-log li.ev-out { padding-left: 16px; color: var(--muted); }
-ul.fight-log li.ev-out { font-weight: 600; }
-.log-round { margin-top: 8px; }
-.round-head { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); border-bottom: 1px solid var(--line); padding-bottom: 2px; margin-bottom: 2px; }
+table.fight-log { width: 100%; border-collapse: collapse; }
+table.fight-log th { text-align: left; }
+table.fight-log td { padding: 4px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.fight-log td.action { width: 60%; }
+table.fight-log .dice { font-family: ui-monospace, Menlo, monospace; font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+table.fight-log tr.ev-nerve td.action, table.fight-log tr.ev-out td.action { padding-left: 24px; color: var(--muted); }
+table.fight-log tr.ev-out td.action { font-weight: 600; }
+table.fight-log tr.round-head td { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); padding-top: 14px; border-bottom: 1px solid var(--muted); }
+@media (max-width: 640px) { table.fight-log .dice { white-space: normal; } }
 .simulation table td.num, .simulation table th.num { text-align: right; }

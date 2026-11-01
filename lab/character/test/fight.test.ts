@@ -235,6 +235,19 @@ describe('describeFightEvent', { tags: ['unit'] }, () => {
     assert.equal(log(duel(), 15, 10, 20, 2, 3, 1)[2], 'D is at half HP and loses their nerve (rolled 1 vs 10).');
   });
 
+  test('can leave out the numbers when the dice are shown separately, keeping natural 20s and 1s', () => {
+    const lines = (...faces: number[]) => {
+      const r = runFight(duel(), scripted(...faces));
+      return r.events.map((e) => describeFightEvent(e, r, { rolls: false }));
+    };
+    assert.deepEqual(lines(15, 10, 8, 3, 9).slice(0, 3), ['Turn order: A, D.', 'A hits D: 3 damage, 7 HP left.', 'D misses A.']);
+    assert.deepEqual(lines(15, 10, 20, 2, 3, 20, 1).slice(1, 4), [
+      'A lands a critical hit on D: 5 damage, 5 HP left (natural 20).',
+      'D is at half HP and holds their nerve.',
+      'D misses A (natural 1).',
+    ]);
+  });
+
   test('names the highest and lowest possible rolls on other dice', () => {
     assert.deepEqual(log(duel({ dice: DICE['3d6'] }), 4, 4, 4, 3, 3, 3, 6, 6, 6, 1, 1, 1, 1, 1).slice(1, 3), [
       'A lands a critical hit on D: 2 damage, 8 HP left (highest possible roll).',

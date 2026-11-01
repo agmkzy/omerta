@@ -35,3 +35,12 @@ export function describeOpposed(result: OpposedResult): string {
 function byHowMuch(margin: number): string {
   return margin >= 0 ? `by ${margin}` : `short by ${-margin}`;
 }
+
+/** A roll in a few characters: the faces, the total bonus and the result, e.g. "d20: 6 + 6 = 12". */
+export function compactRoll(roll: RollResult): string {
+  const { throws, kept } = roll.thrown;
+  const faces = throws.map((t) => t.join('+'));
+  const dice = roll.edge === 'none' ? `${roll.dice.name}: ${faces[0]}` : `${roll.dice.name} with ${roll.edge}: ${faces.join(' or ')} → ${kept}`;
+  if (roll.bonus === 0) return dice;
+  return `${dice} ${roll.bonus < 0 ? '−' : '+'} ${Math.abs(roll.bonus)} = ${roll.total}`;
+}
