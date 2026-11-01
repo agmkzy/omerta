@@ -107,3 +107,16 @@ export function hitPointModifiers(c: Character): Modifier[] {
 export function maxHitPoints(c: Character): number {
   return bonusOf(hitPointModifiers(c));
 }
+
+/** Defence before Reflexes, as for D&D's unarmoured Armour Class. */
+export const BASE_DEFENCE = 10;
+
+/** What a character's Defence is made of: the base and their Reflexes bonus. */
+export function defenceModifiers(c: Character): Modifier[] {
+  return [{ value: BASE_DEFENCE, reason: 'Base' }, ...skillModifiers(c, 'reflexes')];
+}
+
+/** The total an attack roll must meet to hit this character. */
+export function defence(c: Character): number {
+  return bonusOf(defenceModifiers(c));
+}

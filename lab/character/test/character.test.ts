@@ -3,7 +3,7 @@ import fc from 'fast-check';
 import { describe, test } from 'vitest';
 import { attributeScores } from '../src/attributes';
 import { bonusOf } from '../src/check';
-import { BASE_HIT_POINTS, attributeUsed, createCharacter, hitPointModifiers, maxHitPoints, rollFor, skillModifiers } from '../src/character';
+import { BASE_DEFENCE, BASE_HIT_POINTS, attributeUsed, createCharacter, defence, defenceModifiers, hitPointModifiers, maxHitPoints, rollFor, skillModifiers } from '../src/character';
 import { DICE } from '../src/dice';
 import { SKILLS } from '../src/skills';
 import { temperament } from '../src/temperament';
@@ -128,6 +128,24 @@ describe('hit points', { tags: ['unit'] }, () => {
 
   test('are 5 at the lowest Constitution score', () => {
     assert.equal(maxHitPoints(createCharacter({ name: 'X', attributes: attributeScores({ con: 1 }) })), 5);
+  });
+});
+
+describe('defence', { tags: ['unit'] }, () => {
+  test('is 10 plus the Reflexes bonus, like D&D’s unarmoured Armour Class plus training', () => {
+    assert.equal(BASE_DEFENCE, 10);
+    assert.equal(defence(createCharacter({ name: 'Average' })), 10);
+    assert.equal(defence(createCharacter({ name: 'Quick', attributes: attributeScores({ agi: 16 }), training: { reflexes: 'trained' } })), 15);
+    assert.equal(defence(createCharacter({ name: 'Slow', attributes: attributeScores({ agi: 6 }) })), 8);
+  });
+
+  test('is listed with reasons', () => {
+    const c = createCharacter({ name: 'Q', attributes: attributeScores({ agi: 14 }), training: { reflexes: 'trained' } });
+    assert.deepEqual(defenceModifiers(c), [
+      { value: 10, reason: 'Base' },
+      { value: 2, reason: 'Agility 14' },
+      { value: 2, reason: 'Trained in Reflexes' },
+    ]);
   });
 });
 
