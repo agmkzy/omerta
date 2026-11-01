@@ -7,7 +7,7 @@ import { BACKGROUND_INFO } from '../src/backgrounds';
 import { BASE_DEFENCE, BASE_HIT_POINTS, type Character } from '../src/character';
 import { DICE, DICE_NAMES, type DiceName } from '../src/dice';
 import { compactRoll, percent, signed } from '../src/explain';
-import { UNARMED_DAMAGE_DIE, fightStats, runFight, stepFight, tallyFights, type FightEvent, type FightSpec, type FightTally, type Fighter, type FighterStatus, type RollRequest } from '../src/fight';
+import { UNARMED_DAMAGE_DIE, fightStats, rollOdds, runFight, stepFight, tallyFights, type FightEvent, type FightSpec, type FightTally, type Fighter, type FighterStatus, type RollOdds, type RollRequest } from '../src/fight';
 import { describeFightEvent, describeRollRequest } from '../src/fight-log';
 import { NERVE_DC, type Side } from '../src/nerve';
 import { replay, roller, seeded } from '../src/random';
@@ -38,6 +38,8 @@ interface State {
   parties: Parties;
   dice: DiceName;
   maxRounds: number;
+  /** Whether the roll panel shows the odds of the roll. Stays as set across rolls. */
+  showOdds: boolean;
   /** The fight in progress or finished: its line-up and every roll so far. */
   fight: { spec: FightSpec; faces: number[] } | null;
   tally: FightTally | null;
@@ -86,7 +88,7 @@ function eventDice(e: FightEvent, nameOf: (id: string) => string): string[] {
 }
 
 export function fightPanel(): Panel {
-  const state: State = { view: 'setup', parties: { attackers: [], defenders: [] }, dice: 'd20', maxRounds: 12, fight: null, tally: null };
+  const state: State = { showOdds: false, view: 'setup', parties: { attackers: [], defenders: [] }, dice: 'd20', maxRounds: 12, fight: null, tally: null };
   const dice = roller(seeded(2));
   const root = h('section', { class: 'panel', id: 'fight', 'aria-labelledby': 'fight-title' });
 
@@ -179,17 +181,16 @@ export function fightPanel(): Panel {
       return null;
     };
     const faceLabel = (face: number) => (r.kind === 'target' ? `${face}: ${name(r.options[face - 1]!)}` : String(face));
-    const display = h('div', { class: 'die-display', 'aria-live': 'polite' }, h('span', { class: 'die-sides' }, `d${request.sides}`), h('span', { class: 'die-face' }, '?'));
     const faceButtons = Array.from({ length: request.sides }, (_, i) => {
       const face = i + 1;
       const good = succeeds(face);
       return h('button', { type: 'button', class: `face${good === true ? ' good' : good === false ? ' bad' : ''}`, onclick: () => setFaces([...faces, face]) }, faceLabel(face));
     });
-    const show = (face: number, landed = false) => {
-      display.querySelector('.die-face')!.textContent = r.kind === 'target' ? faceLabel(face) : String(face);
-      display.classList.toggle('landed', landed);
-      faceButtons.forEach((b, i) => b.classList.toggle('showing', i === face - 1));
-    };
+    const show = (face: number, landed = false) =>
+      faceButtons.forEach((b, i) => {
+        b.classList.toggle('showing', i === face - 1);
+        b.classList.toggle('landed', landed && i === face - 1);
+      });
 
     /** Decides the result at once, then sweeps left to right along the faces like a roulette wheel, slowing down onto it. */
     const animatedRoll = async () => {
@@ -211,15 +212,42 @@ export function fightPanel(): Panel {
 
     const panel = h('div', { class: 'roll-panel' },
       h('div', { class: 'roll-count' }, `Roll ${faces.length + 1}`),
-      h('div', { class: 'roll-main' }, display, h('p', { class: 'prompt' }, describeRollRequest(request, fighters, fightDice))),
+      h('p', { class: 'prompt' }, describeRollRequest(request, fighters, fightDice)),
       h('div', { class: 'row' },
         h('button', { type: 'button', class: 'primary', onclick: () => void animatedRoll() }, 'Roll'),
         h('button', { type: 'button', onclick: () => setFaces(playOut(s, faces)) }, 'Play the rest'),
-        h('button', { type: 'button', disabled: faces.length === 0, onclick: () => setFaces(faces.slice(0, -1)) }, 'Back')),
+        h('button', { type: 'button', disabled: faces.length === 0, onclick: () => setFaces(faces.slice(0, -1)) }, 'Back'),
+        h('button', { type: 'button', 'aria-pressed': String(state.showOdds), onclick: () => { state.showOdds = !state.showOdds; render(); } }, state.showOdds ? 'Hide odds' : 'Show odds')),
       h('div', { class: 'hint' }, 'Or choose the result:'),
       h('div', { class: 'faces' }, ...faceButtons),
+      state.showOdds ? oddsView(rollOdds(request, fighters, fightDice), request) : null,
     );
     return panel;
+  }
+
+  /** The odds of the roll: a bar for every possible result, then the averages and chances in words. */
+  function oddsView(o: RollOdds, request: RollRequest): HTMLElement {
+    const r = request.reason;
+    const n = (x: number) => String(Number(x.toFixed(1)));
+    const tallest = Math.max(...o.bars.map((b) => b.probability));
+    const lines: string[] = [];
+    if (o.success) lines.push(`Chance ${o.success.label}: ${percent(o.success.chance)}${o.critical !== null ? ` (critical hit: ${percent(o.critical)})` : ''}.`);
+    if (r.kind === 'target') lines.push(`Each is equally likely (${percent(1 / o.bars.length)}).`);
+    else if (r.kind === 'damage') lines.push(`Average damage: ${n(o.average)} (from ${o.bars[0]!.total} to ${o.bars.at(-1)!.total}).`);
+    else lines.push(`Average total: ${n(o.average)}.`);
+    if (o.damage) {
+      lines.push(`Damage if it hits: ${n(o.damage.average)} on average (${n(o.damage.criticalAverage)} on a critical hit).`);
+      lines.push(`Expected damage from this attack: ${n(o.damage.expected)}.`);
+    }
+    if (r.of > 1) lines.push(`These are the odds for the whole ${r.of}-dice roll.`);
+    return h('div', { class: 'odds-view' },
+      h('div', { class: 'odds-chart', role: 'img', 'aria-label': o.bars.map((b) => `${b.dice}: ${percent(b.probability)}`).join(', ') },
+        ...o.bars.map((b) =>
+          h('div', { class: 'odds-col', title: `Roll ${b.dice}${b.total !== b.dice ? `, total ${b.total}` : ''}: ${percent(b.probability)}` },
+            h('div', { class: 'odds-bar-wrap' }, h('div', { class: `odds-bar${b.success === true ? ' good' : b.success === false ? ' bad' : ''}`, style: `height:${(b.probability / tallest) * 100}%` })),
+            h('div', { class: 'odds-label' }, String(b.dice))))),
+      h('ul', { class: 'odds-lines' }, ...lines.map((l) => h('li', {}, l))),
+    );
   }
 
   function renderFight() {

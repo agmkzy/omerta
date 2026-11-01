@@ -175,9 +175,16 @@ table.fight-log tr.round-head td { font-size: 0.75rem; text-transform: uppercase
 .face { min-width: 2.4em; padding: 4px 6px; font-variant-numeric: tabular-nums; }
 .face.good { border-color: var(--success); }
 .face.bad { border-color: var(--critical-failure); color: var(--muted); }
-.roll-main { display: flex; gap: 14px; align-items: center; }
-.die-display { flex: none; min-width: 64px; height: 64px; padding: 0 8px; border: 2px solid var(--line); border-radius: 12px; display: grid; place-items: center; align-content: center; background: var(--bg); }
-.die-display .die-sides { font-size: 0.65rem; color: var(--muted); line-height: 1; }
-.die-display .die-face { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
-.die-display.landed { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
 .face.showing { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.face.landed { outline: 3px solid var(--accent); outline-offset: 2px; transform: scale(1.15); }
+.face { transition: transform 0.1s; }
+.odds-view { border-top: 1px solid var(--line); padding-top: 10px; display: grid; gap: 8px; }
+.odds-chart { display: flex; gap: 2px; align-items: flex-end; height: 120px; }
+.odds-col { flex: 1; min-width: 0; display: grid; grid-template-rows: 1fr auto; height: 100%; cursor: help; }
+.odds-bar-wrap { display: flex; align-items: flex-end; }
+.odds-bar { width: 100%; background: var(--muted); border-radius: 2px 2px 0 0; }
+.odds-bar.good { background: var(--success); }
+.odds-bar.bad { background: var(--critical-failure); }
+.odds-label { font-size: 0.7rem; color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
+.odds-lines { margin: 0; padding-left: 18px; }
