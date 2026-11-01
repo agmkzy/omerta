@@ -9,17 +9,24 @@ export interface Dice {
   readonly name: DiceName;
   readonly count: number;
   readonly sides: number;
+  readonly description: string;
 }
 
 export const DICE: { readonly [N in DiceName]: Dice & { readonly name: N } } = {
-  d20: { name: 'd20', count: 1, sides: 20 },
-  '2d10': { name: '2d10', count: 2, sides: 10 },
-  '3d6': { name: '3d6', count: 3, sides: 6 },
+  d20: { name: 'd20', count: 1, sides: 20, description: 'One 20-sided die (D&D standard). Every result is equally likely, so outcomes vary a lot.' },
+  '2d10': { name: '2d10', count: 2, sides: 10, description: 'Two 10-sided dice added. Middle results are more likely than extremes.' },
+  '3d6': { name: '3d6', count: 3, sides: 6, description: 'Three 6-sided dice added. Strongly favours middle results, so skill matters more than luck.' },
 };
 
 /** D&D's advantage and disadvantage: roll twice and keep the higher or lower total. */
 export const EDGES = ['none', 'advantage', 'disadvantage'] as const;
 export type Edge = (typeof EDGES)[number];
+
+export const EDGE_INFO: { readonly [E in Edge]: { readonly name: string; readonly description: string } } = {
+  none: { name: 'None', description: 'Roll once.' },
+  advantage: { name: 'Advantage', description: 'Roll twice and keep the higher result.' },
+  disadvantage: { name: 'Disadvantage', description: 'Roll twice and keep the lower result.' },
+};
 
 export interface DiceRoll {
   /** The faces of each throw: one throw, or two with advantage/disadvantage. */

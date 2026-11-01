@@ -10,19 +10,19 @@ export type Trait = (typeof TRAITS)[number];
 /** Each trait from 0 to 1; 0.5 is average. */
 export type Temperament = Readonly<Record<Trait, number>>;
 
-export const TRAIT_INFO: { readonly [T in Trait]: { readonly name: string; readonly low: string; readonly high: string } } = {
-  greed: { name: 'Greed', low: 'content', high: 'greedy' },
-  violence: { name: 'Violence', low: 'gentle', high: 'violent' },
-  ambition: { name: 'Ambition', low: 'unambitious', high: 'ambitious' },
-  caution: { name: 'Caution', low: 'reckless', high: 'cautious' },
-  sociability: { name: 'Sociability', low: 'solitary', high: 'sociable' },
-  vice: { name: 'Vice', low: 'abstemious', high: 'indulgent' },
-  courage: { name: 'Courage', low: 'timid', high: 'brave' },
-  loyalty: { name: 'Loyalty', low: 'disloyal', high: 'loyal' },
-  pride: { name: 'Pride', low: 'humble', high: 'proud' },
-  temper: { name: 'Temper', low: 'calm', high: 'hot-tempered' },
-  honesty: { name: 'Honesty', low: 'dishonest', high: 'honest' },
-  cruelty: { name: 'Cruelty', low: 'kind', high: 'cruel' },
+export const TRAIT_INFO: { readonly [T in Trait]: { readonly name: string; readonly low: string; readonly high: string; readonly description: string } } = {
+  greed: { name: 'Greed', low: 'content', high: 'greedy', description: 'How strongly money motivates them.' },
+  violence: { name: 'Violence', low: 'gentle', high: 'violent', description: 'Willingness to use force to get what they want.' },
+  ambition: { name: 'Ambition', low: 'unambitious', high: 'ambitious', description: 'Desire for status and promotion.' },
+  caution: { name: 'Caution', low: 'reckless', high: 'cautious', description: 'How much they weigh risk before acting.' },
+  sociability: { name: 'Sociability', low: 'solitary', high: 'sociable', description: 'How much they seek company and conversation.' },
+  vice: { name: 'Vice', low: 'abstemious', high: 'indulgent', description: 'Appetite for drinking, gambling and other indulgences.' },
+  courage: { name: 'Courage', low: 'timid', high: 'brave', description: 'Willingness to face danger.' },
+  loyalty: { name: 'Loyalty', low: 'disloyal', high: 'loyal', description: 'How firmly they stand by their organisation and allies.' },
+  pride: { name: 'Pride', low: 'humble', high: 'proud', description: 'Sensitivity to their standing and to being disrespected.' },
+  temper: { name: 'Temper', low: 'calm', high: 'hot-tempered', description: 'How quickly they lose control when provoked.' },
+  honesty: { name: 'Honesty', low: 'dishonest', high: 'honest', description: 'Reluctance to lie or cheat.' },
+  cruelty: { name: 'Cruelty', low: 'kind', high: 'cruel', description: 'Willingness to cause suffering beyond what is necessary.' },
 };
 
 export type Leaning = 'low' | 'average' | 'high';
@@ -66,7 +66,15 @@ export function rollTemperament(roller: Roller, centres: Partial<Temperament> = 
 export const SITUATIONS = ['intimidate', 'resist-intimidation', 'hold-nerve', 'deceive', 'persuade'] as const;
 export type Situation = (typeof SITUATIONS)[number];
 
-interface Effect {
+export const SITUATION_INFO: { readonly [S in Situation]: { readonly name: string; readonly description: string } } = {
+  intimidate: { name: 'Intimidating', description: 'Making threats to coerce someone.' },
+  'resist-intimidation': { name: 'Resisting intimidation', description: 'Being threatened by someone.' },
+  'hold-nerve': { name: 'Holding nerve', description: 'Staying composed under danger or pressure.' },
+  deceive: { name: 'Deceiving', description: 'Lying or bluffing.' },
+  persuade: { name: 'Persuading', description: 'Negotiating or convincing someone.' },
+};
+
+export interface Effect {
   readonly situation: Situation;
   readonly trait: Trait;
   readonly when: Exclude<Leaning, 'average'>;
@@ -85,6 +93,11 @@ export const TEMPERAMENT_EFFECTS: readonly Effect[] = [
   { situation: 'persuade', trait: 'sociability', when: 'high', value: 1 },
   { situation: 'persuade', trait: 'sociability', when: 'low', value: -1 },
 ];
+
+/** The roll modifiers a trait can give, in table order. */
+export function effectsOf(trait: Trait): Effect[] {
+  return TEMPERAMENT_EFFECTS.filter((e) => e.trait === trait);
+}
 
 /** Temperament modifiers for the given situations, in the order the situations are listed. The reason is the trait adjective. */
 export function temperamentModifiers(t: Temperament, situations: readonly Situation[]): Modifier[] {

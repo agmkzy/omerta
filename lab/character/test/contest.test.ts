@@ -3,7 +3,7 @@ import fc from 'fast-check';
 import { describe, test } from 'vitest';
 import { BACKGROUNDS, rollCharacter, type BackgroundName } from '../src/backgrounds';
 import { createCharacter, type Character } from '../src/character';
-import { APPROACHES, endingKey, runContest, tally, type Approach, type ContestEvent, type ContestSpec } from '../src/contest';
+import { APPROACHES, APPROACH_INFO, NERVE_FAILURE, endingKey, runContest, tally, type Approach, type ContestEvent, type ContestSpec } from '../src/contest';
 import { roller, seeded } from '../src/random';
 import { temperament } from '../src/temperament';
 import { scripted } from './support';
@@ -161,6 +161,13 @@ describe('runContest: options', { tags: ['unit'] }, () => {
   test('defaults to d20, track 5 and 12 rounds', () => {
     const r = runContest({ attacker, defender: defender(), approach: 'intimidate' }, roller(seeded(1)));
     assert.ok(r.rounds <= 12);
+  });
+});
+
+describe('contest descriptions', { tags: ['unit'] }, () => {
+  test('describe every approach and the traits that decide a failed nerve check', () => {
+    for (const a of APPROACHES) assert.ok(APPROACH_INFO[a].name && APPROACH_INFO[a].description, a);
+    assert.deepEqual(Object.keys(NERVE_FAILURE).sort(), ['caution', 'courage', 'temper']);
   });
 });
 

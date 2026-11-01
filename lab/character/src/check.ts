@@ -13,6 +13,14 @@ export interface Modifier {
 export const OUTCOMES = ['critical-failure', 'failure', 'partial', 'success', 'critical-success'] as const;
 export type Outcome = (typeof OUTCOMES)[number];
 
+export const OUTCOME_INFO: { readonly [O in Outcome]: { readonly name: string; readonly description: string } } = {
+  'critical-failure': { name: 'Critical failure', description: 'Missed by 6 or more: it fails and something goes wrong.' },
+  failure: { name: 'Failure', description: 'Missed by 1 to 5: it fails.' },
+  partial: { name: 'Partial success', description: 'Met or beat by up to 4: it succeeds, at a cost.' },
+  success: { name: 'Success', description: 'Beat by 5 to 9: it succeeds cleanly.' },
+  'critical-success': { name: 'Critical success', description: 'Beat by 10 or more: it succeeds with an extra benefit.' },
+};
+
 /** The minimum margin for each outcome. Anything below `failure` is a critical failure. */
 export interface Bands {
   readonly criticalSuccess: number;

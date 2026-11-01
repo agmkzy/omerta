@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fc from 'fast-check';
 import { describe, test } from 'vitest';
-import { DICE, DICE_NAMES, EDGES, rollDice } from '../src/dice';
+import { DICE, DICE_NAMES, EDGES, EDGE_INFO, rollDice } from '../src/dice';
 import { roller, seeded } from '../src/random';
 import { scripted } from './support';
 
@@ -26,6 +26,13 @@ describe('rollDice', { tags: ['unit'] }, () => {
   test('supports d20, 2d10 and 3d6', () => {
     assert.deepEqual(DICE_NAMES, ['d20', '2d10', '3d6']);
     assert.deepEqual(DICE_NAMES.map((n) => [DICE[n].count, DICE[n].sides]), [[1, 20], [2, 10], [3, 6]]);
+  });
+});
+
+describe('descriptions', { tags: ['unit'] }, () => {
+  test('describe every dice option and advantage setting', () => {
+    for (const n of DICE_NAMES) assert.ok(DICE[n].description, n);
+    for (const e of EDGES) assert.ok(EDGE_INFO[e].name && EDGE_INFO[e].description, e);
   });
 });
 

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'vitest';
 import { ATTRIBUTES } from '../src/attributes';
-import { SKILLS, SKILL_INFO, attributesFor } from '../src/skills';
+import { SKILLS, SKILL_INFO, attributesFor, skillsUsing } from '../src/skills';
 
 describe('skills', { tags: ['unit'] }, () => {
   test('attributesFor lists the primary attribute, then any alternatives', () => {
@@ -17,6 +17,14 @@ describe('skills', { tags: ['unit'] }, () => {
       for (const a of attributesFor(s)) assert.ok(ATTRIBUTES.includes(a), `${s} uses ${a}`);
       assert.equal(new Set(attributesFor(s)).size, attributesFor(s).length, `${s} lists an attribute twice`);
     }
+  });
+
+  test('skillsUsing lists skills using an attribute, primary uses first', () => {
+    assert.deepEqual(skillsUsing('str'), [
+      { skill: 'brawling', primary: true },
+      { skill: 'intimidation', primary: false },
+    ]);
+    assert.deepEqual(skillsUsing('con').map((u) => [u.skill, u.primary]), [['toughness', true], ['carousing', true], ['nerve', false]]);
   });
 
   test('every attribute is the primary attribute of at least one skill', () => {

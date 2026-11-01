@@ -3,6 +3,7 @@ import fc from 'fast-check';
 import { describe, test } from 'vitest';
 import {
   OUTCOMES,
+  OUTCOME_INFO,
   checkOdds,
   combineEdges,
   grade,
@@ -40,6 +41,12 @@ describe('grade', { tags: ['unit'] }, () => {
   test('throws if the bands are not in descending order', () => {
     assert.throws(() => grade(0, { criticalSuccess: 5, success: 5, partial: 0, failure: -5 }), RangeError);
     assert.throws(() => grade(0, { criticalSuccess: 10, success: 5, partial: 0, failure: 1 }), RangeError);
+  });
+});
+
+describe('OUTCOME_INFO', { tags: ['unit'] }, () => {
+  test('describes every outcome', () => {
+    for (const o of OUTCOMES) assert.ok(OUTCOME_INFO[o].name && OUTCOME_INFO[o].description, o);
   });
 });
 

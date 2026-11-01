@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fc from 'fast-check';
 import { describe, test } from 'vitest';
 import { roller, seeded } from '../src/random';
-import { SITUATIONS, TRAITS, TRAIT_INFO, leaning, notableTraits, rollTemperament, temperament, temperamentModifiers } from '../src/temperament';
+import { SITUATIONS, SITUATION_INFO, TRAITS, TRAIT_INFO, effectsOf, leaning, notableTraits, rollTemperament, temperament, temperamentModifiers } from '../src/temperament';
 
 describe('temperament', { tags: ['unit'] }, () => {
   test('has the game’s seven traits followed by five new ones', () => {
@@ -18,6 +18,23 @@ describe('temperament', { tags: ['unit'] }, () => {
 
   test('throws for values outside 0–1', () => {
     for (const bad of [-0.1, 1.1, Number.NaN]) assert.throws(() => temperament({ pride: bad }), RangeError);
+  });
+});
+
+describe('descriptions', { tags: ['unit'] }, () => {
+  test('every trait and situation has a description', () => {
+    for (const t of TRAITS) assert.ok(TRAIT_INFO[t].description, t);
+    for (const s of SITUATIONS) assert.ok(SITUATION_INFO[s].name && SITUATION_INFO[s].description, s);
+  });
+});
+
+describe('effectsOf', { tags: ['unit'] }, () => {
+  test('lists the roll modifiers a trait can give', () => {
+    assert.deepEqual(effectsOf('courage').map((e) => [e.situation, e.when, e.value]), [['hold-nerve', 'high', 2], ['hold-nerve', 'low', -2]]);
+  });
+
+  test('is empty for a trait with no roll modifiers', () => {
+    assert.deepEqual(effectsOf('greed'), []);
   });
 });
 

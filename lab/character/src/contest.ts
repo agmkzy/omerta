@@ -8,10 +8,19 @@ import { resolveCheck, resolveOpposed, type CheckResult, type Modifier, type Opp
 import { rollFor, type Character } from './character';
 import { DICE, type Dice } from './dice';
 import type { Roller } from './random';
-import { leaning } from './temperament';
+import { leaning, type Trait } from './temperament';
 
 export const APPROACHES = ['intimidate', 'gunpoint', 'brawl'] as const;
 export type Approach = (typeof APPROACHES)[number];
+
+export const APPROACH_INFO: { readonly [A in Approach]: { readonly name: string; readonly description: string } } = {
+  intimidate: { name: 'Intimidate', description: 'Attacker’s Intimidation against the defender’s Nerve each round.' },
+  gunpoint: {
+    name: 'Gunpoint',
+    description: 'As Intimidate, but the attacker has advantage and the defender must pass a DC 12 nerve check before the first round.',
+  },
+  brawl: { name: 'Brawl', description: 'Brawling against Brawling. Winning a round by 5 or more lands a hit (−1 to later rolls); three hits is a knockout.' },
+};
 
 export type Side = 'attacker' | 'defender';
 
@@ -48,6 +57,13 @@ export interface ContestResult {
   readonly rounds: number;
   readonly hits: Readonly<Record<Side, number>>;
 }
+
+/** How temperament decides the result of a failed nerve check (implemented in runContest). */
+export const NERVE_FAILURE: Readonly<Partial<Record<Trait, string>>> = {
+  temper: 'If high: lashes out on a failed nerve check (once per contest) and the contest becomes a brawl.',
+  courage: 'If low: flees on a failed nerve check.',
+  caution: 'If high: flees on a failed nerve check.',
+};
 
 /** Points of roll difference per step of marker movement (rounded up). */
 export const POINTS_PER_STEP = 5;

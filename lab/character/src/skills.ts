@@ -40,6 +40,14 @@ export const SKILL_INFO: { readonly [S in Skill]: SkillInfo } = {
   deception: { name: 'Deception', attribute: 'cha', covers: 'Lying convincingly.' },
 };
 
+/** The skills that can use an attribute: those based on it first, then those allowing it as an alternative. */
+export function skillsUsing(attribute: Attribute): { readonly skill: Skill; readonly primary: boolean }[] {
+  return [
+    ...SKILLS.filter((s) => SKILL_INFO[s].attribute === attribute).map((skill) => ({ skill, primary: true })),
+    ...SKILLS.filter((s) => SKILL_INFO[s].alternatives?.includes(attribute)).map((skill) => ({ skill, primary: false })),
+  ];
+}
+
 /** The attributes a skill can use, its primary attribute first. */
 export function attributesFor(skill: Skill): readonly Attribute[] {
   const info = SKILL_INFO[skill];
