@@ -4,7 +4,7 @@ import { APPROACH_INFO, type ContestEvent, type ContestSpec, type Ending, type S
 const TRIGGER_TEXT: Readonly<Record<Trigger, string>> = {
   'weapon-drawn': 'weapon drawn on them',
   'falling-behind': 'fell behind by half the winning lead',
-  hit: 'took a hit',
+  hurt: 'took damage',
 };
 
 /** "Fighter 1 leads by 2", "Shopkeeper 1 leads by 1" or "level". */
@@ -22,8 +22,14 @@ export function describeEvent(event: ContestEvent, spec: ContestSpec): string {
       const change = event.change === 0 ? 'No change' : `${gainer} gains ${Math.abs(event.change)}`;
       return `Round ${event.round} (${APPROACH_INFO[event.approach].name}): ${name('attacker')} rolled ${active.total}, ${name('defender')} rolled ${passive.total}. ${change}; ${describeLead(event.lead, spec)}.`;
     }
-    case 'hit':
-      return `${name(event.side)} takes a hit (${event.hits} so far).`;
+    case 'fight-round': {
+      const { active, passive } = event.result;
+      const rolls = `Round ${event.round} (Fight): ${name('attacker')} rolled ${active.total}, ${name('defender')} rolled ${passive.total}.`;
+      if (!event.hit) return `${rolls} No hit.`;
+      const target: Side = event.hit.by === 'attacker' ? 'defender' : 'attacker';
+      const hit = event.hit.critical ? 'lands a critical hit' : 'hits';
+      return `${rolls} ${name(event.hit.by)} ${hit} for ${event.hit.damage.total} damage (${name(target)}: ${event.hp[target]} HP left).`;
+    }
     case 'nerve':
       return `${name(event.side)} makes a nerve check (${TRIGGER_TEXT[event.trigger]}): needed ${event.result.dc}, rolled ${event.result.roll.total}, ${event.passed ? 'passed' : 'failed'}.`;
     case 'escalation':
@@ -41,7 +47,7 @@ export function describeEnding(ending: Ending, spec: ContestSpec): string {
     case 'outscored':
       return `${loser} loses: ${winner} reached the winning lead.`;
     case 'knocked-out':
-      return `${loser} loses: knocked out.`;
+      return `${loser} loses: knocked out (0 HP).`;
     case 'gives-up':
       return `${loser} loses: failed a nerve check and gave up.`;
     case 'flees':

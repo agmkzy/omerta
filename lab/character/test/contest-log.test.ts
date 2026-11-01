@@ -33,20 +33,26 @@ describe('describeEvent', { tags: ['unit'] }, () => {
     assert.equal(log(spec({ winningLead: 8 }), 1, 15)[0], 'Round 1 (Intimidation): A rolled 3, D rolled 15. D gains 3; D leads by 3.');
   });
 
-  test('describes weapon-drawn checks, hits and escalation', () => {
+  test('describes weapon-drawn checks and escalation', () => {
     assert.equal(log(spec({ approach: 'armed-threat' }), 5)[0], 'D makes a nerve check (weapon drawn on them): needed 12, rolled 5, failed.');
-    assert.deepEqual(log(spec({ approach: 'fight', winningLead: 10 }), 15, 10, 13).slice(1, 3), [
-      'D takes a hit (1 so far).',
-      'D makes a nerve check (took a hit): needed 12, rolled 12, passed.',
+    assert.equal(log(spec({ maxRounds: 2, defender: defender({ temper: 0.9 }) }), 15, 10, 9, 10, 10, 1, 20)[2], 'D escalates. The contest becomes a fight.');
+  });
+
+  test('describes fight rounds: hits, critical hits, misses and the nerve check after damage', () => {
+    assert.deepEqual(log(spec({ approach: 'fight' }), 15, 10, 3, 10).slice(0, 2), [
+      'Round 1 (Fight): A rolled 17, D rolled 10. A hits for 3 damage (D: 5 HP left).',
+      'D makes a nerve check (took damage): needed 10, rolled 10, passed.',
     ]);
-    assert.equal(log(spec({ maxRounds: 2, defender: defender({ temper: 0.9 }) }), 15, 10, 9, 10, 10)[2], 'D escalates. The contest becomes a fight.');
+    assert.equal(log(spec({ approach: 'fight' }), 20, 5, 2, 3, 20)[0], 'Round 1 (Fight): A rolled 22, D rolled 5. A lands a critical hit for 5 damage (D: 3 HP left).');
+    assert.equal(log(spec({ approach: 'fight' }), 8, 10)[0], 'Round 1 (Fight): A rolled 10, D rolled 10. No hit.');
+    assert.equal(log(spec({ approach: 'fight' }), 5, 15, 2, 20)[0], 'Round 1 (Fight): A rolled 7, D rolled 15. D hits for 2 damage (A: 6 HP left).');
   });
 });
 
 describe('describeEnding', { tags: ['unit'] }, () => {
   test('describes every kind of ending', () => {
     assert.equal(describeEnding({ how: 'outscored', loser: 'defender' }, spec()), 'D loses: A reached the winning lead.');
-    assert.equal(describeEnding({ how: 'knocked-out', loser: 'defender' }, spec()), 'D loses: knocked out.');
+    assert.equal(describeEnding({ how: 'knocked-out', loser: 'defender' }, spec()), 'D loses: knocked out (0 HP).');
     assert.equal(describeEnding({ how: 'gives-up', loser: 'attacker' }, spec()), 'A loses: failed a nerve check and gave up.');
     assert.equal(describeEnding({ how: 'flees', loser: 'defender' }, spec()), 'D loses: failed a nerve check and fled.');
     assert.equal(describeEnding({ how: 'withdraws', loser: 'attacker' }, spec()), 'A loses: withdrew after falling too far behind.');
