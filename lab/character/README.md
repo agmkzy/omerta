@@ -1,7 +1,7 @@
 # Character lab
 
 An exploratory, self-contained prototype of a D&D-style character system: attributes, skills, temperament, checks and
-contests. It is intended to eventually replace the game's `Traits`/`Skills` (`src/types.ts`), but nothing here is
+fights. It is intended to eventually replace the game's `Traits`/`Skills` (`src/types.ts`), but nothing here is
 connected to the game yet. The lab imports nothing from `src/`, and the game imports nothing from the lab.
 
 ## Running
@@ -27,16 +27,17 @@ npm run lab:dev         # playground at http://localhost:5180
 | `src/character.ts` | Characters: attributes, training (untrained/trained/expert), proficiency bonus (2–6), temperament. `rollFor()` builds a roll. |
 | `src/temperament.ts` | 12 traits (the game's 7 plus loyalty, pride, temper, honesty, cruelty), 0–1. One table lists where temperament modifies rolls. |
 | `src/backgrounds.ts` | Backgrounds instead of classes: training, attribute priorities, temperament centres. `rollCharacter()` generates a character. |
-| `src/contest.ts` | Automatically resolved multi-round contests (see below). |
-| `src/contest-log.ts`, `src/explain.ts` | Plain-text descriptions of results and events. |
+| `src/fight.ts`, `src/fight-log.ts` | Fights: initiative, attack rolls, damage, hit points and morale (see below). |
+| `src/nerve.ts` | The nerve check shared by fights and threats. |
+| `src/explain.ts` | Plain-text descriptions of rolls and checks. |
 | `src/serialize.ts` | Versioned JSON save/load for characters, with validation and defaults for missing fields. |
 | `playground/` | Framework-free browser page using the modules above (see below). |
 
 ## Playground
 
 Four tabs: **Characters** (a list of saved characters and an editor for the selected one, split into attributes, skills
-and temperament), **Skill check**, **Contest** and **Dice and odds**. Characters are saved to `localStorage` in this
-browser after every change, as is the open tab. The check and contest tabs pick their two characters from the saved
+and temperament), **Skill check**, **Fight** and **Dice and odds**. Characters are saved to `localStorage` in this
+browser after every change, as is the open tab. The check and fight tabs pick their two characters from the saved
 list. The roster logic (`playground/roster.ts`) is pure and tested like the library.
 
 Tests are in `test/`, one file per module. Each is tagged `unit` or `property` (fast-check). The suite has 100% statement,
@@ -54,29 +55,23 @@ branch, function and line coverage.
 - **Exact odds.** `checkOdds`/`opposedOdds` give exact probabilities. Intended for NPC decision-making.
 - **Deterministic.** All randomness comes from an injected source; the same seed gives the same results.
 
-### Contests
+### Fights
 
-A contest is a multi-round opposed check that resolves automatically; neither side chooses actions.
+Fights follow D&D's combat rules; neither side chooses actions.
 
-- **Intimidation and armed threats are decided by a lead.** Each round both characters roll. Whoever rolls higher gains
-  lead points: 1 per 5 points of difference, rounded up. A tie changes nothing. A character wins outright when their
-  lead reaches the **winning lead** (default 5). `intimidation` is Intimidation vs Nerve; `armed-threat` is the same
-  with attacker advantage and a DC 12 nerve check for the defender before round 1.
-- **Fights are decided by hit points, using D&D's attack rules.** When a fight starts, both characters roll Reflexes
-  for initiative; the higher acts first each round (a tie goes to the defender). Each round each character attacks:
-  d20 + Brawling bonus against the target's **Defence** (10 + Reflexes bonus, like D&D's unarmoured Armour Class). A
-  hit deals 1d4 + Strength modifier (minimum 1). A natural 20 always hits and rolls the damage dice twice; a natural 1
-  always misses. 0 HP is a knockout, and a knocked-out character does not act. There are no wound penalties.
+- **Initiative:** both characters roll Reflexes; the higher acts first each round (a tie goes to the defender).
+- **Attacks:** each round each character attacks: d20 + Brawling bonus against the target's **Defence** (10 + Reflexes
+  bonus, like D&D's unarmoured Armour Class). A hit deals 1d4 + Strength modifier (minimum 1). A natural 20 always hits
+  and rolls the damage dice twice; a natural 1 always misses. There are no wound penalties.
 - **Hit points** are 10 + Constitution modifier, plus the proficiency bonus if trained in Toughness (twice if expert):
-  D&D's first-level d10 hit die plus its Tough feat.
-- **Nerve checks** happen when a character falls behind by half the winning lead (DC 10, once per side), first drops to
-  half HP or below in a fight (DC 10, once per side: fight or flight, as in D&D's optional morale rule), or has a weapon
-  drawn on them (DC 12).
-- **A failed nerve check** ends the contest: a high-temper character escalates to a fight instead (once, and not when
-  already fighting), a low-courage or high-caution character flees, and anyone else yields: in a fight the defender
-  surrenders and the attacker backs off; otherwise the defender complies and the attacker backs down.
-- **Other endings:** the attacker's optional withdraw setting (lead contests only) and the round limit (stalemate).
-- `ENDING_INFO` explains each kind of ending; the playground groups simulated results by winner and cause.
+  D&D's first-level d10 hit die plus its Tough feat. 0 HP is a knockout, and a knocked-out character does not act.
+- **Nerve (morale):** the first time a character drops to half HP or below, they make one nerve check (DC 10), as in
+  D&D's optional morale rule. Passing commits them to the fight. Failing ends it: a low-courage or high-caution
+  character flees; otherwise the defender surrenders or the attacker backs off.
+- **Other ending:** the round limit (stalemate).
+- `FIGHT_ENDING_INFO` explains each ending; the playground groups simulated results by winner and cause.
+
+The nerve check itself (`src/nerve.ts`) is shared: it is also made when a weapon is drawn on someone (DC 12).
 
 ## Open questions
 
@@ -85,10 +80,9 @@ A contest is a multi-round opposed check that resolves automatically; neither si
 - **Progression.** XP/levels versus improvement through use. Not implemented; only the proficiency bonus can be set.
 - **Knowledge.** The player should see an estimate of an NPC's abilities based on what they know, not the true values.
   This would sit on top of the exact odds.
-- **Contest balance.** The lead step, nerve DCs, damage and temperament effects are first guesses, all defined as
-  constants or in one table. Simulated fights last about 2.5 rounds (about 5 attacks) and end
-  about 50–60% by knockout and the rest by a failed nerve check.
-- **Unused skills.** Firearms and others are defined but no contest uses them yet. Armour and weapons are not
+- **Fight balance.** Damage, hit points and the nerve DC are first guesses, all defined as constants. Simulated fights
+  last about 2.5 rounds (about 5 attacks) and end about 50–60% by knockout and the rest by a failed nerve check.
+- **Unused skills.** Firearms and others are defined but nothing uses them yet. Armour and weapons are not
   modelled.
 - **Integration with the game.** Mapping the existing `Traits`/`Skills` onto this model, save migration, and replacing
   the game's existing ad-hoc checks in `src/` are not started.

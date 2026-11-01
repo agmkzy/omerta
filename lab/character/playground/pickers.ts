@@ -1,5 +1,5 @@
-// Controls for choosing which saved characters take part in a check or contest.
-import type { Side } from '../src/contest';
+// Controls for choosing which saved characters take part in a check or fight.
+import type { Side } from '../src/nerve';
 import { h } from './dom';
 import { setSide, swapSides } from './roster';
 import { change, getRoster } from './store';

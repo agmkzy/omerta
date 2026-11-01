@@ -1,7 +1,7 @@
 // Playground entry point: one tab per panel. The open tab is remembered in this browser.
 import { charactersPanel } from './characters';
 import { checkPanel } from './checkpanel';
-import { contestPanel } from './contestpanel';
+import { fightPanel } from './fightpanel';
 import { h } from './dom';
 import { oddsPanel } from './odds';
 import { onChange, storage } from './store';
@@ -11,7 +11,7 @@ const TAB_KEY = 'character-lab:tab';
 const tabs: readonly { id: string; label: string; panel: Panel }[] = [
   { id: 'characters', label: 'Characters', panel: charactersPanel() },
   { id: 'check', label: 'Skill check', panel: checkPanel() },
-  { id: 'contest', label: 'Contest', panel: contestPanel() },
+  { id: 'fight', label: 'Fight', panel: fightPanel() },
   { id: 'odds', label: 'Dice and odds', panel: oddsPanel() },
 ];
 

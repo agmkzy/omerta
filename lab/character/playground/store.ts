@@ -1,7 +1,7 @@
 // The playground's shared state: the roster of characters, saved to localStorage after every change.
 import { BACKGROUND_INFO, rollCharacter, type BackgroundName } from '../src/backgrounds';
 import type { Character } from '../src/character';
-import type { Side } from '../src/contest';
+import type { Side } from '../src/nerve';
 import { roller, seeded } from '../src/random';
 import { createRoster, loadRoster, saveRoster, type KeyValueStorage, type Roster } from './roster';
 

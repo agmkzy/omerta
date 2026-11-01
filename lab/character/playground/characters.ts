@@ -4,7 +4,7 @@ import { BACKGROUNDS, BACKGROUND_INFO, type BackgroundName } from '../src/backgr
 import { bonusOf } from '../src/check';
 import { PROFICIENCIES, PROFICIENCY_MAX, PROFICIENCY_MIN, attributeUsed, createCharacter, defence, defenceModifiers, hitPointModifiers, maxHitPoints, skillModifiers, type Character, type Proficiency } from '../src/character';
 import { describeModifier, signed } from '../src/explain';
-import { NERVE_FAILURE } from '../src/contest';
+import { NERVE_FAILURE } from '../src/nerve';
 import { SKILLS, SKILL_INFO, attributesFor, skillsUsing } from '../src/skills';
 import { SITUATION_INFO, TRAITS, TRAIT_INFO, effectsOf, notableTraits, type Trait } from '../src/temperament';
 import { h, segmented, slider } from './dom';
@@ -31,7 +31,7 @@ function attributeUse(a: (typeof ATTRIBUTES)[number]): string {
   return `Used by: ${primary.join(', ')}${alternative.length ? `; alternative for ${alternative.join(', ')}` : ''}.${hp}`;
 }
 
-/** What a trait does to rolls and in contests, if anything. */
+/** What a trait does to rolls and fights, if anything. */
 function traitEffects(t: Trait): string {
   const rolls = effectsOf(t).map((e) => `${e.when === 'high' ? 'High' : 'Low'}: ${signed(e.value)} when ${SITUATION_INFO[e.situation].name.toLowerCase()}.`);
   return [...rolls, NERVE_FAILURE[t] ?? ''].filter(Boolean).join(' ');

@@ -1,7 +1,7 @@
 // The playground's saved characters: a list of entries, the one selected for editing, and the two assigned as attacker and
 // defender. Pure functions over an immutable roster; persistence goes through an injected storage (localStorage).
 import type { Character } from '../src/character';
-import type { Side } from '../src/contest';
+import type { Side } from '../src/nerve';
 import { loadCharacter, saveCharacter } from '../src/serialize';
 
 export interface Entry {
@@ -40,7 +40,7 @@ export function updateEntry(r: Roster, id: string, character: Character): Roster
   return { ...r, entries: r.entries.map((e) => (e.id === id ? { id, character } : e)) };
 }
 
-/** Removes an entry. The roster must keep at least two, so a contest always has two sides. */
+/** Removes an entry. The roster must keep at least two, so a check or fight always has two sides. */
 export function removeEntry(r: Roster, id: string): Roster {
   assertHas(r, id);
   const entries = r.entries.filter((e) => e.id !== id);
