@@ -55,7 +55,11 @@ export interface ContestSpec {
 export type Trigger = 'weapon-drawn' | 'falling-behind' | 'hurt';
 
 export type Ending =
-  | { readonly how: 'outscored' | 'knocked-out' | 'gives-up' | 'flees' | 'withdraws'; readonly loser: Side }
+  | { readonly how: 'outscored' | 'knocked-out' | 'flees'; readonly loser: Side }
+  /** The defender lost their nerve: in a fight they stop resisting; otherwise they do as they were told. */
+  | { readonly how: 'surrenders' | 'complies'; readonly loser: 'defender' }
+  /** The attacker lost their nerve: in a fight they stop attacking; otherwise they drop the demand. */
+  | { readonly how: 'backs-off' | 'backs-down' | 'withdraws'; readonly loser: 'attacker' }
   | { readonly how: 'stalemate'; readonly loser: null };
 
 export interface Damage {
@@ -99,9 +103,21 @@ export const ENDING_INFO: { readonly [H in Ending['how']]: { readonly title: str
     explanation: 'The other side won enough rounds to reach the winning lead. Decided by skill bonuses and dice.',
   },
   'knocked-out': { title: 'Knocked out', explanation: 'Reduced to 0 hit points in a fight.' },
-  'gives-up': {
-    title: 'Lost their nerve and gave up',
-    explanation: 'Failed a nerve check (after falling behind by half the winning lead, first dropping to half hit points in a fight, or having a weapon drawn on them).',
+  surrenders: {
+    title: 'Lost their nerve and surrendered',
+    explanation: 'The defender failed a nerve check in a fight and stopped resisting. They are still there and conscious.',
+  },
+  'backs-off': {
+    title: 'Lost their nerve and backed off',
+    explanation: 'The attacker failed a nerve check in a fight and stopped attacking, without getting what they came for.',
+  },
+  'backs-down': {
+    title: 'Lost their nerve and backed down',
+    explanation: 'The attacker failed a nerve check and dropped the demand.',
+  },
+  complies: {
+    title: 'Lost their nerve and complied',
+    explanation: 'The defender failed a nerve check (after falling behind or having a weapon drawn on them) and did what was demanded.',
   },
   flees: { title: 'Lost their nerve and fled', explanation: 'Failed a nerve check, and their low courage or high caution made them run.' },
   withdraws: { title: 'Withdrew', explanation: 'The attacker fell as far behind as the withdraw setting allows.' },
@@ -163,7 +179,8 @@ export function runContest(spec: ContestSpec, roller: Roller): ContestResult {
   /**
    * Makes a nerve check. Returns the ending if the contest is over, or null if it continues. On a failure: a hot-tempered
    * character escalates to a fight (once, and not when already fighting) and the contest continues; a timid or cautious
-   * one flees; anyone else gives up.
+   * one flees; anyone else yields: a defender surrenders (in a fight) or complies, an attacker backs off (in a fight) or
+   * backs down.
    */
   const nerveCheck = (side: Side, trigger: Trigger): Ending | null => {
     const result = resolveCheck({ ...rollFor(sides[side], 'nerve', { dice, situations: ['hold-nerve'] }), dc: NERVE_DC[trigger] }, roller);
@@ -177,7 +194,9 @@ export function runContest(spec: ContestSpec, roller: Roller): ContestResult {
       events.push({ kind: 'escalation', round, side });
       return null;
     }
-    return { how: leaning(t.courage) === 'low' || leaning(t.caution) === 'high' ? 'flees' : 'gives-up', loser: side };
+    if (leaning(t.courage) === 'low' || leaning(t.caution) === 'high') return { how: 'flees', loser: side };
+    const fighting = approach === 'fight';
+    return side === 'defender' ? { how: fighting ? 'surrenders' : 'complies', loser: side } : { how: fighting ? 'backs-off' : 'backs-down', loser: side };
   };
 
   if (approach === 'armed-threat') {

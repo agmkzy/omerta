@@ -25,7 +25,7 @@ describe('describeEvent', { tags: ['unit'] }, () => {
     assert.deepEqual(log(spec(), 15, 10, 9), [
       'Round 1 (Intimidation): A rolled 17, D rolled 10. A gains 2; A leads by 2.',
       'D makes a nerve check (fell behind by half the winning lead): needed 10, rolled 9, failed.',
-      'D loses: failed a nerve check and gave up.',
+      'D loses: failed a nerve check and complied.',
     ]);
   });
 
@@ -68,7 +68,10 @@ describe('describeEnding', { tags: ['unit'] }, () => {
   test('describes every kind of ending', () => {
     assert.equal(describeEnding({ how: 'outscored', loser: 'defender' }, spec()), 'D loses: A reached the winning lead.');
     assert.equal(describeEnding({ how: 'knocked-out', loser: 'defender' }, spec()), 'D loses: knocked out (0 HP).');
-    assert.equal(describeEnding({ how: 'gives-up', loser: 'attacker' }, spec()), 'A loses: failed a nerve check and gave up.');
+    assert.equal(describeEnding({ how: 'surrenders', loser: 'defender' }, spec()), 'D loses: failed a nerve check and surrendered.');
+    assert.equal(describeEnding({ how: 'backs-off', loser: 'attacker' }, spec()), 'A loses: failed a nerve check and backed off.');
+    assert.equal(describeEnding({ how: 'complies', loser: 'defender' }, spec()), 'D loses: failed a nerve check and complied.');
+    assert.equal(describeEnding({ how: 'backs-down', loser: 'attacker' }, spec()), 'A loses: failed a nerve check and backed down.');
     assert.equal(describeEnding({ how: 'flees', loser: 'defender' }, spec()), 'D loses: failed a nerve check and fled.');
     assert.equal(describeEnding({ how: 'withdraws', loser: 'attacker' }, spec()), 'A loses: withdrew after falling too far behind.');
     assert.equal(describeEnding({ how: 'stalemate', loser: null }, spec()), 'Stalemate: the round limit was reached with no winner.');

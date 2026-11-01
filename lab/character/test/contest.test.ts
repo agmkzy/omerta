@@ -67,8 +67,12 @@ describe('runContest: nerve checks', { tags: ['unit'] }, () => {
     assert.equal(r.ending.how, 'stalemate');
   });
 
-  test('failing the nerve check ends the contest; average temperament gives up', () => {
-    assert.deepEqual(run(spec({ winningLead: 4 }), 15, 10, 9).ending, { how: 'gives-up', loser: 'defender' });
+  test('a defender who fails the nerve check, with average temperament, complies', () => {
+    assert.deepEqual(run(spec({ winningLead: 4 }), 15, 10, 9).ending, { how: 'complies', loser: 'defender' });
+  });
+
+  test('an attacker who fails the nerve check, with average temperament, backs down', () => {
+    assert.deepEqual(run(spec({ winningLead: 4 }), 1, 12, 1).ending, { how: 'backs-down', loser: 'attacker' }); // 3 vs 12: behind by 2
   });
 
   test('the falling-behind check happens only once per side', () => {
@@ -92,12 +96,12 @@ describe('runContest: nerve checks', { tags: ['unit'] }, () => {
     assert.equal(r.ending.how, 'stalemate');
   });
 
-  test('high temper: does not escalate during a fight; a failed nerve check gives up', () => {
+  test('high temper: does not escalate during a fight; a failed nerve check surrenders', () => {
     // Round 1: lead 3 of 6, nerve fails, escalates. Round 2 (fight): the attacker wins initiative and lands a critical
     // hit for 5 (10 → 5 HP, half); the defender's nerve fails again.
     const r = run(spec({ winningLead: 6, maxRounds: 2, defender: defender({ temper: 0.9 }) }), 20, 10, 1, 15, 10, 20, 2, 3, 1);
     assert.deepEqual(kinds(r.events), ['round', 'nerve', 'escalation', 'initiative', 'attack', 'nerve', 'end']);
-    assert.deepEqual(r.ending, { how: 'gives-up', loser: 'defender' });
+    assert.deepEqual(r.ending, { how: 'surrenders', loser: 'defender' });
   });
 });
 
@@ -107,7 +111,7 @@ describe('runContest: armed threat', { tags: ['unit'] }, () => {
     assert.deepEqual(kinds(r.events), ['nerve', 'end']);
     const nerve = r.events[0];
     assert.ok(nerve?.kind === 'nerve' && nerve.trigger === 'weapon-drawn' && nerve.result.dc === 12);
-    assert.deepEqual(r.ending, { how: 'gives-up', loser: 'defender' });
+    assert.deepEqual(r.ending, { how: 'complies', loser: 'defender' });
     assert.equal(r.rounds, 0);
   });
 
@@ -218,9 +222,14 @@ describe('runContest: fight', { tags: ['unit'] }, () => {
     for (const e of r.events) if (e.kind === 'attack' || e.kind === 'nerve') assert.deepEqual(e.result.roll.modifiers.filter((m) => m.value < 0), []);
   });
 
-  test('failing the nerve check ends the fight', () => {
+  test('a defender who fails the nerve check in a fight surrenders', () => {
     const r = run(fight(), 15, 10, 20, 2, 3, 1); // critical for 5: 10 → 5 HP; nerve fails
-    assert.deepEqual(r.ending, { how: 'gives-up', loser: 'defender' });
+    assert.deepEqual(r.ending, { how: 'surrenders', loser: 'defender' });
+  });
+
+  test('an attacker who fails the nerve check in a fight backs off', () => {
+    const r = run(fight(), 5, 15, 20, 2, 3, 1); // the defender acts first: critical for 5; nerve fails
+    assert.deepEqual(r.ending, { how: 'backs-off', loser: 'attacker' });
   });
 
   test('reaching 0 hit points is a knockout', () => {
@@ -264,7 +273,7 @@ describe('contest descriptions', { tags: ['unit'] }, () => {
 
 describe('ENDING_INFO', { tags: ['unit'] }, () => {
   test('explains every way a contest can end', () => {
-    for (const how of ['outscored', 'knocked-out', 'gives-up', 'flees', 'withdraws', 'stalemate'] as const)
+    for (const how of ['outscored', 'knocked-out', 'surrenders', 'backs-off', 'complies', 'backs-down', 'flees', 'withdraws', 'stalemate'] as const)
       assert.ok(ENDING_INFO[how].title && ENDING_INFO[how].explanation, how);
   });
 });
@@ -273,7 +282,7 @@ describe('tally', { tags: ['unit'] }, () => {
   test('counts endings by key and the counts sum to the number of runs', () => {
     const t = tally(spec({ maxRounds: 12 }), roller(seeded(2)), 200);
     assert.equal(Object.values(t).reduce((a, b) => a + b, 0), 200);
-    assert.ok((t['outscored:defender'] ?? 0) + (t['gives-up:defender'] ?? 0) + (t['flees:defender'] ?? 0) > 0);
+    assert.ok((t['outscored:defender'] ?? 0) + (t['complies:defender'] ?? 0) + (t['flees:defender'] ?? 0) > 0);
   });
 
   test('endingKey combines how and loser, or is just "stalemate"', () => {

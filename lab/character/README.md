@@ -73,7 +73,8 @@ A contest is a multi-round opposed check that resolves automatically; neither si
   half HP or below in a fight (DC 10, once per side: fight or flight, as in D&D's optional morale rule), or has a weapon
   drawn on them (DC 12).
 - **A failed nerve check** ends the contest: a high-temper character escalates to a fight instead (once, and not when
-  already fighting), a low-courage or high-caution character flees, and anyone else gives up.
+  already fighting), a low-courage or high-caution character flees, and anyone else yields: in a fight the defender
+  surrenders and the attacker backs off; otherwise the defender complies and the attacker backs down.
 - **Other endings:** the attacker's optional withdraw setting (lead contests only) and the round limit (stalemate).
 - `ENDING_INFO` explains each kind of ending; the playground groups simulated results by winner and cause.
 

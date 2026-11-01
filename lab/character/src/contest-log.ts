@@ -56,8 +56,14 @@ export function describeEnding(ending: Ending, spec: ContestSpec): string {
       return `${loser} loses: ${winner} reached the winning lead.`;
     case 'knocked-out':
       return `${loser} loses: knocked out (0 HP).`;
-    case 'gives-up':
-      return `${loser} loses: failed a nerve check and gave up.`;
+    case 'surrenders':
+      return `${loser} loses: failed a nerve check and surrendered.`;
+    case 'backs-off':
+      return `${loser} loses: failed a nerve check and backed off.`;
+    case 'complies':
+      return `${loser} loses: failed a nerve check and complied.`;
+    case 'backs-down':
+      return `${loser} loses: failed a nerve check and backed down.`;
     case 'flees':
       return `${loser} loses: failed a nerve check and fled.`;
     case 'withdraws':

@@ -34,7 +34,7 @@ export function contestPanel(): Panel {
     winningLead: state.winningLead, maxRounds: state.maxRounds, ...(state.withdrawAt ? { withdrawAt: state.withdrawAt } : {}),
   });
 
-  /** Parses a tally key ("gives-up:defender") back into an ending. */
+  /** Parses a tally key ("surrenders:defender") back into an ending. */
   const endingOf = (key: string): Ending => {
     const [how, loser] = key.split(':');
     return loser ? ({ how, loser } as Ending) : { how: 'stalemate', loser: null };
@@ -103,13 +103,13 @@ export function contestPanel(): Panel {
               h('li', {}, `Each round, each character attacks in turn: d20 + Brawling bonus against the other’s Defence (${BASE_DEFENCE} + Reflexes bonus). Meeting or beating it is a hit for 1d${UNARMED_DAMAGE_DIE} + Strength modifier damage (at least 1).`),
               h('li', {}, 'A natural 20 always hits and is a critical hit: the damage dice are rolled twice. A natural 1 always misses.'),
               h('li', {}, `Each character has hit points: ${BASE_HIT_POINTS} + Constitution modifier, plus their proficiency bonus if trained in Toughness (twice if expert). At 0 they are knocked out and do not act.`),
-              h('li', {}, `The first time a character drops to half hit points or below, they make one nerve check (DC ${NERVE_DC.hurt}): fight or flight. If they pass, they are committed and fight on with no further checks. If they fail, a timid or cautious character flees; anyone else gives up. This follows D&D’s optional morale rule.`),
+              h('li', {}, `The first time a character drops to half hit points or below, they make one nerve check (DC ${NERVE_DC.hurt}): fight or flight. If they pass, they are committed and fight on with no further checks. If they fail, a timid or cautious character flees; otherwise the defender surrenders (stops resisting) or the attacker backs off. This follows D&D’s optional morale rule.`),
               h('li', {}, 'If nobody has won by the round limit, it is a stalemate.'))
           : h('ul', {},
               h('li', {}, `It is played in rounds. Each round both characters roll, and whoever rolls higher gains lead points: 1 point for every ${POINTS_PER_LEAD} points they rolled higher by (rounded up). A tie changes nothing.`),
               h('li', {}, 'A character wins outright when their lead reaches the winning lead.'),
               h('li', {}, `A character can also lose their nerve. They make a nerve check when they fall behind by half the winning lead (DC ${NERVE_DC['falling-behind']}, once per contest) or have a weapon drawn on them (DC ${NERVE_DC['weapon-drawn']}).`),
-              h('li', {}, 'Failing a nerve check ends the contest: a hot-tempered character escalates to a fight instead (once, decided by hit points from then on); a timid or cautious one flees; anyone else gives up.'),
+              h('li', {}, 'Failing a nerve check ends the contest: a hot-tempered character escalates to a fight instead (once, decided by hit points from then on); a timid or cautious one flees; otherwise the defender complies (does what was demanded) or the attacker backs down.'),
               h('li', {}, 'If neither side has won by the round limit, it is a stalemate.'))),
       h('div', { class: 'grid' },
         h('div', {},
