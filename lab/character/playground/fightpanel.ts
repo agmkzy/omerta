@@ -22,7 +22,7 @@ const RUNS = 1000;
 /** The dice animation, a roulette-style sweep: at least this many steps (and more than once round), over this long, then a short rest on the result. */
 const SWEEP_MIN_STEPS = 16;
 const SWEEP_MS = 850;
-const SETTLE_MS = 200;
+const SETTLE_MS = 1200;
 /** Dice for the animation only (where the sweep starts), kept apart from the fight's dice so it can never change a result. */
 const showDice = roller(seeded(Date.now() >>> 0));
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
