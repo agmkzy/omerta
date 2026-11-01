@@ -1,7 +1,7 @@
 // Characters (player and NPC): attributes, skill training, proficiency bonus and temperament.
 import { ATTRIBUTE_INFO, abilityModifier, attributeScores, type Attribute, type AttributeScores } from './attributes';
 import type { BackgroundName } from './backgrounds';
-import { combineEdges, type Modifier, type Roll } from './check';
+import { bonusOf, combineEdges, type Modifier, type Roll } from './check';
 import { DICE, type Dice, type Edge } from './dice';
 import { SKILL_INFO, attributesFor, type Skill } from './skills';
 import { temperament as fullTemperament, temperamentModifiers, type Situation, type Temperament } from './temperament';
@@ -85,4 +85,25 @@ export function rollFor(c: Character, skill: Skill, options: RollOptions = {}): 
     edge: combineEdges(options.edges ?? []),
     modifiers: [...skillModifiers(c, skill, options.using), ...temperamentModifiers(c.temperament, options.situations ?? []), ...(options.modifiers ?? [])],
   };
+}
+
+/** Hit points before Constitution and Toughness, as for a D&D d8 hit die at first level. */
+export const BASE_HIT_POINTS = 8;
+
+/** What a character's maximum hit points are made of: the base, the Constitution modifier and Toughness training. */
+export function hitPointModifiers(c: Character): Modifier[] {
+  const score = c.attributes.con;
+  const modifiers: Modifier[] = [
+    { value: BASE_HIT_POINTS, reason: 'Base' },
+    { value: abilityModifier(score), reason: `${ATTRIBUTE_INFO.con.name} ${score}` },
+  ];
+  const toughness = c.training.toughness;
+  if (toughness === 'trained') modifiers.push({ value: c.proficiencyBonus, reason: 'Trained in Toughness' });
+  if (toughness === 'expert') modifiers.push({ value: 2 * c.proficiencyBonus, reason: 'Expert at Toughness' });
+  return modifiers;
+}
+
+/** Maximum hit points. The lowest possible is 3 (Constitution 1, untrained). */
+export function maxHitPoints(c: Character): number {
+  return bonusOf(hitPointModifiers(c));
 }
