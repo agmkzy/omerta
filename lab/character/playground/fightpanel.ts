@@ -143,7 +143,7 @@ export function fightPanel(): Panel {
         h('li', {}, 'A side loses when nobody on it is still fighting. If both sides are still fighting at the round limit, it is a stalemate.')));
 
   /** How the fight is likely to go for the left side, in words, estimated from simulated fights. */
-  const ASSESSMENT_RUNS = 500;
+  const ASSESSMENT_RUNS = 2000;
   const assessmentBox = h('div', { class: 'assessment' });
   function refreshAssessment() {
     if (!canFight(state.parties)) return;
@@ -151,7 +151,7 @@ export function fightPanel(): Panel {
     assessmentBox.replaceChildren(
       h('h3', {}, 'How it is likely to go for the left side'),
       h('ul', {}, ...[risk.outcome, risk.hurt, risk.nerve, risk.mostAtRisk].filter((line): line is string => line !== null).map((line) => h('li', {}, line))),
-      hint(`Estimated from ${ASSESSMENT_RUNS} simulated fights with this line-up.`));
+      hint(`Estimated from ${ASSESSMENT_RUNS.toLocaleString()} simulated fights with this line-up.`));
   }
 
   function renderSetup() {

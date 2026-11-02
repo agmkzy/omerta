@@ -32,7 +32,7 @@ export function likelihood(chance: number): Likelihood {
 /** The fixed seed for assessments, so they do not change unless the fight does. */
 const ASSESSMENT_SEED = 1;
 
-export function assessFight(spec: FightSpec, runs = 500): FightAssessment {
+export function assessFight(spec: FightSpec, runs = 2000): FightAssessment {
   const dice = roller(seeded(ASSESSMENT_SEED));
   let win = 0, stalemate = 0, anyKnockedOut = 0, anyLostNerve = 0;
   const downed = new Map<string, { name: string; count: number }>();
