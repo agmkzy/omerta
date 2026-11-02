@@ -51,13 +51,17 @@ function byHowMuch(margin: number): string {
 export function compactRoll(roll: RollResult): string {
   const { throws, kept } = roll.thrown;
   if (roll.edge === 'none') return `${roll.dice.name}: ${compactSum(throws.flat(), roll.bonus, roll.total)}`;
-  const dice = `${roll.dice.name} with ${roll.edge}: ${throws.map((t) => t.join('+')).join(' or ')} → ${kept}`;
-  return roll.bonus === 0 ? dice : `${dice} ${roll.bonus < 0 ? '−' : '+'} ${Math.abs(roll.bonus)} = ${roll.total}`;
+  return `${roll.dice.name} with ${roll.edge}: ${throws.map((t) => t.join('+')).join(' or ')} → ${kept}${withBonus(roll.bonus, roll.total)}`;
+}
+
+/** " + 2 = 15" after a dice result, or nothing when there is no bonus. */
+function withBonus(bonus: number, total: number): string {
+  return bonus === 0 ? '' : ` ${bonus < 0 ? '−' : '+'} ${Math.abs(bonus)} = ${total}`;
 }
 
 /** Faces, a bonus and the total, e.g. "2+5+6 + 2 = 15" or "4+4 = 8"; a single die with no bonus is just its face. */
 export function compactSum(faces: readonly number[], bonus: number, total: number): string {
   const dice = faces.join('+');
-  if (bonus !== 0) return `${dice} ${bonus < 0 ? '−' : '+'} ${Math.abs(bonus)} = ${total}`;
+  if (bonus !== 0) return `${dice}${withBonus(bonus, total)}`;
   return faces.length > 1 ? `${dice} = ${total}` : dice;
 }

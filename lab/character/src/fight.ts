@@ -191,31 +191,35 @@ export interface FightRoller {
   roll(sides: number, reason: FightRollReason): number;
 }
 
-/** A fight played until it ended, or until the roller threw (stepFight's roller throws when it runs out of rolls). */
+/** Thrown by a roller to pause a fight at a roll it cannot make yet (stepFight's roller, when it runs out of rolls). */
+export class AwaitingRoll {
+  constructor(readonly request: RollRequest) {}
+}
+
+/** A fight played until it ended, or paused at a roll (AwaitingRoll) with the fight so far. */
 export type PlayedFight =
   | { readonly finished: true; readonly result: FightResult }
   | {
       readonly finished: false;
-      /** What the roller (or the fight's own checks) threw. */
-      readonly stoppedBy: unknown;
+      /** The roll the fight paused at. */
+      readonly request: RollRequest;
       readonly round: number;
       readonly events: readonly FightEvent[];
       readonly fighters: readonly Fighter[];
     };
 
 export function runFight(spec: FightSpec, roller: FightRoller): FightResult {
-  const played = playFight(spec, roller);
-  if (!played.finished) throw played.stoppedBy;
-  return played.result;
+  return play(spec, roller, { events: [], fighters: [], round: 0 });
 }
 
-/** Plays a fight. If anything throws partway, it stops there and returns the fight so far with what was thrown. */
+/** Plays a fight that the roller may pause by throwing AwaitingRoll. Anything else thrown propagates. */
 export function playFight(spec: FightSpec, roller: FightRoller): PlayedFight {
   const record: FightRecord = { events: [], fighters: [], round: 0 };
   try {
     return { finished: true, result: play(spec, roller, record) };
-  } catch (stoppedBy) {
-    return { finished: false, stoppedBy, round: record.round, events: [...record.events], fighters: record.fighters.map(publicFighter) };
+  } catch (stop) {
+    if (!(stop instanceof AwaitingRoll)) throw stop;
+    return { finished: false, request: stop.request, round: record.round, events: [...record.events], fighters: record.fighters.map(publicFighter) };
   }
 }
 

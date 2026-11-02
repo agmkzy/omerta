@@ -81,7 +81,7 @@ export interface CheckResult {
 export interface OpposedResult {
   readonly active: RollResult;
   readonly passive: RollResult;
-  /** The active total minus the target (the passive total + 1). */
+  /** The graded margin: opposedMargin of the lead (the active total minus the passive total). */
   readonly margin: number;
   readonly outcome: Outcome;
 }
@@ -144,7 +144,7 @@ export function outcomeMargins(outcome: Outcome, bands: Bands = DEFAULT_BANDS): 
 export function describeMargins(outcome: Outcome, bands: Bands = DEFAULT_BANDS, against: 'dc' | 'opponent' = 'dc'): string {
   const range = outcomeMargins(outcome, bands);
   const lead = (n: number) => (n < 0 ? `${-n} behind` : n === 0 ? 'a tie' : `${n} ahead`);
-  const margin = (n: number) => (against === 'opponent' ? lead(n + 1) : n < 0 ? `${-n} short` : n === 0 ? 'exactly the DC' : `${n} over`);
+  const margin = (n: number) => (against === 'opponent' ? lead(opposedLead(n)) : n < 0 ? `${-n} short` : n === 0 ? 'exactly the DC' : `${n} over`);
   if (range.min === null) return `${margin(range.max)} or worse`;
   if (range.max === null) return `${margin(range.min)} or better`;
   return range.min === range.max ? margin(range.min) : `${margin(range.min)} to ${margin(range.max)}`;
@@ -167,10 +167,23 @@ export function resolveCheck(spec: CheckSpec, roller: Roller): CheckResult {
   return { roll, dc: spec.dc, margin, outcome: grade(margin, spec.bands) };
 }
 
+/**
+ * In an opposed check the acting side must beat the other's total: a tie goes to the side resisting. So the margin that
+ * is graded is the lead (active total minus passive total) less one, as if the passive total were a DC one higher.
+ */
+export function opposedMargin(lead: number): number {
+  return lead - 1;
+}
+
+/** The lead an opposed margin stands for: the inverse of opposedMargin. */
+export function opposedLead(margin: number): number {
+  return margin + 1;
+}
+
 export function resolveOpposed(spec: OpposedSpec, roller: Roller): OpposedResult {
   const active = throwRoll(spec.active, roller);
   const passive = throwRoll(spec.passive, roller);
-  const margin = active.total - (passive.total + 1);
+  const margin = opposedMargin(active.total - passive.total);
   return { active, passive, margin, outcome: grade(margin, spec.bands) };
 }
 
@@ -179,7 +192,7 @@ export function checkOdds(spec: CheckSpec): Odds {
 }
 
 export function opposedOdds(spec: OpposedSpec): Odds {
-  return oddsOf(shift(minus(totalDistribution(spec.active), totalDistribution(spec.passive)), -1), spec.bands);
+  return oddsOf(shift(minus(totalDistribution(spec.active), totalDistribution(spec.passive)), opposedMargin(0)), spec.bands);
 }
 
 /** Rolls the dice and adds the modifiers, without a target to grade against. */

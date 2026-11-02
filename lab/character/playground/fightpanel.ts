@@ -313,7 +313,7 @@ export function fightPanel(): Panel {
                 h('button', { type: 'button', disabled: !canFight(state.parties), onclick: () => startFight('step') }, 'Step through again'),
                 h('button', { type: 'button', onclick: () => setFaces(withoutLastRoll(s, faces)) }, 'Back one roll'),
                 h('button', { type: 'button', disabled: !canFight(state.parties), onclick: () => startFight('simulate') }, `Simulate ${SIMULATED_FIGHTS.toLocaleString()} fights`),
-                ...(canFight(state.parties) ? [] : [h('span', { class: 'hint' }, 'The line-up has changed: change it so each side has someone to fight again.')]),
+                ...(canFight(state.parties) ? [] : [h('span', { class: 'hint' }, 'The line-up has changed and one side is now empty. Change the line-up to fight again.')]),
               ]
             : []),
           h('button', { type: 'button', onclick: showSetup }, 'Change line-up'))),

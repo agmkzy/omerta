@@ -5,7 +5,7 @@ import { attributeScores } from '../src/attributes';
 import { BACKGROUNDS, rollCharacter, type BackgroundName } from '../src/backgrounds';
 import { createCharacter, type Character } from '../src/character';
 import { DICE } from '../src/dice';
-import { DEFAULT_MAX_ROUNDS, FIGHTER_STATUSES, FIGHTER_STATUS_INFO, attackOutcome, fightStats, rollDamage, runFight, type FightEvent, type FightResult, type FightSpec } from '../src/fight';
+import { DEFAULT_MAX_ROUNDS, FIGHTER_STATUSES, FIGHTER_STATUS_INFO, attackOutcome, fightStats, playFight, rollDamage, runFight, type FightEvent, type FightResult, type FightSpec } from '../src/fight';
 import { NERVE_DC } from '../src/nerve';
 import { roller, seeded } from '../src/random';
 import { temperament } from '../src/temperament';
@@ -147,6 +147,12 @@ describe('runFight: one against one', { tags: ['unit'] }, () => {
   test('ends in a stalemate after maxRounds', () => {
     const r = fightWith(duel({ maxRounds: 2 }), { initiative: [15, 10], attack: [1, 1, 1, 1] });
     assert.deepEqual([r.winner, r.rounds], [null, 2]);
+  });
+
+  test('playFight pauses only for AwaitingRoll; anything else thrown propagates', () => {
+    const broken = { roll: (): number => { throw new Error('broken roller'); } };
+    assert.throws(() => playFight(duel(), broken), /broken roller/);
+    assert.throws(() => playFight(duel({ maxRounds: 0 }), broken), RangeError);
   });
 
   test('defaults to d20 and the default round limit, and rejects an invalid round limit or an empty side', () => {

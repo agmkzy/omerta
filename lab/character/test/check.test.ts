@@ -15,6 +15,8 @@ import {
   successChance,
   outcomeMargins,
   describeMargins,
+  opposedLead,
+  opposedMargin,
   type Bands,
   type Roll,
 } from '../src/check';
@@ -194,6 +196,28 @@ describe('checkOdds and opposedOdds', { tags: ['property'] }, () => {
 
   test('identical rolls give the active side less than 50%, because ties fail', () => {
     fc.assert(fc.property(roll, (r) => successChance(opposedOdds({ active: r, passive: r })) < 0.5));
+  });
+});
+
+describe('opposed checks', { tags: ['property'] }, () => {
+  const roll = fc.record({
+    dice: fc.constantFrom(...DICE_NAMES).map((n) => DICE[n]),
+    edge: fc.constantFrom(...EDGES),
+    modifiers: fc.array(fc.record({ value: fc.integer({ min: -5, max: 10 }), reason: fc.string() }), { maxLength: 3 }),
+  });
+
+  test('the lead of every resolved opposed check lies in the range its outcome is described by', () => {
+    fc.assert(
+      fc.property(roll, roll, fc.integer(), (active, passive, seed) => {
+        const r = resolveOpposed({ active, passive }, roller(seeded(seed)));
+        const lead = r.active.total - r.passive.total;
+        const range = outcomeMargins(r.outcome);
+        assert.equal(r.margin, opposedMargin(lead));
+        assert.equal(opposedLead(r.margin), lead);
+        if (range.min !== null) assert.ok(lead >= opposedLead(range.min), `${lead} below ${r.outcome}`);
+        if (range.max !== null) assert.ok(lead <= opposedLead(range.max), `${lead} above ${r.outcome}`);
+      }),
+    );
   });
 });
 
