@@ -56,6 +56,11 @@ describe('loadCharacter', { tags: ['unit'] }, () => {
     assert.deepEqual(loadCharacter({ format: 1, name: 'X', training: { driving: 'untrained', notice: 'trained' } }).training, { notice: 'trained' });
   });
 
+  test('ignores unknown skills, as it ignores unknown attributes and traits, so a removed skill does not lose the character', () => {
+    const c = loadCharacter({ format: 2, name: 'X', training: { juggling: 'expert', driving: 'trained' }, attributes: { luck: 18 }, temperament: { whimsy: 0.9 } });
+    assert.deepEqual(c.training, { driving: 'trained' });
+  });
+
   test('ignores unknown fields', () => {
     assert.equal(loadCharacter({ format: 1, name: 'Extra', notes: 'unused' }).name, 'Extra');
   });
@@ -79,7 +84,6 @@ describe('loadCharacter', { tags: ['unit'] }, () => {
     assert.throws(() => loadCharacter({ format: 1, name: 'X', background: 'astronaut' }), RangeError);
     assert.throws(() => loadCharacter({ format: 1, name: 'X', attributes: { str: 30 } }), RangeError);
     assert.throws(() => loadCharacter({ format: 1, name: 'X', attributes: { str: '12' } }), TypeError);
-    assert.throws(() => loadCharacter({ format: 1, name: 'X', training: { juggling: 'expert' } }), RangeError);
     assert.throws(() => loadCharacter({ format: 1, name: 'X', training: { driving: 'master' } }), RangeError);
     assert.throws(() => loadCharacter({ format: 1, name: 'X', temperament: { greed: 2 } }), RangeError);
     assert.throws(() => loadCharacter({ format: 1, name: 'X', proficiencyBonus: 9 }), RangeError);

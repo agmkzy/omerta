@@ -1,0 +1,80 @@
+{
+  "format": 1,
+  "entries": [
+    {
+      "id": "5781cde5-c062-434d-82c2-d62202218125",
+      "character": {
+        "format": 1,
+        "name": "Enforcer 1",
+        "background": "enforcer",
+        "attributes": {
+          "str": 15,
+          "agi": 13,
+          "con": 14,
+          "int": 9,
+          "wis": 11,
+          "cha": 13
+        },
+        "training": {
+          "intimidation": "trained",
+          "toughness": "trained",
+          "brawling": "expert"
+        },
+        "proficiencyBonus": 2,
+        "temperament": {
+          "greed": 0.45,
+          "violence": 0.66,
+          "ambition": 0.67,
+          "caution": 0.53,
+          "sociability": 0.69,
+          "vice": 0.73,
+          "courage": 0.36,
+          "loyalty": 0.55,
+          "pride": 0.88,
+          "temper": 0.55,
+          "honesty": 0.49,
+          "cruelty": 1
+        }
+      }
+    },
+    {
+      "id": "e4bb6c0e-1f7a-473b-8307-0959e7077f3f",
+      "character": {
+        "format": 1,
+        "name": "Shopkeeper 1",
+        "background": "shopkeeper",
+        "attributes": {
+          "str": 8,
+          "agi": 10,
+          "con": 12,
+          "int": 17,
+          "wis": 14,
+          "cha": 15
+        },
+        "training": {
+          "bookkeeping": "trained",
+          "persuasion": "trained",
+          "notice": "trained"
+        },
+        "proficiencyBonus": 2,
+        "temperament": {
+          "greed": 0.56,
+          "violence": 0,
+          "ambition": 0.71,
+          "caution": 0.79,
+          "sociability": 0.45,
+          "vice": 0.64,
+          "courage": 0.5,
+          "loyalty": 0.79,
+          "pride": 0.65,
+          "temper": 0.48,
+          "honesty": 0.33,
+          "cruelty": 0.71
+        }
+      }
+    }
+  ],
+  "selected": "5781cde5-c062-434d-82c2-d62202218125",
+  "attacker": "5781cde5-c062-434d-82c2-d62202218125",
+  "defender": "e4bb6c0e-1f7a-473b-8307-0959e7077f3f"
+}

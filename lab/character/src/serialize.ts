@@ -1,5 +1,6 @@
-// Saving and loading characters as plain JSON. Loading validates every field and defaults anything missing, so data
-// saved before a field (e.g. a new trait) existed still loads.
+// Saving and loading characters as plain JSON. Loading validates every known field and defaults anything missing, so data
+// saved before a field (e.g. a new trait) existed still loads. Unknown attributes, traits and skills are ignored rather
+// than rejected, so data saved before one was removed still loads; renames are handled by migrations.
 import { ATTRIBUTES, attributeScores, type AttributeScores } from './attributes';
 import { BACKGROUNDS, type BackgroundName } from './backgrounds';
 import { PROFICIENCIES, createCharacter, type Character, type Proficiency, type Training } from './character';
@@ -80,7 +81,7 @@ function numbers<K extends string>(value: unknown, what: string, keys: readonly 
 function training(value: unknown): Training {
   const out: Partial<Record<Skill, Proficiency>> = {};
   for (const [skill, level] of Object.entries(record(value, 'training'))) {
-    if (!SKILLS.includes(skill as Skill)) throw new RangeError(`unknown skill ${skill}`);
+    if (!SKILLS.includes(skill as Skill)) continue;
     if (!PROFICIENCIES.includes(level as Proficiency)) throw new RangeError(`unknown proficiency ${String(level)} for ${skill}`);
     if (level !== 'untrained') out[skill as Skill] = level as Proficiency;
   }

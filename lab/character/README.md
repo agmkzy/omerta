@@ -42,7 +42,10 @@ and temperament), **Skill check** (intimidate, persuade, deceive, or any skill),
 two sides, then the fight, either played automatically or stepped through roll by roll, rolling or choosing each
 result; each fighter's card shows their stats and state, with a short log by round) and **Dice
 and odds**. Characters are saved to `localStorage` in this
-browser after every change, as is the open tab. The check tab picks its two characters from the saved list; the fight line-up is also saved. The roster and line-up logic (`playground/roster.ts`, `playground/parties.ts`) is pure and tested like the library.
+browser after every change, as is the open tab. The check tab picks its two characters from the saved list; the fight line-up is also saved. The roster and line-up logic (`playground/roster.ts`, `playground/parties.ts`) is pure and tested like the library. Saved data that cannot be fully read (a corrupt entry, or a newer format) is copied to a
+backup key before anything is saved over it, and the Characters tab says so; unknown skills, attributes and traits are
+ignored rather than rejected, and renames are handled by migrations. `test/fixtures/roster-format1.json` is a save written
+by an older build and must keep loading.
 
 Tests are in `test/`, one file per module. Each is tagged `unit` or `property` (fast-check). The suite has 100% statement,
 branch, function and line coverage.

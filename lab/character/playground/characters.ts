@@ -9,7 +9,7 @@ import { SKILLS, SKILL_INFO, attributesFor, skillsUsing } from '../src/skills';
 import { SITUATION_INFO, TRAITS, TRAIT_INFO, effectsOf, notableTraits, type Trait } from '../src/temperament';
 import { h, segmented, slider } from './dom';
 import { addEntry, removeEntry, select, updateEntry } from './roster';
-import { change, characterById, getRoster, newId, rollNew, saved } from './store';
+import { change, characterById, getRoster, loadWarning, newId, rollNew, saved } from './store';
 import { hint, type Panel } from './views';
 
 const SOURCE = 'characters';
@@ -80,7 +80,8 @@ export function charactersPanel(): Panel {
         hint(`${BACKGROUND_INFO[newBackground].description} Rolls attributes, sets training and rolls a temperament to suit.`),
         h('button', { type: 'button', class: 'primary', onclick: () => { change((x) => addEntry(x, { id: newId(), character: rollNew(newBackground) }), SOURCE); render(); } }, 'Create'),
       ),
-      h('p', { class: 'muted small' }, saved() ? 'Saved in this browser.' : 'Could not save: browser storage is unavailable.'),
+      ...(loadWarning() ? [h('p', { class: 'warning small', role: 'alert' }, loadWarning()!)] : []),
+      h('p', { class: 'muted small' }, saved() ? 'Saved in this browser.' : loadWarning() ? 'Not saved.' : 'Not saved: browser storage is unavailable.'),
     );
   }
 

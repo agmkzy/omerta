@@ -75,17 +75,25 @@ export function serializeRoster(r: Roster): string {
   });
 }
 
-/** Parses a saved roster. Invalid or duplicate entries are dropped and references repaired; null if unusable. */
-export function parseRoster(text: string): Roster | null {
+/** A saved roster as read: the roster (null if unusable) and how many entries had to be dropped. */
+export interface ParsedRoster {
+  readonly roster: Roster | null;
+  readonly dropped: number;
+}
+
+/** Parses a saved roster. Invalid or duplicate entries are dropped (and counted) and references repaired. */
+export function parseRoster(text: string): ParsedRoster {
+  const unusable = { roster: null, dropped: 0 };
   let data: unknown;
   try {
     data = JSON.parse(text);
   } catch {
-    return null;
+    return unusable;
   }
-  if (typeof data !== 'object' || data === null || Array.isArray(data)) return null;
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) return unusable;
   const d = data as Record<string, unknown>;
-  if (d.format !== ROSTER_FORMAT || !Array.isArray(d.entries)) return null;
+  // Older formats would be migrated here; a newer format is not read, so it is never overwritten by this version.
+  if (typeof d.format !== 'number' || d.format > ROSTER_FORMAT || !Array.isArray(d.entries)) return unusable;
   const entries: Entry[] = [];
   for (const raw of d.entries) {
     try {
@@ -93,18 +101,41 @@ export function parseRoster(text: string): Roster | null {
       if (typeof e.id !== 'string' || entries.some((x) => x.id === e.id)) continue;
       entries.push({ id: e.id, character: loadCharacter(e.character) });
     } catch {
-      // An entry that fails validation is dropped; the rest still load.
+      // An entry that fails validation is dropped (and counted); the rest still load.
     }
   }
-  if (entries.length < 2) return null;
+  const dropped = d.entries.length - entries.length;
+  if (entries.length < 2) return { roster: null, dropped };
   const ref = (v: unknown) => (typeof v === 'string' ? v : '');
-  return repair({ entries, selected: ref(d.selected), attacker: ref(d.attacker), defender: ref(d.defender) });
+  return { roster: repair({ entries, selected: ref(d.selected), attacker: ref(d.attacker), defender: ref(d.defender) }), dropped };
 }
 
-export function loadRoster(storage: KeyValueStorage): Roster | null {
+/** The roster as stored: what could be read, and the stored text itself (null if there was none). */
+export interface LoadedRoster extends ParsedRoster {
+  readonly raw: string | null;
+}
+
+export function loadRoster(storage: KeyValueStorage): LoadedRoster {
+  let raw: string | null = null;
   try {
-    const text = storage.getItem(ROSTER_KEY);
-    return text === null ? null : parseRoster(text);
+    raw = storage.getItem(ROSTER_KEY);
+  } catch {
+    return { roster: null, dropped: 0, raw: null };
+  }
+  return raw === null ? { roster: null, dropped: 0, raw } : { ...parseRoster(raw), raw };
+}
+
+/** Whether the stored text could not be fully read, so it must be kept before anything is saved over it. */
+export function needsBackup(loaded: LoadedRoster): boolean {
+  return loaded.raw !== null && (loaded.roster === null || loaded.dropped > 0);
+}
+
+/** Keeps stored text under its own key (with the time), returning the key, or null if it could not be stored. */
+export function backupRoster(storage: KeyValueStorage, raw: string, time: number): string | null {
+  const key = `${ROSTER_KEY}:backup:${time}`;
+  try {
+    storage.setItem(key, raw);
+    return key;
   } catch {
     return null;
   }

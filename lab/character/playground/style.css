@@ -210,3 +210,4 @@ table.fight-log tr.round-head td { font-size: 0.75rem; text-transform: uppercase
 .assessment { border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: var(--radius); padding: 8px 14px; }
 .assessment h3 { margin: 4px 0 6px; }
 .assessment ul { margin: 0 0 4px; padding-left: 18px; }
+.warning { color: var(--critical-failure); border: 1px solid var(--critical-failure); border-radius: var(--radius); padding: 6px 8px; }

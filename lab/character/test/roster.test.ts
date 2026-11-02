@@ -2,9 +2,12 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'vitest';
 import { createCharacter } from '../src/character';
 import { saveCharacter } from '../src/serialize';
+import { readFileSync } from 'node:fs';
 import {
   ROSTER_KEY,
   addEntry,
+  backupRoster,
+  needsBackup,
   createRoster,
   loadRoster,
   parseRoster,
@@ -102,7 +105,19 @@ describe('roster edits', { tags: ['unit'] }, () => {
 describe('serializeRoster and parseRoster', { tags: ['unit'] }, () => {
   test('round-trip a roster', () => {
     const r = setSide(select(three(), 'c'), 'defender', 'c');
-    assert.deepEqual(parseRoster(serializeRoster(r)), r);
+    assert.deepEqual(parseRoster(serializeRoster(r)), { roster: r, dropped: 0 });
+  });
+
+  test('load a save written by an older build (roster format 1, character format 1), migrating old background names', () => {
+    const { roster, dropped } = parseRoster(readFileSync(new URL('./fixtures/roster-format1.json', import.meta.url), 'utf8'));
+    assert.equal(dropped, 0);
+    assert.deepEqual(roster?.entries.map((e) => [e.character.name, e.character.background]), [['Enforcer 1', 'fighter'], ['Shopkeeper 1', 'shopkeeper']]);
+    assert.equal(roster?.entries[0]!.character.training.brawling, 'expert');
+  });
+
+  test('do not read a newer roster format', () => {
+    const saved = JSON.parse(serializeRoster(three())) as Record<string, unknown>;
+    assert.deepEqual(parseRoster(JSON.stringify({ ...saved, format: 99 })), { roster: null, dropped: 0 });
   });
 
   test('drop invalid or duplicate entries and repair references', () => {
@@ -119,39 +134,54 @@ describe('serializeRoster and parseRoster', { tags: ['unit'] }, () => {
       attacker: 'c',
       defender: 'c',
     });
-    const r = parseRoster(text);
+    const { roster: r, dropped } = parseRoster(text);
     assert.ok(r);
+    assert.equal(dropped, 3);
     assert.deepEqual(r.entries.map((e) => [e.id, e.character.name]), [['a', 'A'], ['c', 'C']]);
     assert.deepEqual([r.selected, r.attacker, r.defender], ['a', 'c', 'a']);
   });
 
   test('repair references that are not strings', () => {
     const saved = JSON.parse(serializeRoster(three())) as Record<string, unknown>;
-    const r = parseRoster(JSON.stringify({ ...saved, selected: 5, attacker: null }));
+    const r = parseRoster(JSON.stringify({ ...saved, selected: 5, attacker: null })).roster;
     assert.ok(r);
     assert.deepEqual([r.selected, r.attacker, r.defender], ['a', 'a', 'b']);
   });
 
   test('return null for unusable data', () => {
     const one = JSON.stringify({ format: 1, entries: [{ id: 'a', character: saveCharacter(createCharacter({ name: 'A' })) }] });
-    for (const bad of ['', '{', 'null', '[]', '{"format":2,"entries":[]}', '{"format":1}', one]) assert.equal(parseRoster(bad), null, bad);
+    for (const bad of ['', '{', 'null', '[]', '{"format":1,"entries":[]}', '{"format":1}', '{"format":"1","entries":[]}', one]) assert.equal(parseRoster(bad).roster, null, bad);
   });
 });
 
 describe('loadRoster and saveRoster', { tags: ['unit'] }, () => {
-  test('save to and load from storage', () => {
+  test('save to and load from storage, returning the stored text too', () => {
     const storage = memoryStorage();
     assert.equal(saveRoster(storage, three()), true);
     assert.ok(storage.data[ROSTER_KEY]);
-    assert.deepEqual(loadRoster(storage), three());
+    assert.deepEqual(loadRoster(storage), { roster: three(), dropped: 0, raw: storage.data[ROSTER_KEY] });
   });
 
-  test('return null when nothing is stored', () => {
-    assert.equal(loadRoster(memoryStorage()), null);
+  test('find nothing when nothing is stored', () => {
+    assert.deepEqual(loadRoster(memoryStorage()), { roster: null, dropped: 0, raw: null });
   });
 
   test('fail softly when storage is unavailable', () => {
-    assert.equal(loadRoster(brokenStorage), null);
+    assert.deepEqual(loadRoster(brokenStorage), { roster: null, dropped: 0, raw: null });
     assert.equal(saveRoster(brokenStorage, three()), false);
+  });
+
+  test('stored text that could not be fully read needs backing up before anything is saved over it', () => {
+    assert.equal(needsBackup({ roster: null, dropped: 0, raw: null }), false);
+    assert.equal(needsBackup({ roster: three(), dropped: 0, raw: '…' }), false);
+    assert.equal(needsBackup({ roster: null, dropped: 0, raw: 'unreadable' }), true);
+    assert.equal(needsBackup({ roster: three(), dropped: 1, raw: '…' }), true);
+  });
+
+  test('a backup keeps the stored text under its own key', () => {
+    const storage = memoryStorage();
+    assert.equal(backupRoster(storage, 'old text', 1700000000000), `${ROSTER_KEY}:backup:1700000000000`);
+    assert.equal(storage.data[`${ROSTER_KEY}:backup:1700000000000`], 'old text');
+    assert.equal(backupRoster(brokenStorage, 'old text', 1), null);
   });
 });
