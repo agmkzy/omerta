@@ -5,7 +5,7 @@ import { fightPanel } from './fightpanel';
 import { h } from './dom';
 import { guidePanel } from './guidepanel';
 import { oddsPanel } from './odds';
-import { onChange, storage } from './store';
+import { loadWarning, onChange, storage } from './store';
 import type { Panel } from './views';
 
 const TAB_KEY = 'character-lab:tab';
@@ -46,7 +46,9 @@ onChange((source) => {
   if (source !== active) tabs.find((t) => t.id === active)?.panel.render();
 });
 
-document.getElementById('app')!.append(bar, content);
+// A warning about saved data that could not all be read stays above every tab until the page is reloaded.
+const warning = loadWarning();
+document.getElementById('app')!.append(...(warning ? [h('p', { class: 'warning small', role: 'alert' }, warning)] : []), bar, content);
 let remembered: string | null = null;
 try {
   remembered = storage?.getItem(TAB_KEY) ?? null;

@@ -5,7 +5,7 @@ import { attributeScores } from '../src/attributes';
 import { BACKGROUNDS, rollCharacter } from '../src/backgrounds';
 import { createCharacter } from '../src/character';
 import { roller, seeded } from '../src/random';
-import { CHARACTER_FORMAT, loadCharacter, saveCharacter } from '../src/serialize';
+import { CHARACTER_FORMAT, NewerFormatError, loadCharacter, readCharacter, saveCharacter } from '../src/serialize';
 import { temperament } from '../src/temperament';
 
 const sample = createCharacter({
@@ -56,17 +56,21 @@ describe('loadCharacter', { tags: ['unit'] }, () => {
     assert.deepEqual(loadCharacter({ format: 1, name: 'X', training: { driving: 'untrained', notice: 'trained' } }).training, { notice: 'trained' });
   });
 
-  test('ignores unknown skills, as it ignores unknown attributes and traits, so a removed skill does not lose the character', () => {
-    const c = loadCharacter({ format: 2, name: 'X', training: { juggling: 'expert', driving: 'trained' }, attributes: { luck: 18 }, temperament: { whimsy: 0.9 } });
-    assert.deepEqual(c.training, { driving: 'trained' });
+  test('ignores anything it does not recognise, and reports it, so the caller can keep the original', () => {
+    const { character, ignored } = readCharacter({
+      format: 2, name: 'X', background: 'astronaut', notes: 'unused',
+      training: { juggling: 'expert', driving: 'trained' }, attributes: { luck: 18, str: 14 }, temperament: { whimsy: 0.9, greed: 0.2 },
+    });
+    assert.deepEqual(character, createCharacter({ name: 'X', training: { driving: 'trained' }, attributes: attributeScores({ str: 14 }), temperament: temperament({ greed: 0.2 }) }));
+    assert.deepEqual([...ignored].sort(), ['attributes.luck', 'background', 'notes', 'temperament.whimsy', 'training.juggling']);
   });
 
-  test('ignores unknown fields', () => {
-    assert.equal(loadCharacter({ format: 1, name: 'Extra', notes: 'unused' }).name, 'Extra');
+  test('reports nothing ignored for a character this version saved', () => {
+    assert.deepEqual(readCharacter(JSON.parse(JSON.stringify(saveCharacter(sample)))).ignored, []);
   });
 
   test('rejects data that is not a saved character', () => {
-    for (const bad of [null, 'text', 42, [], { name: 'No format' }, { format: 1 }, { format: 1, name: 7 }])
+    for (const bad of [null, 'text', 42, [], { name: 'No format' }, { format: 0, name: 'X' }, { format: 1.5, name: 'X' }, { format: 1 }, { format: 1, name: 7 }])
       assert.throws(() => loadCharacter(bad), TypeError, JSON.stringify(bad));
   });
 
@@ -77,11 +81,10 @@ describe('loadCharacter', { tags: ['unit'] }, () => {
   });
 
   test('rejects a newer format', () => {
-    assert.throws(() => loadCharacter({ format: CHARACTER_FORMAT + 1, name: 'Future' }), /newer/);
+    assert.throws(() => loadCharacter({ format: CHARACTER_FORMAT + 1, name: 'Future' }), NewerFormatError);
   });
 
   test('rejects invalid values', () => {
-    assert.throws(() => loadCharacter({ format: 1, name: 'X', background: 'astronaut' }), RangeError);
     assert.throws(() => loadCharacter({ format: 1, name: 'X', attributes: { str: 30 } }), RangeError);
     assert.throws(() => loadCharacter({ format: 1, name: 'X', attributes: { str: '12' } }), TypeError);
     assert.throws(() => loadCharacter({ format: 1, name: 'X', training: { driving: 'master' } }), RangeError);

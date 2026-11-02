@@ -9,7 +9,7 @@ import { SKILLS, SKILL_INFO, attributesFor, skillsUsing } from '../src/skills';
 import { SITUATION_INFO, TRAITS, TRAIT_INFO, effectsOf, notableTraits, type Trait } from '../src/temperament';
 import { h, segmented, slider } from './dom';
 import { addEntry, removeEntry, select, updateEntry } from './roster';
-import { change, characterById, getRoster, loadWarning, newId, rollNew, saved } from './store';
+import { canSave, change, characterById, getRoster, loadWarning, newId, rollNew, saved, storage } from './store';
 import { hint, type Panel } from './views';
 
 const SOURCE = 'characters';
@@ -80,8 +80,7 @@ export function charactersPanel(): Panel {
         hint(`${BACKGROUND_INFO[newBackground].description} Rolls attributes, sets training and rolls a temperament to suit.`),
         h('button', { type: 'button', class: 'primary', onclick: () => { change((x) => addEntry(x, { id: newId(), character: rollNew(newBackground) }), SOURCE); render(); } }, 'Create'),
       ),
-      ...(loadWarning() ? [h('p', { class: 'warning small', role: 'alert' }, loadWarning()!)] : []),
-      h('p', { class: 'muted small' }, saved() ? 'Saved in this browser.' : loadWarning() ? 'Not saved.' : 'Not saved: browser storage is unavailable.'),
+      h('p', { class: 'muted small' }, savedNote()),
     );
   }
 
@@ -190,4 +189,12 @@ export function charactersPanel(): Panel {
   }
 
   return { element, render };
+}
+
+function savedNote(): string {
+  if (saved()) return 'Saved in this browser.';
+  if (storage === null) return 'Not saved: browser storage is unavailable.';
+  if (!canSave()) return 'Not saved, to protect the saved data (see the warning at the top of the page).';
+  if (loadWarning()) return 'Not saved yet: the first change will be saved (the warning at the top of the page says where the original is kept).';
+  return 'Not saved: the browser refused to store it (its storage may be full).';
 }

@@ -2,7 +2,7 @@
 // defender. Pure functions over an immutable roster; persistence goes through an injected storage (localStorage).
 import type { Character } from '../src/character';
 import type { Side } from '../src/nerve';
-import { loadCharacter, saveCharacter } from '../src/serialize';
+import { NewerFormatError, readCharacter, saveCharacter } from '../src/serialize';
 
 export interface Entry {
   readonly id: string;
@@ -75,39 +75,53 @@ export function serializeRoster(r: Roster): string {
   });
 }
 
-/** A saved roster as read: the roster (null if unusable) and how many entries had to be dropped. */
+/** A saved roster as read. */
 export interface ParsedRoster {
+  /** Null if fewer than two characters could be read. */
   readonly roster: Roster | null;
+  /** Entries that could not be read, and were left out. */
   readonly dropped: number;
+  /** Entries read with some saved details left out, because this version does not recognise them. */
+  readonly incomplete: number;
+  /** Whether any of it was saved by a newer version, which this version does not read. */
+  readonly newer: boolean;
 }
 
-/** Parses a saved roster. Invalid or duplicate entries are dropped (and counted) and references repaired. */
+const NOTHING_READ = { roster: null, dropped: 0, incomplete: 0, newer: false } as const;
+
+/** Parses a saved roster. Entries that cannot be read, or repeat an id, are dropped (and counted) and references repaired. */
 export function parseRoster(text: string): ParsedRoster {
-  const unusable = { roster: null, dropped: 0 };
   let data: unknown;
   try {
     data = JSON.parse(text);
   } catch {
-    return unusable;
+    return NOTHING_READ;
   }
-  if (typeof data !== 'object' || data === null || Array.isArray(data)) return unusable;
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) return NOTHING_READ;
   const d = data as Record<string, unknown>;
-  // Older formats would be migrated here; a newer format is not read, so it is never overwritten by this version.
-  if (typeof d.format !== 'number' || d.format > ROSTER_FORMAT || !Array.isArray(d.entries)) return unusable;
+  // Older formats would be migrated here.
+  if (typeof d.format !== 'number' || !Number.isInteger(d.format) || d.format < 1) return NOTHING_READ;
+  if (d.format > ROSTER_FORMAT) return { ...NOTHING_READ, newer: true };
+  if (!Array.isArray(d.entries)) return NOTHING_READ;
   const entries: Entry[] = [];
+  let incomplete = 0;
+  let newer = false;
   for (const raw of d.entries) {
     try {
       const e = raw as { id: unknown; character: unknown };
       if (typeof e.id !== 'string' || entries.some((x) => x.id === e.id)) continue;
-      entries.push({ id: e.id, character: loadCharacter(e.character) });
-    } catch {
+      const { character, ignored } = readCharacter(e.character);
+      entries.push({ id: e.id, character });
+      if (ignored.length > 0) incomplete++;
+    } catch (error) {
       // An entry that fails validation is dropped (and counted); the rest still load.
+      if (error instanceof NewerFormatError) newer = true;
     }
   }
   const dropped = d.entries.length - entries.length;
-  if (entries.length < 2) return { roster: null, dropped };
+  if (entries.length < 2) return { roster: null, dropped, incomplete, newer };
   const ref = (v: unknown) => (typeof v === 'string' ? v : '');
-  return { roster: repair({ entries, selected: ref(d.selected), attacker: ref(d.attacker), defender: ref(d.defender) }), dropped };
+  return { roster: repair({ entries, selected: ref(d.selected), attacker: ref(d.attacker), defender: ref(d.defender) }), dropped, incomplete, newer };
 }
 
 /** The roster as stored: what could be read, and the stored text itself (null if there was none). */
@@ -120,25 +134,75 @@ export function loadRoster(storage: KeyValueStorage): LoadedRoster {
   try {
     raw = storage.getItem(ROSTER_KEY);
   } catch {
-    return { roster: null, dropped: 0, raw: null };
+    // Unreadable storage is treated as empty; saving to it will fail and say so.
   }
-  return raw === null ? { roster: null, dropped: 0, raw } : { ...parseRoster(raw), raw };
+  return raw === null ? { ...NOTHING_READ, raw } : { ...parseRoster(raw), raw };
 }
 
-/** Whether the stored text could not be fully read, so it must be kept before anything is saved over it. */
-export function needsBackup(loaded: LoadedRoster): boolean {
-  return loaded.raw !== null && (loaded.roster === null || loaded.dropped > 0);
+/** What the playground starts with. */
+export interface OpenedRoster {
+  /** The saved roster, or null to start with a new one. */
+  readonly roster: Roster | null;
+  /** False if changes must not be saved this session, so that saved data is not lost. */
+  readonly canSave: boolean;
+  /** For the user, when saved data could not all be read: what happened, and where the original is kept. */
+  readonly warning: string | null;
 }
 
-/** Keeps stored text under its own key (with the time), returning the key, or null if it could not be stored. */
-export function backupRoster(storage: KeyValueStorage, raw: string, time: number): string | null {
-  const key = `${ROSTER_KEY}:backup:${time}`;
+/**
+ * Reads the saved roster without risking data it cannot fully read. Data from a newer version is left alone and nothing
+ * is saved this session. Anything else that could not be fully read is backed up first; if that fails, nothing is saved.
+ */
+export function openRoster(storage: KeyValueStorage | null): OpenedRoster {
+  if (!storage) return { roster: null, canSave: false, warning: null };
+  const loaded = loadRoster(storage);
+  const { roster, raw } = loaded;
+  if (raw === null) return { roster, canSave: true, warning: null };
+  if (loaded.newer) {
+    const which = roster ? 'Some of the saved characters were' : 'The saved characters were';
+    return { roster, canSave: false, warning: `${which} saved by a newer version of the lab, which this version cannot read. They have been left as they are, and changes will not be saved this session.` };
+  }
+  const problems = roster === null
+    ? ['The saved characters could not be loaded.']
+    : [
+        ...(loaded.dropped > 0 ? [`${characters(loaded.dropped)} could not be read.`] : []),
+        ...(loaded.incomplete > 0 ? [`${characters(loaded.incomplete)} had details this version does not recognise, which were left out.`] : []),
+      ];
+  if (problems.length === 0) return { roster, canSave: true, warning: null };
+  const key = backupRoster(storage, raw);
+  const kept = key
+    ? `The original data is kept in this browser’s storage under “${key}”.`
+    : 'The original data could not be backed up, so changes will not be saved this session.';
+  return { roster, canSave: key !== null, warning: `${problems.join(' ')} ${kept}` };
+}
+
+const characters = (n: number): string => `${n} saved ${n === 1 ? 'character' : 'characters'}`;
+
+/**
+ * Keeps stored text under a backup key named from its content, so backing up the same text again (on every reload, say)
+ * reuses the one copy. Returns the key, or null if it could not be stored.
+ */
+export function backupRoster(storage: KeyValueStorage, raw: string): string | null {
+  const key = `${ROSTER_KEY}:backup:${contentHash(raw)}`;
   try {
-    storage.setItem(key, raw);
+    if (storage.getItem(key) !== raw) storage.setItem(key, raw);
     return key;
   } catch {
     return null;
   }
+}
+
+/** A 53-bit hash of the text (cyrb53), as hex. Not cryptographic; it only needs to tell different texts apart. */
+function contentHash(text: string): string {
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 2654435761);
+    h2 = Math.imul(h2 ^ c, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16);
 }
 
 /** Returns false if the roster could not be saved (e.g. storage blocked or full). */

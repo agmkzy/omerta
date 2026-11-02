@@ -17,7 +17,7 @@ import { notableTraits } from '../src/temperament';
 import { slowingDelays, sweepSequence } from './animation';
 import { h, segmented, slider } from './dom';
 import { assign, canFight, loadParties, reconcile, saveParties, type Parties } from './parties';
-import { characterById, getRoster, storage } from './store';
+import { canSave, characterById, getRoster, storage } from './store';
 import { hint, type Panel } from './views';
 
 const RUNS = 1000;
@@ -104,11 +104,11 @@ export function fightPanel(): Panel {
     }
     state.parties = reconcile(state.parties, ids);
     if (!state.parties.attackers.length && !state.parties.defenders.length) state.parties = { attackers: [ids[0]!], defenders: [ids[1]!] };
-    if (storage) saveParties(storage, state.parties);
+    if (storage && canSave()) saveParties(storage, state.parties);
   };
   const setParties = (p: Parties) => {
     state.parties = p;
-    if (storage) saveParties(storage, p);
+    if (storage && canSave()) saveParties(storage, p);
     render();
   };
   const members = (side: Side) => (side === 'attacker' ? state.parties.attackers : state.parties.defenders);

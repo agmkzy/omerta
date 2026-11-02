@@ -3,7 +3,7 @@ import { BACKGROUND_INFO, rollCharacter, type BackgroundName } from '../src/back
 import type { Character } from '../src/character';
 import type { Side } from '../src/nerve';
 import { roller, seeded } from '../src/random';
-import { backupRoster, createRoster, loadRoster, needsBackup, saveRoster, type KeyValueStorage, type Roster } from './roster';
+import { createRoster, openRoster, saveRoster, type KeyValueStorage, type Roster } from './roster';
 
 type Listener = (source: string) => void;
 
@@ -20,25 +20,24 @@ export const storage: KeyValueStorage | null = (() => {
 const dice = roller(seeded(Date.now() >>> 0));
 const listeners: Listener[] = [];
 
-// Load the saved roster. Anything that could not be fully read is backed up before it can be saved over; if the backup
-// fails too, nothing is saved this session, so the stored data is never lost.
-const loaded = storage ? loadRoster(storage) : { roster: null, dropped: 0, raw: null };
-const backupKey = storage && needsBackup(loaded) ? backupRoster(storage, loaded.raw!, Date.now()) : null;
-const canSave = storage !== null && (!needsBackup(loaded) || backupKey !== null);
-let lastSaveOk = canSave;
-
-let roster: Roster = loaded.roster ?? createRoster([
+// Open the saved roster (see openRoster for how data it cannot fully read is protected).
+const opened = openRoster(storage);
+let roster: Roster = opened.roster ?? createRoster([
   { id: newId(), character: rollCharacter('Fighter 1', 'fighter', dice) },
   { id: newId(), character: rollCharacter('Shopkeeper 1', 'shopkeeper', dice) },
 ]);
+// A new roster is saved at once, so the saved note is true from the start. Stored data that could not all be read is left
+// as it is until the first change, so the warning stays until then.
+let lastSaveOk = storage !== null && opened.canSave && opened.warning === null && (opened.roster !== null || saveRoster(storage, roster));
 
 /** A warning to show if saved characters could not all be read, saying where the original data was kept. */
 export function loadWarning(): string | null {
-  if (!needsBackup(loaded)) return null;
-  const what = loaded.roster ? `${loaded.dropped} saved ${loaded.dropped === 1 ? 'character' : 'characters'} could not be read` : 'The saved characters could not be read';
-  return backupKey
-    ? `${what}. The original data is kept in this browser’s storage under “${backupKey}”.`
-    : `${what}, and could not be backed up, so changes will not be saved this session.`;
+  return opened.warning;
+}
+
+/** False if nothing may be saved this session, to protect saved data this version could not fully read. */
+export function canSave(): boolean {
+  return opened.canSave;
 }
 
 export function getRoster(): Roster {
@@ -48,7 +47,7 @@ export function getRoster(): Roster {
 /** Applies a change, saves it and notifies listeners. `source` identifies the panel making the change. */
 export function change(update: (r: Roster) => Roster, source: string): void {
   roster = update(roster);
-  lastSaveOk = storage !== null && canSave && saveRoster(storage, roster);
+  lastSaveOk = storage !== null && opened.canSave && saveRoster(storage, roster);
   for (const l of listeners) l(source);
 }
 
