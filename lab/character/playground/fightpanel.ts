@@ -1,5 +1,6 @@
 // Fight tab, in two views. A fight is kept as the rolls made so far: Auto plays it out at once, Step through stops at
-// every roll so the player can roll or choose the result, Back drops the last roll, and Play the rest finishes it.
+// every roll so the player can roll or choose the result, Back drops the last roll, and Play the rest finishes it. The
+// fight stays when switching tabs.
 // Set-up: click characters to add them to the left or right side; each fighter is shown once as a card
 // with the numbers the fight uses. Fight: the same cards with how each fighter ended up, then the log, one short line per
 // action, grouped by round, with the dice for each line in a column on the right.
@@ -26,6 +27,8 @@ import { hint, type Panel } from './views';
 const SWEEP_MIN_STEPS = 16;
 const SWEEP_MS = 850;
 const SETTLE_MS = 1200;
+/** How long the round-limit slider must rest before the assessment is worked out again. */
+const ASSESSMENT_DELAY_MS = 200;
 /** Dice for the animation only (where the sweep starts), kept apart from the fight's dice so it can never change a result. */
 const showDice = roller(seeded(Date.now() >>> 0));
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -109,16 +112,34 @@ export function fightPanel(): Panel {
     runFight(s, rolls);
     return rolls.faces;
   };
+  /** Counts every change to the fight shown, so a roll animation that finishes after the fight changed is ignored. */
+  let fightVersion = 0;
   const startFight = (how: 'auto' | 'step' | 'simulate') => {
     const s = spec();
+    fightVersion++;
     state.fight = { spec: s, faces: how === 'step' ? [] : playOut(s, []) };
-    state.tally = how === 'simulate' ? simulateFights(s) : null;
+    state.tally = how === 'simulate' ? tallyFor(s) : null;
     state.view = 'fight';
     render();
   };
   const setFaces = (faces: number[]) => {
-    state.fight = { ...state.fight!, faces };
+    if (!state.fight) return;
+    fightVersion++;
+    state.fight = { ...state.fight, faces };
     render();
+  };
+  const showSetup = () => {
+    fightVersion++;
+    state.view = 'setup';
+    render();
+  };
+
+  /** The simulated fights for a line-up, worked out once for each line-up, dice and round limit (a few hundred milliseconds). */
+  let simulated: { readonly key: string; readonly tally: FightTally } | null = null;
+  const tallyFor = (s: FightSpec): FightTally => {
+    const key = JSON.stringify(s);
+    if (simulated?.key !== key) simulated = { key, tally: simulateFights(s) };
+    return simulated.tally;
   };
 
   const guide = (dice: Dice) => {
@@ -129,9 +150,10 @@ export function fightPanel(): Panel {
 
   /** How the fight is likely to go for the left side, in words, estimated from simulated fights. */
   const assessmentBox = h('div', { class: 'assessment' });
+  let assessmentTimer: ReturnType<typeof setTimeout> | undefined;
   function refreshAssessment() {
     if (!canFight(state.parties)) return;
-    const risk = describeRisk(assess(simulateFights(spec())));
+    const risk = describeRisk(assess(tallyFor(spec())));
     assessmentBox.replaceChildren(
       h('h3', {}, 'How it is likely to go for the left side'),
       h('ul', {}, ...[risk.outcome, risk.hurt, risk.nerve, risk.mostAtRisk].filter((line): line is string => line !== null).map((line) => h('li', {}, line))),
@@ -144,6 +166,8 @@ export function fightPanel(): Panel {
     const available = getRoster().entries.filter((e) => !inFight.has(e.id));
     const ready = canFight(state.parties);
     const lineNote = line.note();
+    const optionsText = () => `Options: round limit ${state.maxRounds}, ${state.dice}`;
+    const optionsSummary = h('summary', {}, optionsText());
     const sideColumn = (side: Side) =>
       h('div', { class: 'side' },
         h('h3', {}, `${SIDE_NAME[side]} ${side === 'attacker' ? '(attackers)' : '(defenders)'}`),
@@ -159,8 +183,14 @@ export function fightPanel(): Panel {
       h('div', { class: 'grid two sides' }, sideColumn('attacker'), sideColumn('defender')),
       ...(lineNote ? [h('p', { class: 'warning small', role: 'status' }, lineNote)] : []),
       ...(ready ? [assessmentBox] : []),
-      h('details', { class: 'guide' }, h('summary', {}, `Options: round limit ${state.maxRounds}, ${state.dice}`),
-        slider('Round limit', state.maxRounds, 1, 30, (v) => { state.maxRounds = v; refreshAssessment(); }, String, 'The fight is a stalemate if both sides are still fighting after this many rounds.'),
+      h('details', { class: 'guide' }, optionsSummary,
+        slider('Round limit', state.maxRounds, 1, 30, (v) => {
+          state.maxRounds = v;
+          optionsSummary.textContent = optionsText();
+          // Working out the assessment takes a moment, so wait until the slider stops moving.
+          clearTimeout(assessmentTimer);
+          assessmentTimer = setTimeout(refreshAssessment, ASSESSMENT_DELAY_MS);
+        }, String, 'The fight is a stalemate if both sides are still fighting after this many rounds.'),
         h('div', { class: 'field' }, h('span', {}, 'Dice'), segmented(DICE_NAMES, state.dice, (d) => { state.dice = d; render(); }), hint(DICE[state.dice].description))),
       guide(DICE[state.dice]),
       h('div', { class: 'row' },
@@ -189,6 +219,7 @@ export function fightPanel(): Panel {
 
     /** Rolls all the dice at once, then sweeps left to right along the choices like a roulette wheel, slowing down onto the result. */
     const animatedRoll = async () => {
+      const version = fightVersion;
       const rolled = Array.from({ length: r.of }, () => dice.roll(request.sides, r));
       const result = choices.findIndex((c) => c.result === resultOf(request, rolled));
       if (!reduceMotion()) {
@@ -202,7 +233,7 @@ export function fightPanel(): Panel {
         show(result, true);
         await wait(SETTLE_MS);
       }
-      setFaces([...faces, ...rolled]);
+      if (version === fightVersion) setFaces([...faces, ...rolled]);
     };
 
     const panel = h('div', { class: 'roll-panel' },
@@ -255,7 +286,8 @@ export function fightPanel(): Panel {
   }
 
   function renderFight() {
-    const { spec: s, faces } = state.fight!;
+    if (!state.fight) return renderSetup();
+    const { spec: s, faces } = state.fight;
     const step = stepFight(s, faces);
     const events = step.done ? step.result.events : step.events;
     const fighters = step.done ? step.result.fighters : step.fighters;
@@ -285,7 +317,7 @@ export function fightPanel(): Panel {
                 h('button', { type: 'button', onclick: () => startFight('simulate') }, `Simulate ${SIMULATED_FIGHTS.toLocaleString()} fights`),
               ]
             : []),
-          h('button', { type: 'button', onclick: () => { state.view = 'setup'; render(); } }, 'Change line-up'))),
+          h('button', { type: 'button', onclick: showSetup }, 'Change line-up'))),
       h('p', { class: 'result' }, status),
       h('div', { class: 'grid two sides' }, ...SIDES.map((side) =>
         h('div', { class: 'side' }, h('h3', {}, SIDE_NAME[side]),
@@ -317,17 +349,15 @@ export function fightPanel(): Panel {
   }
 
   function render() {
-    if (state.view === 'fight' && state.fight) renderFight();
+    if (state.view === 'fight') renderFight();
     else renderSetup();
   }
 
   return {
     element: root,
+    // Coming back to the tab keeps the fight shown; the line-up follows any change to the saved characters.
     render() {
       syncParties();
-      state.view = 'setup';
-      state.fight = null;
-      state.tally = null;
       render();
     },
   };
