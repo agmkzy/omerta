@@ -29,6 +29,7 @@ npm run lab:dev         # playground at http://localhost:5180
 | `src/backgrounds.ts` | Backgrounds instead of classes: training, attribute priorities, temperament centres. `rollCharacter()` generates a character. |
 | `src/fight.ts`, `src/fight-log.ts` | Fights: initiative, attack rolls, damage, hit points and morale (see below). |
 | `src/nerve.ts` | The nerve check shared by fights and threats. |
+| `src/assessment.ts` | How a fight is likely to go for the left side, in words: estimated from simulated fights and described on a fixed likelihood scale. |
 | `src/social.ts` | Social actions (intimidate, persuade, deceive) as single checks, with outcome meanings and exact odds. |
 | `src/explain.ts` | Plain-text descriptions of rolls and checks. |
 | `src/serialize.ts` | Versioned JSON save/load for characters, with validation and defaults for missing fields. |

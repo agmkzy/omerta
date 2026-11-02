@@ -3,6 +3,7 @@
 // Set-up: click characters to add them to the left or right side; each fighter is shown once as a card
 // with the numbers the fight uses. Fight: the same cards with how each fighter ended up, then the log, one short line per
 // action, grouped by round, with the dice for each line in a column on the right.
+import { assessFight, describeRisk } from '../src/assessment';
 import { BACKGROUND_INFO } from '../src/backgrounds';
 import { BASE_DEFENCE, BASE_HIT_POINTS, type Character } from '../src/character';
 import { DICE, DICE_NAMES, type DiceName } from '../src/dice';
@@ -141,7 +142,20 @@ export function fightPanel(): Panel {
         h('li', {}, `Nerve: a fighter makes one nerve check (d20 + Nerve, DC ${NERVE_DC.hurt}) the first time they drop to half HP, and everyone left on a side makes one (DC ${NERVE_DC['allies-down']}) the first time half of that side is out. Failing takes them out: a timid or cautious fighter flees; otherwise they surrender (right side) or back off (left side).`),
         h('li', {}, 'A side loses when nobody on it is still fighting. If both sides are still fighting at the round limit, it is a stalemate.')));
 
+  /** How the fight is likely to go for the left side, in words, estimated from simulated fights. */
+  const ASSESSMENT_RUNS = 500;
+  const assessmentBox = h('div', { class: 'assessment' });
+  function refreshAssessment() {
+    if (!canFight(state.parties)) return;
+    const risk = describeRisk(assessFight(spec(), ASSESSMENT_RUNS));
+    assessmentBox.replaceChildren(
+      h('h3', {}, 'How it is likely to go for the left side'),
+      h('ul', {}, ...[risk.outcome, risk.hurt, risk.nerve, risk.mostAtRisk].filter((line): line is string => line !== null).map((line) => h('li', {}, line))),
+      hint(`Estimated from ${ASSESSMENT_RUNS} simulated fights with this line-up.`));
+  }
+
   function renderSetup() {
+    refreshAssessment();
     const inFight = new Set([...state.parties.attackers, ...state.parties.defenders]);
     const available = getRoster().entries.filter((e) => !inFight.has(e.id));
     const ready = canFight(state.parties);
@@ -158,8 +172,9 @@ export function fightPanel(): Panel {
       h('h2', { id: 'fight-title' }, 'Fight set-up'),
       hint(available.length ? 'Click a name to add that character to a side, or × to remove them.' : 'Everyone saved is already in the fight. Create more characters in the Characters tab.'),
       h('div', { class: 'grid two sides' }, sideColumn('attacker'), sideColumn('defender')),
+      ...(ready ? [assessmentBox] : []),
       h('details', { class: 'guide' }, h('summary', {}, `Options: round limit ${state.maxRounds}, ${state.dice}`),
-        slider('Round limit', state.maxRounds, 1, 30, (v) => (state.maxRounds = v), String, 'The fight is a stalemate if both sides are still fighting after this many rounds.'),
+        slider('Round limit', state.maxRounds, 1, 30, (v) => { state.maxRounds = v; refreshAssessment(); }, String, 'The fight is a stalemate if both sides are still fighting after this many rounds.'),
         h('div', { class: 'field' }, h('span', {}, 'Dice'), segmented(DICE_NAMES, state.dice, (d) => { state.dice = d; render(); }), hint(DICE[state.dice].description))),
       guide(),
       h('div', { class: 'row' },
