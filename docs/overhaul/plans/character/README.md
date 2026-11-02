@@ -10,9 +10,10 @@ It does not replace the game's `Character` (`src/types.ts`) yet, and it is not m
 
 ## Where it lives and how it is built
 
-- **Folder:** `src/character/`, self-contained. Nothing in it imports from the rest of the game; an architecture test fails if anything does.
-- **Types:** its own tsconfig with the lab's stricter settings (`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `verbatimModuleSyntax` and the rest). The game's looser settings still accept it.
-- **Tests:** written first, with Vitest and `node:assert`, each tagged with one kind (`unit`, `property`, `statistical`). Its own Vitest config holds coverage at 100%.
+- **Folders, kept separate from the game:** the overhaul's code goes in `src/overhaul/` and its tests in `tests/overhaul/`, so this plan's code is `src/overhaul/character/` with its tests in `tests/overhaul/character/`. Nothing in `src/overhaul/` imports from the rest of `src/`, and nothing in the game imports from `src/overhaul/` until it is slotted in; an architecture test fails if either happens.
+- **Its own configuration:** a tsconfig, a Vitest config and npm scripts (`overhaul:test`, `overhaul:typecheck`, `overhaul:cov`), as the lab has. The game's Vitest config finds tests only in `src/tests/`, so it does not run these. Its coverage counts all of `src/`, so it must exclude `src/overhaul/**`; that is the only change to the game's own configuration.
+- **Types:** the lab's stricter settings (`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `verbatimModuleSyntax` and the rest). The game's typecheck also covers `src/`, and its looser settings still accept the code.
+- **Tests:** written first, with Vitest and `node:assert`, each tagged with one kind (`unit`, `property`, `statistical`). Coverage is held at 100%.
 - **Modules:** small, each owning one rule. A rule is written once and everything else uses it.
 - **Determinism:** dice are always passed in and seeded. No `Math.random`, no wall-clock time.
 
