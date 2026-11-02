@@ -107,9 +107,14 @@ export function passes(margin: number, bands: Bands = DEFAULT_BANDS): boolean {
   return succeeded(grade(margin, bands));
 }
 
+/** The chance of this outcome or a better one. */
+export function chanceOfAtLeast(odds: Odds, outcome: Outcome): number {
+  return OUTCOMES.slice(OUTCOMES.indexOf(outcome)).reduce((sum, o) => sum + odds[o], 0);
+}
+
 /** The chance of a partial success or better. */
 export function successChance(odds: Odds): number {
-  return OUTCOMES.filter(succeeded).reduce((sum, o) => sum + odds[o], 0);
+  return chanceOfAtLeast(odds, 'partial');
 }
 
 /** The margins (total minus DC) that give an outcome; null where the range is open. */

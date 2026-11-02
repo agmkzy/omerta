@@ -10,18 +10,19 @@ import { BASE_DEFENCE, type Character } from '../src/character';
 import { DICE, DICE_NAMES, type Dice, type DiceName } from '../src/dice';
 import { compactRoll, describeModifier, describeTotal, percent, signed } from '../src/explain';
 import { bonusOf } from '../src/check';
-import { FIGHTER_STATUS_INFO, UNARMED_DAMAGE_DIE, fightStats, runFight, type FightEvent, type FightSpec, type FighterStatus, type RollRequest } from '../src/fight';
+import { DEFAULT_MAX_ROUNDS, FIGHTER_STATUS_INFO, UNARMED_DAMAGE_DIE, fightStats, runFight, type FightEvent, type FightSpec, type FighterStatus, type RollRequest } from '../src/fight';
 import { describeFightEvent, describeRollRequest, explainRoll, fightRules, SIDE_NAME } from '../src/fight-log';
 import { rollOdds, type RollOdds } from '../src/fight-odds';
 import { facesForResult, resultOf, stepFight, withoutLastRoll } from '../src/fight-step';
 import type { Side } from '../src/nerve';
-import { replay, roller, seeded } from '../src/random';
+import { replay } from '../src/random';
 import { notableTraits } from '../src/temperament';
 import { slowingDelays, sweepSequence } from './animation';
 import { h, segmented, slider } from './dom';
 import { assign, canFight, lineUp, type Parties } from './parties';
 import { canSave, characterById, getRoster, storage } from './store';
 import { hint, type Panel } from './views';
+import { newDice } from './rolling';
 
 /** The dice animation, a roulette-style sweep: at least this many steps (and more than once round), over this long, then a short rest on the result. */
 const SWEEP_MIN_STEPS = 16;
@@ -30,7 +31,7 @@ const SETTLE_MS = 1200;
 /** How long the round-limit slider must rest before the assessment is worked out again. */
 const ASSESSMENT_DELAY_MS = 200;
 /** Dice for the animation only (where the sweep starts), kept apart from the fight's dice so it can never change a result. */
-const showDice = roller(seeded(Date.now() >>> 0));
+const showDice = newDice();
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 const reduceMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 const SIDES = ['attacker', 'defender'] as const;
@@ -90,8 +91,8 @@ function eventDice(e: FightEvent, nameOf: (id: string) => string): string[] {
 }
 
 export function fightPanel(): Panel {
-  const state: State = { showOdds: false, view: 'setup', parties: { attackers: [], defenders: [] }, dice: 'd20', maxRounds: 12, fight: null, tally: null };
-  const dice = roller(seeded(2));
+  const state: State = { showOdds: false, view: 'setup', parties: { attackers: [], defenders: [] }, dice: 'd20', maxRounds: DEFAULT_MAX_ROUNDS, fight: null, tally: null };
+  const dice = newDice();
   const root = h('section', { class: 'panel', id: 'fight', 'aria-labelledby': 'fight-title' });
 
   // The saved line-up; looking at it never saves, only a change made here does.

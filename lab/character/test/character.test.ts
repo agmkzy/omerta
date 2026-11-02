@@ -71,6 +71,12 @@ describe('createCharacter', { tags: ['unit'] }, () => {
     assert.throws(() => createCharacter({ name: 'X', proficiencyBonus: 1 }), RangeError);
     assert.throws(() => createCharacter({ name: 'X', proficiencyBonus: 7 }), RangeError);
   });
+
+  test('throws for training or temperament out of range', () => {
+    assert.throws(() => createCharacter({ name: 'X', training: { juggling: 'trained' } as never }), RangeError);
+    assert.throws(() => createCharacter({ name: 'X', training: { driving: 'master' } as never }), RangeError);
+    assert.throws(() => createCharacter({ name: 'X', temperament: { ...temperament({}), greed: 2 } }), RangeError);
+  });
 });
 
 describe('rollFor', { tags: ['unit'] }, () => {

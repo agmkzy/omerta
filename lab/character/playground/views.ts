@@ -1,15 +1,15 @@
 // UI components shared by the panels.
-import { OUTCOMES, OUTCOME_INFO, describeMargins, type Modifier, type Odds, type Outcome } from '../src/check';
+import { OUTCOMES, OUTCOME_INFO, describeMargins, successChance, type Modifier, type Odds, type Outcome } from '../src/check';
 import { describeModifier, percent, signed } from '../src/explain';
 import { h } from './dom';
 
 export function outcomeLabel(o: Outcome): string {
-  return o.replace('-', ' ');
+  return OUTCOME_INFO[o].name.toLowerCase();
 }
 
 /** Success chance as a headline, plus a stacked bar and legend for every outcome. */
 export function oddsView(odds: Odds): HTMLElement {
-  const success = odds.partial + odds.success + odds['critical-success'];
+  const success = successChance(odds);
   return h('div', {},
     h('div', { class: 'headline' }, percent(success), ' ', h('small', {}, 'success (partial or better)')),
     h('div', { class: 'bar', role: 'img', 'aria-label': OUTCOMES.map((o) => `${outcomeLabel(o)} ${percent(odds[o])}`).join(', ') },

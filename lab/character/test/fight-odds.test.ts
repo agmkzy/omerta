@@ -4,7 +4,7 @@ import { describe, test } from 'vitest';
 import { attributeScores } from '../src/attributes';
 import { BACKGROUNDS, rollCharacter, type BackgroundName } from '../src/backgrounds';
 import { createCharacter, type Character } from '../src/character';
-import { DICE } from '../src/dice';
+import { DICE, type Dice } from '../src/dice';
 import { runFight, type FightSpec, type RollRequest } from '../src/fight';
 import { attackHitChance, attackOdds, averageDamage, lowestHit, resultNeeded, rollOdds } from '../src/fight-odds';
 import { stepFight, type FightStep } from '../src/fight-step';
@@ -139,7 +139,7 @@ describe('rollOdds', { tags: ['property'] }, () => {
 
   test('agree with what the fight does with each attack and nerve check', () => {
     fc.assert(
-      fc.property(fightOf, (c: { seed: number; a: BackgroundName[]; d: BackgroundName[]; dice: (typeof DICE)['d20' | '2d10' | '3d6']; maxRounds: number }) => {
+      fc.property(fightOf, (c: { seed: number; a: BackgroundName[]; d: BackgroundName[]; dice: Dice; maxRounds: number }) => {
         const r = roller(seeded(c.seed));
         const spec: FightSpec = { attackers: c.a.map((b, i) => rollCharacter(`A${i}`, b, r)), defenders: c.d.map((b, i) => rollCharacter(`D${i}`, b, r)), dice: c.dice, maxRounds: c.maxRounds };
         const dice = replay([], roller(seeded(c.seed)));

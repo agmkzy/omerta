@@ -6,15 +6,15 @@ import { DICE, DICE_NAMES, type DiceName } from '../src/dice';
 import { describeCheck, describeOpposed, percent, signed } from '../src/explain';
 import { NERVE_DC, nerveCheckSpec } from '../src/nerve';
 import { SOCIAL_ACTIONS, SOCIAL_ACTION_INFO, describeEnding, describeSocial, endingOf, goesAlong, resolveSocial, socialOdds, socialRolls, type SocialAction, type SocialChance, type SocialEnding, type SocialSpec } from '../src/social';
-import { roller, seeded } from '../src/random';
 import { SKILLS, SKILL_INFO, type Skill } from '../src/skills';
 import { ATTRIBUTE_INFO } from '../src/attributes';
 import { attributesFor } from '../src/skills';
 import { SITUATIONS, SITUATION_INFO, type Situation } from '../src/temperament';
-import { h, segmented, slider } from './dom';
+import { checkedOf, h, segmented, slider, valueOf } from './dom';
 import { roleSelect } from './pickers';
 import { roleCharacter } from './store';
 import { hint, modifiersView, oddsView, outcomeGuide, type Panel } from './views';
+import { newDice } from './rolling';
 
 type Mode = 'skill' | SocialAction;
 const MODES: readonly Mode[] = [...SOCIAL_ACTIONS, 'skill'];
@@ -51,7 +51,7 @@ export function checkPanel(): Panel {
     mode: 'intimidate', armed: false, dice: 'd20', skill: 'stealth', situations: ['intimidate'], against: 'opponent', dc: 12,
     opponentSkill: 'notice', opponentSituations: [], situational: 0, log: [],
   };
-  const dice = roller(seeded(7));
+  const dice = newDice();
   const root = h('section', { class: 'panel', id: 'check', 'aria-labelledby': 'check-title' });
   const results = h('div');
 
@@ -123,7 +123,7 @@ export function checkPanel(): Panel {
   }
 
   const skillSelect = (value: Skill, set: (s: Skill) => void, label: string) =>
-    h('select', { 'aria-label': label, onchange: (e: Event) => { set((e.target as HTMLSelectElement).value as Skill); renderResults(); } },
+    h('select', { 'aria-label': label, onchange: (e: Event) => { set(valueOf(e) as Skill); renderResults(); } },
       ...SKILLS.map((s) => h('option', { value: s, selected: s === value }, SKILL_INFO[s].name)));
 
   const situationBoxes = (chosen: Situation[], label: string) => {
@@ -132,7 +132,7 @@ export function checkPanel(): Panel {
     describe();
     return h('details', { class: 'situations' }, summary,
       ...SITUATIONS.map((s) => h('label', {}, h('input', { type: 'checkbox', checked: chosen.includes(s), onchange: (e: Event) => {
-        const on = (e.target as HTMLInputElement).checked;
+        const on = checkedOf(e);
         const i = chosen.indexOf(s);
         if (on && i < 0) chosen.push(s);
         if (!on && i >= 0) chosen.splice(i, 1);
@@ -152,7 +152,7 @@ export function checkPanel(): Panel {
       roleSelect('target', 'Target'),
       action === 'intimidate'
         ? h('label', { class: 'field checkbox' },
-            h('span', {}, h('input', { type: 'checkbox', checked: state.armed, onchange: (e: Event) => { state.armed = (e.target as HTMLInputElement).checked; renderResults(); } }), ' Armed: draws a weapon'),
+            h('span', {}, h('input', { type: 'checkbox', checked: state.armed, onchange: (e: Event) => { state.armed = checkedOf(e); renderResults(); } }), ' Armed: draws a weapon'),
             hint(`The target first makes a DC ${NERVE_DC['weapon-drawn']} nerve check. If they fail, they give in at once, run, or (if hot-tempered) fight back. If they hold, the intimidation is rolled with advantage.`))
         : null,
       h('h3', {}, 'Options'),

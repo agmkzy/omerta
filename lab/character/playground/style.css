@@ -31,8 +31,8 @@ body { margin: 0; background: var(--bg); color: var(--ink); line-height: 1.45; }
 .masthead p { margin: 4px 0 0; color: var(--muted); }
 main { max-width: 1440px; margin: 0 auto; padding: 8px 16px 48px; display: grid; gap: 16px; }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
-.panel h2 { font-size: 1.2rem; margin: 0 0 12px; }
-.panel h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 16px 0 8px; }
+.panel h2, .tab-content h2 { font-size: 1.2rem; margin: 0 0 12px; }
+.panel h3, .tab-content h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 16px 0 8px; }
 .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 .field { display: grid; gap: 4px; margin-bottom: 10px; }
 .field > span { font-size: 0.85rem; color: var(--muted); }
@@ -67,8 +67,6 @@ tr.current td { font-weight: 600; }
 .muted { color: var(--muted); }
 .grid.two { grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); }
 .tab-content > * { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
-.tab-content h2 { font-size: 1.2rem; margin: 0 0 12px; }
-.tab-content h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 16px 0 8px; }
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); overflow-x: auto; }
 .tabs button { border: 1px solid transparent; border-bottom: 0; border-radius: var(--radius) var(--radius) 0 0; background: transparent; color: var(--muted); padding: 8px 14px; white-space: nowrap; }
 .tabs button[aria-selected='true'] { background: var(--panel); border-color: var(--line); color: var(--ink); font-weight: 600; margin-bottom: -1px; }

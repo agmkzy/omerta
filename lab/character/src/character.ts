@@ -3,7 +3,7 @@ import { ATTRIBUTE_INFO, abilityModifier, attributeScores, type Attribute, type 
 import type { BackgroundName } from './backgrounds';
 import { combineEdges, totalOf, type Modifier, type Roll, type Total } from './check';
 import { DICE, type Dice, type Edge } from './dice';
-import { SKILL_INFO, attributesFor, type Skill } from './skills';
+import { SKILLS, SKILL_INFO, attributesFor, type Skill } from './skills';
 import { temperament as fullTemperament, temperamentModifiers, type Situation, type Temperament } from './temperament';
 
 export const PROFICIENCIES = ['untrained', 'trained', 'expert'] as const;
@@ -32,17 +32,22 @@ export interface CharacterInput {
 export const PROFICIENCY_MIN = 2;
 export const PROFICIENCY_MAX = 6;
 
+/** Throws RangeError for attributes, a proficiency bonus, training or temperament out of range. */
 export function createCharacter(input: CharacterInput): Character {
   const proficiencyBonus = input.proficiencyBonus ?? PROFICIENCY_MIN;
   if (!Number.isInteger(proficiencyBonus) || proficiencyBonus < PROFICIENCY_MIN || proficiencyBonus > PROFICIENCY_MAX)
     throw new RangeError(`the proficiency bonus runs from ${PROFICIENCY_MIN} to ${PROFICIENCY_MAX}, got ${proficiencyBonus}`);
+  for (const [skill, level] of Object.entries(input.training ?? {})) {
+    if (!SKILLS.includes(skill as Skill)) throw new RangeError(`unknown skill ${skill}`);
+    if (!PROFICIENCIES.includes(level)) throw new RangeError(`unknown proficiency ${String(level)} for ${skill}`);
+  }
   return {
     name: input.name,
     ...(input.background && { background: input.background }),
     attributes: attributeScores(input.attributes ?? {}),
     training: { ...input.training },
     proficiencyBonus,
-    temperament: input.temperament ?? fullTemperament({}),
+    temperament: fullTemperament(input.temperament ?? {}),
   };
 }
 

@@ -1,5 +1,5 @@
 // Text descriptions of rolls and checks: the dice faces, each modifier with its reason, the total and the outcome.
-import type { CheckResult, Modifier, OpposedResult, RollResult, Total } from './check';
+import { OUTCOME_INFO, type CheckResult, type Modifier, type OpposedResult, type RollResult, type Total } from './check';
 
 export function signed(n: number): string {
   return n < 0 ? `−${-n}` : `+${n}`;
@@ -30,11 +30,11 @@ export function describeRoll(roll: RollResult): string {
 }
 
 export function describeCheck(result: CheckResult): string {
-  return `${describeRoll(result.roll)} against ${result.dc}: ${result.outcome} (${byHowMuch(result.margin)})`;
+  return `${describeRoll(result.roll)} against ${result.dc}: ${OUTCOME_INFO[result.outcome].name.toLowerCase()} (${byHowMuch(result.margin)})`;
 }
 
 export function describeOpposed(result: OpposedResult): string {
-  return `${describeRoll(result.active)} against ${describeRoll(result.passive)}: ${result.outcome} (${byHowMuch(result.margin)})`;
+  return `${describeRoll(result.active)} against ${describeRoll(result.passive)}: ${OUTCOME_INFO[result.outcome].name.toLowerCase()} (${byHowMuch(result.margin)})`;
 }
 
 function byHowMuch(margin: number): string {
@@ -46,6 +46,7 @@ export function compactRoll(roll: RollResult): string {
   const { throws, kept } = roll.thrown;
   const faces = throws.map((t) => t.join('+'));
   const dice = roll.edge === 'none' ? `${roll.dice.name}: ${faces[0]}` : `${roll.dice.name} with ${roll.edge}: ${faces.join(' or ')} → ${kept}`;
-  if (roll.bonus === 0) return dice;
-  return `${dice} ${roll.bonus < 0 ? '−' : '+'} ${Math.abs(roll.bonus)} = ${roll.total}`;
+  if (roll.bonus !== 0) return `${dice} ${roll.bonus < 0 ? '−' : '+'} ${Math.abs(roll.bonus)} = ${roll.total}`;
+  // With no bonus, a single die is its own total; several dice still need adding up.
+  return roll.edge === 'none' && roll.dice.count > 1 ? `${dice} = ${roll.total}` : dice;
 }

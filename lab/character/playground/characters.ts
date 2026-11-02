@@ -7,10 +7,13 @@ import { describeModifier, describeTotal, signed } from '../src/explain';
 import { NERVE_FAILURE } from '../src/nerve';
 import { SKILLS, SKILL_INFO, attributesFor, skillsUsing } from '../src/skills';
 import { SITUATION_INFO, TRAITS, TRAIT_INFO, effectsOf, notableTraits, type Trait } from '../src/temperament';
-import { h, segmented, slider } from './dom';
+import { h, segmented, slider, valueOf } from './dom';
 import { addEntry, removeEntry, select, updateEntry } from './roster';
 import { canSave, change, characterById, getRoster, loadWarning, newId, rollNew, saved, storage } from './store';
 import { hint, type Panel } from './views';
+
+/** The background a character without one is rerolled as, unless another is chosen. */
+const REROLL_WITHOUT_BACKGROUND: BackgroundName = 'labourer';
 
 const SOURCE = 'characters';
 const SECTIONS = ['attributes', 'skills', 'temperament'] as const;
@@ -74,7 +77,7 @@ export function charactersPanel(): Panel {
       h('div', { class: 'new-character' },
         h('label', { class: 'field' }, h('span', {}, 'New character'),
           h('select', { 'aria-label': 'Background for new character', onchange: (e: Event) => {
-            newBackground = (e.target as HTMLSelectElement).value as BackgroundName;
+            newBackground = valueOf(e) as BackgroundName;
             renderList();
           } }, ...BACKGROUNDS.map((b) => h('option', { value: b, selected: b === newBackground }, BACKGROUND_INFO[b].name)))),
         hint(`${BACKGROUND_INFO[newBackground].description} Rolls attributes, sets training and rolls a temperament to suit.`),
@@ -115,10 +118,10 @@ export function charactersPanel(): Panel {
             h('div', { class: 'field' }, h('span', {}, 'Reroll attributes, training and temperament'),
               h('span', { class: 'hint' }, 'Replaces this character’s values with a new roll for the chosen background. The name is kept.'),
               h('div', { class: 'row' },
-                h('select', { 'aria-label': 'Background to reroll as', onchange: (e: Event) => (rerollBackground = (e.target as HTMLSelectElement).value as BackgroundName) },
+                h('select', { 'aria-label': 'Background to reroll as', onchange: (e: Event) => (rerollBackground = valueOf(e) as BackgroundName) },
                   ...BACKGROUNDS.map((b) => h('option', { value: b, selected: b === (rerollBackground ?? c.background) }, BACKGROUND_INFO[b].name))),
                 h('button', { type: 'button', onclick: () => {
-                  update(rollNew(rerollBackground ?? current().background ?? 'labourer', current().name), true);
+                  update(rollNew(rerollBackground ?? current().background ?? REROLL_WITHOUT_BACKGROUND, current().name), true);
                   rerollBackground = null;
                 } }, 'Reroll'))),
           ),
@@ -136,7 +139,7 @@ export function charactersPanel(): Panel {
               h('td', { class: 'muted', title: options.length > 1 ? `Uses the higher of ${options.map((a) => ATTRIBUTE_INFO[a].name).join(' and ')}` : undefined },
                 ATTRIBUTE_INFO[attributeUsed(c, s)].short, options.length > 1 ? h('div', { class: 'hint' }, `best of ${options.map((a) => ATTRIBUTE_INFO[a].short).join('/')}`) : null),
               h('td', {}, h('select', { 'aria-label': `${SKILL_INFO[s].name} training`, onchange: (e: Event) => {
-                const p = (e.target as HTMLSelectElement).value as Proficiency;
+                const p = valueOf(e) as Proficiency;
                 const training = { ...current().training };
                 if (p === 'untrained') delete training[s];
                 else training[s] = p;
@@ -163,7 +166,7 @@ export function charactersPanel(): Panel {
     const c = current();
     editor.replaceChildren(
       h('div', { class: 'editor-head' },
-        h('input', { class: 'name', value: c.name, 'aria-label': 'Name', oninput: (e: Event) => update(createCharacter({ ...current(), name: (e.target as HTMLInputElement).value })) }),
+        h('input', { class: 'name', value: c.name, 'aria-label': 'Name', oninput: (e: Event) => update(createCharacter({ ...current(), name: valueOf(e) })) }),
         h('button', { type: 'button', onclick: () => {
           change((x) => addEntry(x, { id: newId(), character: createCharacter({ ...current(), name: `${current().name} (copy)` }) }), SOURCE);
           render();

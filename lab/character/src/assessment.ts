@@ -1,6 +1,7 @@
 // How fights are likely to go: simulated fights are tallied (with a fixed seed, so the same line-up always gives the same
 // numbers), and the chances for the Left side are described in words on a fixed scale of likelihood words.
 import { FIGHTER_STATUSES, runFight, type FightSpec, type FighterStatus } from './fight';
+import { SIDE_NAME } from './fight-log';
 import type { Side } from './nerve';
 import { roller, seeded, type Roller } from './random';
 
@@ -31,6 +32,8 @@ export function likelihood(chance: number): Likelihood {
 
 /** How many simulated fights an assessment, and the playground's Simulate button, are built on. */
 export const SIMULATED_FIGHTS = 2000;
+
+const LEFT = SIDE_NAME.attacker;
 
 /** The fixed seed for simulated fights, so the numbers do not change unless the fight does. */
 const SIMULATION_SEED = 1;
@@ -133,13 +136,13 @@ const STALEMATE: Record<Likelihood, string> = {
 /** Who is likely to win, given the chance that Left wins a fight that has a winner. A clause, without the full stop. */
 function winner(chance: number): string {
   const words: Record<Likelihood, string> = {
-    'almost certain': 'Left will almost certainly win',
-    'very likely': 'Left will very likely win',
-    likely: 'Left will probably win',
+    'almost certain': `${LEFT} will almost certainly win`,
+    'very likely': `${LEFT} will very likely win`,
+    likely: `${LEFT} will probably win`,
     'about even': 'it is about even',
-    unlikely: 'Left will probably lose',
-    'very unlikely': 'Left will very likely lose',
-    'almost no chance': 'Left has almost no chance of winning',
+    unlikely: `${LEFT} will probably lose`,
+    'very unlikely': `${LEFT} will very likely lose`,
+    'almost no chance': `${LEFT} has almost no chance of winning`,
   };
   return words[likelihood(chance)];
 }
@@ -150,19 +153,19 @@ const capitalise = (text: string): string => text.charAt(0).toUpperCase() + text
 function someoneOnLeft(chance: number, verb: string, gerund: string, fullVerb = verb): string {
   switch (likelihood(chance)) {
     case 'almost certain':
-      return `Someone on Left will almost certainly ${fullVerb}.`;
+      return `Someone on ${LEFT} will almost certainly ${fullVerb}.`;
     case 'very likely':
-      return `Someone on Left will very likely ${fullVerb}.`;
+      return `Someone on ${LEFT} will very likely ${fullVerb}.`;
     case 'likely':
-      return `Someone on Left will probably ${fullVerb}.`;
+      return `Someone on ${LEFT} will probably ${fullVerb}.`;
     case 'about even':
-      return `Someone on Left may well ${fullVerb}.`;
+      return `Someone on ${LEFT} may well ${fullVerb}.`;
     case 'unlikely':
-      return `Probably nobody on Left will ${verb}.`;
+      return `Probably nobody on ${LEFT} will ${verb}.`;
     case 'very unlikely':
-      return `It is very unlikely anyone on Left will ${verb}.`;
+      return `It is very unlikely anyone on ${LEFT} will ${verb}.`;
     case 'almost no chance':
-      return `Nobody on Left is at real risk of ${gerund}.`;
+      return `Nobody on ${LEFT} is at real risk of ${gerund}.`;
   }
 }
 

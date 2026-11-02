@@ -1,9 +1,9 @@
 // Dice and odds panel: choose the dice, a bonus and a DC or opposing bonus, and compare the outcome probabilities across dice.
-import { checkOdds, opposedOdds, resolveCheck, resolveOpposed, succeeded, type Odds, type Outcome, type Roll } from '../src/check';
+import { chanceOfAtLeast, successChance, checkOdds, opposedOdds, resolveCheck, resolveOpposed, succeeded, type Odds, type Outcome, type Roll } from '../src/check';
 import { DICE, DICE_NAMES, EDGES, EDGE_INFO, type DiceName, type Edge } from '../src/dice';
 import { describeCheck, describeOpposed, percent, signed } from '../src/explain';
 import { roller, seeded, type Roller } from '../src/random';
-import { h, segmented, slider } from './dom';
+import { h, segmented, slider, valueOf } from './dom';
 import { hint, oddsView, outcomeGuide, outcomeTag, type Panel } from './views';
 
 type Against = 'dc' | 'opponent';
@@ -57,14 +57,14 @@ export function oddsPanel(): Panel {
         h('tbody', {}, ...DICE_NAMES.map((name) => {
           const o = odds(name);
           return h('tr', { class: name === state.dice ? 'current' : '' },
-            h('td', {}, name), h('td', {}, percent(o.partial + o.success + o['critical-success'])), h('td', {}, percent(o.success + o['critical-success'])), h('td', {}, percent(o['critical-failure'])));
+            h('td', {}, name), h('td', {}, percent(successChance(o))), h('td', {}, percent(chanceOfAtLeast(o, 'success'))), h('td', {}, percent(o['critical-failure'])));
         }))),
       h('h3', {}, 'Rolls'),
       h('div', { class: 'row' },
         h('button', { type: 'button', class: 'primary', onclick: () => roll(1) }, 'Roll'),
         h('button', { type: 'button', onclick: () => roll(10) }, 'Roll 10'),
         h('label', { class: 'row muted' }, 'Seed', h('input', { type: 'number', value: state.seed, onchange: (e: Event) => {
-          state.seed = Number((e.target as HTMLInputElement).value);
+          state.seed = Number(valueOf(e));
           dice = roller(seeded(state.seed));
           state.log = [];
           renderResults();

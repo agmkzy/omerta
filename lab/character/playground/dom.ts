@@ -16,6 +16,17 @@ export function h<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Attrs = 
   return el;
 }
 
+/** The value of the input or select an event came from ('' for anything else). */
+export function valueOf(e: Event): string {
+  const t = e.currentTarget;
+  return t instanceof HTMLInputElement || t instanceof HTMLSelectElement ? t.value : '';
+}
+
+/** Whether the checkbox an event came from is ticked. */
+export function checkedOf(e: Event): boolean {
+  return e.currentTarget instanceof HTMLInputElement && e.currentTarget.checked;
+}
+
 /** A row of buttons for picking one of a few values. */
 export function segmented<T extends string>(options: readonly T[], current: T, pick: (v: T) => void, label: (v: T) => string = (v) => v): HTMLElement {
   return h('div', { class: 'segmented', role: 'group' }, ...options.map((o) => h('button', { type: 'button', 'aria-pressed': String(o === current), onclick: () => pick(o) }, label(o))));

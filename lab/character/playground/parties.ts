@@ -48,7 +48,16 @@ export function parseParties(text: string): Parties | null {
   const { attackers, defenders } = data as Record<string, unknown>;
   if (!Array.isArray(attackers) || !Array.isArray(defenders)) return null;
   const seen = new Set<string>();
-  const keep = (ids: unknown[]) => ids.filter((x): x is string => typeof x === 'string' && !seen.has(x) && Boolean(seen.add(x)));
+  /** The ids that are strings and not already on either side, in order. */
+  const keep = (ids: unknown[]): string[] => {
+    const kept: string[] = [];
+    for (const x of ids) {
+      if (typeof x !== 'string' || seen.has(x)) continue;
+      seen.add(x);
+      kept.push(x);
+    }
+    return kept;
+  };
   return { attackers: keep(attackers), defenders: keep(defenders) };
 }
 

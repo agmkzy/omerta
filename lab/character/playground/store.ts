@@ -1,10 +1,10 @@
 // The playground's shared state: the roster of characters, saved to localStorage after every change.
 import { BACKGROUND_INFO, rollCharacter, type BackgroundName } from '../src/backgrounds';
 import type { Character } from '../src/character';
-import { roller, seeded } from '../src/random';
 import { PARTIES_KEY } from './parties';
 import { createRoster, openRoster, saveRoster, type Role, type Roster } from './roster';
 import type { KeyValueStorage } from './storage';
+import { newDice } from './rolling';
 
 type Listener = (source: string) => void;
 
@@ -17,8 +17,8 @@ export const storage: KeyValueStorage | null = (() => {
   }
 })();
 
-// New characters are rolled from one seeded stream per page load.
-const dice = roller(seeded(Date.now() >>> 0));
+// New characters are rolled from their own stream of dice.
+const dice = newDice();
 const listeners: Listener[] = [];
 
 // Open the saved roster, or start a new one. See openRoster for how saved data it cannot fully read is protected.

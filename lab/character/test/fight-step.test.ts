@@ -150,7 +150,7 @@ describe('resultOf and facesForResult', { tags: ['unit'] }, () => {
 describe('stepFight', { tags: ['property'] }, () => {
   const party = fc.array(fc.constantFrom(...BACKGROUNDS), { minLength: 1, maxLength: 3 });
   const fightOf = fc.record({ seed: fc.integer(), a: party, d: party, dice: fc.constantFrom(DICE.d20, DICE['3d6']), maxRounds: fc.integer({ min: 1, max: 6 }) });
-  const build = (c: { seed: number; a: BackgroundName[]; d: BackgroundName[]; dice: (typeof DICE)['d20' | '3d6']; maxRounds: number }) => {
+  const build = (c: { seed: number; a: BackgroundName[]; d: BackgroundName[]; dice: Dice; maxRounds: number }) => {
     const r = roller(seeded(c.seed));
     const spec: FightSpec = { attackers: c.a.map((b, i) => rollCharacter(`A${i}`, b, r)), defenders: c.d.map((b, i) => rollCharacter(`D${i}`, b, r)), dice: c.dice, maxRounds: c.maxRounds };
     const dice = replay([], roller(seeded(c.seed)));
