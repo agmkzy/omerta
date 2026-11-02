@@ -14,7 +14,7 @@ Developer documentation for the V85 codebase. New here? Read [CLAUDE.md](../CLAU
 | [06-deployment.md](06-deployment.md) | Current hosting, why build output is committed, recommended GitHub Pages and Actions setup, DigitalOcean App Platform and other PaaS, release checklist |
 | [07-guidelines.md](07-guidelines.md) | Design and engineering rules, single doors, code style, the PR checklist, enforcement ideas |
 | [08-framework-migration.md](08-framework-migration.md) | Viability of Vue, Vitest, Vite and Pinia, with a step-by-step plan and a store sketch |
-| [plans/](plans/README.md) | Designs agreed but not yet built, one folder per plan |
+| [overhaul/plans/](overhaul/plans/README.md) | Designs agreed but not yet built, one folder per plan |
 | [engine/](engine/README.md) | Per-system reference: purpose, state owned, public API, ticks, dependencies, invariants, known issues, replacement notes |
 
 ## The questions in issue #1, answered

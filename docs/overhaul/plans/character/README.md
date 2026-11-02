@@ -4,7 +4,7 @@
 
 ## Purpose
 
-One character object that can represent any character in the game, the player included. It is built up from the [character lab](../../../lab/character/README.md) (attributes, skills, temperament, checks, social actions, fights), extended with inventory, condition, relationships and knowledge, and written so that it can later be slotted into the game.
+One character object that can represent any character in the game, the player included. It is built up from the [character lab](../../../../lab/character/README.md) (attributes, skills, temperament, checks, social actions, fights), extended with inventory, condition, relationships and knowledge, and written so that it can later be slotted into the game.
 
 It does not replace the game's `Character` (`src/types.ts`) yet, and it is not modelled on it. Where the game already has a concept that this needs, such as knowledge or relationships, the design follows the game's meaning so the two can be joined later.
 
@@ -87,7 +87,7 @@ The player's temperament starts neutral (0.5 for every trait) and moves with wha
 
 ## Checks and modifiers
 
-- **The roll decides the response** in social checks, as decided in the lab ([Social actions](../../../lab/character/README.md#social-actions)). What the target knows, what is at stake for them, their relationship with the actor and their temperament are all modifiers on the roll. A certain outcome is the same as a modifier large enough to make the check impossible, so social checks have no automatic success.
+- **The roll decides the response** in social checks, as decided in the lab ([Social actions](../../../../lab/character/README.md#social-actions)). What the target knows, what is at stake for them, their relationship with the actor and their temperament are all modifiers on the roll. A certain outcome is the same as a modifier large enough to make the check impossible, so social checks have no automatic success.
 - **The character works out its own modifiers** from rules tables: temperament (as the lab does now), knowledge and relationships, items, and temporary effects. Every modifier carries its reason, so an explanation always says where each number came from.
 - **Situational modifiers** can still be added to any check with `.with(...)`.
 
