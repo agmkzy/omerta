@@ -48,7 +48,10 @@ export interface ReadCharacter {
   readonly ignored: readonly string[];
 }
 
-const SAVED_FIELDS: readonly string[] = ['format', 'name', 'background', 'attributes', 'training', 'proficiencyBonus', 'temperament'];
+/** Every field of SavedCharacter; the type check fails if one is missing or misspelt. */
+const SAVED_FIELDS: readonly string[] = Object.keys({
+  format: true, name: true, background: true, attributes: true, training: true, proficiencyBonus: true, temperament: true,
+} satisfies Record<keyof SavedCharacter, true>);
 
 /** Throws TypeError for data of the wrong shape (NewerFormatError for a newer format) and RangeError for out-of-range values. */
 export function readCharacter(data: unknown): ReadCharacter {

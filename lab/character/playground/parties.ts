@@ -1,7 +1,7 @@
 // Who is on each side of a fight in the playground, by roster id. Pure functions; persistence goes through an injected
 // storage (localStorage).
 import type { Side } from '../src/nerve';
-import type { KeyValueStorage } from './roster';
+import type { KeyValueStorage } from './storage';
 
 export interface Parties {
   readonly attackers: readonly string[];

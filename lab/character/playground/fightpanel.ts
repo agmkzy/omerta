@@ -94,7 +94,10 @@ export function fightPanel(): Panel {
   const dice = roller(seeded(2));
   const root = h('section', { class: 'panel', id: 'fight', 'aria-labelledby': 'fight-title' });
 
-  /** Keeps the line-up in step with the roster. Starts from the saved line-up, or the 1st against the 2nd saved character. */
+  /**
+   * Keeps the line-up in step with the roster. Starts from the saved line-up, or the 1st against the 2nd saved character.
+   * Only a change made here is saved, so opening the tab never saves over the stored line-up.
+   */
   let loaded = false;
   const syncParties = () => {
     const ids = getRoster().entries.map((e) => e.id);
@@ -104,7 +107,6 @@ export function fightPanel(): Panel {
     }
     state.parties = reconcile(state.parties, ids);
     if (!state.parties.attackers.length && !state.parties.defenders.length) state.parties = { attackers: [ids[0]!], defenders: [ids[1]!] };
-    if (storage && canSave()) saveParties(storage, state.parties);
   };
   const setParties = (p: Parties) => {
     state.parties = p;

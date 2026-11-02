@@ -43,10 +43,13 @@ two sides, then the fight, either played automatically or stepped through roll b
 result; each fighter's card shows their stats and state, with a short log by round) and **Dice
 and odds**. Characters are saved to `localStorage` in this
 browser after every change, as is the open tab. The check tab picks its two characters from the saved list; the fight line-up is also saved. The roster and line-up logic (`playground/roster.ts`, `playground/parties.ts`) is pure and tested like the library. Saved data is protected by `openRoster`:
-- Data saved by a newer version is left alone, and nothing is saved that session.
+- If storage cannot be read, or holds data saved by a newer version, the data is left alone and nothing is saved that
+  session.
 - Anything else that cannot be fully read (a corrupt entry, or a field, background, skill, attribute or trait this
-  version does not recognise) is copied to a backup key named from its content, so reloading makes no further copies,
-  and is left as it is until the first change. If the backup fails, nothing is saved that session.
+  version does not recognise, in a character or in the roster) is copied, with the fight line-up, to backup keys named
+  from their content (`playground/storage.ts`), so reloading makes no further copies. It is left as it is until the
+  first change. If a backup fails, nothing is saved that session.
+- The fight line-up is only saved when it is changed on the Fight tab.
 - A warning above the tabs says what happened and where the original is kept.
 
 Renames are handled by migrations (format 1 to 2 renamed the backgrounds). `test/fixtures/roster-format1.json` is a save

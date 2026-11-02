@@ -3,10 +3,10 @@ import { describe, test } from 'vitest';
 import { createCharacter } from '../src/character';
 import { saveCharacter } from '../src/serialize';
 import { readFileSync } from 'node:fs';
+import { PARTIES_KEY } from '../playground/parties';
 import {
   ROSTER_KEY,
   addEntry,
-  backupRoster,
   createRoster,
   loadRoster,
   openRoster,
@@ -38,7 +38,8 @@ const backupKeys = (data: Record<string, string>) => Object.keys(data).filter((k
 const saved = (id: string, character: unknown) => ({ id, character });
 const rosterText = (entries: unknown[]) => JSON.stringify({ format: 1, entries, selected: 'a', attacker: 'a', defender: 'b' });
 const good = (id: string) => saved(id, saveCharacter(createCharacter({ name: id.toUpperCase() })));
-const read = { dropped: 0, incomplete: 0, newer: false };
+const read = { dropped: 0, incomplete: 0, ignored: [], newer: false };
+const stored = { raw: null, unreadable: false };
 const brokenStorage = {
   getItem: (): string | null => {
     throw new Error('blocked');
@@ -140,6 +141,12 @@ describe('serializeRoster and parseRoster', { tags: ['unit'] }, () => {
     assert.deepEqual([p.roster?.entries.length, p.dropped, p.incomplete], [3, 0, 1]);
   });
 
+  test('list fields of the roster it does not recognise, and count entries with fields it does not recognise', () => {
+    const text = JSON.stringify({ ...JSON.parse(rosterText([good('a'), { ...good('b'), tags: ['x'] }])), notes: 'kept by a later version' });
+    const p = parseRoster(text);
+    assert.deepEqual([p.roster?.entries.length, p.incomplete, p.ignored], [2, 1, ['notes']]);
+  });
+
   test('drop invalid or duplicate entries and repair references', () => {
     const text = JSON.stringify({
       format: 1,
@@ -183,114 +190,118 @@ describe('loadRoster and saveRoster', { tags: ['unit'] }, () => {
     const storage = memoryStorage();
     assert.equal(saveRoster(storage, three()), true);
     assert.ok(storage.data[ROSTER_KEY]);
-    assert.deepEqual(loadRoster(storage), { roster: three(), ...read, raw: storage.data[ROSTER_KEY] });
+    assert.deepEqual(loadRoster(storage), { roster: three(), ...read, raw: storage.data[ROSTER_KEY], unreadable: false });
   });
 
   test('find nothing when nothing is stored', () => {
-    assert.deepEqual(loadRoster(memoryStorage()), { roster: null, ...read, raw: null });
+    assert.deepEqual(loadRoster(memoryStorage()), { roster: null, ...read, ...stored });
   });
 
-  test('fail softly when storage is unavailable', () => {
-    assert.deepEqual(loadRoster(brokenStorage), { roster: null, ...read, raw: null });
+  test('say when storage cannot be read, as distinct from holding nothing', () => {
+    assert.deepEqual(loadRoster(brokenStorage), { roster: null, ...read, ...stored, unreadable: true });
     assert.equal(saveRoster(brokenStorage, three()), false);
-  });
-});
-
-describe('backupRoster', { tags: ['unit'] }, () => {
-  test('keeps the stored text under a key named from its content', () => {
-    const storage = memoryStorage();
-    const key = backupRoster(storage, 'old text');
-    assert.match(key ?? '', new RegExp(`^${ROSTER_KEY}:backup:[0-9a-f]+$`));
-    assert.equal(storage.data[key!], 'old text');
-    assert.notEqual(backupRoster(storage, 'other text'), key);
-  });
-
-  test('backing up the same text again reuses the one copy, even when storage is full', () => {
-    const storage = memoryStorage();
-    const key = backupRoster(storage, 'old text');
-    assert.equal(backupRoster(storage, 'old text'), key);
-    assert.equal(backupRoster(fullStorage(storage.data), 'old text'), key);
-    assert.equal(backupKeys(storage.data).length, 1);
-  });
-
-  test('returns null if the backup cannot be stored', () => {
-    assert.equal(backupRoster(fullStorage({}), 'old text'), null);
-    assert.equal(backupRoster(brokenStorage, 'old text'), null);
   });
 });
 
 describe('openRoster', { tags: ['unit'] }, () => {
   const corrupt = '{"format":1,"entries":[';
+  const fresh = () => createRoster([entry('new1'), entry('new2')]);
+  const open = (storage: Parameters<typeof openRoster>[0], alsoKeep: string[] = []) => openRoster(storage, fresh, alsoKeep);
 
   test('without storage, starts afresh and saves nothing', () => {
-    assert.deepEqual(openRoster(null), { roster: null, canSave: false, warning: null });
+    assert.deepEqual(open(null), { roster: fresh(), canSave: false, saved: false, warning: null });
   });
 
-  test('with nothing stored, or storage that cannot be read, starts afresh and may save', () => {
-    assert.deepEqual(openRoster(memoryStorage()), { roster: null, canSave: true, warning: null });
-    assert.deepEqual(openRoster(brokenStorage), { roster: null, canSave: true, warning: null });
+  test('with nothing stored, starts afresh and saves the new roster at once', () => {
+    const storage = memoryStorage();
+    assert.deepEqual(open(storage), { roster: fresh(), canSave: true, saved: true, warning: null });
+    assert.equal(storage.data[ROSTER_KEY], serializeRoster(fresh()));
+    assert.equal(open(fullStorage({})).saved, false);
+  });
+
+  test('storage that cannot be read is left alone, as it may hold saved data', () => {
+    let writes = 0;
+    const storage = { ...brokenStorage, setItem: () => void writes++ };
+    const opened = open(storage, ['other']);
+    assert.deepEqual([opened.roster, opened.canSave, opened.saved], [fresh(), false, false]);
+    assert.match(opened.warning ?? '', /^The saved characters could not be read from this browser’s storage\. They have been left as they are/);
+    assert.equal(writes, 0);
   });
 
   test('a roster read in full opens as saved, with no warning or backup', () => {
     const storage = memoryStorage();
     saveRoster(storage, three());
-    assert.deepEqual(openRoster(storage), { roster: three(), canSave: true, warning: null });
+    assert.deepEqual(open(storage, [PARTIES_KEY]), { roster: three(), canSave: true, saved: true, warning: null });
     assert.deepEqual(backupKeys(storage.data), []);
   });
 
-  test('data that cannot be read is backed up before anything is saved, and the warning names the backup', () => {
+  test('data that cannot be read is backed up and left as it is, and the warning names the backup', () => {
     const storage = memoryStorage({ [ROSTER_KEY]: corrupt });
-    const opened = openRoster(storage);
+    const opened = open(storage);
     const [key] = backupKeys(storage.data);
-    assert.equal(opened.roster, null);
-    assert.equal(opened.canSave, true);
+    assert.deepEqual([opened.roster, opened.canSave, opened.saved], [fresh(), true, false]);
     assert.equal(storage.data[key!], corrupt);
+    assert.equal(storage.data[ROSTER_KEY], corrupt);
     assert.equal(opened.warning, `The saved characters could not be loaded. The original data is kept in this browser’s storage under “${key}”.`);
   });
 
-  test('a roster read only in part is backed up, and the warning says what was lost', () => {
+  test('the keys in alsoKeep are backed up with it, if they hold anything', () => {
+    const storage = memoryStorage({ [ROSTER_KEY]: corrupt, [PARTIES_KEY]: '{"attackers":["a"],"defenders":["b"]}' });
+    const opened = open(storage, [PARTIES_KEY, 'character-lab:empty']);
+    const parties = Object.keys(storage.data).find((k) => k.startsWith(`${PARTIES_KEY}:backup:`));
+    assert.equal(storage.data[parties!], storage.data[PARTIES_KEY]);
+    assert.match(opened.warning ?? '', new RegExp(`under “${ROSTER_KEY}:backup:[0-9a-f]+” and “${parties}”\\.$`));
+  });
+
+  test('a roster read only in part is backed up, and the warning says what was left out', () => {
     const odd = saved('c', { ...saveCharacter(createCharacter({ name: 'C' })), attributes: { luck: 18 } });
-    const text = rosterText([good('a'), good('b'), odd, saved('d', { name: 'No format' })]);
+    const text = JSON.stringify({ ...JSON.parse(rosterText([good('a'), good('b'), odd, saved('d', { name: 'No format' })])), notes: 'x' });
     const storage = memoryStorage({ [ROSTER_KEY]: text });
-    const opened = openRoster(storage);
+    const opened = open(storage);
     const [key] = backupKeys(storage.data);
-    assert.deepEqual(opened.roster?.entries.map((e) => e.id), ['a', 'b', 'c']);
+    assert.deepEqual(opened.roster.entries.map((e) => e.id), ['a', 'b', 'c']);
     assert.equal(storage.data[key!], text);
-    assert.equal(opened.warning, `1 saved character could not be read. 1 saved character had details this version does not recognise, which were left out. The original data is kept in this browser’s storage under “${key}”.`);
+    assert.equal(opened.warning, [
+      '1 saved character could not be read.',
+      '1 saved character had details this version does not recognise, which were left out.',
+      'Some saved settings this version does not recognise were left out.',
+      `The original data is kept in this browser’s storage under “${key}”.`,
+    ].join(' '));
   });
 
   test('counts characters in the plural', () => {
     const storage = memoryStorage({ [ROSTER_KEY]: rosterText([good('a'), good('b'), 'x', 'y']) });
-    assert.match(openRoster(storage).warning ?? '', /^2 saved characters could not be read\./);
+    assert.match(open(storage).warning ?? '', /^2 saved characters could not be read\./);
   });
 
   test('reopening the same unreadable data makes no further backups', () => {
     const storage = memoryStorage({ [ROSTER_KEY]: corrupt });
-    for (let i = 0; i < 3; i++) openRoster(storage);
+    for (let i = 0; i < 3; i++) open(storage);
     assert.equal(backupKeys(storage.data).length, 1);
   });
 
-  test('if the backup cannot be made, nothing may be saved', () => {
-    const storage = fullStorage({ [ROSTER_KEY]: corrupt });
-    const opened = openRoster(storage);
-    assert.equal(opened.canSave, false);
+  test('if a backup cannot be made, nothing may be saved', () => {
+    const opened = open(fullStorage({ [ROSTER_KEY]: corrupt }));
+    assert.deepEqual([opened.canSave, opened.saved], [false, false]);
     assert.equal(opened.warning, 'The saved characters could not be loaded. The original data could not be backed up, so changes will not be saved this session.');
+    const unreadableExtra = { ...memoryStorage({ [ROSTER_KEY]: corrupt }), getItem: (k: string) => { if (k === 'other') throw new Error('blocked'); return k === ROSTER_KEY ? corrupt : null; } };
+    assert.equal(open(unreadableExtra, ['other']).canSave, false);
   });
 
   test('data from a newer version is left alone: no backup, and nothing may be saved', () => {
     const newer = JSON.stringify({ format: 2, entries: [] });
     const storage = memoryStorage({ [ROSTER_KEY]: newer });
-    const opened = openRoster(storage);
-    assert.deepEqual([opened.roster, opened.canSave], [null, false]);
+    const opened = open(storage);
+    assert.deepEqual([opened.roster, opened.canSave, opened.saved], [fresh(), false, false]);
     assert.match(opened.warning ?? '', /^The saved characters were saved by a newer version of the lab/);
     assert.deepEqual(backupKeys(storage.data), []);
     assert.equal(storage.data[ROSTER_KEY], newer);
   });
 
-  test('a newer character among readable ones also leaves the data alone', () => {
+  test('a newer character among readable ones also leaves the data alone, showing what could be read', () => {
     const storage = memoryStorage({ [ROSTER_KEY]: rosterText([good('a'), good('b'), saved('c', { format: 99, name: 'C' })]) });
-    const opened = openRoster(storage);
-    assert.deepEqual([opened.roster?.entries.length, opened.canSave], [2, false]);
+    const opened = open(storage);
+    assert.deepEqual([opened.roster.entries.map((e) => e.id), opened.canSave], [['a', 'b'], false]);
     assert.match(opened.warning ?? '', /^Some of the saved characters were saved by a newer version/);
   });
 });

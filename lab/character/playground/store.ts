@@ -3,7 +3,9 @@ import { BACKGROUND_INFO, rollCharacter, type BackgroundName } from '../src/back
 import type { Character } from '../src/character';
 import type { Side } from '../src/nerve';
 import { roller, seeded } from '../src/random';
-import { createRoster, openRoster, saveRoster, type KeyValueStorage, type Roster } from './roster';
+import { PARTIES_KEY } from './parties';
+import { createRoster, openRoster, saveRoster, type Roster } from './roster';
+import type { KeyValueStorage } from './storage';
 
 type Listener = (source: string) => void;
 
@@ -20,15 +22,13 @@ export const storage: KeyValueStorage | null = (() => {
 const dice = roller(seeded(Date.now() >>> 0));
 const listeners: Listener[] = [];
 
-// Open the saved roster (see openRoster for how data it cannot fully read is protected).
-const opened = openRoster(storage);
-let roster: Roster = opened.roster ?? createRoster([
+// Open the saved roster, or start a new one. See openRoster for how saved data it cannot fully read is protected.
+const opened = openRoster(storage, () => createRoster([
   { id: newId(), character: rollCharacter('Fighter 1', 'fighter', dice) },
   { id: newId(), character: rollCharacter('Shopkeeper 1', 'shopkeeper', dice) },
-]);
-// A new roster is saved at once, so the saved note is true from the start. Stored data that could not all be read is left
-// as it is until the first change, so the warning stays until then.
-let lastSaveOk = storage !== null && opened.canSave && opened.warning === null && (opened.roster !== null || saveRoster(storage, roster));
+]), [PARTIES_KEY]);
+let roster: Roster = opened.roster;
+let lastSaveOk = opened.saved;
 
 /** A warning to show if saved characters could not all be read, saying where the original data was kept. */
 export function loadWarning(): string | null {
