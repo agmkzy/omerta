@@ -2,7 +2,7 @@
 // defender. Pure functions over an immutable roster; persistence goes through an injected storage (localStorage).
 import type { Character } from '../src/character';
 import type { Side } from '../src/nerve';
-import { NewerFormatError, readCharacter, saveCharacter } from '../src/serialize';
+import { NewerFormatError, readCharacter, saveCharacter, type SavedCharacter } from '../src/serialize';
 import { backup, type KeyValueStorage } from './storage';
 
 export interface Entry {
@@ -60,14 +60,24 @@ export function swapSides(r: Roster): Roster {
   return { ...r, attacker: r.defender, defender: r.attacker };
 }
 
+/** A roster as stored. */
+interface SavedRoster {
+  readonly format: number;
+  readonly entries: readonly { readonly id: string; readonly character: SavedCharacter }[];
+  readonly selected: string;
+  readonly attacker: string;
+  readonly defender: string;
+}
+
 export function serializeRoster(r: Roster): string {
-  return JSON.stringify({
+  const saved: SavedRoster = {
     format: ROSTER_FORMAT,
     entries: r.entries.map((e) => ({ id: e.id, character: saveCharacter(e.character) })),
     selected: r.selected,
     attacker: r.attacker,
     defender: r.defender,
-  });
+  };
+  return JSON.stringify(saved);
 }
 
 /** A saved roster as read. */
@@ -85,8 +95,9 @@ export interface ParsedRoster {
 }
 
 const NOTHING_READ: ParsedRoster = { roster: null, dropped: 0, incomplete: 0, ignored: [], newer: false };
-const ROSTER_FIELDS: readonly string[] = ['format', 'entries', 'selected', 'attacker', 'defender'];
-const ENTRY_FIELDS: readonly string[] = ['id', 'character'];
+// The fields of a saved roster and entry; the type check fails if one is missing or misspelt.
+const ROSTER_FIELDS: readonly string[] = Object.keys({ format: true, entries: true, selected: true, attacker: true, defender: true } satisfies Record<keyof SavedRoster, true>);
+const ENTRY_FIELDS: readonly string[] = Object.keys({ id: true, character: true } satisfies Record<keyof SavedRoster['entries'][number], true>);
 
 /**
  * Parses a saved roster. Entries that cannot be read, or repeat an id, are dropped (and counted), anything not recognised
@@ -164,10 +175,10 @@ export interface OpenedRoster {
  * - A fresh roster with nothing stored before is saved at once.
  */
 export function openRoster(storage: KeyValueStorage | null, fresh: () => Roster, alsoKeep: readonly string[] = []): OpenedRoster {
-  const readOnly = (warning: string | null, roster = fresh()): OpenedRoster => ({ roster, canSave: false, saved: false, warning });
-  if (!storage) return readOnly(null);
+  const readOnly = (roster: Roster, warning: string | null): OpenedRoster => ({ roster, canSave: false, saved: false, warning });
+  if (!storage) return readOnly(fresh(), null);
   const loaded = loadRoster(storage);
-  if (loaded.unreadable) return readOnly('The saved characters could not be read from this browser’s storage. They have been left as they are, and changes will not be saved this session.');
+  if (loaded.unreadable) return readOnly(fresh(), 'The saved characters could not be read from this browser’s storage. They have been left as they are, and changes will not be saved this session.');
   if (loaded.raw === null) {
     const roster = fresh();
     return { roster, canSave: true, saved: saveRoster(storage, roster), warning: null };
@@ -175,13 +186,13 @@ export function openRoster(storage: KeyValueStorage | null, fresh: () => Roster,
   const roster = loaded.roster ?? fresh();
   if (loaded.newer) {
     const which = loaded.roster ? 'Some of the saved characters were' : 'The saved characters were';
-    return readOnly(`${which} saved by a newer version of the lab, which this version cannot read. They have been left as they are, and changes will not be saved this session.`, roster);
+    return readOnly(roster, `${which} saved by a newer version of the lab, which this version cannot read. They have been left as they are, and changes will not be saved this session.`);
   }
   const problems = problemsWith(loaded);
   if (problems.length === 0) return { roster, canSave: true, saved: true, warning: null };
-  const keys = [backup(storage, ROSTER_KEY, loaded.raw), ...alsoKeep.map((key) => backupIfStored(storage, key))];
-  if (keys.some((key) => key === null)) return readOnly(`${problems.join(' ')} The original data could not be backed up, so changes will not be saved this session.`, roster);
-  const where = keys.filter((key) => key !== undefined).map((key) => `“${key}”`).join(' and ');
+  const kept = [ROSTER_KEY, ...alsoKeep].map((key) => keep(storage, key));
+  if (kept.some((k) => k.kind === 'failed')) return readOnly(roster, `${problems.join(' ')} The original data could not be backed up, so changes will not be saved this session.`);
+  const where = kept.flatMap((k) => (k.kind === 'kept' ? [`“${k.key}”`] : [])).join(' and ');
   return { roster, canSave: true, saved: false, warning: `${problems.join(' ')} The original data is kept in this browser’s storage under ${where}.` };
 }
 
@@ -197,15 +208,19 @@ function problemsWith(loaded: ParsedRoster): string[] {
 
 const characters = (n: number): string => `${n} saved ${n === 1 ? 'character' : 'characters'}`;
 
-/** Backs up whatever is stored under `key`: the backup key, undefined if nothing is stored, or null if it failed. */
-function backupIfStored(storage: KeyValueStorage, key: string): string | null | undefined {
+/** The result of backing up a key: where it was kept, that nothing was stored there, or that it could not be kept. */
+type Kept = { readonly kind: 'kept'; readonly key: string } | { readonly kind: 'nothing-stored' } | { readonly kind: 'failed' };
+
+function keep(storage: KeyValueStorage, key: string): Kept {
   let text: string | null;
   try {
     text = storage.getItem(key);
   } catch {
-    return null;
+    return { kind: 'failed' };
   }
-  return text === null ? undefined : backup(storage, key, text);
+  if (text === null) return { kind: 'nothing-stored' };
+  const backupKey = backup(storage, key, text);
+  return backupKey === null ? { kind: 'failed' } : { kind: 'kept', key: backupKey };
 }
 
 /** Returns false if the roster could not be saved (e.g. storage blocked or full). */

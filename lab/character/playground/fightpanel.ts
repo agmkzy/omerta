@@ -16,7 +16,7 @@ import { replay, roller, seeded } from '../src/random';
 import { notableTraits } from '../src/temperament';
 import { slowingDelays, sweepSequence } from './animation';
 import { h, segmented, slider } from './dom';
-import { assign, canFight, loadParties, reconcile, saveParties, type Parties } from './parties';
+import { assign, canFight, lineUp, type Parties } from './parties';
 import { canSave, characterById, getRoster, storage } from './store';
 import { hint, type Panel } from './views';
 
@@ -94,23 +94,14 @@ export function fightPanel(): Panel {
   const dice = roller(seeded(2));
   const root = h('section', { class: 'panel', id: 'fight', 'aria-labelledby': 'fight-title' });
 
-  /**
-   * Keeps the line-up in step with the roster. Starts from the saved line-up, or the 1st against the 2nd saved character.
-   * Only a change made here is saved, so opening the tab never saves over the stored line-up.
-   */
-  let loaded = false;
+  // The saved line-up; looking at it never saves, only a change made here does.
+  const line = lineUp(storage, canSave);
   const syncParties = () => {
-    const ids = getRoster().entries.map((e) => e.id);
-    if (!loaded) {
-      state.parties = (storage && loadParties(storage)) ?? state.parties;
-      loaded = true;
-    }
-    state.parties = reconcile(state.parties, ids);
-    if (!state.parties.attackers.length && !state.parties.defenders.length) state.parties = { attackers: [ids[0]!], defenders: [ids[1]!] };
+    state.parties = line.current(getRoster().entries.map((e) => e.id));
   };
   const setParties = (p: Parties) => {
+    line.set(p);
     state.parties = p;
-    if (storage && canSave()) saveParties(storage, p);
     render();
   };
   const members = (side: Side) => (side === 'attacker' ? state.parties.attackers : state.parties.defenders);

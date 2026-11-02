@@ -49,7 +49,8 @@ browser after every change, as is the open tab. The check tab picks its two char
   version does not recognise, in a character or in the roster) is copied, with the fight line-up, to backup keys named
   from their content (`playground/storage.ts`), so reloading makes no further copies. It is left as it is until the
   first change. If a backup fails, nothing is saved that session.
-- The fight line-up is only saved when it is changed on the Fight tab.
+- The fight line-up (`lineUp` in `playground/parties.ts`) is only saved when it is changed on the Fight tab. If saving
+  what was read would change the stored line-up (it was corrupt, or held something not recognised), it is backed up first.
 - A warning above the tabs says what happened and where the original is kept.
 
 Renames are handled by migrations (format 1 to 2 renamed the backgrounds). `test/fixtures/roster-format1.json` is a save
