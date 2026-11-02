@@ -1,8 +1,9 @@
 // Fights between two sides of one or more fighters, following D&D's combat rules. Every fighter rolls Reflexes for
 // initiative; the order is highest first (defenders first on a tie, then list order). On their turn, each fighter still in
 // the fight attacks a random enemy who is still fighting: d20 + Brawling against the target's Defence (10 + Reflexes
-// bonus). A hit deals 1d4 + Strength modifier, at least 1; a natural 20 always hits and rolls the damage dice twice; a
-// natural 1 always misses. A fighter at 0 hit points is knocked out.
+// bonus). Ganging up, after D&D's optional flanking rule: an attack has advantage if someone on the attacker's side has
+// already attacked that target this round. A hit deals 1d4 + Strength modifier, at least 1; a natural 20 always hits and
+// rolls the damage dice twice; a natural 1 always misses. A fighter at 0 hit points is knocked out.
 //
 // Nerve follows D&D's optional morale rules. The first time a fighter drops to half hit points or below, they make one
 // nerve check. The first time at least half of a side is out of the fight, everyone left on that side makes one. A
@@ -11,7 +12,7 @@
 import { abilityModifier } from './attributes';
 import { bonusOf, resolveCheck, throwRoll, type CheckResult, type RollResult } from './check';
 import { defence, maxHitPoints, rollFor, type Character } from './character';
-import { DICE, type Dice } from './dice';
+import { DICE, facesForTotal, type Dice } from './dice';
 import { NERVE_DC, nerveCheck, nerveCheckSpec, otherSide, type NerveCheck, type Side } from './nerve';
 import { replay, type Roller } from './random';
 import { diceDistribution } from './distribution';
@@ -123,7 +124,7 @@ export function fightStats(c: Character): FightStats {
 export type FightRollReason = (
   | { readonly kind: 'initiative'; readonly id: string; readonly bonus: number }
   | { readonly kind: 'target'; readonly id: string; readonly options: readonly string[] }
-  | { readonly kind: 'attack'; readonly id: string; readonly target: string; readonly bonus: number; readonly dc: number }
+  | { readonly kind: 'attack'; readonly id: string; readonly target: string; readonly bonus: number; readonly dc: number; readonly edge: 'none' | 'advantage' }
   | { readonly kind: 'damage'; readonly id: string; readonly target: string; readonly modifier: number; readonly critical: boolean }
   | { readonly kind: 'nerve'; readonly id: string; readonly trigger: 'hurt' | 'allies-down'; readonly bonus: number; readonly dc: number }
 ) & { readonly die: number; readonly of: number };
@@ -173,7 +174,7 @@ export function rollOdds(request: RollRequest, fighters: readonly Fighter[], dic
     const bars = damageBars(r.of, r.modifier);
     return { bars, average: bars.reduce((sum, b) => sum + b.probability * b.total, 0), ...none };
   }
-  const d = diceDistribution(dice, 'none');
+  const d = diceDistribution(dice, r.kind === 'attack' ? r.edge : 'none');
   const highest = dice.count * dice.sides;
   const succeeds = (kept: number): boolean | null => {
     if (r.kind === 'attack') return kept === highest || (kept !== dice.count && kept + r.bonus >= r.dc);
@@ -197,9 +198,28 @@ function damageBars(count: number, modifier: number): RollOdds['bars'] {
   return d.probabilities.map((probability, i) => ({ dice: d.min + i, total: Math.max(1, d.min + i + modifier), probability, success: null }));
 }
 
+/** How many dice make up each throw of a roll: with advantage a roll is two throws of the fight's dice. */
+function throwSize(request: RollRequest): number {
+  return request.reason.kind === 'attack' && request.reason.edge === 'advantage' ? request.reason.of / 2 : request.reason.of;
+}
+
+/** The result that counts from a whole roll's faces: their total, or with advantage the higher of the two throws. */
+export function resultOf(request: RollRequest, faces: readonly number[]): number {
+  const size = throwSize(request);
+  const sum = (from: number) => faces.slice(from, from + size).reduce((a, b) => a + b, 0);
+  return size === request.reason.of ? sum(0) : Math.max(sum(0), sum(size));
+}
+
+/** Faces that give this result for the whole roll: split into dice, and with advantage the other throw as low as possible. */
+export function facesForResult(request: RollRequest, result: number): number[] {
+  const size = throwSize(request);
+  const faces = facesForTotal(result, size, request.sides);
+  return size === request.reason.of ? faces : [...faces, ...Array.from({ length: size }, () => 1)];
+}
+
 /** The chance an attack with this bonus hits this Defence: natural 20s (the highest roll) always hit, natural 1s never do. */
-export function attackHitChance(dice: Dice, bonus: number, dc: number): number {
-  const d = diceDistribution(dice, 'none');
+export function attackHitChance(dice: Dice, bonus: number, dc: number, edge: 'none' | 'advantage' = 'none'): number {
+  const d = diceDistribution(dice, edge);
   const highest = dice.count * dice.sides;
   return d.probabilities.reduce((sum, p, i) => {
     const kept = d.min + i;
@@ -321,9 +341,12 @@ function fight(spec: FightSpec, roller: Roller, record: FightRecord): FightResul
     const enemies = fightingOn(otherSide(by.side));
     const options = enemies.map((e) => e.id);
     const target = enemies.length === 1 ? enemies[0]! : enemies[rollingFor({ kind: 'target', id: by.id, options }, 1).roll(enemies.length) - 1]!;
-    const brawling = rollFor(by.character, 'brawling', { dice });
+    const edge = attackedThisRound.has(target.id) ? 'advantage' : 'none';
+    attackedThisRound.add(target.id);
+    const brawling = rollFor(by.character, 'brawling', { dice, edges: [edge] });
     const dc = defence(target.character);
-    const result = resolveCheck({ ...brawling, dc }, rollingFor({ kind: 'attack', id: by.id, target: target.id, bonus: bonusOf(brawling.modifiers), dc }, dice.count));
+    const reason = { kind: 'attack', id: by.id, target: target.id, bonus: bonusOf(brawling.modifiers), dc, edge } as const;
+    const result = resolveCheck({ ...brawling, dc }, rollingFor(reason, edge === 'advantage' ? dice.count * 2 : dice.count));
     const kept = result.roll.thrown.kept;
     const critical = kept === dice.count * dice.sides;
     const hit = critical || (kept !== dice.count && result.margin >= 0);
@@ -340,8 +363,11 @@ function fight(spec: FightSpec, roller: Roller, record: FightRecord): FightResul
     if (target.status !== 'fighting') groupMorale(target.side);
   };
 
+  /** Who has been attacked so far this round: a second attacker on the same target has advantage (ganging up). */
+  const attackedThisRound = new Set<string>();
   while (round < maxRounds) {
     record.round = ++round;
+    attackedThisRound.clear();
     for (const f of order) {
       if (f.status !== 'fighting') continue;
       attack(f);

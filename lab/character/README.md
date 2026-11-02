@@ -82,6 +82,9 @@ chooses actions.
   rolled when there is only one): d20 + Brawling bonus against the target's **Defence** (10 + Reflexes bonus, like D&D's
   unarmoured Armour Class). A hit deals 1d4 + Strength modifier (minimum 1). A natural 20 always hits and rolls the
   damage dice twice; a natural 1 always misses. There are no wound penalties.
+- **Ganging up** (after D&D's optional flanking rule): an attack has advantage if someone on the attacker's side has
+  already attacked that target this round. One-against-one fights are unaffected; in simulation one fighter's chance
+  against three civilians falls from 43% to 28%.
 - **Hit points** are 10 + Constitution modifier, plus the proficiency bonus if trained in Toughness (twice if expert):
   D&D's first-level d10 hit die plus its Tough feat. 0 HP is a knockout.
 - **Nerve (morale)**, following D&D's optional morale rules: a fighter makes one nerve check (DC 10) the first time they

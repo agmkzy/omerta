@@ -5,7 +5,7 @@ import { attributeScores } from '../src/attributes';
 import { BACKGROUNDS, rollCharacter, type BackgroundName } from '../src/backgrounds';
 import { createCharacter, type Character } from '../src/character';
 import { DICE } from '../src/dice';
-import { FIGHTER_STATUSES, FIGHTER_STATUS_INFO, attackHitChance, fightStats, rollDamage, rollOdds, runFight, stepFight, tallyFights, type FightEvent, type FightResult, type FightSpec } from '../src/fight';
+import { FIGHTER_STATUSES, FIGHTER_STATUS_INFO, attackHitChance, facesForResult, fightStats, resultOf, rollDamage, rollOdds, runFight, stepFight, tallyFights, type FightEvent, type FightResult, type FightSpec, type RollRequest } from '../src/fight';
 import { describeFightEvent, describeRollRequest, explainRoll } from '../src/fight-log';
 import { NERVE_DC } from '../src/nerve';
 import { replay, roller, seeded } from '../src/random';
@@ -155,7 +155,7 @@ describe('runFight: one against one', { tags: ['unit'] }, () => {
 
 describe('runFight: parties', { tags: ['unit'] }, () => {
   test('everyone rolls initiative; the order is highest first, defenders first on a tie, then list order', () => {
-    const r = run({ attackers: [attacker('A'), attacker('B')], defenders: [defender({}, 'C'), defender({}, 'D')], maxRounds: 1 }, 12, 8, 15, 8, 1, 1, 1, 1, 1, 1, 1, 1);
+    const r = run({ attackers: [attacker('A'), attacker('B')], defenders: [defender({}, 'C'), defender({}, 'D')], maxRounds: 1 }, 12, 8, 15, 8, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1); // the 2nd attacks on A1 and B1 have advantage
     const init = r.events[0];
     assert.ok(init?.kind === 'initiative');
     assert.deepEqual(init.order.map((o) => o.id), ['B1', 'A1', 'B2', 'A2']);
@@ -163,9 +163,23 @@ describe('runFight: parties', { tags: ['unit'] }, () => {
   });
 
   test('each fighter attacks a random enemy who is still fighting', () => {
-    const r = run({ attackers: [attacker()], defenders: [defender({}, 'C'), defender({}, 'D')], maxRounds: 1 }, 15, 10, 10, 2, 1, 1, 1);
+    const r = run({ attackers: [attacker()], defenders: [defender({}, 'C'), defender({}, 'D')], maxRounds: 1 }, 15, 10, 10, 2, 1, 1, 1, 1);
     const targets = attacks(r.events).map((a) => (a.kind === 'attack' ? `${a.by}→${a.target}` : ''));
     assert.deepEqual(targets, ['A1→B2', 'B1→A1', 'B2→A1']);
+  });
+
+  test('ganging up: an attack has advantage if someone on the same side has already attacked that target this round', () => {
+    // 1 against 2 over two rounds. Each round B1 attacks A1 first (no advantage), then B2 attacks A1 too (advantage).
+    const r = run({ attackers: [attacker()], defenders: [defender({}, 'C'), defender({}, 'D')], maxRounds: 2 }, 15, 10, 10, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1);
+    assert.deepEqual(attacks(r.events).map((a) => (a.kind === 'attack' ? `${a.by}:${a.result.roll.edge}` : '')), [
+      'A1:none', 'B1:none', 'B2:advantage', 'A1:none', 'B1:none', 'B2:advantage',
+    ]);
+  });
+
+  test('advantage keeps the higher of the two dice', () => {
+    const r = run({ attackers: [attacker()], defenders: [defender({}, 'C'), defender({}, 'D')], maxRounds: 1 }, 15, 10, 10, 2, 1, 1, 3, 15, 2);
+    const ganging = attacks(r.events).find((a) => a.kind === 'attack' && a.by === 'B2');
+    assert.ok(ganging?.kind === 'attack' && ganging.result.roll.thrown.kept === 15 && ganging.hit);
   });
 
   test('a knocked-out fighter is not attacked; when half a side is out, the rest of that side make a nerve check', () => {
@@ -191,7 +205,7 @@ describe('runFight: parties', { tags: ['unit'] }, () => {
   test('the group nerve check happens once per side, when at least half the side is out', () => {
     // Three frail defenders. B1 out: 1 of 3, no check. B2 out: 2 of 3, B3 checks. B3 out: no further check.
     const r = run({ attackers: [attacker()], defenders: [frail('F'), frail('G'), frail('H')], maxRounds: 3 },
-      20, 1, 1, 1, 1, 20, 4, 4, 1, 1, 1, 20, 4, 4, 20, 1, 20, 4, 4);
+      20, 1, 1, 1, 1, 20, 4, 4, 1, 1, 1, 1, 20, 4, 4, 20, 1, 20, 4, 4); // B3's round-1 attack has advantage
     assert.equal(r.events.filter((e) => e.kind === 'nerve').length, 1);
     assert.deepEqual(r.fighters.map((f) => f.status), ['fighting', 'knocked-out', 'knocked-out', 'knocked-out']);
     assert.equal(r.winner, 'attacker');
@@ -214,9 +228,9 @@ describe('stepFight', { tags: ['unit'] }, () => {
 
   test('asks for each roll in turn, saying what it is for', () => {
     assert.deepEqual(next(duel(), 15).request.reason, { kind: 'initiative', id: 'B1', bonus: 0, die: 1, of: 1 });
-    assert.deepEqual(next(duel(), 15, 10).request.reason, { kind: 'attack', id: 'A1', target: 'B1', bonus: 2, dc: 10, die: 1, of: 1 });
+    assert.deepEqual(next(duel(), 15, 10).request.reason, { kind: 'attack', id: 'A1', target: 'B1', bonus: 2, dc: 10, edge: 'none', die: 1, of: 1 });
     assert.deepEqual(next(duel(), 15, 10, 8).request, { sides: 4, reason: { kind: 'damage', id: 'A1', target: 'B1', modifier: 0, critical: false, die: 1, of: 1 } });
-    assert.deepEqual(next(duel(), 15, 10, 8, 3).request.reason, { kind: 'attack', id: 'B1', target: 'A1', bonus: 0, dc: 10, die: 1, of: 1 });
+    assert.deepEqual(next(duel(), 15, 10, 8, 3).request.reason, { kind: 'attack', id: 'B1', target: 'A1', bonus: 0, dc: 10, edge: 'none', die: 1, of: 1 });
   });
 
   test('says which round the fight is in, 0 while rolling initiative', () => {
@@ -229,6 +243,11 @@ describe('stepFight', { tags: ['unit'] }, () => {
     const step = next(duel(), 15, 10, 8, 3);
     assert.deepEqual(kinds(step.events), ['initiative', 'attack']);
     assert.equal(step.fighters.find((f) => f.id === 'B1')!.hp, 7);
+  });
+
+  test('asks for both dice of an attack with advantage', () => {
+    const s: FightSpec = { attackers: [attacker()], defenders: [defender({}, 'C'), defender({}, 'D')], maxRounds: 1 };
+    assert.deepEqual(next(s, 15, 10, 10, 2, 1, 1).request.reason, { kind: 'attack', id: 'B2', target: 'A1', bonus: 0, dc: 10, edge: 'advantage', die: 1, of: 2 });
   });
 
   test('asks for a target only when there is a choice, listing the options', () => {
@@ -273,6 +292,11 @@ describe('describeRollRequest', { tags: ['unit'] }, () => {
     assert.equal(ask(duel(), 15, 10, 8), 'A rolls damage against D: 1d4.');
     assert.equal(ask(duel(), 15, 10, 20), 'A rolls damage for a critical hit against D: 2d4.');
     assert.equal(ask(duel(), 15, 10, 20, 2, 3), 'D is at half HP and must hold their nerve: d20 + 0 against 10. Needs 10 or more (55%).');
+  });
+
+  test('says when an attack has advantage, and why', () => {
+    const s: FightSpec = { attackers: [attacker()], defenders: [defender({}, 'C'), defender({}, 'E')], maxRounds: 1 };
+    assert.equal(ask(s, 15, 10, 10, 2, 1, 1), 'E attacks A with advantage (someone else is already attacking them): d20 + 0 against Defence 10. Needs 10 or more on either die (80%).');
   });
 
   test('lists the options when choosing a target', () => {
@@ -350,6 +374,11 @@ describe('explainRoll', { tags: ['unit'] }, () => {
     assert.match(group.purpose, /half their side/);
   });
 
+  test('an attack with advantage says why', () => {
+    const e = explain({ attackers: [attacker()], defenders: [defender({}, 'C'), defender({}, 'E')], maxRounds: 1 }, 15, 10, 10, 2, 1, 1);
+    assert.match(e.purpose, /advantage/);
+  });
+
   test('choosing a target: no bonus', () => {
     const e = explain({ attackers: [attacker()], defenders: [defender({}, 'C'), defender({}, 'E')], maxRounds: 1 }, 15, 10, 10);
     assert.match(e.purpose, /random enemy/);
@@ -410,6 +439,13 @@ describe('rollOdds', { tags: ['unit'] }, () => {
     assert.deepEqual(t.bars.map((b) => [b.dice, b.probability, b.success]), [[1, 0.5, null], [2, 0.5, null]]);
   });
 
+  test('for an attack with advantage: the results of the higher die', () => {
+    const o = oddsAt({ attackers: [attacker()], defenders: [defender({}, 'C'), defender({}, 'E')], maxRounds: 1 }, 15, 10, 10, 2, 1, 1);
+    assert.equal(o.bars.length, 20);
+    close(o.success!.chance, 1 - (9 / 20) ** 2);
+    close(o.critical!, 1 - (19 / 20) ** 2);
+  });
+
   test('on other dice, for the whole roll', () => {
     const o = oddsAt(duel({ dice: DICE['3d6'] }), 4, 4, 4, 3, 3, 3);
     assert.equal(o.bars.length, 16); // 3 to 18
@@ -418,7 +454,32 @@ describe('rollOdds', { tags: ['unit'] }, () => {
   });
 });
 
+describe('resultOf and facesForResult', { tags: ['unit'] }, () => {
+  const attackReq = (edge: 'none' | 'advantage', count = 1): RollRequest => ({ sides: count === 1 ? 20 : 6, reason: { kind: 'attack', id: 'A1', target: 'B1', bonus: 0, dc: 10, edge, die: 1, of: edge === 'advantage' ? count * 2 : count } });
+  const damageReq: RollRequest = { sides: 4, reason: { kind: 'damage', id: 'A1', target: 'B1', modifier: 0, critical: true, die: 1, of: 2 } };
+
+  test('the result that counts is the total of the dice, or with advantage the higher throw', () => {
+    assert.equal(resultOf(attackReq('none'), [13]), 13);
+    assert.equal(resultOf(attackReq('advantage'), [4, 17]), 17);
+    assert.equal(resultOf(attackReq('none', 3), [4, 4, 4]), 12);
+    assert.equal(resultOf(attackReq('advantage', 3), [1, 2, 3, 6, 6, 5]), 17);
+    assert.equal(resultOf(damageReq, [3, 2]), 5);
+  });
+
+  test('faces for a chosen result: split into dice, and with advantage the other throw as low as possible', () => {
+    assert.deepEqual(facesForResult(attackReq('none'), 13), [13]);
+    assert.deepEqual(facesForResult(attackReq('advantage'), 17), [17, 1]);
+    assert.deepEqual(facesForResult(attackReq('advantage', 3), 12), [4, 4, 4, 1, 1, 1]);
+    assert.deepEqual(facesForResult(damageReq, 5), [3, 2]);
+  });
+});
+
 describe('attackHitChance', { tags: ['unit'] }, () => {
+  test('with advantage, either die can hit', () => {
+    assert.ok(Math.abs(attackHitChance(DICE.d20, 2, 10, 'advantage') - (1 - (7 / 20) ** 2)) < 1e-12);
+  });
+
+
   test('counts the d20 faces that hit, with a natural 20 always hitting and a natural 1 always missing', () => {
     const close = (actual: number, expected: number) => assert.ok(Math.abs(actual - expected) < 1e-12, `${actual} vs ${expected}`);
     close(attackHitChance(DICE.d20, 2, 10), 13 / 20); // 8 to 20

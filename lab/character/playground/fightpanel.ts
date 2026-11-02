@@ -5,10 +5,10 @@
 // action, grouped by round, with the dice for each line in a column on the right.
 import { BACKGROUND_INFO } from '../src/backgrounds';
 import { BASE_DEFENCE, BASE_HIT_POINTS, type Character } from '../src/character';
-import { DICE, DICE_NAMES, facesForTotal, type DiceName } from '../src/dice';
+import { DICE, DICE_NAMES, type DiceName } from '../src/dice';
 import { compactRoll, describeModifier, percent, signed } from '../src/explain';
 import { bonusOf } from '../src/check';
-import { UNARMED_DAMAGE_DIE, fightStats, rollOdds, runFight, stepFight, tallyFights, type FightEvent, type FightSpec, type FightTally, type Fighter, type FighterStatus, type RollOdds, type RollRequest } from '../src/fight';
+import { UNARMED_DAMAGE_DIE, facesForResult, fightStats, resultOf, rollOdds, runFight, stepFight, tallyFights, type FightEvent, type FightSpec, type FightTally, type Fighter, type FighterStatus, type RollOdds, type RollRequest } from '../src/fight';
 import { describeFightEvent, describeRollRequest, explainRoll } from '../src/fight-log';
 import { NERVE_DC, type Side } from '../src/nerve';
 import { replay, roller, seeded } from '../src/random';
@@ -136,6 +136,7 @@ export function fightPanel(): Panel {
         h('li', {}, 'Everyone rolls Initiative. The highest acts first, and so on down (on a tie, the right side first). This order is used every round.'),
         h('li', {}, `On their turn, each fighter attacks a random enemy who is still fighting: d20 + Attack against the target’s Defence. Meeting or beating it is a hit for their Damage (at least 1).`),
         h('li', {}, 'A natural 20 always hits and is a critical hit: the damage dice are rolled twice. A natural 1 always misses.'),
+        h('li', {}, 'Ganging up: if someone on your side has already attacked a target this round, your attack on them has advantage (two dice, the higher counts).'),
         h('li', {}, `Hit points are ${BASE_HIT_POINTS} + Constitution modifier, plus the proficiency bonus if trained in Toughness. At 0 a fighter is knocked out.`),
         h('li', {}, `Nerve: a fighter makes one nerve check (d20 + Nerve, DC ${NERVE_DC.hurt}) the first time they drop to half HP, and everyone left on a side makes one (DC ${NERVE_DC['allies-down']}) the first time half of that side is out. Failing takes them out: a timid or cautious fighter flees; otherwise they surrender (right side) or back off (left side).`),
         h('li', {}, 'A side loses when nobody on it is still fighting. If both sides are still fighting at the round limit, it is a stalemate.')));
@@ -188,7 +189,7 @@ export function fightPanel(): Panel {
     const name = (id: string) => fighters.find((f) => f.id === id)!.character.name;
     // One choice per possible result of the whole roll (the totals of all its dice), marked where it would succeed.
     const choices = rollOdds(request, fighters, fightDice).bars;
-    const choose = (total: number) => setFaces([...faces, ...facesForTotal(total, r.of, request.sides)]);
+    const choose = (result: number) => setFaces([...faces, ...facesForResult(request, result)]);
     const label = (total: number) => (r.kind === 'target' ? `${total}: ${name(r.options[total - 1]!)}` : String(total));
     const buttons = choices.map((c) =>
       h('button', { type: 'button', class: `face${c.success === true ? ' good' : c.success === false ? ' bad' : ''}`, onclick: () => choose(c.dice) }, label(c.dice)));
@@ -201,7 +202,7 @@ export function fightPanel(): Panel {
     /** Rolls all the dice at once, then sweeps left to right along the choices like a roulette wheel, slowing down onto the result. */
     const animatedRoll = async () => {
       const rolled = Array.from({ length: r.of }, () => dice.roll(request.sides, r));
-      const result = choices.findIndex((c) => c.dice === rolled.reduce((a, b) => a + b, 0));
+      const result = choices.findIndex((c) => c.dice === resultOf(request, rolled));
       if (!reduceMotion()) {
         for (const b of panel.querySelectorAll('button')) b.disabled = true;
         const sequence = sweepSequence(choices.length, showDice.roll(choices.length), result + 1, Math.max(SWEEP_MIN_STEPS, choices.length + 4));
@@ -225,7 +226,7 @@ export function fightPanel(): Panel {
         h('button', { type: 'button', onclick: () => setFaces(playOut(s, faces)) }, 'Play the rest'),
         h('button', { type: 'button', disabled: faces.length === 0, onclick: () => setFaces(backOneRoll(s, faces)) }, 'Back'),
         h('button', { type: 'button', 'aria-pressed': String(state.showOdds), onclick: () => { state.showOdds = !state.showOdds; render(); } }, state.showOdds ? 'Hide odds' : 'Show odds')),
-      h('div', { class: 'hint' }, r.of > 1 ? `Or choose the total of the ${r.of} dice:` : 'Or choose the result:'),
+      h('div', { class: 'hint' }, r.kind === 'attack' && r.edge === 'advantage' ? 'Or choose the higher of the two dice:' : r.of > 1 ? `Or choose the total of the ${r.of} dice:` : 'Or choose the result:'),
       h('div', { class: 'faces' }, ...buttons),
       state.showOdds ? oddsView(rollOdds(request, fighters, fightDice), request) : null,
     );

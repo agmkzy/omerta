@@ -69,11 +69,12 @@ export function describeRollRequest(request: RollRequest, fighters: readonly Fig
       return `${name(r.id)} rolls ${what} against ${name(r.target)}: ${r.of}d${UNARMED_DAMAGE_DIE}${modifier}${which}.`;
     }
     case 'attack': {
-      const roll = `${name(r.id)} attacks ${name(r.target)}: ${dice.name}${plus(r.bonus)} against Defence ${r.dc}`;
+      const advantage = r.edge === 'advantage' ? ' with advantage (someone else is already attacking them)' : '';
+      const roll = `${name(r.id)} attacks ${name(r.target)}${advantage}: ${dice.name}${plus(r.bonus)} against Defence ${r.dc}`;
       if (r.die > 1) return `${roll}${which}.`;
-      const chance = percent(attackHitChance(dice, r.bonus, r.dc));
+      const chance = percent(attackHitChance(dice, r.bonus, r.dc, r.edge));
       if (!d20) return `${roll}. ${chance} to hit.`;
-      return `${roll}. Needs ${Math.min(20, Math.max(2, r.dc - r.bonus))} or more to hit (${chance}).`;
+      return `${roll}. Needs ${Math.min(20, Math.max(2, r.dc - r.bonus))} or more ${r.edge === 'advantage' ? 'on either die' : 'to hit'} (${chance}).`;
     }
     case 'nerve': {
       const situation = r.trigger === 'hurt' ? 'is at half HP' : 'sees half their side out of the fight';
@@ -114,7 +115,7 @@ export function explainRoll(request: RollRequest, fighters: readonly Fighter[]):
       const target = fighter(r.target);
       const parts = defenceModifiers(target);
       return {
-        purpose: 'An attack hits if d20 + Brawling (the Strength modifier, plus any Brawling training) meets the target’s Defence. A natural 20 always hits and is a critical hit; a natural 1 always misses.',
+        purpose: `An attack hits if d20 + Brawling (the Strength modifier, plus any Brawling training) meets the target’s Defence. A natural 20 always hits and is a critical hit; a natural 1 always misses.${r.edge === 'advantage' ? ' This attack has advantage: someone else on their side has already attacked this target this round, so two dice are rolled and the higher counts.' : ''}`,
         bonus: rollFor(c, 'brawling').modifiers,
         against: { label: `${target.name}’s Defence`, total: bonusOf(parts), parts },
       };
