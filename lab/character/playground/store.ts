@@ -1,10 +1,9 @@
 // The playground's shared state: the roster of characters, saved to localStorage after every change.
 import { BACKGROUND_INFO, rollCharacter, type BackgroundName } from '../src/backgrounds';
 import type { Character } from '../src/character';
-import type { Side } from '../src/nerve';
 import { roller, seeded } from '../src/random';
 import { PARTIES_KEY } from './parties';
-import { createRoster, openRoster, saveRoster, type Roster } from './roster';
+import { createRoster, openRoster, saveRoster, type Role, type Roster } from './roster';
 import type { KeyValueStorage } from './storage';
 
 type Listener = (source: string) => void;
@@ -64,8 +63,8 @@ export function characterById(id: string): Character {
   return roster.entries.find((e) => e.id === id)!.character;
 }
 
-export function sideCharacter(side: Side): Character {
-  return characterById(roster[side]);
+export function roleCharacter(role: Role): Character {
+  return characterById(roster[role]);
 }
 
 export function newId(): string {

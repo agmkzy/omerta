@@ -1,7 +1,7 @@
-// The playground's saved characters: a list of entries, the one selected for editing, and the two assigned as attacker and
-// defender. Pure functions over an immutable roster; persistence goes through an injected storage (localStorage).
+// The playground's saved characters: a list of entries, the one selected for editing, and the two the Skill check tab uses
+// (the actor and their target, so there must always be at least two). Pure functions over an immutable roster;
+// persistence goes through an injected storage (localStorage).
 import type { Character } from '../src/character';
-import type { Side } from '../src/nerve';
 import { NewerFormatError, readCharacter, saveCharacter, type SavedCharacter } from '../src/serialize';
 import { backup, type KeyValueStorage } from './storage';
 
@@ -13,16 +13,21 @@ export interface Entry {
 export interface Roster {
   readonly entries: readonly Entry[];
   readonly selected: string;
-  readonly attacker: string;
-  readonly defender: string;
+  /** The Skill check tab's character and their target. */
+  readonly actor: string;
+  readonly target: string;
 }
 
+/** The two roles the Skill check tab assigns. */
+export type Role = 'actor' | 'target';
+
 export const ROSTER_KEY = 'character-lab:roster';
-const ROSTER_FORMAT = 1;
+/** Increment when the saved shape changes, and add a migration in parseRoster. */
+const ROSTER_FORMAT = 2;
 
 export function createRoster(entries: readonly Entry[]): Roster {
   assertUsable(entries);
-  return repair({ entries, selected: '', attacker: '', defender: '' });
+  return repair({ entries, selected: '', actor: '', target: '' });
 }
 
 export function addEntry(r: Roster, e: Entry): Roster {
@@ -48,16 +53,16 @@ export function select(r: Roster, id: string): Roster {
   return { ...r, selected: id };
 }
 
-/** Assigns an entry to a side. If it currently holds the other side, the two sides are swapped. */
-export function setSide(r: Roster, side: Side, id: string): Roster {
+/** Assigns an entry to a role. If it currently holds the other role, the two are swapped. */
+export function setRole(r: Roster, role: Role, id: string): Roster {
   assertHas(r, id);
-  const other = side === 'attacker' ? 'defender' : 'attacker';
-  if (r[other] === id) return swapSides(r);
-  return { ...r, [side]: id };
+  const other = role === 'actor' ? 'target' : 'actor';
+  if (r[other] === id) return swapRoles(r);
+  return { ...r, [role]: id };
 }
 
-export function swapSides(r: Roster): Roster {
-  return { ...r, attacker: r.defender, defender: r.attacker };
+export function swapRoles(r: Roster): Roster {
+  return { ...r, actor: r.target, target: r.actor };
 }
 
 /** A roster as stored. */
@@ -65,8 +70,8 @@ interface SavedRoster {
   readonly format: number;
   readonly entries: readonly { readonly id: string; readonly character: SavedCharacter }[];
   readonly selected: string;
-  readonly attacker: string;
-  readonly defender: string;
+  readonly actor: string;
+  readonly target: string;
 }
 
 export function serializeRoster(r: Roster): string {
@@ -74,8 +79,8 @@ export function serializeRoster(r: Roster): string {
     format: ROSTER_FORMAT,
     entries: r.entries.map((e) => ({ id: e.id, character: saveCharacter(e.character) })),
     selected: r.selected,
-    attacker: r.attacker,
-    defender: r.defender,
+    actor: r.actor,
+    target: r.target,
   };
   return JSON.stringify(saved);
 }
@@ -96,7 +101,7 @@ export interface ParsedRoster {
 
 const NOTHING_READ: ParsedRoster = { roster: null, dropped: 0, incomplete: 0, ignored: [], newer: false };
 // The fields of a saved roster and entry; the type check fails if one is missing or misspelt.
-const ROSTER_FIELDS: readonly string[] = Object.keys({ format: true, entries: true, selected: true, attacker: true, defender: true } satisfies Record<keyof SavedRoster, true>);
+const ROSTER_FIELDS: readonly string[] = Object.keys({ format: true, entries: true, selected: true, actor: true, target: true } satisfies Record<keyof SavedRoster, true>);
 const ENTRY_FIELDS: readonly string[] = Object.keys({ id: true, character: true } satisfies Record<keyof SavedRoster['entries'][number], true>);
 
 /**
@@ -111,9 +116,9 @@ export function parseRoster(text: string): ParsedRoster {
     return NOTHING_READ;
   }
   if (!isObject(data)) return NOTHING_READ;
-  // Older formats would be migrated here.
   if (typeof data.format !== 'number' || !Number.isInteger(data.format) || data.format < 1) return NOTHING_READ;
   if (data.format > ROSTER_FORMAT) return { ...NOTHING_READ, newer: true };
+  if (data.format < 2) migrateFrom1(data);
   if (!Array.isArray(data.entries)) return NOTHING_READ;
   const entries: Entry[] = [];
   let incomplete = 0;
@@ -133,8 +138,17 @@ export function parseRoster(text: string): ParsedRoster {
   const ignored = Object.keys(data).filter((k) => !ROSTER_FIELDS.includes(k));
   if (entries.length < 2) return { roster: null, dropped, incomplete, ignored, newer };
   const ref = (v: unknown) => (typeof v === 'string' ? v : '');
-  const roster = repair({ entries, selected: ref(data.selected), attacker: ref(data.attacker), defender: ref(data.defender) });
+  const roster = repair({ entries, selected: ref(data.selected), actor: ref(data.actor), target: ref(data.target) });
   return { roster, dropped, incomplete, ignored, newer };
+}
+
+/** Format 1 to 2: the Skill check tab's roles were called attacker and defender. */
+function migrateFrom1(data: Record<string, unknown>): void {
+  for (const [from, to] of [['attacker', 'actor'], ['defender', 'target']] as const) {
+    if (!(from in data)) continue;
+    data[to] = data[from];
+    delete data[from];
+  }
 }
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -233,16 +247,16 @@ export function saveRoster(storage: KeyValueStorage, r: Roster): boolean {
   }
 }
 
-/** Points any reference to a missing entry at an existing one, keeping attacker and defender distinct. */
+/** Points any reference to a missing entry at an existing one, keeping the actor and target distinct. */
 function repair(r: Roster): Roster {
   const ids = r.entries.map((e) => e.id);
   const first = (except?: string) => ids.find((id) => id !== except)!;
   const selected = ids.includes(r.selected) ? r.selected : first();
-  let attacker: string | undefined = ids.includes(r.attacker) ? r.attacker : undefined;
-  let defender: string | undefined = ids.includes(r.defender) && r.defender !== attacker ? r.defender : undefined;
-  attacker ??= first(defender);
-  defender ??= first(attacker);
-  return { entries: r.entries, selected, attacker, defender };
+  let actor: string | undefined = ids.includes(r.actor) ? r.actor : undefined;
+  let target: string | undefined = ids.includes(r.target) && r.target !== actor ? r.target : undefined;
+  actor ??= first(target);
+  target ??= first(actor);
+  return { entries: r.entries, selected, actor, target };
 }
 
 function has(r: Roster, id: string): boolean {

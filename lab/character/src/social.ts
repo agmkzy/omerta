@@ -4,7 +4,7 @@
 // Intimidation can be armed. The target then makes a nerve check against a weapon first (DC 12); failing it, they comply
 // at once, flee or fight back, depending on temperament. If they hold their nerve, the intimidation is rolled with
 // advantage. A critical failure at intimidating a hot-tempered target provokes them into starting a fight.
-import { OUTCOME_INFO, OUTCOMES, checkOdds, opposedOdds, resolveOpposed, successChance, type Modifier, type OpposedResult, type Outcome, type Roll } from './check';
+import { OUTCOME_INFO, OUTCOMES, checkOdds, opposedOdds, resolveOpposed, succeeded, successChance, type Modifier, type OpposedResult, type Outcome, type Roll } from './check';
 import { rollFor, type Character } from './character';
 import { DICE, type Dice } from './dice';
 import { nerveCheck, nerveCheckSpec, nerveResponse, type NerveCheck, type NerveResponse } from './nerve';
@@ -94,6 +94,7 @@ export interface SocialSpec {
   readonly dice?: Dice;
 }
 
+/** How a social action ended. */
 export type SocialEnding =
   /** Decided by the opposed check. */
   | { readonly kind: 'check'; readonly outcome: Outcome }
@@ -102,66 +103,83 @@ export type SocialEnding =
   /** A critical failure at intimidating a hot-tempered target: they start a fight. */
   | { readonly kind: 'provoked' };
 
-export interface SocialResult {
-  readonly nerve: NerveCheck | null;
-  readonly check: OpposedResult | null;
-  readonly ending: SocialEnding;
-}
-
-export type SocialResultKey = Outcome | `nerve:${NerveResponse}` | 'provoked';
+/** A social action as resolved: what was attempted, the rolls made, and how it ended. */
+export type SocialResult = { readonly spec: SocialSpec } & (
+  | { readonly kind: 'nerve'; readonly nerve: NerveCheck; readonly response: NerveResponse }
+  | { readonly kind: 'check'; readonly nerve: NerveCheck | null; readonly check: OpposedResult; readonly outcome: Outcome }
+  | { readonly kind: 'provoked'; readonly nerve: NerveCheck | null; readonly check: OpposedResult }
+);
 
 export function resolveSocial(spec: SocialSpec, roller: Roller): SocialResult {
   const { dice, armed } = settings(spec);
   let nerve: NerveCheck | null = null;
   if (armed) {
     nerve = nerveCheck(spec.target, 'weapon-drawn', true, dice, roller);
-    if (nerve.response) return { nerve, check: null, ending: { kind: 'nerve', response: nerve.response } };
+    if (nerve.response) return { spec, kind: 'nerve', nerve, response: nerve.response };
   }
-  const check = resolveOpposed(rolls(spec), roller);
-  return { nerve, check, ending: endingOf(spec, check.outcome) };
+  const check = resolveOpposed(socialRolls(spec), roller);
+  const ending = endingFor(spec, check.outcome);
+  return ending.kind === 'provoked' ? { spec, kind: 'provoked', nerve, check } : { spec, kind: 'check', nerve, check, outcome: check.outcome };
 }
 
-/** The exact chance of each result. */
-export function socialOdds(spec: SocialSpec): Readonly<Record<SocialResultKey, number>> {
-  const { dice, armed } = settings(spec);
-  const odds: Record<SocialResultKey, number> = {
-    ...(Object.fromEntries(OUTCOMES.map((o) => [o, 0])) as Record<Outcome, number>),
-    'nerve:yields': 0,
-    'nerve:flees': 0,
-    'nerve:fights': 0,
-    provoked: 0,
-  };
-  let reachesCheck = 1;
-  if (armed) {
-    const nerve = checkOdds(nerveCheckSpec(spec.target, 'weapon-drawn', dice));
-    const holds = successChance(nerve);
-    odds[`nerve:${nerveResponse(spec.target, true)}`] = 1 - holds;
-    reachesCheck = holds;
-  }
-  const check = opposedOdds(rolls(spec));
-  for (const o of OUTCOMES) odds[socialResultKey(endingOf(spec, o))] += reachesCheck * check[o];
-  return odds;
+/** How a result ended, without its rolls. */
+export function endingOf(result: SocialResult): SocialEnding {
+  if (result.kind === 'nerve') return { kind: 'nerve', response: result.response };
+  if (result.kind === 'provoked') return { kind: 'provoked' };
+  return { kind: 'check', outcome: result.outcome };
 }
 
-export function socialResultKey(ending: SocialEnding): SocialResultKey {
+/** A short id for an ending, e.g. "partial", "nerve:flees" or "provoked", for counting endings. */
+export function endingKey(ending: SocialEnding): string {
   if (ending.kind === 'check') return ending.outcome;
   if (ending.kind === 'nerve') return `nerve:${ending.response}`;
   return 'provoked';
 }
 
+export interface SocialChance {
+  readonly ending: SocialEnding;
+  readonly chance: number;
+}
+
+/**
+ * The exact chance of each way the action can end: every outcome of the check, in OUTCOMES order, then, where they can
+ * happen, failing the nerve check against a weapon and provoking a fight.
+ */
+export function socialOdds(spec: SocialSpec): readonly SocialChance[] {
+  const { dice, armed } = settings(spec);
+  const holds = armed ? successChance(checkOdds(nerveCheckSpec(spec.target, 'weapon-drawn', dice))) : 1;
+  const check = opposedOdds(socialRolls(spec));
+  const provokes = endingFor(spec, 'critical-failure').kind === 'provoked';
+  return [
+    ...OUTCOMES.map((outcome) => ({ ending: { kind: 'check', outcome } as const, chance: provokes && outcome === 'critical-failure' ? 0 : holds * check[outcome] })),
+    ...(armed ? [{ ending: { kind: 'nerve', response: nerveResponse(spec.target, true) } as const, chance: 1 - holds }] : []),
+    ...(provokes ? [{ ending: { kind: 'provoked' } as const, chance: holds * check['critical-failure'] }] : []),
+  ];
+}
+
+/** The chance the target goes along with it: a partial success or better, or giving in to a weapon. */
+export function goesAlong(chances: readonly SocialChance[]): number {
+  return chances.reduce((sum, { ending, chance }) => (ending.kind === 'check' ? succeeded(ending.outcome) : ending.kind === 'nerve' && ending.response === 'yields') ? sum + chance : sum, 0);
+}
+
+/** What an ending means, as a sentence, e.g. "Partial success: complies, but resents it and may make trouble later." */
+export function describeEnding(ending: SocialEnding, action: SocialAction): string {
+  if (ending.kind === 'nerve') return `Fails the nerve check against the weapon and ${ARMED_NERVE_RESPONSE[ending.response]}.`;
+  if (ending.kind === 'provoked') return `Critical failure: ${PROVOKED} (hot-tempered).`;
+  return `${OUTCOME_INFO[ending.outcome].name}: ${SOCIAL_ACTION_INFO[action].outcomes[ending.outcome]}.`;
+}
+
 /** The result in words, e.g. "A rolled 17 for Intimidation against T’s 10 for Nerve: success. T complies." */
-export function describeSocial(result: SocialResult, spec: SocialSpec): string {
-  const { actor, target } = spec;
-  const info = SOCIAL_ACTION_INFO[spec.action];
-  const { ending } = result;
-  if (ending.kind === 'nerve') {
-    const roll = result.nerve!.result;
-    return `${target.name} faces a weapon and fails a nerve check (needed ${roll.dc}, rolled ${roll.roll.total}). ${target.name} ${ARMED_NERVE_RESPONSE[ending.response]}.`;
+export function describeSocial(result: SocialResult): string {
+  const { actor, target, action } = result.spec;
+  const info = SOCIAL_ACTION_INFO[action];
+  if (result.kind === 'nerve') {
+    const roll = result.nerve.result;
+    return `${target.name} faces a weapon and fails a nerve check (needed ${roll.dc}, rolled ${roll.roll.total}). ${target.name} ${ARMED_NERVE_RESPONSE[result.response]}.`;
   }
-  const check = result.check!;
-  const rolled = `${actor.name} rolled ${check.active.total} for ${SKILL_INFO[info.skill].name} against ${target.name}’s ${check.passive.total} for ${SKILL_INFO[info.resist].name}`;
-  if (ending.kind === 'provoked') return `${rolled}: critical failure. ${target.name} ${PROVOKED}.`;
-  return `${rolled}: ${OUTCOME_INFO[ending.outcome].name.toLowerCase()}. ${target.name} ${info.outcomes[ending.outcome]}.`;
+  const rolled = `${actor.name} rolled ${result.check.active.total} for ${SKILL_INFO[info.skill].name} against ${target.name}’s ${result.check.passive.total} for ${SKILL_INFO[info.resist].name}`;
+  if (result.kind === 'provoked') return `${rolled}: critical failure. ${target.name} ${PROVOKED}.`;
+  return `${rolled}: ${OUTCOME_INFO[result.outcome].name.toLowerCase()}. ${target.name} ${info.outcomes[result.outcome]}.`;
 }
 
 function settings(spec: SocialSpec): { dice: Dice; armed: boolean } {
@@ -170,7 +188,8 @@ function settings(spec: SocialSpec): { dice: Dice; armed: boolean } {
   return { dice: spec.dice ?? DICE.d20, armed };
 }
 
-function rolls(spec: SocialSpec): { active: Roll; passive: Roll } {
+/** The two rolls of the opposed check: the actor's skill (with advantage if armed) and the target's resisting skill. */
+export function socialRolls(spec: SocialSpec): { readonly active: Roll; readonly passive: Roll } {
   const { dice, armed } = settings(spec);
   const info = SOCIAL_ACTION_INFO[spec.action];
   return {
@@ -179,7 +198,7 @@ function rolls(spec: SocialSpec): { active: Roll; passive: Roll } {
   };
 }
 
-function endingOf(spec: SocialSpec, outcome: Outcome): SocialEnding {
+function endingFor(spec: SocialSpec, outcome: Outcome): SocialEnding {
   if (outcome === 'critical-failure' && spec.action === 'intimidate' && leaning(spec.target.temperament.temper) === 'high') return { kind: 'provoked' };
   return { kind: 'check', outcome };
 }

@@ -1,19 +1,19 @@
 // Skill check tab: either a social action (intimidate, persuade, deceive) with the meaning and exact chance of each result,
 // or any skill against a DC or an opponent's skill. Every modifier is listed.
-import { OUTCOMES, OUTCOME_INFO, checkOdds, opposedOdds, resolveCheck, resolveOpposed, type Outcome, type Roll } from '../src/check';
+import { OUTCOME_INFO, checkOdds, opposedOdds, resolveCheck, resolveOpposed, type Outcome, type Roll } from '../src/check';
 import { rollFor } from '../src/character';
 import { DICE, DICE_NAMES, type DiceName } from '../src/dice';
 import { describeCheck, describeOpposed, percent, signed } from '../src/explain';
 import { NERVE_DC, nerveCheckSpec } from '../src/nerve';
-import { ARMED_NERVE_RESPONSE, PROVOKED, SOCIAL_ACTIONS, SOCIAL_ACTION_INFO, describeSocial, resolveSocial, socialOdds, socialResultKey, type SocialAction, type SocialResultKey, type SocialSpec } from '../src/social';
+import { SOCIAL_ACTIONS, SOCIAL_ACTION_INFO, describeEnding, describeSocial, endingOf, goesAlong, resolveSocial, socialOdds, socialRolls, type SocialAction, type SocialChance, type SocialEnding, type SocialSpec } from '../src/social';
 import { roller, seeded } from '../src/random';
 import { SKILLS, SKILL_INFO, type Skill } from '../src/skills';
 import { ATTRIBUTE_INFO } from '../src/attributes';
 import { attributesFor } from '../src/skills';
 import { SITUATIONS, SITUATION_INFO, type Situation } from '../src/temperament';
 import { h, segmented, slider } from './dom';
-import { sideSelect } from './pickers';
-import { sideCharacter } from './store';
+import { roleSelect } from './pickers';
+import { roleCharacter } from './store';
 import { hint, modifiersView, oddsView, outcomeGuide, type Panel } from './views';
 
 type Mode = 'skill' | SocialAction;
@@ -33,12 +33,17 @@ interface State {
   log: { text: string; tag: string; label: string }[];
 }
 
-/** The colour class and label for a result. */
-function resultTag(key: SocialResultKey): { tag: string; label: string } {
-  if (key === 'nerve:yields') return { tag: 'o-success', label: 'gave in to the weapon' };
-  if (key === 'nerve:flees') return { tag: 'o-partial', label: 'fled' };
-  if (key === 'nerve:fights' || key === 'provoked') return { tag: 'o-critical-failure', label: 'fight' };
-  return { tag: `o-${key}`, label: OUTCOME_INFO[key].name.toLowerCase() };
+/** Endings in the order shown: failing the nerve check first, then the check from best to worst, then a provoked fight. */
+function byKind(odds: readonly SocialChance[]): SocialChance[] {
+  const of = (kind: SocialEnding['kind']) => odds.filter((c) => c.ending.kind === kind);
+  return [...of('nerve'), ...of('check').reverse(), ...of('provoked')];
+}
+
+/** The colour class and label for how a social action ended. */
+function endingTag(ending: SocialEnding): { tag: string; label: string } {
+  if (ending.kind === 'check') return { tag: `o-${ending.outcome}`, label: OUTCOME_INFO[ending.outcome].name.toLowerCase() };
+  if (ending.kind === 'provoked' || ending.response === 'fights') return { tag: 'o-critical-failure', label: 'fight' };
+  return ending.response === 'yields' ? { tag: 'o-success', label: 'gave in to the weapon' } : { tag: 'o-partial', label: 'fled' };
 }
 
 export function checkPanel(): Panel {
@@ -50,22 +55,21 @@ export function checkPanel(): Panel {
   const root = h('section', { class: 'panel', id: 'check', 'aria-labelledby': 'check-title' });
   const results = h('div');
 
-  const active = (): Roll => rollFor(sideCharacter('attacker'), state.skill, {
+  const active = (): Roll => rollFor(roleCharacter('actor'), state.skill, {
     dice: DICE[state.dice], situations: state.situations, modifiers: state.situational ? [{ value: state.situational, reason: 'Situational' }] : [],
   });
-  const opponent = (): Roll => rollFor(sideCharacter('defender'), state.opponentSkill, { dice: DICE[state.dice], situations: state.opponentSituations });
+  const opponent = (): Roll => rollFor(roleCharacter('target'), state.opponentSkill, { dice: DICE[state.dice], situations: state.opponentSituations });
 
   const social = (action: SocialAction): SocialSpec => ({
-    actor: sideCharacter('attacker'), target: sideCharacter('defender'), action, armed: action === 'intimidate' && state.armed, dice: DICE[state.dice],
+    actor: roleCharacter('actor'), target: roleCharacter('target'), action, armed: action === 'intimidate' && state.armed, dice: DICE[state.dice],
     modifiers: state.situational ? [{ value: state.situational, reason: 'Situational' }] : [],
   });
   const outcomeLog = (text: string, outcome: Outcome) => ({ text, tag: `o-${outcome}`, label: OUTCOME_INFO[outcome].name.toLowerCase() });
 
   function roll() {
     if (state.mode !== 'skill') {
-      const s = social(state.mode);
-      const r = resolveSocial(s, dice);
-      state.log.unshift({ text: describeSocial(r, s), ...resultTag(socialResultKey(r.ending)) });
+      const r = resolveSocial(social(state.mode), dice);
+      state.log.unshift({ text: describeSocial(r), ...endingTag(endingOf(r)) });
     } else if (state.against === 'dc') {
       const r = resolveCheck({ ...active(), dc: state.dc }, dice);
       state.log.unshift(outcomeLog(describeCheck(r), r.outcome));
@@ -84,23 +88,12 @@ export function checkPanel(): Panel {
     const info = SOCIAL_ACTION_INFO[action];
     const odds = socialOdds(s);
     const target = s.target.name;
-    const wins = odds['nerve:yields'] + OUTCOMES.filter((o) => o === 'partial' || o === 'success' || o === 'critical-success').reduce((sum, o) => sum + odds[o], 0);
-    const meaning = (key: SocialResultKey): string => {
-      if (key === 'nerve:yields' || key === 'nerve:flees' || key === 'nerve:fights') return `Fails the nerve check against the weapon and ${ARMED_NERVE_RESPONSE[key.slice(6) as 'yields']}.`;
-      if (key === 'provoked') return `Critical failure: ${PROVOKED} (hot-tempered).`;
-      return `${OUTCOME_INFO[key].name}: ${info.outcomes[key]}.`;
-    };
-    const nerveKeys: SocialResultKey[] = s.armed ? ['nerve:yields', 'nerve:flees', 'nerve:fights'] : [];
-    const keys = [...nerveKeys, ...[...OUTCOMES].reverse(), 'provoked' as const].filter((k) => odds[k] > 0 || (OUTCOMES as readonly string[]).includes(k));
     const nerveSpec = nerveCheckSpec(s.target, 'weapon-drawn', DICE[state.dice]);
-    const active = rollFor(s.actor, info.skill, { dice: DICE[state.dice], situations: info.actorSituations, modifiers: s.modifiers ?? [], edges: s.armed ? ['advantage'] : [] });
-    const passive = rollFor(s.target, info.resist, { dice: DICE[state.dice], situations: info.targetSituations });
+    const { active, passive } = socialRolls(s);
     results.replaceChildren(
-      h('div', { class: 'headline' }, percent(wins), ' ', h('small', {}, `chance ${target} goes along with it`)),
-      h('table', { class: 'social-odds' }, h('tbody', {}, ...keys.map((k) => {
-        const t = resultTag(k);
-        return h('tr', {}, h('td', {}, h('i', { class: `swatch ${t.tag}` })), h('td', {}, meaning(k)), h('td', { class: 'num' }, percent(odds[k])));
-      }))),
+      h('div', { class: 'headline' }, percent(goesAlong(odds)), ' ', h('small', {}, `chance ${target} goes along with it`)),
+      h('table', { class: 'social-odds' }, h('tbody', {}, ...byKind(odds).map(({ ending, chance }) =>
+        h('tr', {}, h('td', {}, h('i', { class: `swatch ${endingTag(ending).tag}` })), h('td', {}, describeEnding(ending, action)), h('td', { class: 'num' }, percent(chance)))))),
       h('div', { class: 'grid' },
         modifiersView(`${s.actor.name}: ${SKILL_INFO[info.skill].name}${s.armed ? ' (with advantage)' : ''}`, active.modifiers),
         modifiersView(`${target}: ${SKILL_INFO[info.resist].name}`, passive.modifiers),
@@ -118,9 +111,9 @@ export function checkPanel(): Panel {
     results.replaceChildren(
       oddsView(odds),
       h('div', { class: 'grid' },
-        modifiersView(`${sideCharacter('attacker').name}: ${SKILL_INFO[state.skill].name}`, active().modifiers),
+        modifiersView(`${roleCharacter('actor').name}: ${SKILL_INFO[state.skill].name}`, active().modifiers),
         state.against === 'opponent'
-          ? modifiersView(`${sideCharacter('defender').name}: ${SKILL_INFO[state.opponentSkill].name}`, opponent().modifiers)
+          ? modifiersView(`${roleCharacter('target').name}: ${SKILL_INFO[state.opponentSkill].name}`, opponent().modifiers)
           : h('div', { class: 'muted' }, `DC ${state.dc}`),
       ),
       outcomeGuide(),
@@ -135,7 +128,7 @@ export function checkPanel(): Panel {
 
   const situationBoxes = (chosen: Situation[], label: string) => {
     const summary = h('summary', {});
-    const describe = () => (summary.textContent = `${label} (${chosen.length ? chosen.join(', ') : 'none'})`);
+    const describe = () => (summary.textContent = `${label} (${chosen.length ? chosen.map((c) => SITUATION_INFO[c].name.toLowerCase()).join(', ') : 'none'})`);
     describe();
     return h('details', { class: 'situations' }, summary,
       ...SITUATIONS.map((s) => h('label', {}, h('input', { type: 'checkbox', checked: chosen.includes(s), onchange: (e: Event) => {
@@ -155,8 +148,8 @@ export function checkPanel(): Panel {
 
   function renderSocialControls(action: SocialAction): HTMLElement {
     return h('div', {},
-      sideSelect('attacker', 'Character'),
-      sideSelect('defender', 'Target'),
+      roleSelect('actor', 'Character'),
+      roleSelect('target', 'Target'),
       action === 'intimidate'
         ? h('label', { class: 'field checkbox' },
             h('span', {}, h('input', { type: 'checkbox', checked: state.armed, onchange: (e: Event) => { state.armed = (e.target as HTMLInputElement).checked; renderResults(); } }), ' Armed: draws a weapon'),
@@ -171,7 +164,7 @@ export function checkPanel(): Panel {
 
   function renderSkillControls(): HTMLElement {
     return h('div', {},
-      sideSelect('attacker', 'Character'),
+      roleSelect('actor', 'Character'),
       h('label', { class: 'field' }, h('span', {}, 'Skill'), skillSelect(state.skill, (s) => { state.skill = s; render(); }, 'Skill'), hint(skillHint(state.skill))),
       h('div', { class: 'field' }, h('span', {}, 'Against'), segmented(['dc', 'opponent'] as const, state.against, (a) => { state.against = a; render(); },
         (a) => (a === 'dc' ? 'DC' : 'Opponent'))),
@@ -179,7 +172,7 @@ export function checkPanel(): Panel {
         ? slider('DC', state.dc, 0, 30, (v) => { state.dc = v; renderResults(); }, String,
             'Difficulty class: the total needed. Roughly 10 is easy, 15 moderate, 20 hard, 25 very hard.')
         : h('div', {},
-            sideSelect('defender', 'Opponent'),
+            roleSelect('target', 'Opponent'),
             h('label', { class: 'field' }, h('span', {}, 'Opponent skill'), skillSelect(state.opponentSkill, (s) => { state.opponentSkill = s; render(); }, 'Opponent skill'),
               hint(skillHint(state.opponentSkill))),
             hint('Both roll. The character must beat the opponent’s total; a tie goes to the opponent.')),

@@ -12,7 +12,7 @@ import { fightRules } from '../src/fight-log';
 import { attackHitChance, averageDamage, lowestHit } from '../src/fight-odds';
 import { FLEES_WHEN, NERVE_DC } from '../src/nerve';
 import { SKILL_INFO, attributesFor, describeSkillBonus } from '../src/skills';
-import { SOCIAL_ACTION_INFO, socialOdds } from '../src/social';
+import { SOCIAL_ACTION_INFO, goesAlong, socialOdds } from '../src/social';
 import { HIGH, LOW, SITUATION_INFO, TEMPERAMENT_EFFECTS, TRAIT_INFO, temperament } from '../src/temperament';
 import { h } from './dom';
 import type { Panel } from './views';
@@ -158,7 +158,6 @@ const SECTIONS: readonly Section[] = [
     body: () => {
       const odds = socialOdds({ actor: sam, target: alex, action: 'intimidate' });
       const armed = socialOdds({ actor: sam, target: alex, action: 'intimidate', armed: true });
-      const goesAlong = (o: typeof odds) => successChance(o) + o['nerve:yields'];
       return [
         p('Getting someone to do something without force is a single opposed check:'),
         table(['Action', 'Roll', 'Against'], Object.values(SOCIAL_ACTION_INFO).map((a) => [a.name, SKILL_INFO[a.skill].name, `the target’s ${SKILL_INFO[a.resist].name}`])),
@@ -167,7 +166,7 @@ const SECTIONS: readonly Section[] = [
         p('An ', h('strong', {}, 'armed'), ` intimidation (drawing a weapon) first makes the target pass a nerve check against DC ${NERVE_DC['weapon-drawn']}. If they fail, they comply at once (or run, or fight back, depending on temperament); if they hold, the intimidation is rolled with advantage.`),
         example('Sam leans on Alex',
           `Sam’s Intimidation is ${signed(bonusOf(rollFor(sam, 'intimidation').modifiers))}; Alex resists with Nerve (${parts(rollFor(alex, 'nerve', { situations: ['hold-nerve', 'resist-intimidation'] }).modifiers)}).`,
-          `The chance Alex goes along with it is ${percent(goesAlong(odds))}. If Sam draws a weapon, it rises to ${percent(goesAlong(armed))}, mostly because Alex has a ${percent(armed['nerve:yields'])} chance of giving in straight away.`),
+          `The chance Alex goes along with it is ${percent(goesAlong(odds))}. If Sam draws a weapon, it rises to ${percent(goesAlong(armed))}, mostly because Alex has a ${percent(armed.find((c) => c.ending.kind === 'nerve')?.chance ?? 0)} chance of giving in straight away.`),
       ];
     },
   },

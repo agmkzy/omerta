@@ -15,8 +15,8 @@ import {
   saveRoster,
   select,
   serializeRoster,
-  setSide,
-  swapSides,
+  setRole,
+  swapRoles,
   updateEntry,
   type Entry,
   type Roster,
@@ -50,9 +50,9 @@ const brokenStorage = {
 };
 
 describe('createRoster', { tags: ['unit'] }, () => {
-  test('selects the first entry and assigns the first two as attacker and defender', () => {
+  test('selects the first entry and gives the first two the actor and target roles', () => {
     const r = three();
-    assert.deepEqual([r.selected, r.attacker, r.defender], ['a', 'a', 'b']);
+    assert.deepEqual([r.selected, r.actor, r.target], ['a', 'a', 'b']);
   });
 
   test('requires at least two entries with unique ids', () => {
@@ -79,12 +79,12 @@ describe('roster edits', { tags: ['unit'] }, () => {
     const r = removeEntry(three(), 'a');
     assert.deepEqual(r.entries.map((e) => e.id), ['b', 'c']);
     assert.equal(r.selected, 'b');
-    assert.deepEqual([r.attacker, r.defender], ['c', 'b']);
+    assert.deepEqual([r.actor, r.target], ['c', 'b']);
   });
 
   test('removeEntry keeps references to entries that remain', () => {
     const r = removeEntry(select(three(), 'b'), 'c');
-    assert.deepEqual([r.selected, r.attacker, r.defender], ['b', 'a', 'b']);
+    assert.deepEqual([r.selected, r.actor, r.target], ['b', 'a', 'b']);
   });
 
   test('removeEntry refuses to go below two entries', () => {
@@ -97,24 +97,25 @@ describe('roster edits', { tags: ['unit'] }, () => {
     assert.throws(() => select(three(), 'zz'), RangeError);
   });
 
-  test('setSide assigns a side, swapping if that entry holds the other side', () => {
+  test('setRole assigns a role, swapping if that entry holds the other role', () => {
     const r = three();
-    assert.deepEqual([setSide(r, 'attacker', 'c').attacker, setSide(r, 'attacker', 'c').defender], ['c', 'b']);
-    assert.deepEqual([setSide(r, 'defender', 'c').attacker, setSide(r, 'defender', 'c').defender], ['a', 'c']);
-    assert.deepEqual([setSide(r, 'attacker', 'b').attacker, setSide(r, 'attacker', 'b').defender], ['b', 'a']);
-    assert.deepEqual([setSide(r, 'defender', 'a').attacker, setSide(r, 'defender', 'a').defender], ['b', 'a']);
-    assert.throws(() => setSide(r, 'attacker', 'zz'), RangeError);
+    const roles = (x: Roster) => [x.actor, x.target];
+    assert.deepEqual(roles(setRole(r, 'actor', 'c')), ['c', 'b']);
+    assert.deepEqual(roles(setRole(r, 'target', 'c')), ['a', 'c']);
+    assert.deepEqual(roles(setRole(r, 'actor', 'b')), ['b', 'a']);
+    assert.deepEqual(roles(setRole(r, 'target', 'a')), ['b', 'a']);
+    assert.throws(() => setRole(r, 'actor', 'zz'), RangeError);
   });
 
-  test('swapSides exchanges attacker and defender', () => {
-    const r = swapSides(three());
-    assert.deepEqual([r.attacker, r.defender], ['b', 'a']);
+  test('swapRoles exchanges the actor and target', () => {
+    const r = swapRoles(three());
+    assert.deepEqual([r.actor, r.target], ['b', 'a']);
   });
 });
 
 describe('serializeRoster and parseRoster', { tags: ['unit'] }, () => {
   test('round-trip a roster', () => {
-    const r = setSide(select(three(), 'c'), 'defender', 'c');
+    const r = setRole(select(three(), 'c'), 'target', 'c');
     assert.deepEqual(parseRoster(serializeRoster(r)), { roster: r, ...read });
   });
 
@@ -123,11 +124,19 @@ describe('serializeRoster and parseRoster', { tags: ['unit'] }, () => {
     assert.equal(dropped, 0);
     assert.deepEqual(roster?.entries.map((e) => [e.character.name, e.character.background]), [['Enforcer 1', 'fighter'], ['Shopkeeper 1', 'shopkeeper']]);
     assert.equal(roster?.entries[0]!.character.training.brawling, 'expert');
+    assert.deepEqual([roster?.actor, roster?.target], roster?.entries.map((e) => e.id));
+  });
+
+  test('read format 1, where the roles were called attacker and defender, without counting those as unrecognised', () => {
+    const p = parseRoster(JSON.stringify({ format: 1, entries: [good('a'), good('b'), good('c')], selected: 'a', attacker: 'c', defender: 'a' }));
+    assert.deepEqual([p.roster?.actor, p.roster?.target, p.ignored], ['c', 'a', []]);
+    const withoutRoles = parseRoster(JSON.stringify({ format: 1, entries: [good('a'), good('b')] }));
+    assert.deepEqual([withoutRoles.roster?.actor, withoutRoles.roster?.target, withoutRoles.ignored], ['a', 'b', []]);
   });
 
   test('do not read a newer roster format, and say that is why', () => {
     const stored = JSON.parse(serializeRoster(three())) as Record<string, unknown>;
-    assert.deepEqual(parseRoster(JSON.stringify({ ...stored, format: 2 })), { roster: null, ...read, newer: true });
+    assert.deepEqual(parseRoster(JSON.stringify({ ...stored, format: 3 })), { roster: null, ...read, newer: true });
   });
 
   test('say when an entry was saved by a newer version', () => {
@@ -166,14 +175,14 @@ describe('serializeRoster and parseRoster', { tags: ['unit'] }, () => {
     assert.equal(dropped, 3);
     assert.equal(newer, false);
     assert.deepEqual(r.entries.map((e) => [e.id, e.character.name]), [['a', 'A'], ['c', 'C']]);
-    assert.deepEqual([r.selected, r.attacker, r.defender], ['a', 'c', 'a']);
+    assert.deepEqual([r.selected, r.actor, r.target], ['a', 'c', 'a']);
   });
 
   test('repair references that are not strings', () => {
     const saved = JSON.parse(serializeRoster(three())) as Record<string, unknown>;
-    const r = parseRoster(JSON.stringify({ ...saved, selected: 5, attacker: null })).roster;
+    const r = parseRoster(JSON.stringify({ ...saved, selected: 5, actor: null })).roster;
     assert.ok(r);
-    assert.deepEqual([r.selected, r.attacker, r.defender], ['a', 'a', 'b']);
+    assert.deepEqual([r.selected, r.actor, r.target], ['a', 'a', 'b']);
   });
 
   test('return null for unusable data', () => {
@@ -289,7 +298,7 @@ describe('openRoster', { tags: ['unit'] }, () => {
   });
 
   test('data from a newer version is left alone: no backup, and nothing may be saved', () => {
-    const newer = JSON.stringify({ format: 2, entries: [] });
+    const newer = JSON.stringify({ format: 3, entries: [] });
     const storage = memoryStorage({ [ROSTER_KEY]: newer });
     const opened = open(storage);
     assert.deepEqual([opened.roster, opened.canSave, opened.saved], [fresh(), false, false]);

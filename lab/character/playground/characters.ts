@@ -64,7 +64,7 @@ export function charactersPanel(): Panel {
     list.replaceChildren(
       h('h2', {}, `Saved characters (${r.entries.length})`),
       h('ul', { class: 'roster-list' }, ...r.entries.map((e) => {
-        const role = e.id === r.attacker ? 'attacker' : e.id === r.defender ? 'defender' : '';
+        const role = e.id === r.actor ? 'skill check: character' : e.id === r.target ? 'skill check: target' : '';
         return h('li', {},
           h('button', { type: 'button', class: e.id === r.selected ? 'roster-item selected' : 'roster-item', 'aria-current': e.id === r.selected ? 'true' : undefined,
             onclick: () => { change((x) => select(x, e.id), SOURCE); render(); } },
