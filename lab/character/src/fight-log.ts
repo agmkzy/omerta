@@ -3,7 +3,7 @@
 import { abilityModifier } from './attributes';
 import { bonusOf, type Modifier } from './check';
 import { defenceModifiers, rollFor } from './character';
-import { DICE, type Dice } from './dice';
+import type { Dice } from './dice';
 import { atLeast, diceDistribution } from './distribution';
 import { percent } from './explain';
 import { nerveCheckSpec } from './nerve';
@@ -97,15 +97,22 @@ export interface RollExplanation {
   readonly against: { readonly label: string; readonly total: number; readonly parts: readonly Modifier[] } | null;
 }
 
-/** Why a roll is being made and where its numbers come from. */
-export function explainRoll(request: RollRequest, fighters: readonly Fighter[]): RollExplanation {
+/** How the rule for the highest and lowest possible attack rolls reads on these dice. */
+function extremes(dice: Dice): string {
+  if (dice.count === 1 && dice.sides === 20) return 'A natural 20 always hits and is a critical hit; a natural 1 always misses.';
+  return `The highest possible roll (${dice.count * dice.sides}) always hits and is a critical hit; the lowest (${dice.count}) always misses.`;
+}
+
+/** Why a roll is being made and where its numbers come from, worded for the fight's dice. */
+export function explainRoll(request: RollRequest, fighters: readonly Fighter[], dice: Dice): RollExplanation {
   const r = request.reason;
   const fighter = (id: string) => fighters.find((f) => f.id === id)!.character;
   const c = fighter(r.id);
+  const nerve = `${dice.name} + Nerve (Wisdom or Constitution, training and temperament)`;
   switch (r.kind) {
     case 'initiative':
       return {
-        purpose: 'Initiative decides who acts first each round: d20 + Reflexes (the Agility modifier, plus any Reflexes training).',
+        purpose: `Initiative decides who acts first each round: ${dice.name} + Reflexes (the Agility modifier, plus any Reflexes training).`,
         bonus: rollFor(c, 'reflexes').modifiers,
         against: null,
       };
@@ -114,15 +121,18 @@ export function explainRoll(request: RollRequest, fighters: readonly Fighter[]):
     case 'attack': {
       const target = fighter(r.target);
       const parts = defenceModifiers(target);
+      const advantage = r.edge === 'advantage'
+        ? ' This attack has advantage: someone else on their side has already attacked this target this round, so the dice are rolled twice and the higher result counts.'
+        : '';
       return {
-        purpose: `An attack hits if d20 + Brawling (the Strength modifier, plus any Brawling training) meets the target’s Defence. A natural 20 always hits and is a critical hit; a natural 1 always misses.${r.edge === 'advantage' ? ' This attack has advantage: someone else on their side has already attacked this target this round, so two dice are rolled and the higher counts.' : ''}`,
+        purpose: `An attack hits if ${dice.name} + Brawling (the Strength modifier, plus any Brawling training) meets the target’s Defence. ${extremes(dice)}${advantage}`,
         bonus: rollFor(c, 'brawling').modifiers,
         against: { label: `${target.name}’s Defence`, total: bonusOf(parts), parts },
       };
     }
     case 'damage':
       return {
-        purpose: 'Damage is 1d4 plus the Strength modifier, at least 1. A critical hit rolls the dice twice.',
+        purpose: `Damage is 1d${UNARMED_DAMAGE_DIE} plus the Strength modifier, at least 1. A critical hit rolls the damage dice twice.`,
         bonus: [{ value: abilityModifier(c.attributes.str), reason: `Strength ${c.attributes.str}` }],
         against: null,
       };
@@ -130,9 +140,9 @@ export function explainRoll(request: RollRequest, fighters: readonly Fighter[]):
       return {
         purpose:
           r.trigger === 'hurt'
-            ? 'The first time a fighter drops to half HP, they make one nerve check: d20 + Nerve (Wisdom or Constitution, training and temperament). Failing takes them out of the fight.'
-            : 'The first time half their side is out of the fight, everyone left makes one nerve check: d20 + Nerve (Wisdom or Constitution, training and temperament). Failing takes them out of the fight.',
-        bonus: nerveCheckSpec(c, r.trigger, DICE.d20).modifiers,
+            ? `The first time a fighter drops to half HP, they make one nerve check: ${nerve}. Failing takes them out of the fight.`
+            : `The first time half their side is out of the fight, everyone left makes one nerve check: ${nerve}. Failing takes them out of the fight.`,
+        bonus: nerveCheckSpec(c, r.trigger, dice).modifiers,
         against: null,
       };
   }

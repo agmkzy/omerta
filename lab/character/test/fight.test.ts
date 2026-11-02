@@ -336,7 +336,7 @@ describe('explainRoll', { tags: ['unit'] }, () => {
   const explain = (s: FightSpec, ...faces: number[]) => {
     const step = stepFight(s, faces);
     assert.ok(!step.done);
-    return explainRoll(step.request, step.fighters);
+    return explainRoll(step.request, step.fighters, s.dice ?? DICE.d20);
   };
 
   test('initiative: what it is for, and where the bonus comes from', () => {
@@ -377,6 +377,20 @@ describe('explainRoll', { tags: ['unit'] }, () => {
   test('an attack with advantage says why', () => {
     const e = explain({ attackers: [attacker()], defenders: [defender({}, 'C'), defender({}, 'E')], maxRounds: 1 }, 15, 10, 10, 2, 1, 1);
     assert.match(e.purpose, /advantage/);
+  });
+
+  test('names the fight’s dice, and on dice other than a d20 the highest and lowest possible rolls', () => {
+    const d20 = explain(duel(), 15, 10);
+    assert.match(d20.purpose, /d20 \+ Brawling/);
+    assert.match(d20.purpose, /A natural 20 always hits/);
+    const s = duel({ dice: DICE['3d6'] });
+    assert.match(explain(s).purpose, /3d6 \+ Reflexes/);
+    const attack = explain(s, 4, 4, 4, 3, 3, 3).purpose;
+    assert.match(attack, /3d6 \+ Brawling/);
+    assert.match(attack, /The highest possible roll \(18\) always hits and is a critical hit; the lowest \(3\) always misses/);
+    assert.doesNotMatch(attack, /d20|natural/);
+    assert.match(explain(s, 4, 4, 4, 3, 3, 3, 6, 6, 6, 4, 4).purpose, /3d6 \+ Nerve/);
+    assert.match(explain(s, 4, 4, 4, 3, 3, 3, 5, 5, 5).purpose, /^Damage is 1d4 plus/);
   });
 
   test('choosing a target: no bonus', () => {

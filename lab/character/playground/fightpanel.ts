@@ -6,7 +6,7 @@
 import { assessFight, describeRisk } from '../src/assessment';
 import { BACKGROUND_INFO } from '../src/backgrounds';
 import { BASE_DEFENCE, BASE_HIT_POINTS, type Character } from '../src/character';
-import { DICE, DICE_NAMES, type DiceName } from '../src/dice';
+import { DICE, DICE_NAMES, type Dice, type DiceName } from '../src/dice';
 import { compactRoll, describeModifier, percent, signed } from '../src/explain';
 import { bonusOf } from '../src/check';
 import { UNARMED_DAMAGE_DIE, facesForResult, fightStats, resultOf, rollOdds, runFight, stepFight, tallyFights, type FightEvent, type FightSpec, type FightTally, type Fighter, type FighterStatus, type RollOdds, type RollRequest } from '../src/fight';
@@ -63,11 +63,11 @@ function fighterCard(c: Character, options: { result?: { hp: number; status: Fig
       h('div', { class: 'hp-bar' }, h('div', { class: 'hp-fill', style: `width:${(hp / s.hitPoints) * 100}%` })),
       h('span', { class: 'hp-text' }, `${hp}/${s.hitPoints} HP`)),
     h('div', { class: 'stats' },
-      stat('Attack', signed(s.attack), 'Added to the d20 when attacking (Brawling).'),
+      stat('Attack', signed(s.attack), 'Added to the dice when attacking (Brawling).'),
       stat('Defence', String(s.defence), `What an attack must reach to hit (${BASE_DEFENCE} + Reflexes).`),
       stat('Damage', `1d${s.damageDie}${s.damageModifier ? ` ${signed(s.damageModifier)}` : ''}`, 'Damage per hit (Strength modifier added; at least 1).'),
-      stat('Initiative', signed(s.initiative), 'Added to the d20 for turn order (Reflexes).'),
-      stat('Nerve', signed(s.nerve), 'Added to the d20 for nerve checks, including temperament.')),
+      stat('Initiative', signed(s.initiative), 'Added to the dice for turn order (Reflexes).'),
+      stat('Nerve', signed(s.nerve), 'Added to the dice for nerve checks, including temperament.')),
     traits.length ? h('div', { class: 'hint' }, traits.join(', ')) : null,
   );
 }
@@ -131,15 +131,17 @@ export function fightPanel(): Panel {
     render();
   };
 
-  const guide = () =>
+  const guide = (dice: Dice) =>
     h('details', { class: 'guide' }, h('summary', {}, 'How a fight works'),
       h('ul', {},
         h('li', {}, 'Everyone rolls Initiative. The highest acts first, and so on down (on a tie, the right side first). This order is used every round.'),
-        h('li', {}, `On their turn, each fighter attacks a random enemy who is still fighting: d20 + Attack against the target’s Defence. Meeting or beating it is a hit for their Damage (at least 1).`),
-        h('li', {}, 'A natural 20 always hits and is a critical hit: the damage dice are rolled twice. A natural 1 always misses.'),
+        h('li', {}, `On their turn, each fighter attacks a random enemy who is still fighting: ${dice.name} + Attack against the target’s Defence. Meeting or beating it is a hit for their Damage (at least 1).`),
+        h('li', {}, dice.count === 1 && dice.sides === 20
+          ? 'A natural 20 always hits and is a critical hit: the damage dice are rolled twice. A natural 1 always misses.'
+          : `The highest possible roll (${dice.count * dice.sides}) always hits and is a critical hit: the damage dice are rolled twice. The lowest (${dice.count}) always misses.`),
         h('li', {}, 'Ganging up: if someone on your side has already attacked a target this round, your attack on them has advantage (two dice, the higher counts).'),
         h('li', {}, `Hit points are ${BASE_HIT_POINTS} + Constitution modifier, plus the proficiency bonus if trained in Toughness. At 0 a fighter is knocked out.`),
-        h('li', {}, `Nerve: a fighter makes one nerve check (d20 + Nerve, DC ${NERVE_DC.hurt}) the first time they drop to half HP, and everyone left on a side makes one (DC ${NERVE_DC['allies-down']}) the first time half of that side is out. Failing takes them out: a timid or cautious fighter flees; otherwise they surrender (right side) or back off (left side).`),
+        h('li', {}, `Nerve: a fighter makes one nerve check (${dice.name} + Nerve, DC ${NERVE_DC.hurt}) the first time they drop to half HP, and everyone left on a side makes one (DC ${NERVE_DC['allies-down']}) the first time half of that side is out. Failing takes them out: a timid or cautious fighter flees; otherwise they surrender (right side) or back off (left side).`),
         h('li', {}, 'A side loses when nobody on it is still fighting. If both sides are still fighting at the round limit, it is a stalemate.')));
 
   /** How the fight is likely to go for the left side, in words, estimated from simulated fights. */
@@ -176,7 +178,7 @@ export function fightPanel(): Panel {
       h('details', { class: 'guide' }, h('summary', {}, `Options: round limit ${state.maxRounds}, ${state.dice}`),
         slider('Round limit', state.maxRounds, 1, 30, (v) => { state.maxRounds = v; refreshAssessment(); }, String, 'The fight is a stalemate if both sides are still fighting after this many rounds.'),
         h('div', { class: 'field' }, h('span', {}, 'Dice'), segmented(DICE_NAMES, state.dice, (d) => { state.dice = d; render(); }), hint(DICE[state.dice].description))),
-      guide(),
+      guide(DICE[state.dice]),
       h('div', { class: 'row' },
         h('button', { type: 'button', class: 'primary', disabled: !ready, onclick: () => startFight('auto') }, 'Auto fight'),
         h('button', { type: 'button', disabled: !ready, onclick: () => startFight('step') }, 'Step through'),
@@ -235,7 +237,7 @@ export function fightPanel(): Panel {
     const panel = h('div', { class: 'roll-panel' },
       h('div', { class: 'roll-count' }, `Roll ${rollStarts(s, faces).length + 1}`),
       h('p', { class: 'prompt' }, describeRollRequest(request, fighters, fightDice)),
-      breakdown(request, fighters),
+      breakdown(request, fighters, fightDice),
       h('div', { class: 'row' },
         h('button', { type: 'button', class: 'primary', onclick: () => void animatedRoll() }, 'Roll'),
         h('button', { type: 'button', onclick: () => setFaces(playOut(s, faces)) }, 'Play the rest'),
@@ -249,8 +251,8 @@ export function fightPanel(): Panel {
   }
 
   /** What a roll is for and where its numbers come from: the roller's bonus and, for an attack, the target's Defence. */
-  function breakdown(request: RollRequest, fighters: readonly Fighter[]): HTMLElement {
-    const e = explainRoll(request, fighters);
+  function breakdown(request: RollRequest, fighters: readonly Fighter[], dice: Dice): HTMLElement {
+    const e = explainRoll(request, fighters, dice);
     const r = request.reason;
     const who = fighters.find((f) => f.id === r.id)!.character.name;
     const kind = { initiative: 'initiative bonus', attack: 'attack bonus', damage: 'damage bonus', nerve: 'nerve bonus', target: '' }[r.kind];
