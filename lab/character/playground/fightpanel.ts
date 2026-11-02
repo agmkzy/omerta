@@ -139,7 +139,7 @@ export function fightPanel(): Panel {
         h('li', {}, dice.count === 1 && dice.sides === 20
           ? 'A natural 20 always hits and is a critical hit: the damage dice are rolled twice. A natural 1 always misses.'
           : `The highest possible roll (${dice.count * dice.sides}) always hits and is a critical hit: the damage dice are rolled twice. The lowest (${dice.count}) always misses.`),
-        h('li', {}, 'Ganging up: if someone on your side has already attacked a target this round, your attack on them has advantage (two dice, the higher counts).'),
+        h('li', {}, 'Ganging up: if someone on your side has already attacked a target this round, your attack on them has advantage (the dice are rolled twice and the higher result counts).'),
         h('li', {}, `Hit points are ${BASE_HIT_POINTS} + Constitution modifier, plus the proficiency bonus if trained in Toughness. At 0 a fighter is knocked out.`),
         h('li', {}, `Nerve: a fighter makes one nerve check (${dice.name} + Nerve, DC ${NERVE_DC.hurt}) the first time they drop to half HP, and everyone left on a side makes one (DC ${NERVE_DC['allies-down']}) the first time half of that side is out. Failing takes them out: a timid or cautious fighter flees; otherwise they surrender (right side) or back off (left side).`),
         h('li', {}, 'A side loses when nobody on it is still fighting. If both sides are still fighting at the round limit, it is a stalemate.')));
@@ -243,7 +243,7 @@ export function fightPanel(): Panel {
         h('button', { type: 'button', onclick: () => setFaces(playOut(s, faces)) }, 'Play the rest'),
         h('button', { type: 'button', disabled: faces.length === 0, onclick: () => setFaces(backOneRoll(s, faces)) }, 'Back'),
         h('button', { type: 'button', 'aria-pressed': String(state.showOdds), onclick: () => { state.showOdds = !state.showOdds; render(); } }, state.showOdds ? 'Hide odds' : 'Show odds')),
-      h('div', { class: 'hint' }, r.kind === 'attack' && r.edge === 'advantage' ? 'Or choose the higher of the two dice:' : r.of > 1 ? `Or choose the total of the ${r.of} dice:` : 'Or choose the result:'),
+      h('div', { class: 'hint' }, r.kind === 'attack' && r.edge === 'advantage' ? 'Or choose the higher of the two results:' : r.of > 1 ? `Or choose the total of the ${r.of} dice:` : 'Or choose the result:'),
       h('div', { class: 'faces' }, ...buttons),
       state.showOdds ? oddsView(rollOdds(request, fighters, fightDice), request) : null,
     );

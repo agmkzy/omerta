@@ -1,9 +1,10 @@
 // Fights between two sides of one or more fighters, following D&D's combat rules. Every fighter rolls Reflexes for
 // initiative; the order is highest first (defenders first on a tie, then list order). On their turn, each fighter still in
-// the fight attacks a random enemy who is still fighting: d20 + Brawling against the target's Defence (10 + Reflexes
-// bonus). Ganging up, after D&D's optional flanking rule: an attack has advantage if someone on the attacker's side has
-// already attacked that target this round. A hit deals 1d4 + Strength modifier, at least 1; a natural 20 always hits and
-// rolls the damage dice twice; a natural 1 always misses. A fighter at 0 hit points is knocked out.
+// the fight attacks a random enemy who is still fighting: the fight's dice (a d20 by default) + Brawling against the
+// target's Defence (10 + Reflexes bonus). Ganging up, after D&D's optional flanking rule: an attack has advantage if
+// someone on the attacker's side has already attacked that target this round. A hit deals 1d4 + Strength modifier, at
+// least 1; the highest possible roll (a natural 20 on a d20) always hits and rolls the damage dice twice; the lowest
+// always misses. A fighter at 0 hit points is knocked out.
 //
 // Nerve follows D&D's optional morale rules. The first time a fighter drops to half hit points or below, they make one
 // nerve check. The first time at least half of a side is out of the fight, everyone left on that side makes one. A
@@ -95,15 +96,15 @@ export function rollDamage(c: Character, critical: boolean, roller: Roller): Dam
 
 export interface FightStats {
   readonly hitPoints: number;
-  /** Added to the d20 when attacking (the Brawling bonus). */
+  /** Added to the dice when attacking (the Brawling bonus). */
   readonly attack: number;
   /** What an attack must reach to hit them. */
   readonly defence: number;
   readonly damageDie: number;
   readonly damageModifier: number;
-  /** Added to the d20 for initiative (the Reflexes bonus). */
+  /** Added to the dice for initiative (the Reflexes bonus). */
   readonly initiative: number;
-  /** Added to the d20 for nerve checks, including temperament. */
+  /** Added to the dice for nerve checks, including temperament. */
   readonly nerve: number;
 }
 
@@ -217,7 +218,7 @@ export function facesForResult(request: RollRequest, result: number): number[] {
   return size === request.reason.of ? faces : [...faces, ...Array.from({ length: size }, () => 1)];
 }
 
-/** The chance an attack with this bonus hits this Defence: natural 20s (the highest roll) always hit, natural 1s never do. */
+/** The chance an attack with this bonus hits this Defence: the highest possible roll always hits, the lowest never does. */
 export function attackHitChance(dice: Dice, bonus: number, dc: number, edge: 'none' | 'advantage' = 'none'): number {
   const d = diceDistribution(dice, edge);
   const highest = dice.count * dice.sides;

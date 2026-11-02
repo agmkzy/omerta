@@ -191,7 +191,7 @@ const SECTIONS: readonly Section[] = [
           h('li', {}, h('strong', {}, 'Initiative'), ': at the start everyone rolls d20 + Reflexes; the highest acts first, every round.'),
           h('li', {}, h('strong', {}, 'Attacks'), `: on their turn each fighter attacks a random enemy: d20 + Brawling against the target’s Defence. A hit deals 1d${UNARMED_DAMAGE_DIE} + Strength modifier damage (at least 1).`),
           h('li', {}, h('strong', {}, 'Critical hits'), ': a natural 20 (the die showing 20) always hits and rolls the damage dice twice. A natural 1 always misses.'),
-          h('li', {}, h('strong', {}, 'Ganging up'), ': if someone on your side has already attacked a target this round, your attack on them has advantage (two dice, the higher counts). One person cannot fend off several at once. This follows D&D’s optional flanking rule.'),
+          h('li', {}, h('strong', {}, 'Ganging up'), ': if someone on your side has already attacked a target this round, your attack on them has advantage (roll twice, the higher result counts). One person cannot fend off several at once. This follows D&D’s optional flanking rule.'),
           h('li', {}, h('strong', {}, 'Nerve'), `: the first time someone drops to half HP, they make one nerve check (d20 + Nerve against ${NERVE_DC.hurt}): fight or flight. The first time half a side is out, everyone left on it checks too. Failing takes them out of the fight – they run, surrender or back off.`),
           h('li', {}, h('strong', {}, 'Winning'), ': a side loses when nobody on it is still fighting.')),
         example('Sam against Alex',

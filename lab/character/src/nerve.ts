@@ -39,7 +39,7 @@ export interface NerveCheck {
 }
 
 /**
- * d20 + Nerve (with the hold-nerve temperament modifiers) against the trigger's DC. On a failure, a timid or cautious
+ * The dice + Nerve (with the hold-nerve temperament modifiers) against the trigger's DC. On a failure, a timid or cautious
  * character flees; a hot-tempered one fights back if `canFightBack`; anyone else yields.
  */
 export function nerveCheck(c: Character, trigger: Trigger, canFightBack: boolean, dice: Dice, roller: Roller): NerveCheck {
