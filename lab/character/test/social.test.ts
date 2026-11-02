@@ -138,7 +138,9 @@ describe('socialOdds', { tags: ['property'] }, () => {
       }),
     );
   });
+});
 
+describe('socialOdds', { tags: ['statistical'] }, () => {
   test('match sampled frequencies', () => {
     const r = roller(seeded(5));
     const s = spec({ armed: true, target: target({ temper: 0.9 }) });

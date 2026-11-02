@@ -68,7 +68,9 @@ describe('random draws', { tags: ['property'] }, () => {
       }),
     );
   });
+});
 
+describe('random draws', { tags: ['statistical'] }, () => {
   test('produce each face of a d6 with roughly equal frequency', () => {
     const r = roller(seeded(7));
     const counts = [0, 0, 0, 0, 0, 0];

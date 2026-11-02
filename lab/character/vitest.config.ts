@@ -10,6 +10,7 @@ export default defineConfig({
     tags: [
       { name: 'unit', description: 'One function or module, called directly.', timeout: 2_000 },
       { name: 'property', description: 'A rule checked over many generated inputs (fast-check).', timeout: 10_000 },
+      { name: 'statistical', description: 'A seeded simulation whose rates are checked against what the rules should give.', timeout: 10_000 },
     ],
     coverage: {
       provider: 'v8',

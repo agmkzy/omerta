@@ -92,7 +92,9 @@ describe('diceDistribution', { tags: ['property'] }, () => {
       }),
     );
   });
+});
 
+describe('diceDistribution', { tags: ['statistical'] }, () => {
   test('matches sampled frequencies from rollDice', () => {
     for (const name of DICE_NAMES)
       for (const edge of EDGES) {
