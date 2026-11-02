@@ -1,6 +1,6 @@
 # Character: one object for every character
 
-**Status:** design agreed in discussion on 2 November 2026. Nothing is built. The rules tables in [Still to decide](#still-to-decide) must be agreed before the code that uses them is written.
+**Status:** design agreed in discussion on 2 November 2026. Nothing is built. The points under [Later](#later) are deliberately left for after the first version works.
 
 ## Purpose
 
@@ -14,35 +14,40 @@ It does not replace the game's `Character` (`src/types.ts`) yet, and it is not m
 - **Its own configuration:** a tsconfig, a Vitest config and npm scripts (`overhaul:test`, `overhaul:typecheck`, `overhaul:cov`), as the lab has. The game's Vitest config finds tests only in `src/tests/`, so it does not run these. Its coverage counts all of `src/`, so it must exclude `src/overhaul/**`; that is the only change to the game's own configuration.
 - **Types:** the lab's stricter settings (`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `verbatimModuleSyntax` and the rest). The game's typecheck also covers `src/`, and its looser settings still accept the code.
 - **Tests:** written first, with Vitest and `node:assert`, each tagged with one kind (`unit`, `property`, `statistical`). Coverage is held at 100%.
-- **Modules:** small, each owning one rule. A rule is written once and everything else uses it.
+- **Modules:** small, each owning one rule. A rule is written once and everything else uses it, and every rules table below is data in one place.
 - **Determinism:** dice are always passed in and seeded. No `Math.random`, no wall-clock time.
 
 ## Shape
 
-A character is plain data: a record that can be saved and loaded as it is. A handle wraps it to give a fluent interface:
+**A cast holds everyone.** One plain record holds every character and every event, so relationships and knowledge can refer to anyone by id. It can be saved and loaded as it is. Handles for characters come from it and give a fluent interface:
 
 ```ts
-const sam = character(samData);
-const rico = character(ricoData);
+const everyone = cast({ characters, events });
+const sam = everyone.character('sam');
+const rico = everyone.character('rico');
 
 sam.skills.brawling;            // training, the attribute used, the bonus and its parts
+sam.inventory.cash;             // 120
+rico.towards(sam);              // how Rico feels about Sam
 sam.data;                       // the plain record
 ```
 
-**An action returns a check before any dice are rolled.** The check can be given more modifiers, asked for its odds and explanation, then rolled:
+**An action returns a check before any dice are rolled.** The check works out its own modifiers, can be given more, can be asked for its odds and explanation, then rolled:
 
 ```ts
 const check = sam.social.intimidate(rico)
-  .with({ value: -3, reason: 'Rico saw the money himself' });
+  .with({ value: -3, reason: 'Rico has the police outside' });
 
 check.odds();                   // the chance of each outcome
 check.explain();                // every modifier, with its reason
-const { result, actor, target } = check.roll(dice);
+const outcome = check.roll(dice);
+outcome.result;                 // what happened
+outcome.cast;                   // a new cast, with Sam, Rico and any new events updated
 ```
 
-**Characters never change in place.** A result carries new versions of the characters it changed; `sam` and `rico` above are as they were. When this is slotted into the game, results are written back to the world through one function, so nothing else edits characters directly.
+**Nothing changes in place.** A roll returns a new cast; `everyone`, `sam` and `rico` above are as they were. When this is slotted into the game, a new cast is written back to the world through one function, so nothing else edits characters directly.
 
-**The player and NPCs are the same type.** There is no player flag in the character. Every character has an id, which relationships and knowledge refer to.
+**The player and NPCs are the same type.** There is no player flag in the character. Every character has an id.
 
 ## What a character holds
 
@@ -52,10 +57,10 @@ const { result, actor, target } = check.roll(dice);
 | Attributes | The six [attributes](#attributes), 1 to 20 |
 | Skills | Training in each [skill](#skills) (untrained, trained or expert) and the proficiency bonus (2 to 6) |
 | Temperament | One stored set of [traits](#temperament), each 0 to 1 |
-| Condition | Current hit points and temporary effects (for example hurt, shaken, drunk). An effect lasts until something clears it. |
-| Inventory | Items, each of which can carry situational modifiers |
-| Relationships | How this character feels about each other character, one-way |
-| Knowledge | This character's own version of each event they know about |
+| Condition | Current hit points and [temporary effects](#condition-and-temporary-effects) |
+| Inventory | Cash, as a number, and [items](#inventory) |
+| Relationships | How this character feels about each other character, one-way: see [Relationships](#relationships) |
+| Knowledge | This character's own version of each event they know about: see [Knowledge](#knowledge) |
 
 A skill's status is its training plus any temporary effects, so its bonus lists every part:
 
@@ -65,7 +70,40 @@ sam.skills.brawling;
 //   modifiers: [Strength 14 +2, Trained +2, Hurt −2] }
 ```
 
-### Relationships
+### Temperament of the player
+
+The player's temperament starts neutral (0.5 for every trait) and moves with what the player does, as the game's `conduct` record does now.
+
+## Condition and temporary effects
+
+| Effect | When it starts | What it does | How it ends |
+| --- | --- | --- | --- |
+| Hurt | Hit points at or below half. Read from hit points, not stored, so the two can never disagree. | −2 to skills using Strength, Agility or Constitution. Not applied during fights. | Healing back above half |
+| Shaken | Losing their nerve in a fight, or giving in to intimidation | −2 to Nerve, and −2 to resisting intimidation | Cleared explicitly, for example by resting |
+| Drunk | Set explicitly, or by drinking a bottle of spirits | −2 to skills using Agility or Intelligence, and to Insight and Notice; +2 to Nerve | Cleared explicitly, for example by sobering up |
+
+An effect does not stack with itself; different effects add together. Each is named in explanations, for example "Hurt −2".
+
+## Inventory
+
+**Cash is a separate number,** not an item. In the game, money moves only through the ledger, where every transfer is recorded, so keeping it apart makes it easy to join to that later.
+
+**An item** has a name and a list of effects. Each effect has a situation, a value, and when it applies: while carried, while shown (or worn), or when used. A carried weapon is hidden unless it is shown.
+
+| Item | Effect |
+| --- | --- |
+| Knife | Can be drawn for armed intimidation: nerve DC 12 |
+| Pistol | Can be drawn for armed intimidation: nerve DC 15 |
+| Lockpicks | +2 to Larceny for locks, when used |
+| Toolkit | +2 to Mechanics, when used |
+| Good suit | +1 to Persuasion, while worn |
+| Bottle of spirits | Drinking it makes the character Drunk |
+
+Armed intimidation works as it does in the lab: the target makes a nerve check against the weapon first, and the actor rolls with advantage. With an inventory, a character can intimidate armed only if they carry a weapon, and the weapon sets the nerve DC.
+
+Fights stay unarmed for now.
+
+## Relationships
 
 One-way: how Rico feels about Sam can differ from how Sam feels about Rico. Each relationship holds everything the game's `Rel` holds: trust, respect, affection, grudge, fear, familiarity (how well they know each other), when they last met, and the reasons behind the grudge and the regard.
 
@@ -73,29 +111,80 @@ One-way: how Rico feels about Sam can differ from how Sam feels about Rico. Each
 rico.towards(sam);   // { trust: 0.4, respect: 0.7, affection: 0.2, grudge: 0.1, fear: 0.6, ... }
 ```
 
-### Knowledge
+### As modifiers on social checks
+
+"High" and "low" mean the same as for temperament: 0.7 or more, and 0.3 or less. Every modifier is on the actor's roll.
+
+**How the target feels about the actor:**
+
+| Action | Modifiers |
+| --- | --- |
+| Persuade | Trust high +2, trust low −2; affection high +1; grudge high −2 |
+| Deceive | Trust high +2; familiarity high −1 (they know the actor's tells); grudge high −1 (suspicious) |
+| Intimidate | Fear high +2; respect high +1; grudge high −1 |
+
+**How the actor feels about the target:**
+
+| Action | Modifiers |
+| --- | --- |
+| Persuade | Familiarity high +1 (they know what moves the target) |
+| Deceive | Familiarity high +1 (they know what the target will believe); affection high −1 (lying to someone they are fond of is harder) |
+| Intimidate | Affection high −1 (they hold back); grudge high +1 (they mean it); fear high −2 (it is hard to threaten someone you are afraid of) |
+
+### Aftermath
+
+A social result changes how the target feels about the actor. Values run from 0 to 1, so these are small steps, as in the game.
+
+| Result | Change |
+| --- | --- |
+| Intimidation: the target gives in | Fear +0.1, grudge +0.05, trust −0.05 |
+| Intimidation: the target resists | Respect −0.05 |
+| Intimidation: the target is provoked | Grudge +0.1 |
+| Persuasion: succeeds | Trust +0.02 |
+| Persuasion: fails | None |
+| Deception: succeeds | None: the target does not know they were lied to. The lie is recorded as an event only the actor knows about, so it can come out later. |
+| Deception: caught lying | Trust −0.15, grudge +0.05 |
+
+## Knowledge
 
 Follows the game's model (`Fact` and `Knowledge` in `src/types.ts`, `addFact` and `learn` in `src/core.ts`):
 
-- **An event is recorded once,** in a list shared by everyone: what kind of event, who did it, who it was done to, any business or amount, when, where, the event that caused it, and whether who did it is hidden.
+- **An event is recorded once,** in the cast's list of events: what kind of event, who did it, who it was done to, any business or amount, when, where, the event that caused it, and whether who did it is hidden.
 - **Each character holds their own version** of the events they know about: when they learned it; where it came from (they did it, they witnessed it, it was public, or who told them); whether they know who did it; how they came by it (seen, told by a witness, heard second-hand); who they believe did it when they don't know, which can be wrong; and whether they heard it exaggerated.
 
-So the character holds versions, not the events themselves, and the handle needs access to the shared list of events.
+### As modifiers on Deception
 
-### Temperament of the player
+A lie names the event it is about: `sam.social.deceive(rico).about(eventId)`. The modifier comes from the target's own version of that event.
 
-The player's temperament starts neutral (0.5 for every trait) and moves with what the player does, as the game's `conduct` record does now.
+| What the target knows of the event | Modifier |
+| --- | --- |
+| Saw it, or took part in it | Impossible, explained as "Rico saw it himself" |
+| Was told by a witness | −4 |
+| Heard it second-hand | −2 |
+| Does not know about it | None |
+| The lie matches what they already believe, such as who they blame | +2 |
+
+Intimidation has no knowledge modifier of its own: hearing what someone has done already raises fear of them (as `learn` does in the game), and fear is in the relationship table, so a separate modifier would count it twice.
 
 ## Checks and modifiers
 
-- **The roll decides the response** in social checks, as decided in the lab ([Social actions](../../../../lab/character/README.md#social-actions)). What the target knows, what is at stake for them, their relationship with the actor and their temperament are all modifiers on the roll. A certain outcome is the same as a modifier large enough to make the check impossible, so social checks have no automatic success.
-- **The character works out its own modifiers** from rules tables: temperament (as the lab does now), knowledge and relationships, items, and temporary effects. Every modifier carries its reason, so an explanation always says where each number came from.
+- **The roll decides the response** in social checks, as decided in the lab ([Social actions](../../../../lab/character/README.md#social-actions)). What the target knows, what is at stake for them, how each feels about the other and their temperament are all modifiers on the roll. A certain outcome is the same as a modifier large enough to make the check impossible, so social checks have no automatic success.
+- **The character works out its own modifiers** from the rules tables: temperament (as the lab does now), temporary effects, items, relationships and knowledge. Every modifier carries its reason, so an explanation always says where each number came from.
 - **Situational modifiers** can still be added to any check with `.with(...)`.
 
 ## Fights
 
-- One against one: `sam.fight(rico)`. Groups are called squads: `squad(sam, joe).fight(squad(rico))`. ("Crew" already means a captain's men in the game.)
-- **Fights have named kinds.** A sparring match starts at full health and nothing lasts afterwards. A real fight starts from each character's current condition, and the damage stays.
+One against one: `sam.fight(rico)`. Groups are called squads: `squad(sam, joe).fight(squad(rico))`. ("Crew" already means a captain's men in the game.)
+
+| Kind | Starts from | Nerve checks | Afterwards |
+| --- | --- | --- | --- |
+| Sparring | Full health | None: nobody flees or surrenders | Nothing lasts, and no event is recorded |
+| Real fight | Current condition | As in the lab | Damage stays, and the fight is recorded as an event that witnesses learn about |
+
+```ts
+sam.fight(rico, { kind: 'sparring' });
+squad(sam, joe).fight(squad(rico), { kind: 'real' });
+```
 
 ## Words
 
@@ -119,7 +208,7 @@ The game has none, so the lab's six are kept: Strength, Agility, Constitution, I
 | Toughness | Constitution | Withstanding injury, pain and exhaustion | — |
 | Carousing | Constitution | Tolerance for alcohol and late nights | — |
 | Bookkeeping | Intelligence | Financial records, and spotting errors or fraud in them | Part of the game's `brains`; see [Bookkeeping](#bookkeeping) |
-| Planning | Intelligence | Preparing a job or a move; see [Planning](#planning) | Replaces the lab's Scheming |
+| Planning | Intelligence (or Wisdom) | Preparing a job or a move; see [Planning](#planning) | Replaces the lab's Scheming |
 | Mechanics | Intelligence | Repairing and operating engines, machines and electrics | — |
 | Streetwise | Wisdom | Local knowledge: rumours, contacts, finding people | — |
 | Insight | Wisdom | Reading people's intentions and detecting lies | — |
@@ -127,6 +216,8 @@ The game has none, so the lab's six are kept: Strength, Agility, Constitution, I
 | Nerve | Wisdom (or Constitution) | Staying composed under threat or interrogation | Same word as the game's `nerve`, for its composure use |
 | Persuasion | Charisma | Negotiation and convincing others | The game's `charm` covers both this and Deception |
 | Deception | Charisma | Lying convincingly | See Persuasion |
+
+A skill with an alternative attribute uses whichever of the two is higher, as in the lab.
 
 ### Temperament
 
@@ -153,7 +244,8 @@ One stored set of traits, each 0 to 1. The game has two layers (stored traits, a
 
 A roll made before a job or a move. Its result becomes modifiers on the checks that follow.
 
-- One character plans, rolling Planning (Intelligence) against a DC the job sets: for example 10 for a simple job, 15 for a tricky one, 20 for a hard one.
+- One character plans, rolling Planning (Intelligence or Wisdom, whichever is higher) against a DC the job sets: for example 10 for a simple job, 15 for a tricky one, 20 for a hard one.
+- One other character taking part in the job can help, giving the planner advantage on the roll. More helpers add nothing more.
 - The result applies to every skill check made by anyone following the plan during that job:
 
 | Outcome | Effect on the job's checks |
@@ -167,10 +259,10 @@ A roll made before a job or a move. Its result becomes modifiers on the checks t
 - There is one plan per job, and a job cannot be replanned.
 - The planner does not know exactly how good the plan is: a critical failure looks like a failure to them, so they follow a bad plan without knowing.
 - The modifier is named in each check's explanation, for example "A good plan +2".
-- Fight rolls are not affected, for now.
+- Fight rolls are not affected.
 
 ```ts
-const plan = sam.planning.plan(burglary).roll(dice);
+const plan = sam.planning.plan(burglary).helpedBy(joe).roll(dice);
 squad(sam, joe).following(plan).larceny.check(15);   // includes "A good plan +2"
 ```
 
@@ -182,13 +274,16 @@ Where it would be used once this is slotted into the game, which now uses `brain
 - **Spotting a skim:** the same check from the other side.
 - **Running a business, a loan book or a numbers game well:** in place of `brains` in a business's management quality (`src/econ.ts`).
 
-The rules for these are not set.
+The rules for these are not set; they belong with slotting the character into the game.
 
-## Still to decide
+## Later
 
-1. **Temporary effects:** which effects there are, what each does to which skills, and what clears them.
-2. **Knowledge and relationships:** the rules table that turns what a character knows, and how they feel about someone, into modifiers.
-3. **Items:** the first items and their effects. Whether cash is an item or a separate value.
-4. **Fight kinds:** what each named kind does beyond sparring and a real fight, and whether there are others.
-5. **Planning:** whether another character can help (giving the planner advantage), and whether Wisdom can be used instead of Intelligence.
-6. **Access to events:** whether the handle is given the shared list of events when it is made (`character(data, events)`) or each action is.
+Left out of the first version on purpose, each to be decided on its own:
+
+- **More fight kinds:** a beating (one side does not fight back) and an ambush (the attacking squad gets the first round).
+- **Sparring's end:** whether a sparring match stops when someone first drops to half health, rather than at a knockout.
+- **Weapons in fights:** weapon damage changes fight balance, so it needs checking with the simulation.
+- **Hurt during fights,** and Planning's effect on fight rolls: both change fight balance in the same way.
+- **The actor's side of the aftermath:** whether the actor's feelings change too, such as contempt for someone who always gives in.
+- **Drinking:** whether drinking needs a Carousing check before a character becomes Drunk.
+- **Bookkeeping's rules,** as above.

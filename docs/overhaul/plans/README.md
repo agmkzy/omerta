@@ -4,4 +4,4 @@ Designs for work that has been agreed but not yet built, one folder per plan. Ea
 
 | Plan | Status |
 | --- | --- |
-| [character/](character/README.md) | Design agreed in part (2 November 2026); rules tables still open; nothing built |
+| [character/](character/README.md) | Design agreed (2 November 2026); nothing built |
