@@ -92,7 +92,7 @@ describe('openParties', { tags: ['unit'] }, () => {
   });
 
   test('if that backup fails, it may not be saved', () => {
-    assert.deepEqual(openParties(full({ [PARTIES_KEY]: '{' })), { parties: null, canSave: false, warning: 'The saved line-up could not be fully read, or backed up, so changes to it will not be saved this session.' });
+    assert.deepEqual(openParties(full({ [PARTIES_KEY]: '{' })), { parties: null, canSave: false, warning: 'The saved line-up could not be fully read, and could not be backed up, so changes to it will not be saved this session.' });
   });
 });
 
@@ -153,5 +153,24 @@ describe('lineUp', { tags: ['unit'] }, () => {
     refuse = false;
     line.set(parties);
     assert.equal(line.note(), null);
+  });
+
+  test('after a backup, still says when changes are not being saved', () => {
+    const backedUp = /^The saved line-up could not be fully read\. The original is kept in this browser’s storage under “[^”]+”\. /;
+    const blocked = lineUp(memoryStorage({ [PARTIES_KEY]: '{' }), () => false);
+    blocked.set(parties);
+    assert.match(blocked.note() ?? '', new RegExp(`${backedUp.source}Changes to the line-up are not saved this session`));
+
+    let refuse = false;
+    const filling = memoryStorage({ [PARTIES_KEY]: '{' });
+    const line = lineUp({ ...filling, setItem: (k: string, v: string) => { if (refuse) throw new Error('quota exceeded'); filling.setItem(k, v); } }, () => true);
+    line.current(['a', 'b']);
+    refuse = true;
+    line.set(parties);
+    assert.match(line.note() ?? '', new RegExp(`${backedUp.source}The last change to the line-up was not saved`));
+  });
+
+  test('a read warning that already blocks saving is not followed by a second reason', () => {
+    assert.equal(lineUp(brokenStorage, () => false).note(), 'The saved line-up could not be read from this browser’s storage, so changes to it will not be saved this session.');
   });
 });

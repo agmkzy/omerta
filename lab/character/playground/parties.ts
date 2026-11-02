@@ -78,7 +78,7 @@ export function openParties(storage: KeyValueStorage | null): OpenedParties {
   const key = backup(storage, PARTIES_KEY, text);
   return key
     ? { parties, canSave: true, warning: `The saved line-up could not be fully read. The original is kept in this browser’s storage under “${key}”.` }
-    : { parties, canSave: false, warning: 'The saved line-up could not be fully read, or backed up, so changes to it will not be saved this session.' };
+    : { parties, canSave: false, warning: 'The saved line-up could not be fully read, and could not be backed up, so changes to it will not be saved this session.' };
 }
 
 /** The fight line-up for one page. */
@@ -105,6 +105,14 @@ export function lineUp(storage: KeyValueStorage | null, canSave: () => boolean):
     }
     return opened;
   };
+  /** Why changes are not being saved now, if they are not; null when a read warning that blocks saving already says so. */
+  const savingNote = (lineUpCanSave: boolean): string | null => {
+    if (!storage) return 'Changes to the line-up are not saved: browser storage is unavailable.';
+    if (!lineUpCanSave) return null;
+    if (!canSave()) return 'Changes to the line-up are not saved this session, to protect the saved characters (see the warning at the top of the page).';
+    if (lastSaveFailed) return 'The last change to the line-up was not saved: the browser refused to store it (its storage may be full).';
+    return null;
+  };
   return {
     current(ids) {
       const o = open();
@@ -119,10 +127,8 @@ export function lineUp(storage: KeyValueStorage | null, canSave: () => boolean):
     },
     note() {
       const o = open();
-      if (o.warning) return o.warning;
-      if (!storage) return 'Changes to the line-up are not saved: browser storage is unavailable.';
-      if (!canSave()) return 'Changes to the line-up are not saved this session, to protect the saved characters (see the warning at the top of the page).';
-      return lastSaveFailed ? 'The last change to the line-up was not saved: the browser refused to store it (its storage may be full).' : null;
+      const notes = [o.warning, savingNote(o.canSave)].filter((n) => n !== null);
+      return notes.length ? notes.join(' ') : null;
     },
   };
 }
