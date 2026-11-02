@@ -192,6 +192,8 @@ export function checkOdds(spec: CheckSpec): Odds {
 }
 
 export function opposedOdds(spec: OpposedSpec): Odds {
+  // The lead's distribution (active minus passive), turned into margins: opposedMargin is the lead plus a fixed offset,
+  // so shifting by opposedMargin(0) applies it to every lead at once.
   return oddsOf(shift(minus(totalDistribution(spec.active), totalDistribution(spec.passive)), opposedMargin(0)), spec.bands);
 }
 
