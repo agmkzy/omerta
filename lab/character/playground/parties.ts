@@ -52,10 +52,11 @@ export function parseParties(text: string): Parties | null {
   return { attackers: keep(attackers), defenders: keep(defenders) };
 }
 
-/** The stored line-up as read, and whether it may be saved over. */
+/** The stored line-up as read, whether it may be saved over, and what to tell the user if it could not all be read. */
 export interface OpenedParties {
   readonly parties: Parties | null;
   readonly canSave: boolean;
+  readonly warning: string | null;
 }
 
 /**
@@ -64,17 +65,20 @@ export interface OpenedParties {
  * saved over.
  */
 export function openParties(storage: KeyValueStorage | null): OpenedParties {
-  if (!storage) return { parties: null, canSave: false };
+  if (!storage) return { parties: null, canSave: false, warning: null };
   let text: string | null;
   try {
     text = storage.getItem(PARTIES_KEY);
   } catch {
-    return { parties: null, canSave: false };
+    return { parties: null, canSave: false, warning: 'The saved line-up could not be read from this browser’s storage, so changes to it will not be saved this session.' };
   }
-  if (text === null) return { parties: null, canSave: true };
+  if (text === null) return { parties: null, canSave: true, warning: null };
   const parties = parseParties(text);
-  if (parties && serializeParties(parties) === text) return { parties, canSave: true };
-  return { parties, canSave: backup(storage, PARTIES_KEY, text) !== null };
+  if (parties && serializeParties(parties) === text) return { parties, canSave: true, warning: null };
+  const key = backup(storage, PARTIES_KEY, text);
+  return key
+    ? { parties, canSave: true, warning: `The saved line-up could not be fully read. The original is kept in this browser’s storage under “${key}”.` }
+    : { parties, canSave: false, warning: 'The saved line-up could not be fully read, or backed up, so changes to it will not be saved this session.' };
 }
 
 /** The fight line-up for one page. */
@@ -86,15 +90,18 @@ export interface LineUp {
   current(ids: readonly string[]): Parties;
   /** Changes the line-up, and saves it if it may be saved over and `canSave` (the roster's rule) allows. */
   set(p: Parties): void;
+  /** What to tell the user if the line-up could not all be read, or changes to it are not being saved; null if all is well. */
+  note(): string | null;
 }
 
 /** A line-up read from storage when first needed (see openParties). */
 export function lineUp(storage: KeyValueStorage | null, canSave: () => boolean): LineUp {
-  let opened: { parties: Parties; canSave: boolean } | null = null;
+  let opened: { parties: Parties; canSave: boolean; warning: string | null } | null = null;
+  let lastSaveFailed = false;
   const open = () => {
     if (!opened) {
       const read = openParties(storage);
-      opened = { parties: read.parties ?? { attackers: [], defenders: [] }, canSave: read.canSave };
+      opened = { ...read, parties: read.parties ?? { attackers: [], defenders: [] } };
     }
     return opened;
   };
@@ -108,7 +115,14 @@ export function lineUp(storage: KeyValueStorage | null, canSave: () => boolean):
     set(p) {
       const o = open();
       o.parties = p;
-      if (storage && o.canSave && canSave()) saveParties(storage, p);
+      if (storage && o.canSave && canSave()) lastSaveFailed = !saveParties(storage, p);
+    },
+    note() {
+      const o = open();
+      if (o.warning) return o.warning;
+      if (!storage) return 'Changes to the line-up are not saved: browser storage is unavailable.';
+      if (!canSave()) return 'Changes to the line-up are not saved this session, to protect the saved characters (see the warning at the top of the page).';
+      return lastSaveFailed ? 'The last change to the line-up was not saved: the browser refused to store it (its storage may be full).' : null;
     },
   };
 }

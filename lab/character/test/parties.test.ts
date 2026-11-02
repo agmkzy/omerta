@@ -67,17 +67,17 @@ describe('openParties', { tags: ['unit'] }, () => {
 
   test('reads a line-up saved by this version, with no backup', () => {
     const storage = memoryStorage({ [PARTIES_KEY]: serializeParties(parties) });
-    assert.deepEqual(openParties(storage), { parties, canSave: true });
+    assert.deepEqual(openParties(storage), { parties, canSave: true, warning: null });
     assert.deepEqual(backups(storage.data), []);
   });
 
   test('with nothing stored there is nothing to read, and it may be saved', () => {
-    assert.deepEqual(openParties(memoryStorage()), { parties: null, canSave: true });
+    assert.deepEqual(openParties(memoryStorage()), { parties: null, canSave: true, warning: null });
   });
 
   test('without storage, or storage that cannot be read, it may not be saved', () => {
-    assert.deepEqual(openParties(null), { parties: null, canSave: false });
-    assert.deepEqual(openParties(brokenStorage), { parties: null, canSave: false });
+    assert.deepEqual(openParties(null), { parties: null, canSave: false, warning: null });
+    assert.deepEqual(openParties(brokenStorage), { parties: null, canSave: false, warning: 'The saved line-up could not be read from this browser’s storage, so changes to it will not be saved this session.' });
   });
 
   test('backs up a stored line-up that saving would change: corrupt, or with something not recognised', () => {
@@ -85,12 +85,14 @@ describe('openParties', { tags: ['unit'] }, () => {
       const storage = memoryStorage({ [PARTIES_KEY]: text });
       const opened = openParties(storage);
       assert.equal(opened.canSave, true, text);
-      assert.deepEqual(backups(storage.data).map((k) => storage.data[k]), [text], text);
+      const keys = backups(storage.data);
+      assert.deepEqual(keys.map((k) => storage.data[k]), [text], text);
+      assert.equal(opened.warning, `The saved line-up could not be fully read. The original is kept in this browser’s storage under “${keys[0]}”.`);
     }
   });
 
   test('if that backup fails, it may not be saved', () => {
-    assert.deepEqual(openParties(full({ [PARTIES_KEY]: '{' })), { parties: null, canSave: false });
+    assert.deepEqual(openParties(full({ [PARTIES_KEY]: '{' })), { parties: null, canSave: false, warning: 'The saved line-up could not be fully read, or backed up, so changes to it will not be saved this session.' });
   });
 });
 
@@ -133,5 +135,23 @@ describe('lineUp', { tags: ['unit'] }, () => {
     const failing = { getItem: (k: string) => (k === PARTIES_KEY ? '{' : null), setItem: (k: string) => { if (k === PARTIES_KEY) attempts++; throw new Error('quota exceeded'); } };
     lineUp(failing, () => true).set(parties);
     assert.equal(attempts, 0);
+  });
+
+  test('says nothing when all is well, and says why changes are not saved when they are not', () => {
+    assert.equal(lineUp(memoryStorage(), () => true).note(), null);
+    assert.equal(lineUp(null, () => true).note(), 'Changes to the line-up are not saved: browser storage is unavailable.');
+    assert.match(lineUp(memoryStorage(), () => false).note() ?? '', /^Changes to the line-up are not saved this session, to protect the saved characters/);
+    assert.match(lineUp(memoryStorage({ [PARTIES_KEY]: '{' }), () => true).note() ?? '', /^The saved line-up could not be fully read\. The original is kept/);
+  });
+
+  test('says when the last change could not be saved, until one is', () => {
+    let refuse = true;
+    const storage = { ...memoryStorage(), setItem: () => { if (refuse) throw new Error('quota exceeded'); } };
+    const line = lineUp(storage, () => true);
+    line.set(parties);
+    assert.match(line.note() ?? '', /^The last change to the line-up was not saved/);
+    refuse = false;
+    line.set(parties);
+    assert.equal(line.note(), null);
   });
 });

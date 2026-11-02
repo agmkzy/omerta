@@ -154,6 +154,7 @@ export function fightPanel(): Panel {
     const inFight = new Set([...state.parties.attackers, ...state.parties.defenders]);
     const available = getRoster().entries.filter((e) => !inFight.has(e.id));
     const ready = canFight(state.parties);
+    const lineNote = line.note();
     const sideColumn = (side: Side) =>
       h('div', { class: 'side' },
         h('h3', {}, `${SIDE_TITLE[side]} ${side === 'attacker' ? '(attackers)' : '(defenders)'}`),
@@ -167,6 +168,7 @@ export function fightPanel(): Panel {
       h('h2', { id: 'fight-title' }, 'Fight set-up'),
       hint(available.length ? 'Click a name to add that character to a side, or × to remove them.' : 'Everyone saved is already in the fight. Create more characters in the Characters tab.'),
       h('div', { class: 'grid two sides' }, sideColumn('attacker'), sideColumn('defender')),
+      ...(lineNote ? [h('p', { class: 'warning small', role: 'status' }, lineNote)] : []),
       ...(ready ? [assessmentBox] : []),
       h('details', { class: 'guide' }, h('summary', {}, `Options: round limit ${state.maxRounds}, ${state.dice}`),
         slider('Round limit', state.maxRounds, 1, 30, (v) => { state.maxRounds = v; refreshAssessment(); }, String, 'The fight is a stalemate if both sides are still fighting after this many rounds.'),
