@@ -59,20 +59,6 @@ describe('describeRisk', { tags: ['unit'] }, () => {
     assert.equal(describeRisk(assessment({ win: 0.5, stalemate: 0.25 })).outcome, 'It could end in a stalemate. If not, Left will probably win.');
   });
 
-  test('says Left will lose only when losing is more likely than winning, and win only when winning is', { tags: ['property'] }, () => {
-    const chances = fc.tuple(fc.double({ min: 0, max: 1, noNaN: true }), fc.double({ min: 0, max: 1, noNaN: true }), fc.double({ min: 0, max: 1, noNaN: true }));
-    fc.assert(
-      fc.property(chances, ([a, b, c]) => {
-        const total = a + b + c || 1;
-        const [win, loss, stalemate] = [a / total, b / total, c / total];
-        const outcome = describeRisk(assessment({ win, stalemate })).outcome;
-        if (/lose|chance of winning/.test(outcome)) assert.ok(loss > win, outcome);
-        if (/ win\./.test(outcome)) assert.ok(win > loss, outcome);
-        assert.equal(/stalemate/.test(outcome), stalemate >= 0.25, outcome);
-      }),
-    );
-  });
-
   test('says how likely someone on Left is to be knocked out', () => {
     const hurt = (p: number) => describeRisk(assessment({ anyKnockedOut: p })).hurt;
     assert.deepEqual([0.97, 0.8, 0.6, 0.5, 0.35, 0.12, 0.03].map(hurt), [
@@ -100,6 +86,23 @@ describe('describeRisk', { tags: ['unit'] }, () => {
   test('names nobody when the risk is spread evenly, or when Left is one fighter', () => {
     assert.equal(describeRisk(assessment({ fighters: [{ id: 'A1', name: 'F', downed: 0.5 }, { id: 'A2', name: 'G', downed: 0.45 }] })).mostAtRisk, null);
     assert.equal(describeRisk(assessment()).mostAtRisk, null);
+  });
+});
+
+describe('describeRisk', { tags: ['property'] }, () => {
+  test('says Left will lose only when losing is more likely than winning, and win only when winning is', () => {
+    // Any split of the fights into wins, losses and stalemates: win first, then a share of what is left for stalemates.
+    const chances = fc.tuple(fc.double({ min: 0, max: 1, noNaN: true }), fc.double({ min: 0, max: 1, noNaN: true }));
+    fc.assert(
+      fc.property(chances, ([a, b]) => {
+        const [win, stalemate] = [a, b * (1 - a)];
+        const loss = 1 - win - stalemate;
+        const outcome = describeRisk(assessment({ win, stalemate })).outcome;
+        if (/lose|chance of winning/.test(outcome)) assert.ok(loss > win, outcome);
+        if (/ win\./.test(outcome)) assert.ok(win > loss, outcome);
+        assert.equal(/stalemate/.test(outcome), stalemate >= 0.25, outcome);
+      }),
+    );
   });
 });
 
