@@ -34,9 +34,21 @@ describe('describeRisk', { tags: ['unit'] }, () => {
     ]);
   });
 
-  test('mentions a likely stalemate', () => {
-    assert.equal(describeRisk(assessment({ win: 0.3, stalemate: 0.4 })).outcome, 'Left will probably lose. It may well end in a stalemate.');
-    assert.equal(describeRisk(assessment({ win: 0.1, stalemate: 0.7 })).outcome, 'Left will very likely lose. It will probably end in a stalemate.');
+  test('when a stalemate is a real possibility, leads with it, then says who would win if someone does', () => {
+    const outcome = (win: number, stalemate: number) => describeRisk(assessment({ win, stalemate })).outcome;
+    assert.equal(outcome(0.3, 0.45), 'It may well end in a stalemate. If not, it is about even.');
+    assert.equal(outcome(0.1, 0.7), 'It will probably end in a stalemate. If not, Left will probably lose.');
+    assert.equal(outcome(0.6, 0.3), 'It could end in a stalemate. If not, Left will very likely win.');
+  });
+
+  test('a near-certain stalemate is not described as a loss', () => {
+    const outcome = describeRisk(assessment({ win: 0.001, stalemate: 0.988 })).outcome;
+    assert.equal(outcome, 'It will almost certainly end in a stalemate.');
+    assert.doesNotMatch(outcome, /lose|chance of winning/);
+  });
+
+  test('a small chance of a stalemate is not mentioned', () => {
+    assert.equal(describeRisk(assessment({ win: 0.6, stalemate: 0.2 })).outcome, 'Left will probably win.');
   });
 
   test('says how likely someone on Left is to be knocked out', () => {

@@ -74,7 +74,26 @@ export function describeRisk(a: FightAssessment): RiskDescription {
   return { outcome: outcome(a), hurt: someoneOnLeft(a.anyKnockedOut, 'be knocked out', 'being knocked out'), nerve: nerve(a.anyLostNerve), mostAtRisk: mostAtRisk(a) };
 }
 
+/** How the fight is likely to end. A stalemate that is a real possibility is said first, then who would win if someone does. */
 function outcome(a: FightAssessment): string {
+  if (likelihood(a.stalemate) === 'very unlikely' || likelihood(a.stalemate) === 'almost no chance') return winner(a.win);
+  const stalemate: Record<Likelihood, string> = {
+    'almost certain': 'It will almost certainly end in a stalemate.',
+    'very likely': 'It will very likely end in a stalemate.',
+    likely: 'It will probably end in a stalemate.',
+    'about even': 'It may well end in a stalemate.',
+    unlikely: 'It could end in a stalemate.',
+    'very unlikely': '',
+    'almost no chance': '',
+  };
+  const decisive = 1 - a.stalemate;
+  if (likelihood(decisive) === 'almost no chance') return stalemate[likelihood(a.stalemate)];
+  const ifNot = winner(a.win / decisive);
+  return `${stalemate[likelihood(a.stalemate)]} If not, ${ifNot.replace(/^It /, 'it ')}`;
+}
+
+/** Who is likely to win, given the chance that Left does. */
+function winner(chance: number): string {
   const words: Record<Likelihood, string> = {
     'almost certain': 'Left will almost certainly win.',
     'very likely': 'Left will very likely win.',
@@ -84,8 +103,7 @@ function outcome(a: FightAssessment): string {
     'very unlikely': 'Left will very likely lose.',
     'almost no chance': 'Left has almost no chance of winning.',
   };
-  const stalemate = a.stalemate >= 0.58 ? ' It will probably end in a stalemate.' : a.stalemate >= 0.25 ? ' It may well end in a stalemate.' : '';
-  return words[likelihood(a.win)] + stalemate;
+  return words[likelihood(chance)];
 }
 
 /** "Someone on Left will probably …", down to "Nobody on Left is at real risk of …". */
