@@ -3,15 +3,17 @@
 // Set-up: click characters to add them to the left or right side; each fighter is shown once as a card
 // with the numbers the fight uses. Fight: the same cards with how each fighter ended up, then the log, one short line per
 // action, grouped by round, with the dice for each line in a column on the right.
-import { assessFight, describeRisk } from '../src/assessment';
+import { SIMULATED_FIGHTS, assess, describeRisk, simulateFights, type FightTally } from '../src/assessment';
 import { BACKGROUND_INFO } from '../src/backgrounds';
-import { BASE_DEFENCE, BASE_HIT_POINTS, type Character } from '../src/character';
+import { BASE_DEFENCE, type Character } from '../src/character';
 import { DICE, DICE_NAMES, type Dice, type DiceName } from '../src/dice';
-import { compactRoll, describeModifier, percent, signed } from '../src/explain';
+import { compactRoll, describeModifier, describeTotal, percent, signed } from '../src/explain';
 import { bonusOf } from '../src/check';
-import { UNARMED_DAMAGE_DIE, facesForResult, fightStats, resultOf, rollOdds, runFight, stepFight, tallyFights, type FightEvent, type FightSpec, type FightTally, type Fighter, type FighterStatus, type RollOdds, type RollRequest } from '../src/fight';
-import { describeFightEvent, describeRollRequest, explainRoll } from '../src/fight-log';
-import { NERVE_DC, type Side } from '../src/nerve';
+import { FIGHTER_STATUS_INFO, UNARMED_DAMAGE_DIE, fightStats, runFight, type FightEvent, type FightSpec, type FighterStatus, type RollRequest } from '../src/fight';
+import { describeFightEvent, describeRollRequest, explainRoll, fightRules, SIDE_NAME } from '../src/fight-log';
+import { rollOdds, type RollOdds } from '../src/fight-odds';
+import { facesForResult, resultOf, stepFight, withoutLastRoll } from '../src/fight-step';
+import type { Side } from '../src/nerve';
 import { replay, roller, seeded } from '../src/random';
 import { notableTraits } from '../src/temperament';
 import { slowingDelays, sweepSequence } from './animation';
@@ -20,7 +22,6 @@ import { assign, canFight, lineUp, type Parties } from './parties';
 import { canSave, characterById, getRoster, storage } from './store';
 import { hint, type Panel } from './views';
 
-const RUNS = 1000;
 /** The dice animation, a roulette-style sweep: at least this many steps (and more than once round), over this long, then a short rest on the result. */
 const SWEEP_MIN_STEPS = 16;
 const SWEEP_MS = 850;
@@ -30,10 +31,6 @@ const showDice = roller(seeded(Date.now() >>> 0));
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 const reduceMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 const SIDES = ['attacker', 'defender'] as const;
-const SIDE_TITLE: Readonly<Record<Side, string>> = { attacker: 'Left', defender: 'Right' };
-const STATUS_LABEL: Readonly<Record<FighterStatus, string>> = {
-  fighting: 'Still fighting', 'knocked-out': 'Knocked out', surrendered: 'Surrendered', 'backed-off': 'Backed off', fled: 'Fled',
-};
 
 interface State {
   view: 'setup' | 'fight';
@@ -57,7 +54,7 @@ function fighterCard(c: Character, options: { result?: { hp: number; status: Fig
   return h('div', { class: `fighter-card${status && status !== 'fighting' ? ' out' : ''}` },
     h('div', { class: 'fighter-head' },
       h('div', {}, h('div', { class: 'fighter-name' }, c.name), h('div', { class: 'hint' }, c.background ? BACKGROUND_INFO[c.background].name : '')),
-      status ? h('span', { class: `status status-${status}` }, STATUS_LABEL[status]) : null,
+      status ? h('span', { class: `status status-${status}`, title: FIGHTER_STATUS_INFO[status].explanation }, FIGHTER_STATUS_INFO[status].label) : null,
       options.onRemove ? h('button', { type: 'button', class: 'remove', 'aria-label': `Remove ${c.name}`, onclick: options.onRemove }, '×') : null),
     h('div', { class: 'hp', title: 'Hit points' },
       h('div', { class: 'hp-bar' }, h('div', { class: 'hp-fill', style: `width:${(hp / s.hitPoints) * 100}%` })),
@@ -77,10 +74,10 @@ function eventDice(e: FightEvent, nameOf: (id: string) => string): string[] {
   if (e.kind === 'attack') {
     const lines = [`${compactRoll(e.result.roll)} vs ${e.result.dc}`];
     if (e.damage) {
-      const { faces, modifier, total } = e.damage;
+      const { faces, modifier, total, minimumApplied } = e.damage;
       const sum = `${faces.join('+')}${modifier ? ` ${modifier < 0 ? '−' : '+'} ${Math.abs(modifier)}` : ''}`;
       const result = modifier || faces.length > 1 ? `${sum} = ${total}` : sum;
-      lines.push(`damage ${faces.length}d${UNARMED_DAMAGE_DIE}: ${result}${total !== faces.reduce((a, b) => a + b, 0) + modifier ? ' (minimum 1)' : ''}`);
+      lines.push(`damage ${faces.length}d${UNARMED_DAMAGE_DIE}: ${result}${minimumApplied ? ' (minimum 1)' : ''}`);
     }
     return lines;
   }
@@ -115,7 +112,7 @@ export function fightPanel(): Panel {
   const startFight = (how: 'auto' | 'step' | 'simulate') => {
     const s = spec();
     state.fight = { spec: s, faces: how === 'step' ? [] : playOut(s, []) };
-    state.tally = how === 'simulate' ? tallyFights(s, dice, RUNS) : null;
+    state.tally = how === 'simulate' ? simulateFights(s) : null;
     state.view = 'fight';
     render();
   };
@@ -124,29 +121,21 @@ export function fightPanel(): Panel {
     render();
   };
 
-  const guide = (dice: Dice) =>
-    h('details', { class: 'guide' }, h('summary', {}, 'How a fight works'),
-      h('ul', {},
-        h('li', {}, 'Everyone rolls Initiative. The highest acts first, and so on down (on a tie, the right side first). This order is used every round.'),
-        h('li', {}, `On their turn, each fighter attacks a random enemy who is still fighting: ${dice.name} + Attack against the target’s Defence. Meeting or beating it is a hit for their Damage (at least 1).`),
-        h('li', {}, dice.count === 1 && dice.sides === 20
-          ? 'A natural 20 always hits and is a critical hit: the damage dice are rolled twice. A natural 1 always misses.'
-          : `The highest possible roll (${dice.count * dice.sides}) always hits and is a critical hit: the damage dice are rolled twice. The lowest (${dice.count}) always misses.`),
-        h('li', {}, 'Ganging up: if someone on your side has already attacked a target this round, your attack on them has advantage (the dice are rolled twice and the higher result counts).'),
-        h('li', {}, `Hit points are ${BASE_HIT_POINTS} + Constitution modifier, plus the proficiency bonus if trained in Toughness. At 0 a fighter is knocked out.`),
-        h('li', {}, `Nerve: a fighter makes one nerve check (${dice.name} + Nerve, DC ${NERVE_DC.hurt}) the first time they drop to half HP, and everyone left on a side makes one (DC ${NERVE_DC['allies-down']}) the first time half of that side is out. Failing takes them out: a timid or cautious fighter flees; otherwise they surrender (right side) or back off (left side).`),
-        h('li', {}, 'A side loses when nobody on it is still fighting. If both sides are still fighting at the round limit, it is a stalemate.')));
+  const guide = (dice: Dice) => {
+    const rules = fightRules(dice);
+    return h('details', { class: 'guide' }, h('summary', {}, 'How a fight works'),
+      h('ul', {}, ...[rules.initiative, rules.attack, `${rules.extremes} ${rules.damage}`, `Ganging up: ${rules.gangingUp.charAt(0).toLowerCase()}${rules.gangingUp.slice(1)}`, rules.hitPoints, `${rules.nerveHurt} ${rules.nerveAlliesDown}`, rules.nerveFailure, rules.end].map((rule) => h('li', {}, rule))));
+  };
 
   /** How the fight is likely to go for the left side, in words, estimated from simulated fights. */
-  const ASSESSMENT_RUNS = 2000;
   const assessmentBox = h('div', { class: 'assessment' });
   function refreshAssessment() {
     if (!canFight(state.parties)) return;
-    const risk = describeRisk(assessFight(spec(), ASSESSMENT_RUNS));
+    const risk = describeRisk(assess(simulateFights(spec())));
     assessmentBox.replaceChildren(
       h('h3', {}, 'How it is likely to go for the left side'),
       h('ul', {}, ...[risk.outcome, risk.hurt, risk.nerve, risk.mostAtRisk].filter((line): line is string => line !== null).map((line) => h('li', {}, line))),
-      hint(`Estimated from ${ASSESSMENT_RUNS.toLocaleString()} simulated fights with this line-up.`));
+      hint(`Estimated from ${SIMULATED_FIGHTS.toLocaleString()} simulated fights with this line-up: the same fights Simulate shows.`));
   }
 
   function renderSetup() {
@@ -157,11 +146,11 @@ export function fightPanel(): Panel {
     const lineNote = line.note();
     const sideColumn = (side: Side) =>
       h('div', { class: 'side' },
-        h('h3', {}, `${SIDE_TITLE[side]} ${side === 'attacker' ? '(attackers)' : '(defenders)'}`),
+        h('h3', {}, `${SIDE_NAME[side]} ${side === 'attacker' ? '(attackers)' : '(defenders)'}`),
         ...members(side).map((id) => fighterCard(characterById(id), { onRemove: () => setParties(assign(state.parties, id, null)) })),
         members(side).length ? null : hint('Nobody yet.'),
         available.length
-          ? h('div', { class: 'add' }, h('span', { class: 'hint' }, `Add to ${SIDE_TITLE[side]}:`),
+          ? h('div', { class: 'add' }, h('span', { class: 'hint' }, `Add to ${SIDE_NAME[side]}:`),
               h('div', { class: 'chips' }, ...available.map((e) => h('button', { type: 'button', class: 'chip', onclick: () => setParties(assign(state.parties, e.id, side)) }, `+ ${e.character.name}`))))
           : null);
     root.replaceChildren(
@@ -177,34 +166,21 @@ export function fightPanel(): Panel {
       h('div', { class: 'row' },
         h('button', { type: 'button', class: 'primary', disabled: !ready, onclick: () => startFight('auto') }, 'Auto fight'),
         h('button', { type: 'button', disabled: !ready, onclick: () => startFight('step') }, 'Step through'),
-        h('button', { type: 'button', disabled: !ready, onclick: () => startFight('simulate') }, `Simulate ${RUNS.toLocaleString()} fights`),
+        h('button', { type: 'button', disabled: !ready, onclick: () => startFight('simulate') }, `Simulate ${SIMULATED_FIGHTS.toLocaleString()} fights`),
         ready ? null : h('span', { class: 'hint' }, 'Put at least one character on each side.')),
     );
   }
 
-  /**
-   * Where each whole roll starts in a fight's faces: a roll of several dice (3d6, or 2d4 on a critical hit) is one roll,
-   * chosen or rolled as a total and undone together.
-   */
-  const rollStarts = (s: FightSpec, faces: readonly number[]): number[] =>
-    faces.map((_, i) => i).filter((i) => {
-      const step = stepFight(s, faces.slice(0, i));
-      return !step.done && step.request.reason.die === 1;
-    });
-  /** The faces with the last whole roll removed. */
-  const backOneRoll = (s: FightSpec, faces: readonly number[]) => faces.slice(0, rollStarts(s, faces).at(-1) ?? 0);
-
   /** The roll the fight is waiting for: what it is, and buttons to roll it, choose its result, go back or finish. */
-  function rollPanel(request: RollRequest, fighters: readonly Fighter[], s: FightSpec, faces: number[]): HTMLElement {
-    const fightDice = s.dice ?? DICE.d20;
+  function rollPanel(request: RollRequest, s: FightSpec, faces: number[], rollsMade: number): HTMLElement {
     const r = request.reason;
-    const name = (id: string) => fighters.find((f) => f.id === id)!.character.name;
     // One choice per possible result of the whole roll (the totals of all its dice), marked where it would succeed.
-    const choices = rollOdds(request, fighters, fightDice).bars;
+    const odds = rollOdds(request);
+    const choices = odds.bars;
     const choose = (result: number) => setFaces([...faces, ...facesForResult(request, result)]);
-    const label = (total: number) => (r.kind === 'target' ? `${total}: ${name(r.options[total - 1]!)}` : String(total));
+    const label = (result: number) => (r.kind === 'target' ? `${result}: ${r.options[result - 1]?.name}` : String(result));
     const buttons = choices.map((c) =>
-      h('button', { type: 'button', class: `face${c.success === true ? ' good' : c.success === false ? ' bad' : ''}`, onclick: () => choose(c.dice) }, label(c.dice)));
+      h('button', { type: 'button', class: `face${c.success === true ? ' good' : c.success === false ? ' bad' : ''}`, onclick: () => choose(c.result) }, label(c.result)));
     const show = (index: number, landed = false) =>
       buttons.forEach((b, i) => {
         b.classList.toggle('showing', i === index);
@@ -214,7 +190,7 @@ export function fightPanel(): Panel {
     /** Rolls all the dice at once, then sweeps left to right along the choices like a roulette wheel, slowing down onto the result. */
     const animatedRoll = async () => {
       const rolled = Array.from({ length: r.of }, () => dice.roll(request.sides, r));
-      const result = choices.findIndex((c) => c.dice === resultOf(request, rolled));
+      const result = choices.findIndex((c) => c.result === resultOf(request, rolled));
       if (!reduceMotion()) {
         for (const b of panel.querySelectorAll('button')) b.disabled = true;
         const sequence = sweepSequence(choices.length, showDice.roll(choices.length), result + 1, Math.max(SWEEP_MIN_STEPS, choices.length + 4));
@@ -230,35 +206,28 @@ export function fightPanel(): Panel {
     };
 
     const panel = h('div', { class: 'roll-panel' },
-      h('div', { class: 'roll-count' }, `Roll ${rollStarts(s, faces).length + 1}`),
-      h('p', { class: 'prompt' }, describeRollRequest(request, fighters, fightDice)),
-      breakdown(request, fighters, fightDice),
+      h('div', { class: 'roll-count' }, `Roll ${rollsMade + 1}`),
+      h('p', { class: 'prompt' }, describeRollRequest(request)),
+      breakdown(request),
       h('div', { class: 'row' },
         h('button', { type: 'button', class: 'primary', onclick: () => void animatedRoll() }, 'Roll'),
         h('button', { type: 'button', onclick: () => setFaces(playOut(s, faces)) }, 'Play the rest'),
-        h('button', { type: 'button', disabled: faces.length === 0, onclick: () => setFaces(backOneRoll(s, faces)) }, 'Back'),
+        h('button', { type: 'button', disabled: faces.length === 0, onclick: () => setFaces(withoutLastRoll(s, faces)) }, 'Back'),
         h('button', { type: 'button', 'aria-pressed': String(state.showOdds), onclick: () => { state.showOdds = !state.showOdds; render(); } }, state.showOdds ? 'Hide odds' : 'Show odds')),
       h('div', { class: 'hint' }, r.kind === 'attack' && r.edge === 'advantage' ? 'Or choose the higher of the two results:' : r.of > 1 ? `Or choose the total of the ${r.of} dice:` : 'Or choose the result:'),
       h('div', { class: 'faces' }, ...buttons),
-      state.showOdds ? oddsView(rollOdds(request, fighters, fightDice), request) : null,
+      state.showOdds ? oddsView(odds, request) : null,
     );
     return panel;
   }
 
   /** What a roll is for and where its numbers come from: the roller's bonus and, for an attack, the target's Defence. */
-  function breakdown(request: RollRequest, fighters: readonly Fighter[], dice: Dice): HTMLElement {
-    const e = explainRoll(request, fighters, dice);
-    const r = request.reason;
-    const who = fighters.find((f) => f.id === r.id)!.character.name;
-    const kind = { initiative: 'initiative bonus', attack: 'attack bonus', damage: 'damage bonus', nerve: 'nerve bonus', target: '' }[r.kind];
-    const parts = (mods: readonly { value: number; reason: string }[]) => mods.map(describeModifier).join(', ');
+  function breakdown(request: RollRequest): HTMLElement {
+    const e = explainRoll(request);
     return h('div', { class: 'breakdown' },
       h('p', { class: 'hint' }, e.purpose),
-      e.bonus.length ? h('div', {}, h('strong', {}, `${who}’s ${kind} ${signed(bonusOf(e.bonus))}: `), parts(e.bonus)) : null,
-      e.against
-        ? h('div', {}, h('strong', {}, `${e.against.label} ${e.against.total}: `),
-            [`${e.against.parts[0]!.value} ${e.against.parts[0]!.reason.toLowerCase()}`, parts(e.against.parts.slice(1))].filter(Boolean).join(', '))
-        : null);
+      e.bonusLabel && e.bonus.length ? h('div', {}, h('strong', {}, `${e.bonusLabel} ${signed(bonusOf(e.bonus))}: `), e.bonus.map(describeModifier).join(', ')) : null,
+      e.against ? h('div', {}, h('strong', {}, `${e.against.label} ${e.against.total}: `), describeTotal(e.against.parts)) : null);
   }
 
   /** The odds of the roll: a bar for every possible result, then the averages and chances in words. */
@@ -276,11 +245,11 @@ export function fightPanel(): Panel {
       lines.push(`Expected damage from this attack: ${n(o.damage.expected)}.`);
     }
     return h('div', { class: 'odds-view' },
-      h('div', { class: 'odds-chart', role: 'img', 'aria-label': o.bars.map((b) => `${b.dice}: ${percent(b.probability)}`).join(', ') },
+      h('div', { class: 'odds-chart', role: 'img', 'aria-label': o.bars.map((b) => `${b.result}: ${percent(b.probability)}`).join(', ') },
         ...o.bars.map((b) =>
-          h('div', { class: 'odds-col', title: `Roll ${b.dice}${b.total !== b.dice ? `, total ${b.total}` : ''}: ${percent(b.probability)}` },
+          h('div', { class: 'odds-col', title: `Roll ${b.result}${b.total !== b.result ? `, total ${b.total}` : ''}: ${percent(b.probability)}` },
             h('div', { class: 'odds-bar-wrap' }, h('div', { class: `odds-bar${b.success === true ? ' good' : b.success === false ? ' bad' : ''}`, style: `height:${(b.probability / tallest) * 100}%` })),
-            h('div', { class: 'odds-label' }, String(b.dice))))),
+            h('div', { class: 'odds-label' }, String(b.result))))),
       h('ul', { class: 'odds-lines' }, ...lines.map((l) => h('li', {}, l))),
     );
   }
@@ -290,41 +259,39 @@ export function fightPanel(): Panel {
     const step = stepFight(s, faces);
     const events = step.done ? step.result.events : step.events;
     const fighters = step.done ? step.result.fighters : step.fighters;
-    const names = (side: Side) => fighters.filter((f) => f.side === side).map((f) => f.character.name).join(', ');
-    const lastRound = events.reduce((n, e) => ('round' in e ? Math.max(n, e.round) : n), 0);
+    const sideNames = (side: Side) => fighters.filter((f) => f.side === side).map((f) => f.character.name).join(', ');
     const status = step.done
-      ? step.result.winner ? `${SIDE_TITLE[step.result.winner]} wins after ${step.result.rounds} ${step.result.rounds === 1 ? 'round' : 'rounds'}.` : `Stalemate after ${step.result.rounds} rounds.`
+      ? step.result.winner ? `${SIDE_NAME[step.result.winner]} wins after ${step.result.rounds} ${step.result.rounds === 1 ? 'round' : 'rounds'}.` : `Stalemate after ${step.result.rounds} rounds.`
       : step.round ? `In progress: round ${step.round}.` : 'In progress: rolling initiative.';
 
     // The log: the turn order, then each round's lines under a heading.
-    const forLog = { events, fighters, winner: null, rounds: lastRound };
     const rounds = new Map<number, FightEvent[]>();
     for (const e of events) if (e.kind !== 'initiative' && e.kind !== 'end') rounds.set(e.round, [...(rounds.get(e.round) ?? []), e]);
-    const nameOf = (id: string) => fighters.find((f) => f.id === id)!.character.name;
+    const names = new Map(fighters.map((f) => [f.id, f.character.name]));
     const row = (e: FightEvent) =>
-      h('tr', { class: `ev-${e.kind}` }, h('td', { class: 'action' }, describeFightEvent(e, forLog, { rolls: false })),
-        h('td', { class: 'dice' }, ...eventDice(e, nameOf).map((d) => h('div', {}, d))));
+      h('tr', { class: `ev-${e.kind}` }, h('td', { class: 'action' }, describeFightEvent(e, fighters, { rolls: false })),
+        h('td', { class: 'dice' }, ...eventDice(e, (id) => names.get(id) ?? id).map((d) => h('div', {}, d))));
     const initiative = events.find((e) => e.kind === 'initiative');
 
     root.replaceChildren(
       h('div', { class: 'fight-head' },
-        h('h2', { id: 'fight-title' }, `${names('attacker')} vs ${names('defender')}`),
+        h('h2', { id: 'fight-title' }, `${sideNames('attacker')} vs ${sideNames('defender')}`),
         h('div', { class: 'row' },
           ...(step.done
             ? [
                 h('button', { type: 'button', class: 'primary', onclick: () => startFight('auto') }, 'Auto fight again'),
                 h('button', { type: 'button', onclick: () => startFight('step') }, 'Step through again'),
-                h('button', { type: 'button', onclick: () => setFaces(backOneRoll(s, faces)) }, 'Back one roll'),
-                h('button', { type: 'button', onclick: () => startFight('simulate') }, `Simulate ${RUNS.toLocaleString()} fights`),
+                h('button', { type: 'button', onclick: () => setFaces(withoutLastRoll(s, faces)) }, 'Back one roll'),
+                h('button', { type: 'button', onclick: () => startFight('simulate') }, `Simulate ${SIMULATED_FIGHTS.toLocaleString()} fights`),
               ]
             : []),
           h('button', { type: 'button', onclick: () => { state.view = 'setup'; render(); } }, 'Change line-up'))),
       h('p', { class: 'result' }, status),
       h('div', { class: 'grid two sides' }, ...SIDES.map((side) =>
-        h('div', { class: 'side' }, h('h3', {}, SIDE_TITLE[side]),
+        h('div', { class: 'side' }, h('h3', {}, SIDE_NAME[side]),
           ...fighters.filter((f) => f.side === side).map((f) => fighterCard(f.character, { result: { hp: f.hp, status: f.status } }))))),
-      ...(step.done ? [] : [rollPanel(step.request, fighters, s, faces)]),
-      ...(state.tally ? [tallyView(fighters)] : []),
+      ...(step.done ? [] : [rollPanel(step.request, s, faces, step.rollStarts.length)]),
+      ...(state.tally ? [tallyView(state.tally)] : []),
       h('h3', {}, 'Log'),
       events.length
         ? h('table', { class: 'fight-log' },
@@ -336,20 +303,17 @@ export function fightPanel(): Panel {
     );
   }
 
-  function tallyView(fighters: readonly Fighter[]): HTMLElement {
-    const t = state.tally!;
-    const share = (n: number) => percent(n / RUNS);
+  function tallyView(t: FightTally): HTMLElement {
+    const share = (n: number) => percent(n / t.runs);
     return h('div', { class: 'simulation' },
-      h('h3', {}, `${RUNS.toLocaleString()} simulated fights`),
-      h('p', { class: 'result' }, [...SIDES.map((side) => `${SIDE_TITLE[side]} wins ${share(t.wins[side])}`), ...(t.wins.stalemate ? [`stalemate ${share(t.wins.stalemate)}`] : [])].join(' · ')),
+      h('h3', {}, `${t.runs.toLocaleString()} simulated fights`),
+      h('p', { class: 'result' }, [...SIDES.map((side) => `${SIDE_NAME[side]} wins ${share(t.wins[side])}`), ...(t.wins.stalemate ? [`stalemate ${share(t.wins.stalemate)}`] : [])].join(' · ')),
       h('table', {},
         h('thead', {}, h('tr', {}, h('th', {}, 'How each fighter ended up'), h('th', { class: 'num' }, 'Still fighting'), h('th', { class: 'num' }, 'Knocked out'), h('th', { class: 'num' }, 'Lost their nerve'))),
         h('tbody', {},
-          ...fighters.map((f) => {
-            const s = t.statuses[f.id]!;
-            return h('tr', {}, h('td', {}, `${f.character.name} `, h('span', { class: 'muted' }, f.side === 'attacker' ? '(left)' : '(right)')),
-              h('td', { class: 'num' }, share(s.fighting)), h('td', { class: 'num' }, share(s['knocked-out'])), h('td', { class: 'num' }, share(s.surrendered + s['backed-off'] + s.fled)));
-          }))));
+          ...t.fighters.map((f) =>
+            h('tr', {}, h('td', {}, `${f.name} `, h('span', { class: 'muted' }, `(${SIDE_NAME[f.side].toLowerCase()})`)),
+              h('td', { class: 'num' }, share(f.statuses.fighting)), h('td', { class: 'num' }, share(f.statuses['knocked-out'])), h('td', { class: 'num' }, share(f.statuses.surrendered + f.statuses['backed-off'] + f.statuses.fled)))))));
   }
 
   function render() {

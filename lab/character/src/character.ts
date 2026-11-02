@@ -1,7 +1,7 @@
 // Characters (player and NPC): attributes, skill training, proficiency bonus and temperament.
 import { ATTRIBUTE_INFO, abilityModifier, attributeScores, type Attribute, type AttributeScores } from './attributes';
 import type { BackgroundName } from './backgrounds';
-import { bonusOf, combineEdges, type Modifier, type Roll } from './check';
+import { combineEdges, totalOf, type Modifier, type Roll, type Total } from './check';
 import { DICE, type Dice, type Edge } from './dice';
 import { SKILL_INFO, attributesFor, type Skill } from './skills';
 import { temperament as fullTemperament, temperamentModifiers, type Situation, type Temperament } from './temperament';
@@ -15,7 +15,7 @@ export interface Character {
   readonly background?: BackgroundName;
   readonly attributes: AttributeScores;
   readonly training: Training;
-  /** Added once to trained skills and twice to expert skills. Ranges from 2 to 6, as in D&D. */
+  /** Added once to trained skills and EXPERT_MULTIPLE times to expert skills. Ranges from 2 to 6, as in D&D. */
   readonly proficiencyBonus: number;
   readonly temperament: Temperament;
 }
@@ -61,11 +61,24 @@ export function skillModifiers(c: Character, skill: Skill, using?: Attribute): M
   const attribute = using ?? attributeUsed(c, skill);
   const score = c.attributes[attribute];
   const modifiers: Modifier[] = [{ value: abilityModifier(score), reason: `${ATTRIBUTE_INFO[attribute].name} ${score}` }];
-  const proficiency = c.training[skill] ?? 'untrained';
+  const training = trainingModifier(c, skill);
+  return training ? [...modifiers, training] : modifiers;
+}
+
+/** An expert adds the proficiency bonus this many times. */
+export const EXPERT_MULTIPLE = 2;
+
+/** What training in a skill adds: the proficiency bonus if trained, EXPERT_MULTIPLE times it if expert; null if untrained. */
+export function trainingModifier(c: Character, skill: Skill): Modifier | null {
   const name = SKILL_INFO[skill].name;
-  if (proficiency === 'trained') modifiers.push({ value: c.proficiencyBonus, reason: `Trained in ${name}` });
-  if (proficiency === 'expert') modifiers.push({ value: 2 * c.proficiencyBonus, reason: `Expert at ${name}` });
-  return modifiers;
+  switch (c.training[skill] ?? 'untrained') {
+    case 'trained':
+      return { value: c.proficiencyBonus, reason: `Trained in ${name}` };
+    case 'expert':
+      return { value: EXPERT_MULTIPLE * c.proficiencyBonus, reason: `Expert at ${name}` };
+    case 'untrained':
+      return null;
+  }
 }
 
 export interface RollOptions {
@@ -90,33 +103,27 @@ export function rollFor(c: Character, skill: Skill, options: RollOptions = {}): 
 /** Hit points before Constitution and Toughness, as for a D&D d10 hit die at first level. */
 export const BASE_HIT_POINTS = 10;
 
-/** What a character's maximum hit points are made of: the base, the Constitution modifier and Toughness training. */
-export function hitPointModifiers(c: Character): Modifier[] {
+/** What a character's maximum hit points are made of: the base, then the Constitution modifier and Toughness training. */
+export function hitPoints(c: Character): Total {
   const score = c.attributes.con;
-  const modifiers: Modifier[] = [
-    { value: BASE_HIT_POINTS, reason: 'Base' },
-    { value: abilityModifier(score), reason: `${ATTRIBUTE_INFO.con.name} ${score}` },
-  ];
-  const toughness = c.training.toughness;
-  if (toughness === 'trained') modifiers.push({ value: c.proficiencyBonus, reason: 'Trained in Toughness' });
-  if (toughness === 'expert') modifiers.push({ value: 2 * c.proficiencyBonus, reason: 'Expert at Toughness' });
-  return modifiers;
+  const toughness = trainingModifier(c, 'toughness');
+  return { base: BASE_HIT_POINTS, modifiers: [{ value: abilityModifier(score), reason: `${ATTRIBUTE_INFO.con.name} ${score}` }, ...(toughness ? [toughness] : [])] };
 }
 
 /** Maximum hit points. The lowest possible is 5 (Constitution 1, untrained). */
 export function maxHitPoints(c: Character): number {
-  return bonusOf(hitPointModifiers(c));
+  return totalOf(hitPoints(c));
 }
 
 /** Defence before Reflexes, as for D&D's unarmoured Armour Class. */
 export const BASE_DEFENCE = 10;
 
-/** What a character's Defence is made of: the base and their Reflexes bonus. */
-export function defenceModifiers(c: Character): Modifier[] {
-  return [{ value: BASE_DEFENCE, reason: 'Base' }, ...skillModifiers(c, 'reflexes')];
+/** What a character's Defence is made of: the base, then their Reflexes bonus. */
+export function defenceOf(c: Character): Total {
+  return { base: BASE_DEFENCE, modifiers: skillModifiers(c, 'reflexes') };
 }
 
 /** The total an attack roll must meet to hit this character. */
 export function defence(c: Character): number {
-  return bonusOf(defenceModifiers(c));
+  return totalOf(defenceOf(c));
 }

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'vitest';
 import { createCharacter } from '../src/character';
 import { DICE } from '../src/dice';
-import { NERVE_DC, NERVE_FAILURE, nerveCheck, otherSide } from '../src/nerve';
+import { FLEES_WHEN, NERVE_DC, NERVE_FAILURE, nerveCheck, otherSide } from '../src/nerve';
 import { temperament } from '../src/temperament';
 import { scripted } from './support';
 
@@ -45,7 +45,12 @@ describe('nerve helpers', { tags: ['unit'] }, () => {
     assert.equal(otherSide('defender'), 'attacker');
   });
 
-  test('NERVE_FAILURE describes the traits that decide a failed nerve check', () => {
-    assert.deepEqual(Object.keys(NERVE_FAILURE).sort(), ['caution', 'courage', 'temper']);
+  test('NERVE_FAILURE and FLEES_WHEN describe the rules that decide a failed nerve check', () => {
+    assert.deepEqual(NERVE_FAILURE, {
+      courage: 'If low: flees on a failed nerve check.',
+      caution: 'If high: flees on a failed nerve check.',
+      temper: 'If high: fights back on a failed nerve check when threatened with a weapon.',
+    });
+    assert.equal(FLEES_WHEN, 'low courage or high caution');
   });
 });

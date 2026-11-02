@@ -10,15 +10,25 @@ export interface Modifier {
   readonly reason: string;
 }
 
+/** A fixed base plus modifiers, such as Defence (10 + Reflexes) or hit points (10 + Constitution and Toughness). */
+export interface Total {
+  readonly base: number;
+  readonly modifiers: readonly Modifier[];
+}
+
+export function totalOf(t: Total): number {
+  return t.base + bonusOf(t.modifiers);
+}
+
 export const OUTCOMES = ['critical-failure', 'failure', 'partial', 'success', 'critical-success'] as const;
 export type Outcome = (typeof OUTCOMES)[number];
 
-export const OUTCOME_INFO: { readonly [O in Outcome]: { readonly name: string; readonly description: string } } = {
-  'critical-failure': { name: 'Critical failure', description: 'Missed by 6 or more: it fails and something goes wrong.' },
-  failure: { name: 'Failure', description: 'Missed by 1 to 5: it fails.' },
-  partial: { name: 'Partial success', description: 'Met or beat by up to 4: it succeeds, at a cost.' },
-  success: { name: 'Success', description: 'Beat by 5 to 9: it succeeds cleanly.' },
-  'critical-success': { name: 'Critical success', description: 'Beat by 10 or more: it succeeds with an extra benefit.' },
+export const OUTCOME_INFO: { readonly [O in Outcome]: { readonly name: string; readonly effect: string } } = {
+  'critical-failure': { name: 'Critical failure', effect: 'it fails and something goes wrong' },
+  failure: { name: 'Failure', effect: 'it fails' },
+  partial: { name: 'Partial success', effect: 'it succeeds, at a cost' },
+  success: { name: 'Success', effect: 'it succeeds cleanly' },
+  'critical-success': { name: 'Critical success', effect: 'it succeeds with an extra benefit' },
 };
 
 /** The minimum margin for each outcome. Anything below `failure` is a critical failure. */
@@ -90,6 +100,44 @@ export function grade(margin: number, bands: Bands = DEFAULT_BANDS): Outcome {
 /** True for a partial success or better. */
 export function succeeded(outcome: Outcome): boolean {
   return OUTCOMES.indexOf(outcome) >= OUTCOMES.indexOf('partial');
+}
+
+/** Whether a check with this margin (total minus DC) succeeds: the one pass rule for every check, attack and nerve check. */
+export function passes(margin: number, bands: Bands = DEFAULT_BANDS): boolean {
+  return succeeded(grade(margin, bands));
+}
+
+/** The chance of a partial success or better. */
+export function successChance(odds: Odds): number {
+  return OUTCOMES.filter(succeeded).reduce((sum, o) => sum + odds[o], 0);
+}
+
+/** The margins (total minus DC) that give an outcome; null where the range is open. */
+export type MarginRange = { readonly min: null; readonly max: number } | { readonly min: number; readonly max: number | null };
+
+export function outcomeMargins(outcome: Outcome, bands: Bands = DEFAULT_BANDS): MarginRange {
+  assertOrdered(bands);
+  switch (outcome) {
+    case 'critical-failure':
+      return { min: null, max: bands.failure - 1 };
+    case 'failure':
+      return { min: bands.failure, max: bands.partial - 1 };
+    case 'partial':
+      return { min: bands.partial, max: bands.success - 1 };
+    case 'success':
+      return { min: bands.success, max: bands.criticalSuccess - 1 };
+    case 'critical-success':
+      return { min: bands.criticalSuccess, max: null };
+  }
+}
+
+/** An outcome's margins in words, e.g. "6 short or worse", "exactly the DC to 4 over", "10 over or better". */
+export function describeMargins(outcome: Outcome, bands: Bands = DEFAULT_BANDS): string {
+  const range = outcomeMargins(outcome, bands);
+  const margin = (n: number) => (n < 0 ? `${-n} short` : n === 0 ? 'exactly the DC' : `${n} over`);
+  if (range.min === null) return `${margin(range.max)} or worse`;
+  if (range.max === null) return `${margin(range.min)} or better`;
+  return range.min === range.max ? margin(range.min) : `${margin(range.min)} to ${margin(range.max)}`;
 }
 
 /** Combines advantage/disadvantage from several sources as D&D does: they don't stack, and one of each cancels out. */

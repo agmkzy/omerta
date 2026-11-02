@@ -1,10 +1,10 @@
 // The nerve check, shared by fights and social actions: whether a character holds together when threatened or hurt, and
 // how they react if they do not. It follows D&D's optional morale rule (a Wisdom save against DC 10), using the Nerve skill.
-import { resolveCheck, type CheckResult, type CheckSpec } from './check';
+import { passes, resolveCheck, type CheckResult, type CheckSpec } from './check';
 import { rollFor, type Character } from './character';
 import type { Dice } from './dice';
 import type { Roller } from './random';
-import { leaning, type Trait } from './temperament';
+import { TRAIT_INFO, leaning, type Trait } from './temperament';
 
 export type Side = 'attacker' | 'defender';
 
@@ -23,12 +23,23 @@ export const NERVE_DC: Readonly<Record<Trigger, number>> = { 'weapon-drawn': 12,
 /** How a character reacts to failing a nerve check. */
 export type NerveResponse = 'flees' | 'fights' | 'yields';
 
-/** How temperament decides the response to a failed nerve check (implemented in nerveCheck). */
-export const NERVE_FAILURE: Readonly<Partial<Record<Trait, string>>> = {
-  temper: 'If high: fights back on a failed nerve check when threatened with a weapon.',
-  courage: 'If low: flees on a failed nerve check.',
-  caution: 'If high: flees on a failed nerve check.',
-};
+/**
+ * How temperament decides the response to a failed nerve check, in order: the first rule that applies wins, and anyone
+ * else yields. `whenThreatened` rules apply only when the character can fight back (threatened with a weapon).
+ */
+const NERVE_RULES: readonly { readonly trait: Trait; readonly leaning: 'high' | 'low'; readonly response: Exclude<NerveResponse, 'yields'>; readonly whenThreatened: boolean }[] = [
+  { trait: 'courage', leaning: 'low', response: 'flees', whenThreatened: false },
+  { trait: 'caution', leaning: 'high', response: 'flees', whenThreatened: false },
+  { trait: 'temper', leaning: 'high', response: 'fights', whenThreatened: true },
+];
+
+/** Who flees on a failed nerve check, in words: "someone with low courage or high caution" reads "low courage or high caution". */
+export const FLEES_WHEN = NERVE_RULES.filter((r) => r.response === 'flees').map((r) => `${r.leaning} ${TRAIT_INFO[r.trait].name.toLowerCase()}`).join(' or ');
+
+/** For each trait that decides a failed nerve check, what it does, in words. */
+export const NERVE_FAILURE: Readonly<Partial<Record<Trait, string>>> = Object.fromEntries(
+  NERVE_RULES.map((r) => [r.trait, `If ${r.leaning}: ${r.response === 'flees' ? 'flees' : 'fights back'} on a failed nerve check${r.whenThreatened ? ' when threatened with a weapon' : ''}.`]),
+);
 
 export interface NerveCheck {
   readonly trigger: Trigger;
@@ -44,7 +55,7 @@ export interface NerveCheck {
  */
 export function nerveCheck(c: Character, trigger: Trigger, canFightBack: boolean, dice: Dice, roller: Roller): NerveCheck {
   const result = resolveCheck(nerveCheckSpec(c, trigger, dice), roller);
-  if (result.margin >= 0) return { trigger, result, passed: true, response: null };
+  if (passes(result.margin)) return { trigger, result, passed: true, response: null };
   return { trigger, result, passed: false, response: nerveResponse(c, canFightBack) };
 }
 
@@ -55,8 +66,6 @@ export function nerveCheckSpec(c: Character, trigger: Trigger, dice: Dice): Chec
 
 /** How a character reacts to failing a nerve check. It depends only on temperament, so it is known in advance. */
 export function nerveResponse(c: Character, canFightBack: boolean): NerveResponse {
-  const t = c.temperament;
-  if (leaning(t.courage) === 'low' || leaning(t.caution) === 'high') return 'flees';
-  if (canFightBack && leaning(t.temper) === 'high') return 'fights';
-  return 'yields';
+  const rule = NERVE_RULES.find((r) => (canFightBack || !r.whenThreatened) && leaning(c.temperament[r.trait]) === r.leaning);
+  return rule?.response ?? 'yields';
 }

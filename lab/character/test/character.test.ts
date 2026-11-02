@@ -3,7 +3,7 @@ import fc from 'fast-check';
 import { describe, test } from 'vitest';
 import { attributeScores } from '../src/attributes';
 import { bonusOf } from '../src/check';
-import { BASE_DEFENCE, BASE_HIT_POINTS, attributeUsed, createCharacter, defence, defenceModifiers, hitPointModifiers, maxHitPoints, rollFor, skillModifiers } from '../src/character';
+import { BASE_DEFENCE, BASE_HIT_POINTS, EXPERT_MULTIPLE, attributeUsed, createCharacter, defence, defenceOf, hitPoints, maxHitPoints, rollFor, skillModifiers, trainingModifier } from '../src/character';
 import { DICE } from '../src/dice';
 import { SKILLS } from '../src/skills';
 import { temperament } from '../src/temperament';
@@ -119,11 +119,7 @@ describe('hit points', { tags: ['unit'] }, () => {
 
   test('are listed with reasons', () => {
     const c = createCharacter({ name: 'T', attributes: attributeScores({ con: 14 }), training: { toughness: 'trained' } });
-    assert.deepEqual(hitPointModifiers(c), [
-      { value: 10, reason: 'Base' },
-      { value: 2, reason: 'Constitution 14' },
-      { value: 2, reason: 'Trained in Toughness' },
-    ]);
+    assert.deepEqual(hitPoints(c), { base: 10, modifiers: [{ value: 2, reason: 'Constitution 14' }, { value: 2, reason: 'Trained in Toughness' }] });
   });
 
   test('are 5 at the lowest Constitution score', () => {
@@ -141,11 +137,7 @@ describe('defence', { tags: ['unit'] }, () => {
 
   test('is listed with reasons', () => {
     const c = createCharacter({ name: 'Q', attributes: attributeScores({ agi: 14 }), training: { reflexes: 'trained' } });
-    assert.deepEqual(defenceModifiers(c), [
-      { value: 10, reason: 'Base' },
-      { value: 2, reason: 'Agility 14' },
-      { value: 2, reason: 'Trained in Reflexes' },
-    ]);
+    assert.deepEqual(defenceOf(c), { base: 10, modifiers: [{ value: 2, reason: 'Agility 14' }, { value: 2, reason: 'Trained in Reflexes' }] });
   });
 });
 
@@ -162,5 +154,14 @@ describe('skillModifiers', { tags: ['property'] }, () => {
         return at(undefined) < at('trained') && at('trained') < at('expert');
       }),
     );
+  });
+});
+
+describe('trainingModifier', { tags: ['unit'] }, () => {
+  test('adds the proficiency bonus if trained, EXPERT_MULTIPLE times it if expert, and nothing if untrained', () => {
+    const c = createCharacter({ name: 'T', training: { driving: 'trained', notice: 'expert' }, proficiencyBonus: 3 });
+    assert.deepEqual([trainingModifier(c, 'driving'), trainingModifier(c, 'notice'), trainingModifier(c, 'stealth')], [
+      { value: 3, reason: 'Trained in Driving' }, { value: EXPERT_MULTIPLE * 3, reason: 'Expert at Notice' }, null,
+    ]);
   });
 });

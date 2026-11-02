@@ -2,15 +2,18 @@
 // worked examples is calculated by the same code the lab uses, so the guide stays correct when the rules change.
 import { ATTRIBUTES, ATTRIBUTE_INFO, AVERAGE_SCORE, abilityModifier, attributeScores } from '../src/attributes';
 import { BACKGROUND_INFO } from '../src/backgrounds';
-import { DEFAULT_BANDS, OUTCOMES, OUTCOME_INFO, bonusOf, checkOdds, grade, type Modifier, type Odds } from '../src/check';
-import { BASE_DEFENCE, BASE_HIT_POINTS, PROFICIENCY_MAX, PROFICIENCY_MIN, createCharacter, defence, defenceModifiers, maxHitPoints, rollFor, skillModifiers } from '../src/character';
-import { DICE } from '../src/dice';
-import { describeModifier, percent, signed } from '../src/explain';
-import { UNARMED_DAMAGE_DIE, attackHitChance } from '../src/fight';
-import { NERVE_DC } from '../src/nerve';
-import { SKILL_INFO } from '../src/skills';
+import { DEFAULT_BANDS, OUTCOMES, OUTCOME_INFO, bonusOf, checkOdds, describeMargins, grade, successChance, type Modifier } from '../src/check';
+import { BASE_DEFENCE, EXPERT_MULTIPLE, PROFICIENCY_MAX, PROFICIENCY_MIN, createCharacter, defence, defenceOf, maxHitPoints, rollFor, skillModifiers } from '../src/character';
+import { DICE, type Dice } from '../src/dice';
+import { describeModifier, describeTotal, percent, signed } from '../src/explain';
+import { SIMULATED_FIGHTS } from '../src/assessment';
+import { damageModifiers } from '../src/fight';
+import { fightRules } from '../src/fight-log';
+import { attackHitChance, averageDamage, lowestHit } from '../src/fight-odds';
+import { FLEES_WHEN, NERVE_DC } from '../src/nerve';
+import { SKILL_INFO, attributesFor, describeSkillBonus } from '../src/skills';
 import { SOCIAL_ACTION_INFO, socialOdds } from '../src/social';
-import { SITUATION_INFO, TEMPERAMENT_EFFECTS, TRAIT_INFO, temperament } from '../src/temperament';
+import { HIGH, LOW, SITUATION_INFO, TEMPERAMENT_EFFECTS, TRAIT_INFO, temperament } from '../src/temperament';
 import { h } from './dom';
 import type { Panel } from './views';
 
@@ -23,7 +26,6 @@ const sam = createCharacter({
 });
 const alex = createCharacter({ name: 'Alex', attributes: attributeScores({ agi: 14, wis: 12 }) });
 
-const successChance = (o: Odds) => o.partial + o.success + o['critical-success'];
 const parts = (mods: readonly Modifier[]) => mods.map(describeModifier).join(', ');
 const num = (x: number) => String(Number(x.toFixed(1)));
 /** "16 + 1" or "16 − 1". */
@@ -45,7 +47,7 @@ interface Section {
 const SECTIONS: readonly Section[] = [
   {
     id: 'big-picture',
-    title: '1. The big picture',
+    title: 'The big picture',
     body: () => [
       p('Every character, player or not, is described in three layers:'),
       h('ul', {},
@@ -59,7 +61,7 @@ const SECTIONS: readonly Section[] = [
   },
   {
     id: 'attributes',
-    title: '2. Attributes',
+    title: 'Attributes',
     body: () => [
       p('There are six attributes, each a score from 1 to 20. ', h('strong', {}, `${AVERAGE_SCORE} is an ordinary, average person.`)),
       table(['Attribute', 'What it covers'], ATTRIBUTES.map((a) => [`${ATTRIBUTE_INFO[a].name} (${ATTRIBUTE_INFO[a].short})`, ATTRIBUTE_INFO[a].covers])),
@@ -72,24 +74,24 @@ const SECTIONS: readonly Section[] = [
   },
   {
     id: 'skills',
-    title: '3. Skills',
+    title: 'Skills',
     body: () => [
       p(`Each skill rests on one attribute – Firearms on Agility, Insight on Wisdom, and so on. A few can use either of two attributes (Intimidation can use Charisma or Strength: a big person can be frightening without being charming); the character uses whichever is better.`),
       p('A skill’s bonus is the attribute’s modifier plus training:'),
       h('ul', {},
         h('li', {}, h('strong', {}, 'Untrained'), ': just the attribute modifier.'),
         h('li', {}, h('strong', {}, 'Trained'), `: plus the proficiency bonus, which reflects experience: +${PROFICIENCY_MIN} for a newcomer up to +${PROFICIENCY_MAX} for a veteran.`),
-        h('li', {}, h('strong', {}, 'Expert'), ': plus twice the proficiency bonus.')),
+        h('li', {}, h('strong', {}, 'Expert'), `: plus the proficiency bonus ×${EXPERT_MULTIPLE}.`)),
       example('Sam’s skills',
         `Brawling (Strength, trained): ${parts(skillModifiers(sam, 'brawling'))} = ${signed(bonusOf(skillModifiers(sam, 'brawling')))}.`,
-        `Intimidation (trained) could use Charisma 8 (−1) or Strength 14 (+2), so it uses Strength: ${parts(skillModifiers(sam, 'intimidation'))} = ${signed(bonusOf(skillModifiers(sam, 'intimidation')))}.`,
+        `Intimidation (trained) could use ${attributesFor('intimidation').map((a) => `${ATTRIBUTE_INFO[a].name} ${sam.attributes[a]} (${signed(abilityModifier(sam.attributes[a]))})`).join(' or ')}, so it uses the better: ${parts(skillModifiers(sam, 'intimidation'))} = ${signed(bonusOf(skillModifiers(sam, 'intimidation')))}.`,
         `Notice (Wisdom, untrained): ${parts(skillModifiers(sam, 'notice'))} = ${signed(bonusOf(skillModifiers(sam, 'notice')))}.`),
       p(`There are ${Object.keys(SKILL_INFO).length} skills in all; the Characters tab lists them with what each covers.`),
     ],
   },
   {
     id: 'checks',
-    title: '4. Making a check',
+    title: 'Making a check',
     body: () => {
       const notice = { ...rollFor(sam, 'notice'), dc: 15 };
       const odds = checkOdds(notice);
@@ -99,23 +101,17 @@ const SECTIONS: readonly Section[] = [
         p('A ', h('strong', {}, 'check'), ' is a d20 roll plus a skill’s bonus, against a ', h('strong', {}, 'difficulty class (DC)'),
           ': the total needed. As a rough guide, 10 is easy, 15 is moderate, 20 is hard and 25 is very hard.'),
         p('The result is not just pass or fail. How far the total beats or misses the DC (the ', h('strong', {}, 'margin'), ') decides one of five outcomes:'),
-        table(['Margin (total − DC)', 'Outcome', 'Meaning'], [
-          [`${b.criticalSuccess} or more`, OUTCOME_INFO['critical-success'].name, OUTCOME_INFO['critical-success'].description],
-          [`${b.success} to ${b.criticalSuccess - 1}`, OUTCOME_INFO.success.name, OUTCOME_INFO.success.description],
-          [`${b.partial} to ${b.success - 1}`, OUTCOME_INFO.partial.name, OUTCOME_INFO.partial.description],
-          [`${b.failure} to ${b.partial - 1}`, OUTCOME_INFO.failure.name, OUTCOME_INFO.failure.description],
-          [`${b.failure - 1} or less`, OUTCOME_INFO['critical-failure'].name, OUTCOME_INFO['critical-failure'].description],
-        ]),
+        table(['Margin (total − DC)', 'Outcome', 'Meaning'], [...OUTCOMES].reverse().map((o) => [describeMargins(o, b), OUTCOME_INFO[o].name, `${OUTCOME_INFO[o].effect.charAt(0).toUpperCase()}${OUTCOME_INFO[o].effect.slice(1)}.`])),
         example('Sam watches for a pickpocket',
-          `Spotting a skilled pickpocket is a Notice check against DC 15. Sam’s Notice bonus is ${signed(bonus)}, so Sam needs to roll ${15 - bonus} or more on the d20.`,
-          `Sam rolls 16: ${plus(16, bonus)} = ${16 + bonus}, which beats 15 by ${16 + bonus - 15}. That is a ${OUTCOME_INFO[grade(16 + bonus - 15)].name.toLowerCase()}: Sam spots them, but perhaps too late to stop them.`,
+          `Spotting a skilled pickpocket is a Notice check against DC 15. Sam’s Notice bonus is ${signed(bonus)}, so Sam needs to roll ${15 - bonus} or more on the d20 to succeed at all.`,
+          `Sam rolls 16: ${plus(16, bonus)} = ${16 + bonus}, a margin of ${signed(16 + bonus - 15)}. That is a ${OUTCOME_INFO[grade(16 + bonus - 15, b)].name.toLowerCase()}: ${OUTCOME_INFO[grade(16 + bonus - 15, b)].effect}.`,
           `Before rolling, the chance of at least a partial success is ${percent(successChance(odds))} (${OUTCOMES.map((o) => `${OUTCOME_INFO[o].name.toLowerCase()} ${percent(odds[o])}`).join(', ')}). The Skill check and Dice and odds tabs show these numbers for any check.`),
       ];
     },
   },
   {
     id: 'opposed',
-    title: '5. Opposed checks, advantage and disadvantage',
+    title: 'Opposed checks, advantage and disadvantage',
     body: () => {
       const plain = checkOdds({ ...rollFor(sam, 'notice'), dc: 15 });
       const adv = checkOdds({ ...rollFor(sam, 'notice', { edges: ['advantage'] }), dc: 15 });
@@ -132,19 +128,19 @@ const SECTIONS: readonly Section[] = [
   },
   {
     id: 'temperament',
-    title: '6. Temperament',
+    title: 'Temperament',
     body: () => [
       p('Temperament is a set of traits, each from 0 to 1, with 0.5 as average: ',
         Object.values(TRAIT_INFO).map((t) => `${t.name.toLowerCase()} (${t.low} – ${t.high})`).join(', '), '.'),
-      p('Mostly temperament decides what a character ', h('em', {}, 'wants'), ' to do. In a few situations it also changes a roll, but only when a trait is clearly high (0.7 or more) or low (0.3 or less):'),
+      p('Mostly temperament decides what a character ', h('em', {}, 'wants'), ` to do. In a few situations it also changes a roll, but only when a trait is clearly high (${HIGH} or more) or low (${LOW} or less):`),
       table(['Situation', 'Trait', 'Effect'], TEMPERAMENT_EFFECTS.map((e) => [SITUATION_INFO[e.situation].name, `${e.when === 'high' ? 'High' : 'Low'} ${TRAIT_INFO[e.trait].name.toLowerCase()}`, signed(e.value)])),
-      p('It also decides how someone reacts when they lose their nerve: a timid or cautious person runs, a hot-tempered one may lash out, anyone else gives in.'),
+      p(`It also decides how someone reacts when they lose their nerve: someone with ${FLEES_WHEN} runs, a hot-tempered one may lash out when threatened with a weapon, and anyone else gives in.`),
       example('Sam is proud', `Sam’s pride is 0.8, so when someone tries to intimidate Sam, Sam gets ${signed(TEMPERAMENT_EFFECTS.find((e) => e.trait === 'pride')!.value)} to resist.`),
     ],
   },
   {
     id: 'backgrounds',
-    title: '7. Backgrounds: creating a character',
+    title: 'Backgrounds: creating a character',
     body: () => [
       p('Instead of D&D’s classes, a character has a ', h('strong', {}, 'background'), ' – what they do for a living. It gives them training in a few skills, and when a character is rolled it shapes their attributes and temperament.'),
       p('Rolling a character: six scores are rolled the D&D way (four six-sided dice, keeping the best three, so 3 to 18). The background decides which score goes to which attribute, best first. Temperament is rolled around the background’s typical values.'),
@@ -158,11 +154,11 @@ const SECTIONS: readonly Section[] = [
   },
   {
     id: 'social',
-    title: '8. Getting someone to do something: intimidate, persuade, deceive',
+    title: 'Getting someone to do something: intimidate, persuade, deceive',
     body: () => {
       const odds = socialOdds({ actor: sam, target: alex, action: 'intimidate' });
       const armed = socialOdds({ actor: sam, target: alex, action: 'intimidate', armed: true });
-      const goesAlong = (o: typeof odds) => o.partial + o.success + o['critical-success'] + o['nerve:yields'];
+      const goesAlong = (o: typeof odds) => successChance(o) + o['nerve:yields'];
       return [
         p('Getting someone to do something without force is a single opposed check:'),
         table(['Action', 'Roll', 'Against'], Object.values(SOCIAL_ACTION_INFO).map((a) => [a.name, SKILL_INFO[a.skill].name, `the target’s ${SKILL_INFO[a.resist].name}`])),
@@ -177,37 +173,39 @@ const SECTIONS: readonly Section[] = [
   },
   {
     id: 'fights',
-    title: '9. Fights',
+    title: 'Fights',
     body: () => {
-      const samHit = attackHitChance(DICE.d20, bonusOf(rollFor(sam, 'brawling').modifiers), defence(alex));
-      const alexHit = attackHitChance(DICE.d20, bonusOf(rollFor(alex, 'brawling').modifiers), defence(sam));
-      const samDamage = (UNARMED_DAMAGE_DIE + 1) / 2 + abilityModifier(sam.attributes.str);
-      const alexDamage = (UNARMED_DAMAGE_DIE + 1) / 2 + abilityModifier(alex.attributes.str);
+      const rules = fightRules(DICE.d20);
+      const attackBonus = (c: typeof sam) => bonusOf(rollFor(c, 'brawling').modifiers);
+      const samHit = attackHitChance(DICE.d20, attackBonus(sam), defence(alex));
+      const alexHit = attackHitChance(DICE.d20, attackBonus(alex), defence(sam));
+      const samDamage = averageDamage(bonusOf(damageModifiers(sam)));
+      const alexDamage = averageDamage(bonusOf(damageModifiers(alex)));
       return [
         p('A fight follows D&D’s combat rules. Any number of people can be on each side.'),
         h('ul', {},
-          h('li', {}, h('strong', {}, 'Hit points (HP)'), ` measure how much punishment someone can take: ${BASE_HIT_POINTS} + Constitution modifier, plus the proficiency bonus if trained in Toughness. At 0 they are knocked out.`),
-          h('li', {}, h('strong', {}, 'Defence'), ` is what an attack must reach to hit them: ${BASE_DEFENCE} + Reflexes (Agility modifier, plus Reflexes training). Quick people are harder to hit.`),
-          h('li', {}, h('strong', {}, 'Initiative'), ': at the start everyone rolls d20 + Reflexes; the highest acts first, every round.'),
-          h('li', {}, h('strong', {}, 'Attacks'), `: on their turn each fighter attacks a random enemy: d20 + Brawling against the target’s Defence. A hit deals 1d${UNARMED_DAMAGE_DIE} + Strength modifier damage (at least 1).`),
-          h('li', {}, h('strong', {}, 'Critical hits'), ': a natural 20 (the die showing 20) always hits and rolls the damage dice twice. A natural 1 always misses.'),
-          h('li', {}, h('strong', {}, 'Ganging up'), ': if someone on your side has already attacked a target this round, your attack on them has advantage (roll twice, the higher result counts). One person cannot fend off several at once. This follows D&D’s optional flanking rule.'),
-          h('li', {}, h('strong', {}, 'Nerve'), `: the first time someone drops to half HP, they make one nerve check (d20 + Nerve against ${NERVE_DC.hurt}): fight or flight. The first time half a side is out, everyone left on it checks too. Failing takes them out of the fight – they run, surrender or back off.`),
-          h('li', {}, h('strong', {}, 'Winning'), ': a side loses when nobody on it is still fighting.')),
+          h('li', {}, `${rules.hitPoints} Hit points (HP) measure how much punishment someone can take.`),
+          h('li', {}, h('strong', {}, 'Defence'), ` is what an attack must reach to hit: ${BASE_DEFENCE} + ${describeSkillBonus('reflexes')}. Quick people are harder to hit.`),
+          h('li', {}, rules.initiative),
+          h('li', {}, h('strong', {}, 'Attacks'), `: ${rules.attack} ${rules.damage}`),
+          h('li', {}, h('strong', {}, 'Critical hits'), `: ${rules.extremes}`),
+          h('li', {}, h('strong', {}, 'Ganging up'), `: ${rules.gangingUp} One person cannot fend off several at once. This follows D&D’s optional flanking rule.`),
+          h('li', {}, h('strong', {}, 'Nerve'), `: ${rules.nerveHurt} ${rules.nerveAlliesDown} ${rules.nerveFailure}`),
+          h('li', {}, h('strong', {}, 'Winning'), `: ${rules.end}`)),
         example('Sam against Alex',
-          `Sam has ${maxHitPoints(sam)} HP and Defence ${defence(sam)} (${parts(defenceModifiers(sam).slice(1))}). Alex has ${maxHitPoints(alex)} HP and Defence ${defence(alex)} (${parts(defenceModifiers(alex).slice(1))}).`,
-          `Sam attacks at ${signed(bonusOf(rollFor(sam, 'brawling').modifiers))}, so needs ${defence(alex) - bonusOf(rollFor(sam, 'brawling').modifiers)} or more to hit Alex: a ${percent(samHit)} chance, for ${num(samDamage)} damage on average.`,
-          `Alex attacks at ${signed(bonusOf(rollFor(alex, 'brawling').modifiers))} and needs ${defence(sam) - bonusOf(rollFor(alex, 'brawling').modifiers)} or more against Sam’s low Defence: ${percent(alexHit)}, for ${num(alexDamage)} damage on average.`,
-          `So Sam hits ${samHit > alexHit ? 'more' : samHit < alexHit ? 'less' : 'as'} often${samHit === alexHit ? ' as Alex' : ''} and ${samDamage > alexDamage ? 'harder' : samDamage < alexDamage ? 'less hard' : 'as hard'}. Alex, being quicker (Agility ${alex.attributes.agi} against Sam’s ${sam.attributes.agi}), is more likely to act first. Whoever drops to half HP first faces a nerve check, which ends many fights before anyone is knocked out.`),
-        p('The Fight tab can play a fight automatically, step through it one roll at a time (rolling or choosing each result, with the odds of every roll), or simulate a thousand fights to see how they tend to go.'),
+          `Sam has ${maxHitPoints(sam)} HP and Defence ${defence(sam)} (${describeTotal(defenceOf(sam))}). Alex has ${maxHitPoints(alex)} HP and Defence ${defence(alex)} (${describeTotal(defenceOf(alex))}).`,
+          `Sam attacks at ${signed(attackBonus(sam))}, so needs ${lowestHit(DICE.d20, attackBonus(sam), defence(alex))} or more to hit Alex: a ${percent(samHit)} chance, for ${num(samDamage)} damage on average.`,
+          `Alex attacks at ${signed(attackBonus(alex))} and needs ${lowestHit(DICE.d20, attackBonus(alex), defence(sam))} or more against Sam: ${percent(alexHit)}, for ${num(alexDamage)} damage on average.`,
+          `So Sam hits ${samHit > alexHit ? 'more' : samHit < alexHit ? 'less' : 'as'} often${samHit === alexHit ? ' as Alex' : ''} and ${samDamage > alexDamage ? 'harder' : samDamage < alexDamage ? 'less hard' : 'as hard'}. ${alex.attributes.agi > sam.attributes.agi ? `Alex, being quicker (Agility ${alex.attributes.agi} against Sam’s ${sam.attributes.agi}), is more likely to act first.` : ''} Whoever drops to half HP first faces a nerve check, which ends many fights before anyone is knocked out.`),
+        p(`The Fight tab can play a fight automatically, step through it one roll at a time (rolling or choosing each result, with the odds of every roll), or simulate ${SIMULATED_FIGHTS.toLocaleString()} fights to see how they tend to go.`),
       ];
     },
   },
   {
     id: 'dice',
-    title: '10. Dice options',
+    title: 'Dice options',
     body: () => {
-      const alt = (dice: (typeof DICE)[keyof typeof DICE]) => percent(successChance(checkOdds({ ...rollFor(sam, 'notice', { dice }), dc: 15 })));
+      const alt = (dice: Dice) => percent(successChance(checkOdds({ ...rollFor(sam, 'notice', { dice }), dc: 15 })));
       return [
         p('D&D uses one d20, where every result from 1 to 20 is equally likely. That makes outcomes swingy: a novice can beat an expert surprisingly often.'),
         p('The lab can instead roll ', h('strong', {}, '2d10'), ' (two ten-sided dice added) or ', h('strong', {}, '3d6'),
@@ -220,21 +218,21 @@ const SECTIONS: readonly Section[] = [
   },
   {
     id: 'glossary',
-    title: '11. Glossary',
+    title: 'Glossary',
     body: () => [
       table(['Term', 'Meaning'], [
         ['d20, 3d6, 1d4…', 'Dice: the number of dice, then “d”, then how many sides each has. 3d6 is three six-sided dice added together.'],
         ['Modifier', 'A bonus or penalty added to a roll, e.g. +2 from Strength 14.'],
-        ['Proficiency bonus', 'Added to rolls with trained skills (twice for expert ones). Grows with experience, +2 to +6.'],
+        ['Proficiency bonus', `Added to rolls with trained skills (×${EXPERT_MULTIPLE} for expert ones). Grows with experience, ${signed(PROFICIENCY_MIN)} to ${signed(PROFICIENCY_MAX)}.`],
         ['DC (difficulty class)', 'The total a check must reach.'],
         ['Margin', 'How far a total beats or misses what it needed. Decides the outcome.'],
         ['Opposed check', 'Both sides roll; the one acting must beat the other’s total.'],
         ['Advantage / disadvantage', 'Roll twice, keep the higher / lower.'],
         ['Natural 20 / natural 1', 'The die itself showing 20 or 1, before bonuses. In attacks, always a hit / always a miss.'],
         ['Hit points (HP)', 'How much damage someone can take before being knocked out.'],
-        ['Defence', 'What an attack must reach to hit. 10 + Reflexes.'],
+        ['Defence', `What an attack must reach to hit. ${BASE_DEFENCE} + Reflexes.`],
         ['Initiative', 'Who acts first in a fight. d20 + Reflexes.'],
-        ['Nerve check', 'Whether someone holds their nerve when threatened or hurt. d20 + Nerve (Wisdom or Constitution, training and temperament).'],
+        ['Nerve check', `Whether someone holds their nerve when threatened or hurt. d20 + ${describeSkillBonus('nerve', 'temperament')}.`],
       ]),
     ],
   },
@@ -249,10 +247,10 @@ export function guidePanel(): Panel {
     const panels = SECTIONS.map((section, i) => {
       const next = SECTIONS[i + 1];
       const details = h('details', { class: 'guide-section', id: `guide-${section.id}`, open: section.id === open },
-        h('summary', {}, section.title),
+        h('summary', {}, `${i + 1}. ${section.title}`),
         h('div', { class: 'guide-body' },
           ...section.body(),
-          next ? h('button', { type: 'button', class: 'guide-next', onclick: () => openSection(next.id) }, `Next: ${next.title.replace(/^\d+\. /, '')} →`) : null));
+          next ? h('button', { type: 'button', class: 'guide-next', onclick: () => openSection(next.id) }, `Next: ${next.title} →`) : null));
       details.addEventListener('toggle', () => {
         if (details.open && open !== section.id) openSection(section.id);
       });

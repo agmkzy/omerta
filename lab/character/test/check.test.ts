@@ -11,8 +11,11 @@ import {
   resolveCheck,
   resolveOpposed,
   succeeded,
+  passes,
+  successChance,
+  outcomeMargins,
+  describeMargins,
   type Bands,
-  type Odds,
   type Roll,
 } from '../src/check';
 import { DICE, DICE_NAMES, EDGES } from '../src/dice';
@@ -21,7 +24,6 @@ import { scripted } from './support';
 
 const close = (actual: number, expected: number, tolerance = 1e-12) =>
   assert.ok(Math.abs(actual - expected) <= tolerance, `${actual} is not within ${tolerance} of ${expected}`);
-const successChance = (odds: Odds) => odds.partial + odds.success + odds['critical-success'];
 
 const plain = (...values: number[]): Roll => ({ dice: DICE.d20, edge: 'none', modifiers: values.map((value, i) => ({ value, reason: `m${i}` })) });
 
@@ -45,14 +47,42 @@ describe('grade', { tags: ['unit'] }, () => {
 });
 
 describe('OUTCOME_INFO', { tags: ['unit'] }, () => {
-  test('describes every outcome', () => {
-    for (const o of OUTCOMES) assert.ok(OUTCOME_INFO[o].name && OUTCOME_INFO[o].description, o);
+  test('names every outcome and says what it means', () => {
+    for (const o of OUTCOMES) {
+      assert.notEqual(OUTCOME_INFO[o].name, '', o);
+      assert.notEqual(OUTCOME_INFO[o].effect, '', o);
+    }
   });
 });
 
-describe('succeeded', { tags: ['unit'] }, () => {
-  test('is true for partial and better', () => {
+describe('outcomeMargins and describeMargins', { tags: ['unit'] }, () => {
+  test('give the margins of each outcome from the bands', () => {
+    assert.deepEqual(OUTCOMES.map((o) => outcomeMargins(o)), [
+      { min: null, max: -6 }, { min: -5, max: -1 }, { min: 0, max: 4 }, { min: 5, max: 9 }, { min: 10, max: null },
+    ]);
+    assert.deepEqual(OUTCOMES.map((o) => describeMargins(o)), ['6 short or worse', '5 short to 1 short', 'exactly the DC to 4 over', '5 over to 9 over', '10 over or better']);
+  });
+
+  test('follow other bands, including a range of one margin', () => {
+    const bands = { criticalSuccess: 3, success: 2, partial: 1, failure: -1 };
+    assert.deepEqual(OUTCOMES.map((o) => describeMargins(o, bands)), ['2 short or worse', '1 short to exactly the DC', '1 over', '2 over', '3 over or better']);
+    assert.throws(() => outcomeMargins('partial', { criticalSuccess: 1, success: 1, partial: 0, failure: -1 }), RangeError);
+  });
+});
+
+describe('succeeded, passes and successChance', { tags: ['unit'] }, () => {
+  test('succeeded is true for partial and better', () => {
     assert.deepEqual(OUTCOMES.map(succeeded), [false, false, true, true, true]);
+  });
+
+  test('passes is true from the partial band up, whatever the bands', () => {
+    assert.deepEqual([-1, 0, 1].map((m) => passes(m)), [false, true, true]);
+    assert.deepEqual([1, 2].map((m) => passes(m, { criticalSuccess: 4, success: 3, partial: 2, failure: 0 })), [false, true]);
+  });
+
+  test('successChance adds the chances of partial success and better', () => {
+    const odds = { 'critical-failure': 0.1, failure: 0.2, partial: 0.3, success: 0.25, 'critical-success': 0.15 };
+    assert.ok(Math.abs(successChance(odds) - 0.7) < 1e-12);
   });
 });
 
@@ -161,7 +191,9 @@ describe('checkOdds and opposedOdds', { tags: ['property'] }, () => {
   test('identical rolls give the active side less than 50%, because ties fail', () => {
     fc.assert(fc.property(roll, (r) => successChance(opposedOdds({ active: r, passive: r })) < 0.5));
   });
+});
 
+describe('checkOdds and opposedOdds', { tags: ['statistical'] }, () => {
   test('match sampled frequencies from resolveCheck and resolveOpposed', () => {
     const r = roller(seeded(3));
     for (const spec of [

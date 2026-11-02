@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'vitest';
 import { resolveCheck, resolveOpposed } from '../src/check';
 import { DICE } from '../src/dice';
-import { compactRoll, describeCheck, describeOpposed, describeRoll, percent, signed } from '../src/explain';
+import { compactRoll, describeCheck, describeOpposed, describeRoll, describeTotal, percent, signed } from '../src/explain';
 import { scripted } from './support';
 
 describe('explain', { tags: ['unit'] }, () => {
@@ -12,6 +12,11 @@ describe('explain', { tags: ['unit'] }, () => {
 
   test('percent shows <1% and >99% instead of rounding to 0% or 100%', () => {
     assert.deepEqual([0, 0.001, 0.25, 0.6249, 0.996, 1].map(percent), ['0%', '<1%', '25%', '62%', '>99%', '100%']);
+  });
+
+  test('describeTotal lists the base, then each modifier with its reason', () => {
+    assert.equal(describeTotal({ base: 10, modifiers: [{ value: -1, reason: 'Agility 9' }, { value: 2, reason: 'Trained in Reflexes' }] }), '10 base, −1 Agility 9, +2 Trained in Reflexes');
+    assert.equal(describeTotal({ base: 10, modifiers: [] }), '10 base');
   });
 
   test('describeRoll lists the faces and each modifier with its reason', () => {

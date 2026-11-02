@@ -27,9 +27,9 @@ npm run lab:dev         # playground at http://localhost:5180
 | `src/character.ts` | Characters: attributes, training (untrained/trained/expert), proficiency bonus (2–6), temperament. `rollFor()` builds a roll. |
 | `src/temperament.ts` | 12 traits (the game's 7 plus loyalty, pride, temper, honesty, cruelty), 0–1. One table lists where temperament modifies rolls. |
 | `src/backgrounds.ts` | Backgrounds instead of classes: training, attribute priorities, temperament centres. `rollCharacter()` generates a character. |
-| `src/fight.ts`, `src/fight-log.ts` | Fights: initiative, attack rolls, damage, hit points and morale (see below). |
+| `src/fight.ts`, `src/fight-step.ts`, `src/fight-odds.ts`, `src/fight-log.ts` | Fights: the rules and simulation, stepping roll by roll, exact odds, and descriptions (see below). |
 | `src/nerve.ts` | The nerve check shared by fights and threats. |
-| `src/assessment.ts` | How a fight is likely to go for the left side, in words: estimated from simulated fights and described on a fixed likelihood scale. |
+| `src/assessment.ts` | Simulated fights counted, and how a fight is likely to go for the left side in words, on a fixed likelihood scale. |
 | `src/social.ts` | Social actions (intimidate, persuade, deceive) as single checks, with outcome meanings and exact odds. |
 | `src/explain.ts` | Plain-text descriptions of rolls and checks. |
 | `src/serialize.ts` | Versioned JSON save/load for characters, with validation and defaults for missing fields. |
@@ -56,8 +56,11 @@ browser after every change, as is the open tab. The check tab picks its two char
 Renames are handled by migrations (format 1 to 2 renamed the backgrounds). `test/fixtures/roster-format1.json` is a save
 written by an older build and must keep loading.
 
-Tests are in `test/`, one file per module. Each is tagged `unit` or `property` (fast-check). The suite has 100% statement,
-branch, function and line coverage.
+Tests are in `test/`, one file per module. Each is tagged `unit`, `property` (fast-check) or `statistical` (a seeded
+simulation checked against expected rates). Fight tests script their dice by what each roll is for (`fightWith` in
+`test/support.ts`). Coverage is 100% (statements, branches, functions and lines) for `src/` and the playground's pure
+modules (`roster.ts`, `parties.ts`, `storage.ts`, `animation.ts`); the panels that build the page are checked in the
+browser.
 
 ## Design decisions
 
@@ -87,29 +90,23 @@ As in D&D, getting someone to do something without force is a single check, not 
 ### Fights
 
 Fights are between two sides (attackers and defenders) of one or more fighters, following D&D's combat rules; nobody
-chooses actions.
+chooses actions. Each fighter rolls initiative, then on their turn attacks a random enemy (with advantage when ganging
+up, after D&D's optional flanking rule); hits deal damage, a fighter at 0 hit points is knocked out, and nerve checks
+(after D&D's optional morale rules) take fighters out when they first drop to half hit points or see half their side
+out. The rules in words, with every number, come from `fightRules(dice)` in `src/fight-log.ts`, built from the
+constants the code uses; the playground's Fight tab and guide show them.
 
-- **Initiative:** everyone rolls Reflexes; the order is highest first (defenders first on a tie, then list order) and
-  is used every round.
-- **Attacks:** on their turn each fighter still in the fight attacks a random enemy who is still fighting (no die is
-  rolled when there is only one): d20 + Brawling bonus against the target's **Defence** (10 + Reflexes bonus, like D&D's
-  unarmoured Armour Class). A hit deals 1d4 + Strength modifier (minimum 1). A natural 20 always hits and rolls the
-  damage dice twice; a natural 1 always misses. There are no wound penalties.
-- **Ganging up** (after D&D's optional flanking rule): an attack has advantage if someone on the attacker's side has
-  already attacked that target this round. One-against-one fights are unaffected; in simulation one fighter's chance
-  against three civilians falls from 43% to 28%.
-- **Hit points** are 10 + Constitution modifier, plus the proficiency bonus if trained in Toughness (twice if expert):
-  D&D's first-level d10 hit die plus its Tough feat. 0 HP is a knockout.
-- **Nerve (morale)**, following D&D's optional morale rules: a fighter makes one nerve check (DC 10) the first time they
-  drop to half HP or below, and everyone left on a side makes one (DC 10) the first time half of that side is out of
-  the fight. A failure takes that fighter out: a low-courage or high-caution fighter flees; otherwise a defender
-  surrenders or an attacker backs off.
-- **Ending:** a side loses when none of its fighters is still fighting; otherwise the round limit gives a stalemate.
-- `tallyFights` counts wins per side and how each fighter ended up (`FIGHTER_STATUS_INFO` explains each status).
-- **Stepping through:** every die in a fight says what it is for (initiative, target, attack, damage, nerve, with the
-  numbers involved). `stepFight(spec, faces)` replays a fight from the rolls so far and returns the next roll it is
-  waiting for, with the fight so far; `describeRollRequest` says what that roll needs and its chance. A fight is fully
-  rebuilt from its rolls, so going back is dropping the last one.
+- `src/fight.ts`: the rules and the simulation. `attackOutcome` is the one attack rule (the highest possible roll is a
+  critical hit, the lowest a miss, otherwise the total against Defence); `passes` in `src/check.ts` is the one pass
+  rule for every check. Every die rolled says what it is for in a `RollRequest`, which carries the fight's dice, who
+  rolls and against whom, and the modifiers with their reasons, so anything that explains a roll reads it from there.
+- `src/fight-step.ts`: `stepFight(spec, faces)` replays a fight from the rolls so far and returns the next roll it is
+  waiting for, the fight so far and where each roll started. A fight is fully rebuilt from its rolls, so going back is
+  dropping the last one (`withoutLastRoll`).
+- `src/fight-odds.ts`: the exact odds of any roll, from the same rules.
+- `src/fight-log.ts`: events, roll requests and the rules in words.
+- `src/assessment.ts`: `tallyFights` counts simulated fights; `simulateFights` uses a fixed seed, so the setup page's
+  assessment and the Simulate button show the same 2,000 fights.
 
 The nerve check itself (`src/nerve.ts`) is shared: it is also made when a weapon is drawn on someone (DC 12).
 
@@ -120,8 +117,8 @@ The nerve check itself (`src/nerve.ts`) is shared: it is also made when a weapon
 - **Progression.** XP/levels versus improvement through use. Not implemented; only the proficiency bonus can be set.
 - **Knowledge.** The player should see an estimate of an NPC's abilities based on what they know, not the true values.
   This would sit on top of the exact odds.
-- **Fight balance.** Damage, hit points and the nerve DC are first guesses, all defined as constants. Simulated fights
-  last about 2.5 rounds (about 5 attacks) and end about 50–60% by knockout and the rest by a failed nerve check.
+- **Fight balance.** Damage, hit points and the nerve DC are first guesses, all defined as constants. The Fight tab's
+  Simulate button shows how a line-up's fights tend to end.
 - **Unused skills.** Firearms and others are defined but nothing uses them yet. Armour and weapons are not
   modelled.
 - **Integration with the game.** Mapping the existing `Traits`/`Skills` onto this model, save migration, and replacing

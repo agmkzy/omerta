@@ -1,5 +1,5 @@
 // UI components shared by the panels.
-import { OUTCOMES, OUTCOME_INFO, type Modifier, type Odds, type Outcome } from '../src/check';
+import { OUTCOMES, OUTCOME_INFO, describeMargins, type Modifier, type Odds, type Outcome } from '../src/check';
 import { describeModifier, percent, signed } from '../src/explain';
 import { h } from './dom';
 
@@ -36,7 +36,7 @@ export function hint(text: string): HTMLElement {
 /** A collapsible list explaining the five outcomes. */
 export function outcomeGuide(): HTMLElement {
   return h('details', { class: 'guide' }, h('summary', {}, 'What the outcomes mean'),
-    h('ul', {}, ...OUTCOMES.map((o) => h('li', {}, h('i', { class: `swatch o-${o}` }), h('strong', {}, OUTCOME_INFO[o].name), `: ${OUTCOME_INFO[o].description}`))));
+    h('ul', {}, ...OUTCOMES.map((o) => h('li', {}, h('i', { class: `swatch o-${o}` }), h('strong', {}, OUTCOME_INFO[o].name), `: ${describeMargins(o)}; ${OUTCOME_INFO[o].effect}.`))));
 }
 
 /** A coloured tag showing an outcome. */

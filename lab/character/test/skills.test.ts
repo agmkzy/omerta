@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'vitest';
 import { ATTRIBUTES } from '../src/attributes';
-import { SKILLS, SKILL_INFO, attributesFor, skillsUsing } from '../src/skills';
+import { SKILLS, SKILL_INFO, attributesFor, describeSkillBonus, skillsUsing } from '../src/skills';
 
 describe('skills', { tags: ['unit'] }, () => {
   test('attributesFor lists the primary attribute, then any alternatives', () => {
@@ -29,5 +29,12 @@ describe('skills', { tags: ['unit'] }, () => {
 
   test('every attribute is the primary attribute of at least one skill', () => {
     for (const a of ATTRIBUTES) assert.ok(SKILLS.some((s) => SKILL_INFO[s].attribute === a), a);
+  });
+});
+
+describe('describeSkillBonus', { tags: ['unit'] }, () => {
+  test('names the attribute (or the better of several), the training and anything else added', () => {
+    assert.equal(describeSkillBonus('brawling'), 'Brawling (the Strength modifier, plus any Brawling training)');
+    assert.equal(describeSkillBonus('nerve', 'temperament'), 'Nerve (the higher of the Wisdom and Constitution modifiers, plus any Nerve training and temperament)');
   });
 });

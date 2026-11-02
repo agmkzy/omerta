@@ -1,5 +1,5 @@
 // Skills. Each is based on one attribute; some also allow an alternative attribute (e.g. Intimidation with Strength).
-import type { Attribute } from './attributes';
+import { ATTRIBUTE_INFO, type Attribute } from './attributes';
 
 export const SKILLS = [
   'brawling', 'intimidation',
@@ -52,4 +52,15 @@ export function skillsUsing(attribute: Attribute): { readonly skill: Skill; read
 export function attributesFor(skill: Skill): readonly Attribute[] {
   const info = SKILL_INFO[skill];
   return [info.attribute, ...(info.alternatives ?? [])];
+}
+
+/**
+ * What a skill roll adds, in words, e.g. "Nerve (the higher of the Wisdom and Constitution modifiers, plus any Nerve
+ * training)". `also` names anything else added, e.g. "temperament".
+ */
+export function describeSkillBonus(skill: Skill, also?: string): string {
+  const names = attributesFor(skill).map((a) => ATTRIBUTE_INFO[a].name);
+  const attribute = names.length === 1 ? `the ${names[0]} modifier` : `the higher of the ${names.slice(0, -1).join(', ')} and ${names.at(-1)} modifiers`;
+  const name = SKILL_INFO[skill].name;
+  return `${name} (${attribute}, plus any ${name} training${also ? ` and ${also}` : ''})`;
 }

@@ -18,6 +18,31 @@ export const DICE: { readonly [N in DiceName]: Dice & { readonly name: N } } = {
   '3d6': { name: '3d6', count: 3, sides: 6, description: 'Three 6-sided dice added. Strongly favours middle results, so skill matters more than luck.' },
 };
 
+/** The highest and lowest totals the dice can roll. On a d20 these are the natural 20 and natural 1. */
+export function highestRoll(dice: Pick<Dice, 'count' | 'sides'>): number {
+  return dice.count * dice.sides;
+}
+
+export function lowestRoll(dice: Pick<Dice, 'count'>): number {
+  return dice.count;
+}
+
+/** Whether a dice result is the highest or lowest the dice can roll. */
+export function extremeOf(kept: number, dice: Pick<Dice, 'count' | 'sides'>): 'highest' | 'lowest' | null {
+  return kept === highestRoll(dice) ? 'highest' : kept === lowestRoll(dice) ? 'lowest' : null;
+}
+
+/** "natural 20" and "natural 1" on a d20; on other dice, "highest possible roll (18)" and "lowest possible roll (3)". */
+export function extremeName(which: 'highest' | 'lowest', dice: Dice): string {
+  if (dice.count === 1 && dice.sides === 20) return which === 'highest' ? 'natural 20' : 'natural 1';
+  return which === 'highest' ? `highest possible roll (${highestRoll(dice)})` : `lowest possible roll (${lowestRoll(dice)})`;
+}
+
+/** The same with its article: "a natural 20", but "the highest possible roll (18)". */
+export function extremePhrase(which: 'highest' | 'lowest', dice: Dice): string {
+  return `${dice.count === 1 && dice.sides === 20 ? 'a' : 'the'} ${extremeName(which, dice)}`;
+}
+
 /** D&D's advantage and disadvantage: roll twice and keep the higher or lower total. */
 export const EDGES = ['none', 'advantage', 'disadvantage'] as const;
 export type Edge = (typeof EDGES)[number];

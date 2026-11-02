@@ -4,7 +4,7 @@
 // Intimidation can be armed. The target then makes a nerve check against a weapon first (DC 12); failing it, they comply
 // at once, flee or fight back, depending on temperament. If they hold their nerve, the intimidation is rolled with
 // advantage. A critical failure at intimidating a hot-tempered target provokes them into starting a fight.
-import { OUTCOME_INFO, OUTCOMES, checkOdds, opposedOdds, resolveOpposed, succeeded, type Modifier, type OpposedResult, type Outcome, type Roll } from './check';
+import { OUTCOME_INFO, OUTCOMES, checkOdds, opposedOdds, resolveOpposed, successChance, type Modifier, type OpposedResult, type Outcome, type Roll } from './check';
 import { rollFor, type Character } from './character';
 import { DICE, type Dice } from './dice';
 import { nerveCheck, nerveCheckSpec, nerveResponse, type NerveCheck, type NerveResponse } from './nerve';
@@ -134,7 +134,7 @@ export function socialOdds(spec: SocialSpec): Readonly<Record<SocialResultKey, n
   let reachesCheck = 1;
   if (armed) {
     const nerve = checkOdds(nerveCheckSpec(spec.target, 'weapon-drawn', dice));
-    const holds = OUTCOMES.filter(succeeded).reduce((sum, o) => sum + nerve[o], 0);
+    const holds = successChance(nerve);
     odds[`nerve:${nerveResponse(spec.target, true)}`] = 1 - holds;
     reachesCheck = holds;
   }

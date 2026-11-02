@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fc from 'fast-check';
 import { describe, test } from 'vitest';
-import { assessFight, describeRisk, likelihood, type FightAssessment } from '../src/assessment';
+import { SIMULATED_FIGHTS, assess, assessFight, describeRisk, likelihood, simulateFights, tallyFights, type FightAssessment } from '../src/assessment';
 import { rollCharacter } from '../src/backgrounds';
 import { roller, seeded } from '../src/random';
 
@@ -129,5 +129,49 @@ describe('assessFight', { tags: ['unit'] }, () => {
     const r = roller(seeded(5));
     const a = assessFight({ attackers: [rollCharacter('F', 'accountant', r)], defenders: [rollCharacter('S', 'fighter', r)] }, 200);
     assert.ok(Math.abs(a.fighters[0]!.downed - (a.anyKnockedOut + a.anyLostNerve)) < 1e-12);
+  });
+});
+
+describe('tallyFights', { tags: ['unit'] }, () => {
+  test('counts each fight once: the winner, how each fighter ended up, and whether each side had someone knocked out or losing their nerve', () => {
+    // A frail fighter (5 HP) against a sturdy one: some fights end in a knockout, some in a lost nerve, some in a stalemate.
+    const r = roller(seeded(4));
+    const spec = { attackers: [rollCharacter('F', 'fighter', r)], defenders: [rollCharacter('S', 'shopkeeper', r)], maxRounds: 3 };
+    const t = tallyFights(spec, roller(seeded(2)), 300);
+    assert.equal(t.runs, 300);
+    assert.equal(t.wins.attacker + t.wins.defender + t.wins.stalemate, 300);
+    assert.deepEqual(t.fighters.map((f) => [f.id, f.name, f.side]), [['A1', 'F', 'attacker'], ['B1', 'S', 'defender']]);
+    for (const f of t.fighters) assert.equal(Object.values(f.statuses).reduce((a, b) => a + b, 0), 300, f.id);
+    // One fighter a side, so a side had someone knocked out exactly when its fighter was, and lost nerve likewise.
+    const [left, right] = t.fighters;
+    assert.deepEqual([t.anyKnockedOut.attacker, t.anyKnockedOut.defender], [left?.statuses['knocked-out'], right?.statuses['knocked-out']]);
+    assert.equal(t.anyLostNerve.defender, (right?.statuses.surrendered ?? 0) + (right?.statuses.fled ?? 0));
+    assert.equal(t.anyLostNerve.attacker, (left?.statuses['backed-off'] ?? 0) + (left?.statuses.fled ?? 0));
+  });
+
+  test('a stalemate is counted as one', () => {
+    const r = roller(seeded(3));
+    const spec = { attackers: [rollCharacter('A', 'accountant', r)], defenders: [rollCharacter('B', 'accountant', r)], maxRounds: 1 };
+    assert.ok(tallyFights(spec, roller(seeded(3)), 50).wins.stalemate > 0);
+  });
+});
+
+describe('simulateFights and assess', { tags: ['unit'] }, () => {
+  const spec = () => {
+    const r = roller(seeded(3));
+    return { attackers: [rollCharacter('F', 'fighter', r)], defenders: [rollCharacter('S', 'shopkeeper', r)] };
+  };
+
+  test('simulate the same fights every time, so the assessment and the Simulate button agree', () => {
+    assert.deepEqual(simulateFights(spec()), simulateFights(spec()));
+    assert.equal(simulateFights(spec()).runs, SIMULATED_FIGHTS);
+    assert.deepEqual(assessFight(spec()), assess(simulateFights(spec())));
+  });
+
+  test('assess reads the chances for the left side from a tally', () => {
+    const t = simulateFights(spec(), 200);
+    const a = assess(t);
+    assert.deepEqual([a.runs, a.win, a.stalemate, a.anyKnockedOut, a.anyLostNerve], [200, t.wins.attacker / 200, t.wins.stalemate / 200, t.anyKnockedOut.attacker / 200, t.anyLostNerve.attacker / 200]);
+    assert.deepEqual(a.fighters, [{ id: 'A1', name: 'F', downed: (200 - (t.fighters[0]?.statuses.fighting ?? 0)) / 200 }]);
   });
 });

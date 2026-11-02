@@ -1,8 +1,8 @@
-// How a fight is likely to go for the Left side, in words rather than numbers. The chances are estimated by simulating
-// the fight (with a fixed seed, so the same line-up always gives the same assessment) and then described on a fixed
-// scale of likelihood words.
-import { runFight, type FightSpec } from './fight';
-import { roller, seeded } from './random';
+// How fights are likely to go: simulated fights are tallied (with a fixed seed, so the same line-up always gives the same
+// numbers), and the chances for the Left side are described in words on a fixed scale of likelihood words.
+import { FIGHTER_STATUSES, runFight, type FightSpec, type FighterStatus } from './fight';
+import type { Side } from './nerve';
+import { roller, seeded, type Roller } from './random';
 
 export interface FightAssessment {
   readonly runs: number;
@@ -29,34 +29,68 @@ export function likelihood(chance: number): Likelihood {
   return THRESHOLDS.find(([min]) => chance >= min)?.[1] ?? 'almost no chance';
 }
 
-/** The fixed seed for assessments, so they do not change unless the fight does. */
-const ASSESSMENT_SEED = 1;
+/** How many simulated fights an assessment, and the playground's Simulate button, are built on. */
+export const SIMULATED_FIGHTS = 2000;
 
-export function assessFight(spec: FightSpec, runs = 2000): FightAssessment {
-  const dice = roller(seeded(ASSESSMENT_SEED));
-  let win = 0, stalemate = 0, anyKnockedOut = 0, anyLostNerve = 0;
-  const downed = new Map<string, { name: string; count: number }>();
+/** The fixed seed for simulated fights, so the numbers do not change unless the fight does. */
+const SIMULATION_SEED = 1;
+
+export interface FightTally {
+  readonly runs: number;
+  readonly wins: Readonly<Record<Side | 'stalemate', number>>;
+  /** Every fighter (attackers, then defenders), with how often they finished with each status. */
+  readonly fighters: readonly { readonly id: string; readonly name: string; readonly side: Side; readonly statuses: Readonly<Record<FighterStatus, number>> }[];
+  /** For each side, how many fights ended with at least one of its fighters knocked out. */
+  readonly anyKnockedOut: Readonly<Record<Side, number>>;
+  /** For each side, how many fights ended with at least one of its fighters out because they lost their nerve. */
+  readonly anyLostNerve: Readonly<Record<Side, number>>;
+}
+
+/** Runs the fight `runs` times and counts the winners and how each fighter ended up. */
+export function tallyFights(spec: FightSpec, roller: Roller, runs: number): FightTally {
+  const wins = { attacker: 0, defender: 0, stalemate: 0 };
+  const anyKnockedOut = { attacker: 0, defender: 0 };
+  const anyLostNerve = { attacker: 0, defender: 0 };
+  const fighters = new Map<string, { id: string; name: string; side: Side; statuses: Record<FighterStatus, number> }>();
   for (let i = 0; i < runs; i++) {
-    const r = runFight(spec, dice);
-    if (r.winner === 'attacker') win++;
-    if (r.winner === null) stalemate++;
-    const left = r.fighters.filter((f) => f.side === 'attacker');
-    if (left.some((f) => f.status === 'knocked-out')) anyKnockedOut++;
-    if (left.some((f) => f.status !== 'fighting' && f.status !== 'knocked-out')) anyLostNerve++;
-    for (const f of left) {
-      const entry = downed.get(f.id) ?? { name: f.character.name, count: 0 };
-      if (f.status !== 'fighting') entry.count++;
-      downed.set(f.id, entry);
+    const r = runFight(spec, roller);
+    wins[r.winner ?? 'stalemate']++;
+    for (const side of SIDES) {
+      const mine = r.fighters.filter((f) => f.side === side);
+      if (mine.some((f) => f.status === 'knocked-out')) anyKnockedOut[side]++;
+      if (mine.some((f) => lostNerve(f.status))) anyLostNerve[side]++;
+    }
+    for (const f of r.fighters) {
+      const entry = fighters.get(f.id) ?? { id: f.id, name: f.character.name, side: f.side, statuses: Object.fromEntries(FIGHTER_STATUSES.map((s) => [s, 0])) as Record<FighterStatus, number> };
+      entry.statuses[f.status]++;
+      fighters.set(f.id, entry);
     }
   }
+  return { runs, wins, fighters: [...fighters.values()], anyKnockedOut, anyLostNerve };
+}
+
+const SIDES = ['attacker', 'defender'] as const;
+const lostNerve = (s: FighterStatus) => s === 'surrendered' || s === 'backed-off' || s === 'fled';
+
+/** The simulated fights an assessment is built on: a fixed seed, so the same line-up always gives the same numbers. */
+export function simulateFights(spec: FightSpec, runs = SIMULATED_FIGHTS): FightTally {
+  return tallyFights(spec, roller(seeded(SIMULATION_SEED)), runs);
+}
+
+/** The chances for the left side, from a tally. */
+export function assess(t: FightTally): FightAssessment {
   return {
-    runs,
-    win: win / runs,
-    stalemate: stalemate / runs,
-    anyKnockedOut: anyKnockedOut / runs,
-    anyLostNerve: anyLostNerve / runs,
-    fighters: [...downed].map(([id, { name, count }]) => ({ id, name, downed: count / runs })),
+    runs: t.runs,
+    win: t.wins.attacker / t.runs,
+    stalemate: t.wins.stalemate / t.runs,
+    anyKnockedOut: t.anyKnockedOut.attacker / t.runs,
+    anyLostNerve: t.anyLostNerve.attacker / t.runs,
+    fighters: t.fighters.filter((f) => f.side === 'attacker').map((f) => ({ id: f.id, name: f.name, downed: (t.runs - f.statuses.fighting) / t.runs })),
   };
+}
+
+export function assessFight(spec: FightSpec, runs = SIMULATED_FIGHTS): FightAssessment {
+  return assess(simulateFights(spec, runs));
 }
 
 export interface RiskDescription {

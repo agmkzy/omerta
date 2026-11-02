@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fc from 'fast-check';
 import { describe, test } from 'vitest';
-import { DICE, DICE_NAMES, EDGES, EDGE_INFO, facesForTotal, rollDice } from '../src/dice';
+import { DICE, DICE_NAMES, EDGES, EDGE_INFO, extremeName, extremeOf, extremePhrase, facesForTotal, highestRoll, lowestRoll, rollDice } from '../src/dice';
 import { roller, seeded } from '../src/random';
 import { scripted } from './support';
 
@@ -79,5 +79,14 @@ describe('rollDice', { tags: ['property'] }, () => {
         );
       }),
     );
+  });
+});
+
+describe('highest and lowest rolls', { tags: ['unit'] }, () => {
+  test('are named as natural 20 and 1 on a d20, and by their totals on other dice', () => {
+    assert.deepEqual([highestRoll(DICE['3d6']), lowestRoll(DICE['3d6'])], [18, 3]);
+    assert.deepEqual([extremeOf(20, DICE.d20), extremeOf(1, DICE.d20), extremeOf(10, DICE.d20)], ['highest', 'lowest', null]);
+    assert.deepEqual([extremeName('highest', DICE.d20), extremePhrase('lowest', DICE.d20)], ['natural 20', 'a natural 1']);
+    assert.deepEqual([extremeName('lowest', DICE['2d10']), extremePhrase('highest', DICE['2d10'])], ['lowest possible roll (2)', 'the highest possible roll (20)']);
   });
 });

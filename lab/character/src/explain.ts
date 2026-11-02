@@ -1,5 +1,5 @@
 // Text descriptions of rolls and checks: the dice faces, each modifier with its reason, the total and the outcome.
-import type { CheckResult, Modifier, OpposedResult, RollResult } from './check';
+import type { CheckResult, Modifier, OpposedResult, RollResult, Total } from './check';
 
 export function signed(n: number): string {
   return n < 0 ? `−${-n}` : `+${n}`;
@@ -15,6 +15,11 @@ export function percent(p: number): string {
 
 export function describeModifier(m: Modifier): string {
   return `${signed(m.value)} ${m.reason}`;
+}
+
+/** A total's parts, e.g. "10 base, −1 Agility 9". */
+export function describeTotal(t: Total): string {
+  return [`${t.base} base`, ...t.modifiers.map(describeModifier)].join(', ');
 }
 
 export function describeRoll(roll: RollResult): string {
