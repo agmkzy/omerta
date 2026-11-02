@@ -51,6 +51,11 @@ export const FIGHTER_STATUS_INFO: { readonly [S in FighterStatus]: { readonly la
   fled: { label: 'Fled', title: 'Lost their nerve and fled', explanation: `Failed a nerve check, and their ${FLEES_WHEN} made them run.` },
 };
 
+/** Whether a fighter with this status is out of the fight because they lost their nerve. */
+export function lostNerve(status: FighterStatus): boolean {
+  return status === 'surrendered' || status === 'backed-off' || status === 'fled';
+}
+
 export interface Fighter {
   /** A1, A2… for attackers; B1, B2… for defenders. */
   readonly id: string;
@@ -186,7 +191,35 @@ export interface FightRoller {
   roll(sides: number, reason: FightRollReason): number;
 }
 
-export interface FighterState {
+/** A fight played until it ended, or until the roller threw (stepFight's roller throws when it runs out of rolls). */
+export type PlayedFight =
+  | { readonly finished: true; readonly result: FightResult }
+  | {
+      readonly finished: false;
+      /** What the roller (or the fight's own checks) threw. */
+      readonly stoppedBy: unknown;
+      readonly round: number;
+      readonly events: readonly FightEvent[];
+      readonly fighters: readonly Fighter[];
+    };
+
+export function runFight(spec: FightSpec, roller: FightRoller): FightResult {
+  const played = playFight(spec, roller);
+  if (!played.finished) throw played.stoppedBy;
+  return played.result;
+}
+
+/** Plays a fight. If anything throws partway, it stops there and returns the fight so far with what was thrown. */
+export function playFight(spec: FightSpec, roller: FightRoller): PlayedFight {
+  const record: FightRecord = { events: [], fighters: [], round: 0 };
+  try {
+    return { finished: true, result: play(spec, roller, record) };
+  } catch (stoppedBy) {
+    return { finished: false, stoppedBy, round: record.round, events: [...record.events], fighters: record.fighters.map(publicFighter) };
+  }
+}
+
+interface FighterState {
   id: string;
   side: Side;
   character: Character;
@@ -196,23 +229,18 @@ export interface FighterState {
   nerveTested: boolean;
 }
 
-export function runFight(spec: FightSpec, roller: FightRoller): FightResult {
-  return playFight(spec, roller, { events: [], fighters: [], round: 0 });
-}
-
-/** Where a fight keeps its events and fighters as it goes, so a fight stopped partway (see stepFight) can show them. */
-export interface FightRecord {
+/** Where a fight keeps its events and fighters as it goes, so a fight stopped partway can show them. */
+interface FightRecord {
   events: FightEvent[];
   fighters: FighterState[];
   round: number;
 }
 
-export function publicFighter({ nerveTested: _, ...f }: FighterState): Fighter {
+function publicFighter({ nerveTested: _, ...f }: FighterState): Fighter {
   return { ...f };
 }
 
-/** Plays a fight, recording it as it goes. runFight and stepFight are the ways in. */
-export function playFight(spec: FightSpec, roller: FightRoller, record: FightRecord): FightResult {
+function play(spec: FightSpec, roller: FightRoller, record: FightRecord): FightResult {
   const dice = spec.dice ?? DICE.d20;
   const maxRounds = spec.maxRounds ?? DEFAULT_MAX_ROUNDS;
   if (!Number.isInteger(maxRounds) || maxRounds < 1) throw new RangeError(`maxRounds must be a positive integer, got ${maxRounds}`);

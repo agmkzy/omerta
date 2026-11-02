@@ -4,7 +4,7 @@ import { attributeScores } from '../src/attributes';
 import { createCharacter, type Character } from '../src/character';
 import { DICE } from '../src/dice';
 import { type FightSpec, type RollRequest } from '../src/fight';
-import { describeFightEvent, describeRollRequest, explainRoll, fightRules } from '../src/fight-log';
+import { compactDamage, describeFightEvent, describeRollRequest, explainRoll, fightRules } from '../src/fight-log';
 import { stepFight } from '../src/fight-step';
 import { temperament } from '../src/temperament';
 import { fightWith, type FightRolls } from './support';
@@ -185,6 +185,14 @@ describe('explainRoll', { tags: ['unit'] }, () => {
     const e = explain(oneAgainstTwo, 15, 10, 10);
     assert.match(e.purpose, /random enemy/);
     assert.deepEqual([e.bonusLabel, e.bonus], [null, []]);
+  });
+});
+
+describe('compactDamage', { tags: ['unit'] }, () => {
+  test('shows the damage dice, the modifier and the total, and when the minimum of 1 applied', () => {
+    assert.equal(compactDamage({ faces: [3], modifier: 0, total: 3, minimumApplied: false }), 'damage 1d4: 3');
+    assert.equal(compactDamage({ faces: [3, 2], modifier: 1, total: 6, minimumApplied: false }), 'damage 2d4: 3+2 + 1 = 6');
+    assert.equal(compactDamage({ faces: [1], modifier: -4, total: 1, minimumApplied: true }), 'damage 1d4: 1 − 4 = 1 (minimum 1)');
   });
 });
 

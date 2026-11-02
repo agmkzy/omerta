@@ -1,5 +1,5 @@
 // UI components shared by the panels.
-import { OUTCOMES, OUTCOME_INFO, describeMargins, successChance, type Modifier, type Odds, type Outcome } from '../src/check';
+import { OUTCOMES, OUTCOME_INFO, bonusOf, describeMargins, successChance, type Modifier, type Odds, type Outcome } from '../src/check';
 import { describeModifier, percent, signed } from '../src/explain';
 import { h } from './dom';
 
@@ -20,7 +20,7 @@ export function oddsView(odds: Odds): HTMLElement {
 
 /** A list of modifiers with reasons, and their total. */
 export function modifiersView(title: string, modifiers: readonly Modifier[]): HTMLElement {
-  const total = modifiers.reduce((s, m) => s + m.value, 0);
+  const total = bonusOf(modifiers);
   return h('div', { class: 'modifiers' },
     h('div', { class: 'muted' }, title),
     h('ul', {}, ...modifiers.map((m) => h('li', {}, describeModifier(m)))),
@@ -34,9 +34,9 @@ export function hint(text: string): HTMLElement {
 }
 
 /** A collapsible list explaining the five outcomes. */
-export function outcomeGuide(): HTMLElement {
+export function outcomeGuide(against: 'dc' | 'opponent'): HTMLElement {
   return h('details', { class: 'guide' }, h('summary', {}, 'What the outcomes mean'),
-    h('ul', {}, ...OUTCOMES.map((o) => h('li', {}, h('i', { class: `swatch o-${o}` }), h('strong', {}, OUTCOME_INFO[o].name), `: ${describeMargins(o)}; ${OUTCOME_INFO[o].effect}.`))));
+    h('ul', {}, ...OUTCOMES.map((o) => h('li', {}, h('i', { class: `swatch o-${o}` }), h('strong', {}, OUTCOME_INFO[o].name), `: ${describeMargins(o, undefined, against)}; ${OUTCOME_INFO[o].effect}.`))));
 }
 
 /** A coloured tag showing an outcome. */

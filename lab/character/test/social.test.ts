@@ -111,7 +111,7 @@ describe('socialOdds', { tags: ['unit'] }, () => {
   test('a hot-tempered target turns critical failures into a fight', () => {
     const calm = socialOdds(spec());
     const hot = socialOdds(spec({ target: target({ temper: 0.9 }) }));
-    assert.equal(chanceOf(hot, 'critical-failure'), 0);
+    assert.equal(chanceOf(hot, 'critical-failure'), undefined);
     assert.ok(Math.abs((chanceOf(hot, 'provoked') ?? -1) - (chanceOf(calm, 'critical-failure') ?? -1)) < 1e-12);
     assert.equal(chanceOf(calm, 'provoked'), undefined);
   });

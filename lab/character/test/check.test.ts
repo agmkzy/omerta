@@ -68,6 +68,10 @@ describe('outcomeMargins and describeMargins', { tags: ['unit'] }, () => {
     assert.deepEqual(OUTCOMES.map((o) => describeMargins(o, bands)), ['2 short or worse', '1 short to exactly the DC', '1 over', '2 over', '3 over or better']);
     assert.throws(() => outcomeMargins('partial', { criticalSuccess: 1, success: 1, partial: 0, failure: -1 }), RangeError);
   });
+
+  test('against an opponent, say how far ahead the actor must be, a tie counting as a failure', () => {
+    assert.deepEqual(OUTCOMES.map((o) => describeMargins(o, undefined, 'opponent')), ['5 behind or worse', '4 behind to a tie', '1 ahead to 5 ahead', '6 ahead to 10 ahead', '11 ahead or better']);
+  });
 });
 
 describe('succeeded, passes and successChance', { tags: ['unit'] }, () => {

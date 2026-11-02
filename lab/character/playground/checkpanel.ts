@@ -99,7 +99,7 @@ export function checkPanel(): Panel {
         modifiersView(`${target}: ${SKILL_INFO[info.resist].name}`, passive.modifiers),
         s.armed ? modifiersView(`${target}: nerve check against the weapon (DC ${NERVE_DC['weapon-drawn']})`, nerveSpec.modifiers) : null,
       ),
-      outcomeGuide(),
+      outcomeGuide('opponent'),
       h('div', { class: 'row' }, h('button', { type: 'button', class: 'primary', onclick: roll }, 'Roll')),
       logView(),
     );
@@ -116,7 +116,7 @@ export function checkPanel(): Panel {
           ? modifiersView(`${roleCharacter('target').name}: ${SKILL_INFO[state.opponentSkill].name}`, opponent().modifiers)
           : h('div', { class: 'muted' }, `DC ${state.dc}`),
       ),
-      outcomeGuide(),
+      outcomeGuide(state.against),
       h('div', { class: 'row' }, h('button', { type: 'button', class: 'primary', onclick: roll }, 'Roll')),
       logView(),
     );

@@ -136,10 +136,15 @@ export function outcomeMargins(outcome: Outcome, bands: Bands = DEFAULT_BANDS): 
   }
 }
 
-/** An outcome's margins in words, e.g. "6 short or worse", "exactly the DC to 4 over", "10 over or better". */
-export function describeMargins(outcome: Outcome, bands: Bands = DEFAULT_BANDS): string {
+/**
+ * An outcome's margins in words. Against a DC: "6 short or worse", "exactly the DC to 4 over", "10 over or better".
+ * Against an opponent, by how far the actor's total is ahead (the margin plus 1, as a tie fails): "5 behind or worse",
+ * "1 ahead to 5 ahead".
+ */
+export function describeMargins(outcome: Outcome, bands: Bands = DEFAULT_BANDS, against: 'dc' | 'opponent' = 'dc'): string {
   const range = outcomeMargins(outcome, bands);
-  const margin = (n: number) => (n < 0 ? `${-n} short` : n === 0 ? 'exactly the DC' : `${n} over`);
+  const lead = (n: number) => (n < 0 ? `${-n} behind` : n === 0 ? 'a tie' : `${n} ahead`);
+  const margin = (n: number) => (against === 'opponent' ? lead(n + 1) : n < 0 ? `${-n} short` : n === 0 ? 'exactly the DC' : `${n} over`);
   if (range.min === null) return `${margin(range.max)} or worse`;
   if (range.max === null) return `${margin(range.min)} or better`;
   return range.min === range.max ? margin(range.min) : `${margin(range.min)} to ${margin(range.max)}`;

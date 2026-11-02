@@ -6,7 +6,7 @@ import { BACKGROUNDS, rollCharacter, type BackgroundName } from '../src/backgrou
 import { createCharacter, type Character } from '../src/character';
 import { DICE, type Dice } from '../src/dice';
 import { runFight, type FightSpec, type RollRequest } from '../src/fight';
-import { attackHitChance, attackOdds, averageDamage, lowestHit, resultNeeded, rollOdds } from '../src/fight-odds';
+import { attackHitChance, attackOdds, averageDamage, lowestHit, resultNeeded, rollOdds, successChanceOf } from '../src/fight-odds';
 import { stepFight, type FightStep } from '../src/fight-step';
 import { replay, roller, seeded } from '../src/random';
 import { temperament } from '../src/temperament';
@@ -122,6 +122,14 @@ describe('attackOdds, attackHitChance and lowestHit', { tags: ['unit'] }, () => 
 
   test('lowestHit is the lowest result that hits: never the lowest possible roll, at most the highest', () => {
     assert.deepEqual([lowestHit(DICE.d20, 2, 10), lowestHit(DICE.d20, 30, 10), lowestHit(DICE.d20, -30, 10), lowestHit(DICE['3d6'], 0, 30)], [8, 2, 20, 18]);
+  });
+});
+
+describe('successChanceOf', { tags: ['unit'] }, () => {
+  test('is the chance to hit or to hold, and 0 for other rolls', () => {
+    close(successChanceOf(requestAt(duel(), 15, 10)), 0.65);
+    close(successChanceOf(requestAt(duel(), 15, 10, 20, 2, 3)), 0.55);
+    close(successChanceOf(requestAt(duel())), 0);
   });
 });
 

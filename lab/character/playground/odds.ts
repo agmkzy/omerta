@@ -50,7 +50,7 @@ export function oddsPanel(): Panel {
   function renderResults() {
     results.replaceChildren(
       oddsView(odds()),
-      outcomeGuide(),
+      outcomeGuide(state.against),
       h('h3', {}, 'Comparison by dice'),
       h('table', {},
         h('thead', {}, h('tr', {}, h('th', {}, 'Dice'), h('th', {}, 'Success'), h('th', {}, 'Full success or better'), h('th', {}, 'Critical failure'))),

@@ -10,8 +10,8 @@ import { BASE_DEFENCE, type Character } from '../src/character';
 import { DICE, DICE_NAMES, type Dice, type DiceName } from '../src/dice';
 import { compactRoll, describeModifier, describeTotal, percent, signed } from '../src/explain';
 import { bonusOf } from '../src/check';
-import { DEFAULT_MAX_ROUNDS, FIGHTER_STATUS_INFO, UNARMED_DAMAGE_DIE, fightStats, runFight, type FightEvent, type FightSpec, type FighterStatus, type RollRequest } from '../src/fight';
-import { describeFightEvent, describeRollRequest, explainRoll, fightRules, SIDE_NAME } from '../src/fight-log';
+import { DEFAULT_MAX_ROUNDS, FIGHTER_STATUSES, FIGHTER_STATUS_INFO, lostNerve, fightStats, runFight, type FightEvent, type FightSpec, type FighterStatus, type RollRequest } from '../src/fight';
+import { SIDE_NAME, compactDamage, describeFightEvent, describeRollRequest, explainRoll, fightRules } from '../src/fight-log';
 import { rollOdds, type RollOdds } from '../src/fight-odds';
 import { facesForResult, resultOf, stepFight, withoutLastRoll } from '../src/fight-step';
 import type { Side } from '../src/nerve';
@@ -77,12 +77,7 @@ function fighterCard(c: Character, options: { result?: { hp: number; status: Fig
 function eventDice(e: FightEvent, nameOf: (id: string) => string): string[] {
   if (e.kind === 'attack') {
     const lines = [`${compactRoll(e.result.roll)} vs ${e.result.dc}`];
-    if (e.damage) {
-      const { faces, modifier, total, minimumApplied } = e.damage;
-      const sum = `${faces.join('+')}${modifier ? ` ${modifier < 0 ? '−' : '+'} ${Math.abs(modifier)}` : ''}`;
-      const result = modifier || faces.length > 1 ? `${sum} = ${total}` : sum;
-      lines.push(`damage ${faces.length}d${UNARMED_DAMAGE_DIE}: ${result}${minimumApplied ? ' (minimum 1)' : ''}`);
-    }
+    if (e.damage) lines.push(compactDamage(e.damage));
     return lines;
   }
   if (e.kind === 'nerve') return [`${compactRoll(e.check.result.roll)} vs ${e.check.result.dc}`];
@@ -115,7 +110,9 @@ export function fightPanel(): Panel {
   };
   /** Counts every change to the fight shown, so a roll animation that finishes after the fight changed is ignored. */
   let fightVersion = 0;
+  /** Starts a fight with the current line-up; does nothing unless both sides have someone (see canFight). */
   const startFight = (how: 'auto' | 'step' | 'simulate') => {
+    if (!canFight(state.parties)) return;
     const s = spec();
     fightVersion++;
     state.fight = { spec: s, faces: how === 'step' ? [] : playOut(s, []) };
@@ -312,10 +309,11 @@ export function fightPanel(): Panel {
         h('div', { class: 'row' },
           ...(step.done
             ? [
-                h('button', { type: 'button', class: 'primary', onclick: () => startFight('auto') }, 'Auto fight again'),
-                h('button', { type: 'button', onclick: () => startFight('step') }, 'Step through again'),
+                h('button', { type: 'button', class: 'primary', disabled: !canFight(state.parties), onclick: () => startFight('auto') }, 'Auto fight again'),
+                h('button', { type: 'button', disabled: !canFight(state.parties), onclick: () => startFight('step') }, 'Step through again'),
                 h('button', { type: 'button', onclick: () => setFaces(withoutLastRoll(s, faces)) }, 'Back one roll'),
-                h('button', { type: 'button', onclick: () => startFight('simulate') }, `Simulate ${SIMULATED_FIGHTS.toLocaleString()} fights`),
+                h('button', { type: 'button', disabled: !canFight(state.parties), onclick: () => startFight('simulate') }, `Simulate ${SIMULATED_FIGHTS.toLocaleString()} fights`),
+                ...(canFight(state.parties) ? [] : [h('span', { class: 'hint' }, 'The line-up has changed: change it so each side has someone to fight again.')]),
               ]
             : []),
           h('button', { type: 'button', onclick: showSetup }, 'Change line-up'))),
@@ -346,7 +344,7 @@ export function fightPanel(): Panel {
         h('tbody', {},
           ...t.fighters.map((f) =>
             h('tr', {}, h('td', {}, `${f.name} `, h('span', { class: 'muted' }, `(${SIDE_NAME[f.side].toLowerCase()})`)),
-              h('td', { class: 'num' }, share(f.statuses.fighting)), h('td', { class: 'num' }, share(f.statuses['knocked-out'])), h('td', { class: 'num' }, share(f.statuses.surrendered + f.statuses['backed-off'] + f.statuses.fled)))))));
+              h('td', { class: 'num' }, share(f.statuses.fighting)), h('td', { class: 'num' }, share(f.statuses['knocked-out'])), h('td', { class: 'num' }, share(FIGHTER_STATUSES.filter(lostNerve).reduce((sum, status) => sum + f.statuses[status], 0))))))));
   }
 
   function render() {

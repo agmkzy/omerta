@@ -1,7 +1,7 @@
 // Stepping through a fight one roll at a time. A fight is kept as the faces rolled so far; replaying them shows the fight
 // up to that point and the roll it is waiting for, so a player can roll each die, choose its result, or go back.
 import { DICE, facesForTotal } from './dice';
-import { playFight, publicFighter, type FightEvent, type FightRecord, type FightResult, type FightRollReason, type FightRoller, type FightSpec, type Fighter, type RollRequest } from './fight';
+import { playFight, type FightEvent, type FightResult, type FightRollReason, type FightRoller, type FightSpec, type Fighter, type RollRequest } from './fight';
 
 /** A fight replayed from some rolls: either finished, or waiting for the next roll with the fight so far. */
 export type FightStep = (
@@ -30,7 +30,6 @@ class AwaitingRoll {
  */
 export function stepFight(spec: FightSpec, faces: readonly number[]): FightStep {
   const dice = spec.dice ?? DICE.d20;
-  const record: FightRecord = { events: [], fighters: [], round: 0 };
   const rollStarts: number[] = [];
   let used = 0;
   const given: FightRoller = {
@@ -43,12 +42,10 @@ export function stepFight(spec: FightSpec, faces: readonly number[]): FightStep 
       return face;
     },
   };
-  try {
-    return { done: true, result: playFight(spec, given, record), rollStarts };
-  } catch (e) {
-    if (!(e instanceof AwaitingRoll)) throw e;
-    return { done: false, request: e.request, round: record.round, events: [...record.events], fighters: record.fighters.map(publicFighter), rollStarts };
-  }
+  const played = playFight(spec, given);
+  if (played.finished) return { done: true, result: played.result, rollStarts };
+  if (!(played.stoppedBy instanceof AwaitingRoll)) throw played.stoppedBy;
+  return { done: false, request: played.stoppedBy.request, round: played.round, events: played.events, fighters: played.fighters, rollStarts };
 }
 
 /** The faces with the last whole roll removed. */

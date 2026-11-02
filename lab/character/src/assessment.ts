@@ -1,6 +1,6 @@
 // How fights are likely to go: simulated fights are tallied (with a fixed seed, so the same line-up always gives the same
 // numbers), and the chances for the Left side are described in words on a fixed scale of likelihood words.
-import { FIGHTER_STATUSES, runFight, type FightSpec, type FighterStatus } from './fight';
+import { FIGHTER_STATUSES, lostNerve, runFight, type FightSpec, type FighterStatus } from './fight';
 import { SIDE_NAME } from './fight-log';
 import type { Side } from './nerve';
 import { roller, seeded, type Roller } from './random';
@@ -73,7 +73,6 @@ export function tallyFights(spec: FightSpec, roller: Roller, runs: number): Figh
 }
 
 const SIDES = ['attacker', 'defender'] as const;
-const lostNerve = (s: FighterStatus) => s === 'surrendered' || s === 'backed-off' || s === 'fled';
 
 /** The simulated fights an assessment is built on: a fixed seed, so the same line-up always gives the same numbers. */
 export function simulateFights(spec: FightSpec, runs = SIMULATED_FIGHTS): FightTally {

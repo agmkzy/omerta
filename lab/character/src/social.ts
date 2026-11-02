@@ -142,8 +142,9 @@ export interface SocialChance {
 }
 
 /**
- * The exact chance of each way the action can end: every outcome of the check, in OUTCOMES order, then, where they can
- * happen, failing the nerve check against a weapon and provoking a fight.
+ * The exact chance of each way the action can end: the outcomes of the check, in OUTCOMES order, then, where they can
+ * happen, failing the nerve check against a weapon and provoking a fight. A target that is provoked by a critical failure
+ * has no plain critical failure.
  */
 export function socialOdds(spec: SocialSpec): readonly SocialChance[] {
   const { dice, armed } = settings(spec);
@@ -151,7 +152,7 @@ export function socialOdds(spec: SocialSpec): readonly SocialChance[] {
   const check = opposedOdds(socialRolls(spec));
   const provokes = endingFor(spec, 'critical-failure').kind === 'provoked';
   return [
-    ...OUTCOMES.map((outcome) => ({ ending: { kind: 'check', outcome } as const, chance: provokes && outcome === 'critical-failure' ? 0 : holds * check[outcome] })),
+    ...OUTCOMES.filter((outcome) => !(provokes && outcome === 'critical-failure')).map((outcome) => ({ ending: { kind: 'check', outcome } as const, chance: holds * check[outcome] })),
     ...(armed ? [{ ending: { kind: 'nerve', response: nerveResponse(spec.target, true) } as const, chance: 1 - holds }] : []),
     ...(provokes ? [{ ending: { kind: 'provoked' } as const, chance: holds * check['critical-failure'] }] : []),
   ];

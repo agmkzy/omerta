@@ -80,7 +80,7 @@ export function rollOdds(request: RollRequest): RollOdds {
   const bars = results(request.dice, edge).map(({ result, probability }) => ({ result, total: result + bonus, probability, success: succeeds(result) }));
   const average = mean(bars);
   if (r.kind === 'initiative') return { bars, average, ...none };
-  const chance = bars.reduce((sum, b) => (b.success ? sum + b.probability : sum), 0);
+  const chance = chanceOfSuccess(bars);
   if (r.kind === 'nerve') return { bars, average, success: { label: 'to hold', chance }, critical: null, damage: null };
   const critical = attackOdds(request.dice, bonus, totalOf(r.defence), r.edge).critical;
   const hit = averageDamage(bonusOf(r.damage));
@@ -98,6 +98,16 @@ export function resultNeeded(request: RollRequest): number | 'always' | 'never' 
   if (bars.some((b) => b.success === null)) return null;
   if (bars.every((b) => b.success)) return 'always';
   return bars.find((b) => b.success)?.result ?? 'never';
+}
+
+/** The chance that one of these results succeeds. */
+function chanceOfSuccess(bars: readonly RollBar[]): number {
+  return bars.reduce((sum, b) => (b.success ? sum + b.probability : sum), 0);
+}
+
+/** For an attack or nerve check, the chance it succeeds (to hit, or to hold); 0 for other rolls. */
+export function successChanceOf(request: RollRequest): number {
+  return chanceOfSuccess(rollOdds(request).bars);
 }
 
 /** Every damage result for this many d4s and modifier, with the minimum of 1. */

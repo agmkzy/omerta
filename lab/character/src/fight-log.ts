@@ -4,9 +4,9 @@
 import { bonusOf, totalOf, type Modifier, type Total } from './check';
 import { BASE_DEFENCE, BASE_HIT_POINTS, EXPERT_MULTIPLE } from './character';
 import { extremeName, extremePhrase, type Dice } from './dice';
-import { percent } from './explain';
-import { UNARMED_DAMAGE_DIE, type Fighter, type FightEvent, type RollRequest } from './fight';
-import { resultNeeded, rollOdds } from './fight-odds';
+import { compactSum, percent } from './explain';
+import { UNARMED_DAMAGE_DIE, type Damage, type Fighter, type FightEvent, type RollRequest } from './fight';
+import { lowestHit, resultNeeded, successChanceOf } from './fight-odds';
 import { FLEES_WHEN, NERVE_DC, type Side } from './nerve';
 import { describeSkillBonus } from './skills';
 
@@ -53,6 +53,11 @@ export function describeFightEvent(event: FightEvent, fighters: readonly Fighter
   }
 }
 
+/** A hit's damage dice in a few characters, e.g. "damage 2d4: 3+2 + 1 = 6", noting when the minimum of 1 applied. */
+export function compactDamage(damage: Damage): string {
+  return `damage ${damage.faces.length}d${UNARMED_DAMAGE_DIE}: ${compactSum(damage.faces, damage.modifier, damage.total)}${damage.minimumApplied ? ' (minimum 1)' : ''}`;
+}
+
 const SITUATION = { hurt: 'is at half HP', 'allies-down': 'sees half their side out of the fight' } as const;
 
 const plus = (n: number) => (n < 0 ? ` − ${-n}` : ` + ${n}`);
@@ -66,7 +71,7 @@ export function describeRollRequest(request: RollRequest): string {
   const { reason: r, dice } = request;
   const which = r.die > 1 ? ` (die ${r.die} of ${r.of})` : '';
   const d20 = dice.count === 1 && dice.sides === 20;
-  const chance = () => percent(rollOdds(request).bars.reduce((sum, b) => (b.success ? sum + b.probability : sum), 0));
+  const chance = () => percent(successChanceOf(request));
   switch (r.kind) {
     case 'initiative':
       return `${r.by.name} rolls initiative: ${dice.name}${plus(bonusOf(r.modifiers))}${which}.`;
@@ -82,7 +87,7 @@ export function describeRollRequest(request: RollRequest): string {
       const roll = `${r.by.name} attacks ${r.target.name}${advantage}: ${dice.name}${plus(bonusOf(r.modifiers))} against Defence ${totalOf(r.defence)}`;
       if (r.die > 1) return `${roll}${which}.`;
       if (!d20) return `${roll}. ${chance()} to hit.`;
-      return `${roll}. Needs ${resultNeeded(request)} or more ${r.edge === 'advantage' ? 'on either die' : 'to hit'} (${chance()}).`;
+      return `${roll}. Needs ${lowestHit(dice, bonusOf(r.modifiers), totalOf(r.defence), r.edge)} or more ${r.edge === 'advantage' ? 'on either die' : 'to hit'} (${chance()}).`;
     }
     case 'nerve': {
       const roll = `${r.by.name} ${SITUATION[r.trigger]} and must hold their nerve: ${dice.name}${plus(bonusOf(r.modifiers))} against ${r.dc}`;
