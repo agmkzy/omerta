@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fc from 'fast-check';
 import { describe, test } from 'vitest';
 import { assessFight, describeRisk, likelihood, type FightAssessment } from '../src/assessment';
 import { rollCharacter } from '../src/backgrounds';
@@ -47,8 +48,29 @@ describe('describeRisk', { tags: ['unit'] }, () => {
     assert.doesNotMatch(outcome, /lose|chance of winning/);
   });
 
-  test('a small chance of a stalemate is not mentioned', () => {
-    assert.equal(describeRisk(assessment({ win: 0.6, stalemate: 0.2 })).outcome, 'Left will probably win.');
+  test('a small chance of a stalemate is not mentioned, and does not count as a loss', () => {
+    assert.equal(describeRisk(assessment({ win: 0.64, stalemate: 0.2 })).outcome, 'Left will very likely win.');
+    // Left loses 56% of the time and wins 20%: of the fights with a winner, Left wins about a quarter.
+    assert.equal(describeRisk(assessment({ win: 0.2, stalemate: 0.24 })).outcome, 'Left will probably lose.');
+  });
+
+  test('who would win does not change as a stalemate becomes worth mentioning', () => {
+    assert.equal(describeRisk(assessment({ win: 0.5, stalemate: 0.249 })).outcome, 'Left will probably win.');
+    assert.equal(describeRisk(assessment({ win: 0.5, stalemate: 0.25 })).outcome, 'It could end in a stalemate. If not, Left will probably win.');
+  });
+
+  test('says Left will lose only when losing is more likely than winning, and win only when winning is', { tags: ['property'] }, () => {
+    const chances = fc.tuple(fc.double({ min: 0, max: 1, noNaN: true }), fc.double({ min: 0, max: 1, noNaN: true }), fc.double({ min: 0, max: 1, noNaN: true }));
+    fc.assert(
+      fc.property(chances, ([a, b, c]) => {
+        const total = a + b + c || 1;
+        const [win, loss, stalemate] = [a / total, b / total, c / total];
+        const outcome = describeRisk(assessment({ win, stalemate })).outcome;
+        if (/lose|chance of winning/.test(outcome)) assert.ok(loss > win, outcome);
+        if (/ win\./.test(outcome)) assert.ok(win > loss, outcome);
+        assert.equal(/stalemate/.test(outcome), stalemate >= 0.25, outcome);
+      }),
+    );
   });
 
   test('says how likely someone on Left is to be knocked out', () => {
