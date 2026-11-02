@@ -87,6 +87,27 @@ As in D&D, getting someone to do something without force is a single check, not 
 - A critical failure at intimidating a hot-tempered target provokes a fight.
 - `socialOdds` gives the exact chance of every result, including the nerve check.
 
+**Decided (November 2026): the roll decides the target's response.** In a discussion of whether a roll may make someone
+comply against their will, the conclusion was that it may, as long as everything about the target goes into the roll:
+
+- What the target knows, what is at stake for them and their temperament are all modifiers on the check. A rumour
+  that the lie is false, or a request that would cost them a lot, makes the check harder; it does not take the
+  decision away from the roll. Because the modifiers come from the target's own state, the result is still the
+  target's own reaction (their nerve failing, their belief), not something imposed from outside.
+- Those modifiers must come from what the target actually knows, with its source (seen, told, rumour), never from the
+  truth or from what the player knows. The game, which tracks knowledge, works them out; the lab only takes them as
+  situational modifiers (`SocialSpec.modifiers`), which it already does. A modifier on the actor's side is equivalent to
+  the opposite one on the target's side.
+- A certain outcome (the target saw the truth themselves) needs no roll. That is the same as a modifier large enough
+  to make the check impossible, which works only while social checks have no automatic success: on a d20 the target's
+  bonus must lead the actor's by 19 or more (18 on 2d10, 15 on 3d6), since ties go to the target. Adding "the highest
+  roll always succeeds" to social checks would turn "impossible" into a small chance. Saying why a check cannot work
+  ("he saw it himself") is clearer to the player than showing a hopeless roll.
+- The roll decides the immediate response only. What the target does afterwards (resenting it, telling others,
+  getting even) comes from their own state in the game.
+- Temperament changes the odds, never removes them: a brave or proud target is harder to intimidate, not immune,
+  unless the modifiers make it impossible as above.
+
 ### Fights
 
 Fights are between two sides (attackers and defenders) of one or more fighters, following D&D's combat rules; nobody
