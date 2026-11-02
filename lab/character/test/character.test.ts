@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import fc from 'fast-check';
 import { describe, test } from 'vitest';
-import { attributeScores } from '../src/attributes';
+import { ATTRIBUTES, attributeScores } from '../src/attributes';
 import { bonusOf } from '../src/check';
-import { BASE_DEFENCE, BASE_HIT_POINTS, EXPERT_MULTIPLE, attributeUsed, createCharacter, defence, defenceOf, hitPoints, maxHitPoints, rollFor, skillModifiers, trainingModifier } from '../src/character';
+import { BASE_DEFENCE, BASE_HIT_POINTS, EXPERT_MULTIPLE, attributeUsed, createCharacter, defence, defenceOf, hitPoints, maxHitPoints, rollFor, skillModifiers, skillsByScore, trainingModifier } from '../src/character';
 import { DICE } from '../src/dice';
-import { SKILLS } from '../src/skills';
+import { SKILLS, attributesFor, skillsUsing } from '../src/skills';
 import { temperament } from '../src/temperament';
 
 const subject = createCharacter({
@@ -169,5 +169,29 @@ describe('trainingModifier', { tags: ['unit'] }, () => {
     assert.deepEqual([trainingModifier(c, 'driving'), trainingModifier(c, 'notice'), trainingModifier(c, 'stealth')], [
       { value: 3, reason: 'Trained in Driving' }, { value: EXPERT_MULTIPLE * 3, reason: 'Expert at Notice' }, null,
     ]);
+  });
+});
+
+describe('skillsByScore', { tags: ['unit'] }, () => {
+  const c = createCharacter({ name: 'S', attributes: attributeScores({ str: 14, cha: 16 }), training: { intimidation: 'trained', brawling: 'expert' }, proficiencyBonus: 3 });
+
+  test('gives each skill using the attribute its bonus at each score, with the character’s own training', () => {
+    assert.deepEqual(skillsByScore(c, 'str', [8, 14, 20]).find((r) => r.skill === 'brawling'), { skill: 'brawling', bonuses: [-1 + 6, 2 + 6, 5 + 6] });
+  });
+
+  test('marks where a skill would use another, higher attribute instead (the primary one on a tie)', () => {
+    // Intimidation uses Charisma 16 until Strength is higher; a tie goes to Charisma, its primary attribute.
+    assert.deepEqual(skillsByScore(c, 'str', [14, 16, 18]).find((r) => r.skill === 'intimidation'), { skill: 'intimidation', bonuses: [null, null, 4 + 3] });
+  });
+
+  test('lists every skill that can use the attribute, and only those', () => {
+    assert.deepEqual(skillsByScore(c, 'str', [10]).map((r) => r.skill), skillsUsing('str').map((u) => u.skill));
+    for (const a of ATTRIBUTES) for (const r of skillsByScore(c, a, [10])) assert.ok(attributesFor(r.skill).includes(a), `${r.skill} with ${a}`);
+  });
+
+  test('agrees with the character’s actual bonuses at their current score', () => {
+    for (const a of ATTRIBUTES)
+      for (const r of skillsByScore(c, a, [c.attributes[a]]))
+        if (r.bonuses[0] !== null) assert.equal(r.bonuses[0], bonusOf(skillModifiers(c, r.skill)), `${r.skill} with ${a}`);
   });
 });

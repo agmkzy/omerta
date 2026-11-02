@@ -1,12 +1,12 @@
 // Characters tab: the list of saved characters, and an editor for the selected one.
-import { ATTRIBUTES, ATTRIBUTE_INFO, SCORE_MAX, SCORE_MIN, abilityModifier } from '../src/attributes';
+import { ATTRIBUTES, ATTRIBUTE_INFO, AVERAGE_SCORE, SCORE_MAX, SCORE_MIN, abilityModifier, type Attribute } from '../src/attributes';
 import { BACKGROUNDS, BACKGROUND_INFO, type BackgroundName } from '../src/backgrounds';
 import { bonusOf } from '../src/check';
-import { PROFICIENCIES, PROFICIENCY_MAX, PROFICIENCY_MIN, attributeUsed, createCharacter, defence, defenceOf, hitPoints, maxHitPoints, skillModifiers, type Character, type Proficiency } from '../src/character';
+import { EXPERT_MULTIPLE, PROFICIENCIES, PROFICIENCY_MAX, PROFICIENCY_MIN, attributeUsed, createCharacter, defence, defenceOf, hitPoints, maxHitPoints, skillModifiers, skillsByScore, type Character, type Proficiency, type SkillByScore } from '../src/character';
 import { describeModifier, describeTotal, signed } from '../src/explain';
 import { NERVE_FAILURE } from '../src/nerve';
 import { SKILLS, SKILL_INFO, attributesFor, skillsUsing } from '../src/skills';
-import { SITUATION_INFO, TRAITS, TRAIT_INFO, effectsOf, notableTraits, type Trait } from '../src/temperament';
+import { HIGH, LOW, SITUATION_INFO, TRAITS, TRAIT_INFO, effectsOf, notableTraits, type Trait } from '../src/temperament';
 import { h, segmented, slider, valueOf } from './dom';
 import { addEntry, removeEntry, select, updateEntry } from './roster';
 import { canSave, change, characterById, getRoster, loadWarning, newId, rollNew, saved, storage } from './store';
@@ -16,14 +16,44 @@ import { hint, type Panel } from './views';
 const REROLL_WITHOUT_BACKGROUND: BackgroundName = 'labourer';
 
 const SOURCE = 'characters';
-const SECTIONS = ['attributes', 'skills', 'temperament'] as const;
+
+/** One attribute's table: the modifier and each skill using it, at each score, with the character's current score marked. */
+function growthTable(c: Character, a: Attribute): HTMLElement {
+  const scores = tableScores(c.attributes[a]);
+  const cell = (score: number, text: string, header = false) => h(header ? 'th' : 'td', { class: score === c.attributes[a] ? 'num current' : 'num' }, text);
+  const rows = skillsByScore(c, a, scores);
+  // Where a skill would use another, higher attribute instead, say which.
+  const notes = rows.filter((r) => r.bonuses.includes(null)).map((r) => {
+    const others = attributesFor(r.skill).filter((x) => x !== a).map((x) => `${ATTRIBUTE_INFO[x].name} ${c.attributes[x]}`);
+    const main = ATTRIBUTE_INFO[SKILL_INFO[r.skill].attribute].name;
+    return `– ${SKILL_INFO[r.skill].name} uses ${others.join(' or ')} instead at these scores: a skill uses the better of its attributes, ${main} on a tie.`;
+  });
+  const training = (r: SkillByScore) => (c.training[r.skill] ? ` (${c.training[r.skill]})` : '');
+  return h('div', { class: 'growth' },
+    h('h3', {}, `${ATTRIBUTE_INFO[a].name} (currently ${c.attributes[a]})`),
+    h('div', { class: 'scroll' },
+      h('table', { class: 'growth-table' },
+        h('thead', {}, h('tr', {}, h('th', {}, 'Score'), ...scores.map((s) => cell(s, String(s), true)))),
+        h('tbody', {},
+          h('tr', { class: 'modifier' }, h('td', {}, 'Modifier'), ...scores.map((s) => cell(s, signed(abilityModifier(s))))),
+          ...rows.map((r) => h('tr', {}, h('td', {}, `${SKILL_INFO[r.skill].name}${training(r)}`), ...r.bonuses.map((b, i) => cell(scores[i]!, b === null ? '–' : signed(b)))))))),
+    ...notes.map((n) => hint(n)));
+}
+const SECTIONS = ['attributes', 'skills', 'growth', 'temperament'] as const;
 type Section = (typeof SECTIONS)[number];
-const SECTION_LABEL: Readonly<Record<Section, string>> = { attributes: 'Attributes', skills: 'Skills', temperament: 'Temperament' };
+const SECTION_LABEL: Readonly<Record<Section, string>> = { attributes: 'Attributes', skills: 'Skills', growth: 'Attributes and skills', temperament: 'Temperament' };
 const SECTION_INTRO: Readonly<Record<Section, string>> = {
-  attributes: 'Natural ability, scored 1–20 (10 is average). Each score gives a modifier, shown in brackets, that is added to rolls of the skills using it.',
-  skills: 'Learned abilities. A skill’s bonus is its attribute’s modifier, plus the proficiency bonus if trained, or twice the proficiency bonus if expert.',
-  temperament: 'Personality, from 0 to 1 (0.5 is average). Values of 0.3 or below count as low and 0.7 or above as high. Temperament mainly drives behaviour; where it also changes rolls, that is noted.',
+  attributes: `Natural ability, scored ${SCORE_MIN}–${SCORE_MAX} (${AVERAGE_SCORE} is average). Each score gives a modifier, shown in brackets, that is added to rolls of the skills using it.`,
+  skills: `Learned abilities. A skill’s bonus is its attribute’s modifier, plus the proficiency bonus if trained, or the proficiency bonus ×${EXPERT_MULTIPLE} if expert.`,
+  growth: 'How this character’s skills would change with each attribute: every table shows each skill that uses the attribute, and its bonus if the attribute had that score, with this character’s training and proficiency bonus. Their current score is highlighted. Every 2 points of an attribute add 1 to its modifier, and so to each skill using it.',
+  temperament: `Personality, from 0 to 1 (0.5 is average). Values of ${LOW} or below count as low and ${HIGH} or above as high. Temperament mainly drives behaviour; where it also changes rolls, that is noted.`,
 };
+
+/** The scores the attribute tables show: 1, every even score (where the modifier changes) and the character's own. */
+function tableScores(current: number): number[] {
+  const scores = new Set([SCORE_MIN, ...Array.from({ length: SCORE_MAX / 2 }, (_, i) => 2 * (i + 1)), current]);
+  return [...scores].sort((a, b) => a - b);
+}
 
 /** Which skills an attribute feeds, e.g. "Used by: Brawling; alternative for Intimidation." */
 function attributeUse(a: (typeof ATTRIBUTES)[number]): string {
@@ -114,7 +144,7 @@ export function charactersPanel(): Panel {
               `${ATTRIBUTE_INFO[a].covers} ${attributeUse(a)}`))),
           h('div', {},
             slider('Proficiency bonus', c.proficiencyBonus, PROFICIENCY_MIN, PROFICIENCY_MAX, (v) => update(createCharacter({ ...current(), proficiencyBonus: v })), signed,
-              'Experience. Added once to trained skills and twice to expert skills. Ranges from +2 (new) to +6 (veteran).'),
+              `Experience. Added once to trained skills and ×${EXPERT_MULTIPLE} to expert skills. Ranges from ${signed(PROFICIENCY_MIN)} (new) to ${signed(PROFICIENCY_MAX)} (veteran).`),
             h('div', { class: 'field' }, h('span', {}, 'Reroll attributes, training and temperament'),
               h('span', { class: 'hint' }, 'Replaces this character’s values with a new roll for the chosen background. The name is kept.'),
               h('div', { class: 'row' },
@@ -150,6 +180,8 @@ export function charactersPanel(): Panel {
         ),
         hint('Hover a bonus to see its breakdown.'),
       );
+    } else if (section === 'growth') {
+      body.replaceChildren(...ATTRIBUTES.map((a) => growthTable(c, a)));
     } else {
       body.replaceChildren(
         h('div', { class: 'grid' }, ...TRAITS.map((t) =>

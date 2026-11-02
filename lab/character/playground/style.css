@@ -209,3 +209,10 @@ table.fight-log tr.round-head td { font-size: 0.75rem; text-transform: uppercase
 .assessment h3 { margin: 4px 0 6px; }
 .assessment ul { margin: 0 0 4px; padding-left: 18px; }
 .warning { color: var(--critical-failure); border: 1px solid var(--critical-failure); border-radius: var(--radius); padding: 6px 8px; }
+.growth { margin-bottom: 18px; }
+.growth .scroll { overflow-x: auto; }
+table.growth-table { border-collapse: collapse; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+table.growth-table th, table.growth-table td { padding: 3px 7px; border-bottom: 1px solid var(--line); text-align: right; }
+table.growth-table th:first-child, table.growth-table td:first-child { text-align: left; white-space: nowrap; }
+table.growth-table tr.modifier td { color: var(--muted); }
+table.growth-table .current { background: color-mix(in srgb, var(--accent) 18%, transparent); font-weight: 600; }

@@ -1,9 +1,9 @@
 // Characters (player and NPC): attributes, skill training, proficiency bonus and temperament.
 import { ATTRIBUTE_INFO, abilityModifier, attributeScores, type Attribute, type AttributeScores } from './attributes';
 import type { BackgroundName } from './backgrounds';
-import { combineEdges, totalOf, type Modifier, type Roll, type Total } from './check';
+import { bonusOf, combineEdges, totalOf, type Modifier, type Roll, type Total } from './check';
 import { DICE, type Dice, type Edge } from './dice';
-import { SKILLS, SKILL_INFO, attributesFor, type Skill } from './skills';
+import { SKILLS, SKILL_INFO, attributesFor, skillsUsing, type Skill } from './skills';
 import { temperament as fullTemperament, temperamentModifiers, type Situation, type Temperament } from './temperament';
 
 export const PROFICIENCIES = ['untrained', 'trained', 'expert'] as const;
@@ -84,6 +84,25 @@ export function trainingModifier(c: Character, skill: Skill): Modifier | null {
     case 'untrained':
       return null;
   }
+}
+
+/** A skill's bonus at each of several scores of one attribute. */
+export interface SkillByScore {
+  readonly skill: Skill;
+  /** One per score: the bonus, or null where another attribute the skill can use is higher, so that one is used. */
+  readonly bonuses: readonly (number | null)[];
+}
+
+/**
+ * How a character's skills would change with one attribute: for each skill that can use it, the skill's bonus if the
+ * attribute had each of `scores`, with everything else (training, proficiency, other attributes) as it is.
+ */
+export function skillsByScore(c: Character, attribute: Attribute, scores: readonly number[]): SkillByScore[] {
+  const at = scores.map((score) => createCharacter({ ...c, attributes: attributeScores({ ...c.attributes, [attribute]: score }) }));
+  return skillsUsing(attribute).map(({ skill }) => ({
+    skill,
+    bonuses: at.map((x) => (attributeUsed(x, skill) === attribute ? bonusOf(skillModifiers(x, skill)) : null)),
+  }));
 }
 
 export interface RollOptions {
