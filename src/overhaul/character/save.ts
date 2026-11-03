@@ -129,7 +129,7 @@ export function readCast(data: unknown): ReadCast {
   if (d.characters !== undefined && !Array.isArray(d.characters)) throw new TypeError('characters must be a list');
   const characters = ((d.characters ?? []) as unknown[]).map((c, i) => readCharacter(c, `characters[${i}]`, ignored));
   if (d.transfers !== undefined && !Array.isArray(d.transfers)) throw new TypeError('transfers must be a list');
-  const transfers = ((d.transfers ?? []) as unknown[]).map((t, i) => readTransfer(t, `transfers[${i}]`, ignored));
+  const transfers = ((d.transfers ?? []) as unknown[]).flatMap((t, i) => readTransfer(t, `transfers[${i}]`, ignored) ?? []);
   if (d.facts !== undefined && !Array.isArray(d.facts)) throw new TypeError('facts must be a list');
   const facts = ((d.facts ?? []) as unknown[]).map((f, i) => readFact(f, `facts[${i}]`, ignored));
   if (d.jobs !== undefined && !Array.isArray(d.jobs)) throw new TypeError('jobs must be a list');
@@ -356,12 +356,17 @@ function inventory(value: unknown, path: string, ignored: string[]): { cash?: nu
   return { ...(d.cash !== undefined && { cash: d.cash }), items };
 }
 
-function readTransfer(value: unknown, path: string, ignored: string[]): Transfer {
+/** A transfer, or nothing for one of an item not recognised: it is left out, as the item is from whoever holds it. */
+function readTransfer(value: unknown, path: string, ignored: string[]): Transfer | undefined {
   const d = object(value, path);
   ignored.push(...Object.keys(d).filter((k) => !TRANSFER_FIELDS.includes(k)).map((k) => `${path}.${k}`));
   for (const k of ['from', 'to', 'why'] as const) if (typeof d[k] !== 'string') throw new TypeError(`${path}.${k} must be text`);
   for (const k of ['amount', 'at'] as const) if (typeof d[k] !== 'number') throw new TypeError(`${path}.${k} must be a number`);
-  if (d.item !== undefined && !ITEMS.includes(d.item as Item)) throw new TypeError(`${path}.item must be an item`);
+  if (d.item !== undefined && typeof d.item !== 'string') throw new TypeError(`${path}.item must be text`);
+  if (d.item !== undefined && !ITEMS.includes(d.item as Item)) {
+    ignored.push(path);
+    return undefined;
+  }
   if (d.cause !== undefined && typeof d.cause !== 'string') throw new TypeError(`${path}.cause must be a fact id`);
   return {
     from: d.from as string,
