@@ -1,12 +1,12 @@
 # Character: one object for every character
 
-**Status:** design agreed in discussion on 2 and 3 November 2026, and revised after an adversarial review. Nothing is built. What waits for slotting it into the game is under [Later](#later).
+**Status:** design agreed in discussion on 2 and 3 November 2026, and revised after two adversarial reviews. Nothing is built. What is still to agree is under [Still to agree](#still-to-agree), and what waits for slotting it into the game is under [Later](#later).
 
 ## Purpose
 
 One character object that can represent any character in the game, the player included. It is built up from the [character lab](../../../../lab/character/README.md) (attributes, skills, temperament, checks, social actions, fights), extended with inventory, condition, relationships and knowledge, and written so that it can later be slotted into the game.
 
-It does not replace the game's `Character` (`src/types.ts`) yet, and it is not modelled on it. Where the game already has a concept that this needs, such as knowledge or relationships, the design follows the game's meaning so the two can be joined later.
+Until it is slotted in, the game's own `Character` (`src/types.ts`) stays the game's record, and this is not modelled on it. Where the game already has a concept that this needs, such as knowledge or relationships, the design follows the game's meaning so the two can be joined. How they join is under [One record](#one-record).
 
 ## Where it lives and how it is built
 
@@ -16,11 +16,12 @@ It does not replace the game's `Character` (`src/types.ts`) yet, and it is not m
 - **Types:** the lab's stricter settings (`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `verbatimModuleSyntax` and the rest), with the game's `lib` setting, so that code passing the overhaul's typecheck also passes the game's (which covers all of `src/`).
 - **Tests:** written first, with Vitest and `node:assert`, each tagged with one kind (`unit`, `property`, `statistical`). Coverage is held at 100%.
 - **Modules:** small, each owning one rule. A rule is written once and everything else uses it, and every rules table below is data in one place.
+- **The lab's code is ported, not imported:** the lab's rules (checks, social actions, nerve, fights) are ported into `src/overhaul/character/` with their tests, and the lab is frozen as a reference. Nothing imports from `lab/`. Later the lab's playground can be pointed at the overhaul, and the lab's own code removed.
 - **Determinism:** dice are always passed in and seeded. No `Math.random`, no wall-clock time. Everything else the model cannot know is an explicit input (see [Inputs](#inputs)).
 
 ## Shape
 
-**A cast holds everyone.** One plain record holds every character, every fact and every cash transfer, so relationships and knowledge can refer to anyone by id. Handles for characters come from it and give a fluent interface:
+**A cast holds everyone.** One plain record holds every character, every fact, every [job](#jobs) and every cash transfer, so relationships and knowledge can refer to anyone by id. Handles for characters come from it and give a fluent interface:
 
 ```ts
 const everyone = cast({ characters, facts });
@@ -42,18 +43,25 @@ const check = sam.social.intimidate(rico)
 check.odds({ for: sam });       // the chance of each outcome, as Sam can judge it
 check.explain({ for: sam });    // the modifiers Sam can know about, with their reasons
 const outcome = check.roll(dice, { now, witnesses: ['joe'] });
-outcome.result;                 // what happened
+outcome.result({ for: sam });   // what happened, as Sam can see it
 outcome.cast;                   // a new cast, with Sam, Rico and any new facts updated
 ```
 
-**Odds and explanations never leak private state.** They are always given to someone. The viewer's own modifiers are exact; another character's modifiers (their feelings, their knowledge, their effects) count only where the viewer knows them, and anything the viewer does not know counts as zero. So asking the odds of lying to Rico does not reveal whether Rico saw the fact, unless Sam knows Rico was a witness. The true numbers are used only by the roll itself, and by tests.
+**Odds, explanations and results never leak private state.** They are always given to someone. The viewer's own modifiers are exact; another character's count only where the viewer knows them, and anything the viewer does not know counts as zero. So asking the odds of lying to Rico does not reveal whether Rico saw the fact, unless Sam knows Rico was a witness. A result given to a viewer shows only the modifiers they could know, and the outcome as they could see it (a planner sees a critical failure as a failure). The true numbers are used only by the roll itself, and by tests.
+
+- **Private** means everything about another character except what anyone present can see: the items they show or wear, and whether they are visibly hurt (Hurt or unconscious). Their attributes, skills, temperament, feelings, knowledge, other effects and hidden items are private.
+- **Witnesses are recorded on the fact,** so a witness knows who else was there. Someone told of a fact knows only who told them.
 
 **Nothing changes in place.** A roll returns a new cast; `everyone`, `sam` and `rico` above are as they were.
 
 - **No lost changes:** each handle and check is tied to the cast it came from, and rolling a check made from an older cast is refused, so one roll can never silently undo another.
-- **No copying the world:** a new cast shares everything that did not change with the old one, so a roll costs only what it changes.
-- **One record:** once it is slotted into the game, the cast *is* the game's record of characters and facts, not a copy written back to it.
-- **Cash moves only by recorded transfers:** a transfer names who paid whom, how much and why, as the game's ledger does, and a character's cash is never set directly.
+- **Sharing what did not change:** a new cast shares every unchanged character with the old one. Adding to a list still copies the list, so the cost of a roll is measured with benchmarks once built rather than promised here.
+- **Growth:** facts and transfers are kept for as long as the game keeps them: a fact while anything still refers to it, routine ones expiring, as in `src/retain.ts`; transfers for the ledger's window. A record that can outlive its fact (a character's version of it, a grudge's reason, a step in their conduct) keeps a short summary of the fact (its kind, who did it to whom as they believe it, and when), not only its id, so it still makes sense after the fact is pruned.
+- **Cash moves only by recorded transfers:** a character's cash is a stored number, and every transfer that changes it is in the cast's log; a check verifies that the two agree, as the game's `audit` does. A transfer names who paid whom, how much, why and when, as the game's ledger does. Money entering or leaving the cast comes from or goes to a `world` party, and opening balances are transfers from it, so all cash has a recorded source. When old transfers are pruned, the log keeps each character's balance at that point. Cash is never set directly.
+
+### One record
+
+While both exist, the game's world stays the record. A cast is built from it when one is needed, and the cast's results are written back through one function, the only writer, so the two never disagree. Eventually the cast replaces the game's characters and facts, one system at a time, and the writer goes once nothing is left to write: see [Later](#later). So one record is the goal, not a claim about the first version.
 
 **The player and NPCs are the same type.** There is no player flag in the character. Every character has an id.
 
@@ -64,7 +72,7 @@ What the model cannot work out for itself is passed in, so the same inputs alway
 - **Dice:** seeded, as in the lab.
 - **Time:** each roll is given `now`, for when a fact happened, when a character learned it, and when two characters last met.
 - **Witnesses:** named at the call. With no positions, nothing else decides who saw what.
-- **Fact ids:** made by a counter in the cast, so they are deterministic. When slotted in, they come from the game's own id counter.
+- **Ids for facts and jobs:** made by a counter in the cast, so they are deterministic. When slotted in, they come from the game's own id counter.
 
 ### Saves
 
@@ -77,10 +85,10 @@ The cast carries a format number. Every change to its shape adds a migration fro
 | Identity | Id, name, background |
 | Attributes | The six [attributes](#attributes), 1 to 20 |
 | Skills | Training in each [skill](#skills) (untrained, trained or expert) and the proficiency bonus (2 to 6) |
-| Temperament | One stored set of [traits](#temperament), each 0 to 1 |
+| Temperament | Starting [traits](#temperament), each 0 to 1, and a record of conduct; the current traits are worked out from both: see [Temperament moves with conduct](#temperament-moves-with-conduct) |
 | Condition | Current hit points and [temporary effects](#condition-and-temporary-effects) |
 | Inventory | Cash, as a number, and [items](#inventory) |
-| Relationships | How this character feels about each other character they have met, one-way: see [Relationships](#relationships) |
+| Relationships | How this character feels about each other character they have met or learned about, one-way: see [Relationships](#relationships) |
 | Knowledge | This character's own version of each fact they know about: see [Knowledge](#knowledge) |
 
 A skill's status is its training plus any temporary effects, so its bonus lists every part:
@@ -91,9 +99,15 @@ sam.skills.larceny;
 //   modifiers: [Agility 14 +2, Trained +2, Hurt −2] }
 ```
 
-### Temperament of the player
+### Temperament moves with conduct
 
-The player's temperament starts neutral (0.5 for every trait) and moves with what the player does. It works exactly as any character's does: it gives modifiers on the player's own rolls and decides their response to a failed nerve check. This is a deliberate difference from the game, where the player's temperament never limits what they can do. The traits are stored like anyone's; the player's conduct is the record of what moved them, so it is the recorded cause of each change, not a second copy of the traits.
+Every character's temperament moves with what they do, the player's included, so the player needs no flag.
+
+- **Stored:** each character's starting traits, and their conduct: for each trait, the steps their actions have moved it, each naming the fact that caused it. The current traits are worked out from the two, so there is no second copy of the traits.
+- **Starting traits:** an NPC's are set when they are made; the player's start neutral, at 0.5 for every trait.
+- **Used:** the current traits give modifiers on the character's own rolls and decide their response to a failed nerve check. For the player this is a deliberate difference from the game, where the player's temperament never limits what they can do.
+
+How each kind of conduct moves each trait is a table [still to agree](#still-to-agree).
 
 ## Condition and temporary effects
 
@@ -102,10 +116,11 @@ The player's temperament starts neutral (0.5 for every trait) and moves with wha
 | Hurt | Hit points at or below half. Read from hit points, not stored, so the two can never disagree. | −2 to skills using Strength, Agility or Constitution. Never applied during fights: the nerve check at half health already marks that moment, and a penalty on top would make fights snowball. | Healing back above half |
 | Shaken | Losing their nerve in a fight, or giving in to intimidation | −2 to Nerve (which is also what resists intimidation) | Resting, or cleared explicitly |
 | Drunk | Set explicitly, or by failing a Carousing check (DC 12) on drinking a bottle of spirits; someone already drunk stays drunk | −2 to skills using Agility or Intelligence, and to Insight and Notice; +2 to Nerve | Resting, or cleared explicitly |
+| Unconscious | Hit points at 0. Read from hit points, like Hurt. | Cannot act: no check can be made by them, and in a fight they are out | Regaining hit points |
 
 An effect does not stack with itself; different effects add together. Each is named in explanations, for example "Hurt −2". Where a skill can use either of two attributes, Hurt and Drunk follow the attribute actually used.
 
-**Resting** restores hit points to full and clears Shaken and Drunk: `sam.rest()`.
+**Resting** restores hit points to full and clears Shaken and Drunk. It takes time, and returns a new cast like a roll: the call gives when it starts and how long it lasts, `sam.rest({ now, hours: 8 })`, and the cast records it, so the character is known to be resting for that time. Healing over time, and how much a shorter rest heals, are under [Later](#later).
 
 ## Inventory
 
@@ -147,7 +162,7 @@ This replaces the lab's armed intimidation (a nerve check before the roll, and a
 | Knife | Brawling | 1d6 + Strength |
 | Pistol | Firearms | 2d6, with no Strength |
 
-Weapons are part of a real fight from the start: there are no choices made mid-fight. Each armed character's attacks use their weapon's skill and damage. At the start, each unarmed fighter facing an armed opponent makes one nerve check against the strongest weapon they face (DC 12 for a knife, 15 for a pistol); an armed fighter does not. These numbers change fight balance, so they are a starting point, checked and tuned with statistical tests on simulated fights once built.
+Weapons are part of a real fight from the start: there are no choices made mid-fight. Each armed character's attacks use their weapon's skill and damage. At the start, each fighter facing a weapon that outclasses theirs, by the same rule as the table above (a knife outclasses bare hands; a pistol outclasses bare hands and a knife), makes one nerve check against the strongest such weapon: DC 12 for a knife, 15 for a pistol. A fighter whose weapon answers everything they face does not check. These numbers change fight balance, so they are a starting point, checked and tuned with statistical tests on simulated fights once built.
 
 ## Relationships
 
@@ -157,9 +172,13 @@ One-way: how Rico feels about Sam can differ from how Sam feels about Rico. Each
 rico.towards(sam);   // { trust: 0.4, respect: 0.7, affection: 0.2, grudge: 0.1, fear: 0.6, ... }
 ```
 
-**Strangers:** a character has a relationship only with someone they have met. Between strangers there is no relationship, and so no relationship modifiers.
+**Strangers:** a character has a relationship only with someone they have met or learned about. Two characters meet by taking part in the same roll or fight, as actor, target, squad member or witness. Learning a fact about someone, such as seeing them beat someone, also creates the relationship, as in the game's `learn`. Between strangers there is no relationship, and so no relationship modifiers.
 
-**Every change is damped,** the way the game's `feelOn` (`src/core.ts`) damps them: a value changes more slowly as it nears its limit, and trust and affection grow more slowly between people who barely know each other. The amounts in the tables below are before damping. There is one function that changes feelings, and everything uses it.
+**A new relationship** starts at 0.5 for trust, respect and affection, and at 0 for grudge, fear and familiarity, so meeting someone once does not count as low trust.
+
+**Familiarity** grows by 0.02 each time the two meet, as above. This is a starting value, tuned once built.
+
+**One function changes feelings,** modelled on the game's `feelOn` (`src/core.ts`), and everything uses it, grudges included (the game has a separate `bear`). A gain shrinks as the value nears 1, and gains in trust and affection are smaller between people who barely know each other; losses are not damped. The amounts in the tables below are before damping. Feelings fading with time is under [Later](#later).
 
 ### As modifiers on social checks
 
@@ -190,11 +209,11 @@ A social result changes how the target feels about the actor, following what eac
 | Intimidate | Critical success: will not make trouble | Fear +0.15, trust −0.05 |
 | Intimidate | Success | Fear +0.1, grudge +0.05, trust −0.05 |
 | Intimidate | Partial success: resents it, may make trouble | Fear +0.1, grudge +0.1, trust −0.05 |
-| Intimidate | Failure or critical failure: resists | Respect −0.05 |
-| Intimidate | Provoked (a hot-tempered target, on a critical failure) | Grudge +0.1 |
-| Persuade | Success or better | Trust +0.02 |
+| Intimidate | Failure, or a critical failure on a target who is not volatile: resists | Respect −0.05 |
+| Intimidate | Provoked: a critical failure on a volatile target, in place of the row above | Grudge +0.1 |
+| Persuade | Success or better | Trust +0.05 |
 | Persuade | Partial success or failure | None |
-| Persuade | Critical failure: harder to persuade next time | Trust −0.05 |
+| Persuade | Critical failure: harder to persuade next time | Trust −0.02 |
 | Deceive | Partial success or better: believes it | None: they do not know they were lied to. Their version of the fact now has the actor as its source, so the lie can come out later. |
 | Deceive | Failure: does not believe it | None |
 | Deceive | Critical failure: knows they were lied to | Trust −0.15, grudge +0.05 |
@@ -206,32 +225,65 @@ Intimidation also changes how the actor feels about the target:
 | The target gives in (partial success or better) | Respect −0.05 |
 | The target resists | Respect +0.05 |
 
+**Provoked** is returned as an outcome of its own, and the caller decides what follows, such as starting a fight. The roll never starts one itself.
+
+**Each social roll records a fact,** and that fact is the recorded cause of its aftermath: see [Fact kinds](#fact-kinds).
+
 ## Knowledge
 
 Follows the game's model (`Fact` and `Knowledge` in `src/types.ts`, `addFact` and `learn` in `src/core.ts`):
 
 - **A fact is recorded once,** in the cast's list of facts: what kind of fact, who did it, who it was done to, any business or amount, when, where, the fact that caused it, and whether who did it is hidden.
 - **Each character holds their own version** of the facts they know about: when they learned it; where it came from (they did it, they witnessed it, it was public, or who told them); whether they know who did it; how they came by it (seen, told by a witness, heard second-hand); who they believe did it when they don't know, which can be wrong; and whether they heard it exaggerated.
-- **Who learns a fact when it is recorded:** whoever did it, whoever it was done to, and the witnesses named at the call.
-- **Learning a fact changes feelings,** by the game's own tables, carried over from `learn`: respect for what someone has done, fear of someone violent (more for the less brave), and for the victim a grudge or fear by their courage, with less trust either way. This is the only way facts change feelings, so nothing is counted twice: a beating changes the victim's feelings because they learn of it, and intimidation needs no knowledge modifier because fear already carries what the target has heard.
+- **Who learns a fact when it is recorded:** whoever did it, whoever it was done to, and the witnesses named at the call, who are recorded on the fact.
+- **Learning a fact changes feelings,** by the game's own tables, carried over from `learn`: respect for what someone has done, fear of someone violent (more for the less brave), and for the victim a grudge or fear by their courage, with less trust either way. Apart from the aftermath of social rolls, this is the only way facts change feelings, so nothing is counted twice: a beating changes the victim's feelings because they learn of it.
+- **Re-belief:** when a character's version of a fact they already know changes (they are lied to, or learn the truth), their feelings follow the actor they now believe did it: the learning tables apply towards that actor as if they had learned the fact with them as its actor. Feelings towards whoever they believed before are not undone.
+
+### Fact kinds
+
+The game's kinds are used where the meaning matches, with their rows in the learning tables (`DEED`, `VIOLENT` and `GRUDGE` in `src/core.ts`). Three are added.
+
+| Kind | Recorded when | Feelings on learning it |
+| --- | --- | --- |
+| `beating` | A real fight ends with someone beaten or knocked out | The game's rows. The victim's change is scaled by the share of their hit points they lost, and is never less than a successful intimidation's (fear +0.1, grudge +0.05, trust −0.05) |
+| `fight` (added) | A real fight ends with someone fled, or in a stalemate | The beating's rows, scaled by the share of hit points lost, with no minimum |
+| `threat` | Any intimidation roll | The game's row (respect, for those who hear of it); the target's and actor's change is the aftermath table |
+| `persuasion` (added) | Any persuasion roll | None; the aftermath table only |
+| `lie` (added) | Any deception roll | None; the aftermath table only. See below for who learns it |
+| Any other game kind | A lie invents it, or the game records it | The game's rows; a kind with none, such as `theft`, changes no feelings |
+
+A `lie` fact is known to the liar. The target learns it only when they see through the lie (a critical failure) or later learn the truth; witnesses to a deception learn nothing from it for now (see [Later](#later)).
+
+### As modifiers on Intimidation
+
+What the target knows of the actor's violence (a fact of a violent kind, with the actor as its actor):
+
+| What the target knows | Modifier |
+| --- | --- |
+| Saw the actor be violent | +2 |
+| Was told or heard of it | +1 |
+
+Only the best one counts. Fear from hearing of violence is too small to carry this alone (0.04 at most for a beating), so the knowledge counts directly as well.
 
 ### As modifiers on Deception
 
-A lie is a claim, in the same shape as a character's version of a fact. It is either a different version of a real fact (who did it, how big it was) or a fact that never happened. A fact that never happened is still recorded, marked false, so the simulation always knows the truth; only the liar knows it is false.
+A lie is a claim, in the same shape as a character's version of a fact. It is either a different version of a real fact (who did it, how big it was) or a fact that never happened. A fact that never happened is still recorded, marked false, so the simulation always knows the truth. The liar's own version of it is marked known false. Nobody named in an invented fact learns it when it is recorded; only the liar knows it, and the target if they believe the lie.
 
 ```ts
-sam.social.deceive(rico).claim({ about: factId, blame: 'joe' });                // a different version of a real fact
-sam.social.deceive(rico).claim({ invented: { kind: 'theft', actor: 'joe' } });  // a fact that never happened
+sam.social.deceive(rico).claim({ about: factId, blame: 'joe' });                   // a different version of a real fact
+sam.social.deceive(rico).claim({ invented: { kind: 'robbery', actor: 'joe' } });   // a fact that never happened
 ```
 
-When a lie succeeds, the target's version is updated with "told by the actor" as its source. If they later learn the truth, that is how the lie comes out. The modifier comes from the target's own version of the fact the claim is about:
+When a lie succeeds, the target's version changes by [re-belief](#knowledge), with "told by the actor" as its source. If they later learn the truth, that is re-belief again, and because their version names the liar as its source, they learn the `lie` fact and know who lied to them, with the change of a lie seen through (trust −0.15, grudge +0.05).
 
-| What the target knows of the fact | Modifier |
+The modifier comes from what the target knows of the part of the fact the claim changes: who did it, how big it was, or, for an invented fact, whether it happened at all. So a victim who never knew who robbed them can be told the wrong name.
+
+| What the target knows of the part the claim changes | Modifier |
 | --- | --- |
-| Saw it, or took part in it | Impossible, explained as "Rico saw it himself" |
+| Saw it themselves | Impossible, explained as "Rico saw it himself" |
 | Was told by a witness | −4 |
 | Heard it second-hand | −2 |
-| Does not know about it | None |
+| Does not know it | None |
 | The lie matches what they already believe, such as who they blame | +2 |
 
 ## Checks and modifiers
@@ -246,25 +298,29 @@ One against one: `sam.fight(rico)`. Groups are called squads: `squad(sam, joe).f
 
 | Kind | Starts from | Nerve checks | Afterwards |
 | --- | --- | --- | --- |
-| Sparring | Full health, unarmed | None: nobody flees or surrenders | Ends for everyone when the first fighter drops to half health, and their side loses. Nothing lasts, and no fact is recorded |
-| Real fight | Current condition | As in the lab, plus the start-of-fight check against weapons | Damage stays, and the fight is recorded as a fact that the named witnesses learn |
+| Sparring | Full health, unarmed | None: nobody flees or surrenders | Ends for everyone when the first fighter drops to half health, and their side loses. Nothing lasts but familiarity, and no fact is recorded |
+| Real fight | Current condition | As in the lab, plus the start-of-fight check against weapons | Damage stays, and the fight is recorded as facts that the named witnesses learn |
 
 ```ts
 sam.fight(rico, { kind: 'sparring' });
 squad(sam, joe).fight(squad(rico), { kind: 'real' });
 ```
 
-### How a fight ends for the losers
+A fighter who starts a real fight at or below half health makes the half-health nerve check at the start, since they are already past that point.
 
-A real fight ends with each loser in one state:
+### How a fight ends
+
+During a fight each fighter is fighting, fleeing (see [Fleeing](#fleeing)), beaten, knocked out or fled. A squad loses when none of its members is still fighting. Anyone on it still fleeing then makes one last escape check: getting away means fled, and being caught means beaten. If both squads still have someone fighting after the round limit (12, as in the lab), it is a stalemate: nobody else is beaten, and the fight is recorded as a `fight` between the first fighter of each squad.
 
 | State | Meaning | Recorded as |
 | --- | --- | --- |
-| Beaten | Gave in while still conscious, whenever that happened, including straight away with no damage taken | A beating |
-| Knocked out | Dropped to 0 hit points | A beating |
-| Fled | Got away (see [Fleeing](#fleeing)) | A fight |
+| Beaten | Gave in while still conscious, whenever that happened, including straight away with no damage taken | A `beating` |
+| Knocked out | Dropped to 0 hit points, and unconscious | A `beating`, whichever squad wins |
+| Fled | Got away | A `fight` |
 
-How badly a beaten character was hurt shows in their hit points. Killing is out of scope until it is decided whether weapons can kill. The victim's feelings towards the attackers change once, through [learning the recorded fact](#knowledge).
+- **One fact for each loser and each attacker:** each member of the other squad who attacked them, or, if nobody did (they gave in at the start), every member of the other squad still fighting. A knocked-out winner is recorded as beaten by whoever dropped them. All the facts of one fight share a story id, as the game links the facts of one matter.
+- **Feelings:** the victim's feelings towards each attacker change once, through [learning the recorded fact](#fact-kinds), scaled by the damage they took. How badly a beaten character was hurt shows in their hit points.
+- **Killing** is out of scope until it is decided whether weapons can kill.
 
 ### Being set upon
 
@@ -272,7 +328,7 @@ A real fight can start with the attackers setting on a target:
 
 1. The attackers have advantage on their attacks in the first round, because the target is caught or held. After that the normal rules apply, including advantage for ganging up.
 2. The target makes a nerve check: DC 10, plus 2 for each attacker beyond the first. On a pass they fight back. On a failure their temperament decides, by the lab's nerve rules: low courage or high caution tries to flee; anyone else gives in, and is beaten.
-3. The usual nerve checks still apply, at half health and when half a side is down.
+3. The usual nerve checks still apply, at half health and when half a side is down. A target who also faces a weapon that outclasses theirs makes one nerve check, at the higher of the two DCs, not two.
 
 ```ts
 squad(sam, joe).fight(squad(rico), { kind: 'real', start: 'set-upon' });
@@ -299,7 +355,7 @@ On their turn, instead of attacking, a fleeing character makes an escape check: 
 | Failure or critical failure | Caught: still in the fight, and attacks against them have advantage until their next turn, when they try again |
 
 - **While trying to flee,** a character can still be attacked, and does not count as out of the fight (for "half a side is down") until they get away.
-- **Held:** in the first round of being set upon, the target is held, so breaking free is Brawling against the holder's Brawling instead.
+- **Held:** in the first round of being set upon, the target is held, so breaking free is Brawling against the holder's Brawling instead. The holder is the attacker first in initiative order.
 - **No one to chase them:** with no enemy still fighting, they get away without a roll.
 - **Balance:** fleeing characters now stay in the fight longer and can be hit while running, so the numbers are checked with statistical tests on simulated fights once built.
 
@@ -340,7 +396,7 @@ The game's word for a recorded event is `Fact`, so this plan says "fact" through
 
 ### Temperament
 
-One stored set of traits, each 0 to 1. The game has two layers (stored traits, and a temperament worked out from them in `src/temper.ts`); this keeps one.
+One set of traits, each 0 to 1, worked out from a character's starting traits and their conduct (see [Temperament moves with conduct](#temperament-moves-with-conduct)). The game has two layers (stored traits, and a temperament worked out from them in `src/temper.ts`); this has one set of trait names.
 
 | Trait | Low | High | Against the game |
 | --- | --- | --- | --- |
@@ -365,7 +421,7 @@ An optional roll made before a job or a move. Its result becomes modifiers on th
 
 - One character plans, rolling Planning (Intelligence or Wisdom, whichever is higher) against a DC the job sets: for example 10 for a simple job, 15 for a tricky one, 20 for a hard one.
 - One other character taking part in the job can help, giving the planner advantage on the roll. More helpers add nothing more.
-- The result applies to every skill check made by anyone following the plan during that job. A plan has its own bands: a critical failure needs a margin of −10 or worse, rather than −5.
+- The result applies to every skill check made by anyone taking part in the job while it is open. Following the plan is not optional, so a bad plan cannot be dodged. A plan has its own bands: a critical failure needs a margin of −11 or worse, rather than the usual −6 or worse.
 
 | Outcome | Margin | Effect on the job's checks |
 | --- | --- | --- |
@@ -375,7 +431,7 @@ An optional roll made before a job or a move. Its result becomes modifiers on th
 | Failure | −1 to −10 | No change |
 | Critical failure | −11 or worse | −2: the plan is wrong, and following it makes things worse |
 
-- The plan is recorded in the cast with the job it belongs to, and ends when the job does.
+- The plan is recorded on its [job](#jobs), and ends when the job does.
 - There is one plan per job, and a job cannot be replanned.
 - The planner does not know exactly how good the plan is: a critical failure looks like a failure to them, so they follow a bad plan without knowing. Explanations given to the planner, or anyone following the plan, show what they believe it gives; only the roll uses the real modifier.
 - Fight rolls are not affected, including nerve and escape checks during a fight. A plan helps a fight through the checks around it instead, such as the Stealth roll for an ambush.
@@ -392,9 +448,17 @@ Expected modifier on each of the job's checks, counting a critical success's ext
 So a capable planner helps, and an untrained one planning a hard job alone makes it worse, which is why planning is a choice.
 
 ```ts
-const plan = sam.planning.plan(burglary).helpedBy(joe).roll(dice, { now });
-squad(sam, joe).following(plan).larceny.check(15);   // includes "A good plan +2", as Sam believes it
+const started = everyone.startJob({ kind: 'burglary', dc: 15, members: ['sam', 'joe'], now });
+const planned = started.cast.character('sam').planning.plan(started.job).helpedBy('joe').roll(dice, { now });
+const sam = planned.cast.character('sam');
+sam.check('larceny', 15).explain({ for: sam });   // includes "A good plan +2", as Sam believes it
 ```
+
+Each step uses the cast the previous one returned, so no handle is stale.
+
+### Jobs
+
+A job is a record in the cast: an id, its kind, its members, the DC a plan for it rolls against, its plan if it has one, and when it started and ended. While it is open, every skill check by a member, other than fight rolls, includes the plan's modifier. It ends when the caller ends it (`cast.endJob(job, { now })`), and a member can belong to one open job at a time.
 
 ## Bookkeeping
 
@@ -405,9 +469,19 @@ Where it would be used once this is slotted into the game, which now uses `brain
 
 Both belong to the game's books, so both wait for slotting it in (see [Later](#later)).
 
+## Still to agree
+
+- **How conduct moves temperament:** which kinds of conduct move which traits, and by how much. This is the next table to settle, before building.
+
 ## Later
 
 Left until the character is slotted into the game:
+
+- **Replacing the game's records:** the game's `Character` has about 60 fields this does not hold (rank, family, crew, debts, memos and more). Each system moves over with its fields, its tests and a save migration, one at a time, and the one writer goes once nothing is left.
+- **Fading:** feelings fading when nothing feeds them, as the game's `feelingsWeek` does; it needs the game's clock.
+- **Healing over time,** and how much a shorter rest heals.
+- **Lies told in front of others:** what witnesses to a deception believe.
+- **Clearing a name:** whether learning someone was falsely blamed repairs the feelings the lie caused.
 
 - **Skimming:** an opposed Bookkeeping check between the skimmer and their superior. The chance of the superior catching it must scale with the gap they can see, as the game's own check does now. Running a check only when someone is skimming would leak who is, and a suspicion must be recorded as an inferred fact, not as a change in trust with no recorded cause.
 - **Running a business** with Bookkeeping, in place of `brains` in the game's management quality. This changes the game's economy, and this work stays separate from the game until then.
