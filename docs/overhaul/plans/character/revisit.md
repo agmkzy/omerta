@@ -21,7 +21,9 @@ Found in mapping the game's character fields ([game-mapping.md](game-mapping.md)
 
 ## To confirm
 
-Nothing is open. Every choice made while building was settled with the owner on 3 November 2026: those that changed or settled the design are written into the plan, and those that only follow from it are under [Choices made while building](#choices-made-while-building).
+| Point | Where it came up | Now |
+| --- | --- | --- |
+| **A loser beaten with no blow struck.** Losing a fight while still conscious (surrendering, or running and being caught) counts as being beaten: the fight ends, a `beating` is recorded at the smallest beating's feelings, and nothing else happens to them. So someone unarmed who loses their nerve against a knife at the start can be "beaten" at full health by someone who never touched them, which also sits badly with a beating with no blow struck not counting as violence. Options: (1) the winners beat them when it is over, with real damage; (2) the fight ends with them at the winner's mercy, recorded as a fight they lost, and beating them afterwards is a separate choice by whoever controls the winner, recorded as a beating with real damage and the conduct of beating someone who cannot fight back, with letting them go a choice too. Recommended: (2). | The demo, 3 November 2026 | Built as described; open |
 
 ## Waiting for a later step
 
