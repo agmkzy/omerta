@@ -210,7 +210,7 @@ Proposals that need the owner, to take one at a time:
 | --- | --- |
 | **Rank and a character's abilities.** The game's world generator rolls five skills, better for higher ranks (0.2 to 0.85, against 0.1 to 0.6 for civilians), and one gift | **Decided (3 November 2026): rank is detached from attributes, skills, training and the proficiency bonus.** Rank never sets them and no rule reads them from rank. How the world generator makes characters, and how the proficiency bonus is set, is open; for now every character's is 2 |
 | **Skills growing with use.** In the game every job adds 0.025 to the skills it needs (`people.ts` `grow`); the overhaul's training never changes | **Direction decided (3 November 2026):** XP and levels, each level a point for an attribute, and training unlocked by things that happen in the game. See the design's [Advancement](README.md#advancement), which lists what is still open |
-| **Which courage to keep.** The game has the `courage` trait and the `nerve` skill | Keep both, as the overhaul does: courage decides what someone does after failing a nerve check, Nerve decides whether they fail it |
+| **Which courage to keep.** The game has the `courage` trait and the `nerve` skill | **Settled (follows from the design):** both, as the overhaul has them: courage decides what someone does after failing a nerve check, Nerve decides whether they fail it |
 | **Backgrounds at character creation.** The game offers six (`hustler`, `connected`, `business`, `union`, `bookmaker`, `wheelman`), each with two skills and starting cash; the overhaul has eight | The creation screen offers the overhaul's backgrounds, or the overhaul takes the game's six as its own |
 | **Starting relationships.** The game begins some at 0.25 to 0.4, set by the situation | **Decided and built (3 November 2026):** a first relationship starts from the character's own traits, not the situation (see the design's Relationships) |
 | **Spending time together.** The game marks meeting in 35 places with no roll | **Decided and built (3 November 2026):** `cast.together(people, { now })`: everyone named meets, and nothing else changes |
@@ -219,7 +219,7 @@ Proposals that need the owner, to take one at a time:
 | **Stolen goods.** `cars` and `goods` are counts and values | Stolen cars become items, since a car is a thing with a history (`w.cars` already tracks them); stolen goods stay a value in the economy |
 | **Personal problems.** `problem`: gambling, debt, drink and so on, with how bad it is | Its own record, keyed by id; a problem that should change rolls (drink) does it through an effect |
 | **Sleeping.** The game's characters keep hours (`wake`, `sleep`) | Someone asleep is resting, so unavailable, which is also what attacking someone asleep needs |
-| **Who counts as there.** The overhaul has no places; the game has `district` | The caller decides who is there, as now, from the game's districts |
+| **Who counts as there.** The overhaul has no places; the game has `district` | **Settled (follows from the design's Inputs):** the caller names who is there, and the game decides it from its districts |
 
 ## What this does not cover
 
