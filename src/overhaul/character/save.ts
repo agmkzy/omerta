@@ -8,7 +8,9 @@ import { BACKGROUNDS, type BackgroundName } from './backgrounds';
 import { CAST_FORMAT, castOf, type Cast } from './cast';
 import { createCharacter, type CharacterRecord } from './character';
 import { STORED_EFFECTS, type ConditionRecord, type StoredEffect } from './condition';
+import { FACT_KINDS, type Fact, type FactKind } from './facts';
 import { ITEMS, type HeldItem, type InventoryRecord, type Item } from './items';
+import type { How, Knowledge, Source, Version } from './knowledge';
 import type { Transfer } from './transfers';
 import { PROFICIENCIES, SKILLS, type Proficiency, type Skill, type Training } from './skills';
 import { TRAITS } from './temperament';
@@ -28,6 +30,13 @@ export const MIGRATIONS: readonly Migration[] = [
     d.transfers ??= [];
     for (const c of Array.isArray(d.characters) ? d.characters : [])
       if (typeof c === 'object' && c !== null && !('inventory' in c)) (c as Record<string, unknown>).inventory = {};
+  },
+  // 3 to 4: the cast gained facts and an id counter, and characters their knowledge of the facts. Format 3 had no facts.
+  (d) => {
+    d.facts ??= [];
+    d.nextId ??= 1;
+    for (const c of Array.isArray(d.characters) ? d.characters : [])
+      if (typeof c === 'object' && c !== null && !('knowledge' in c)) (c as Record<string, unknown>).knowledge = {};
   },
 ];
 
@@ -49,14 +58,23 @@ export interface ReadCast {
 /** Every field of a saved character; the type check fails if one is missing or misspelt. */
 const CHARACTER_FIELDS: readonly string[] = Object.keys({
   id: true, name: true, background: true, attributes: true, training: true, proficiencyBonus: true, startingTemperament: true, condition: true,
-  inventory: true,
+  inventory: true, knowledge: true,
 } satisfies Record<keyof CharacterRecord, true>);
 
 const CONDITION_FIELDS: readonly string[] = Object.keys({ hitPoints: true, effects: true, rest: true } satisfies Record<keyof ConditionRecord, true>);
 
 const INVENTORY_FIELDS: readonly string[] = Object.keys({ cash: true, items: true } satisfies Record<keyof InventoryRecord, true>);
 const TRANSFER_FIELDS: readonly string[] = Object.keys({ from: true, to: true, amount: true, why: true, at: true } satisfies Record<keyof Transfer, true>);
-const CAST_FIELDS: readonly string[] = ['format', 'characters', 'transfers'];
+const FACT_FIELDS: readonly string[] = Object.keys({
+  id: true, kind: true, actor: true, victim: true, business: true, amount: true, at: true, where: true, cause: true, story: true,
+  hiddenActor: true, invented: true, witnesses: true,
+} satisfies Record<keyof Fact, true>);
+const VERSION_FIELDS: readonly string[] = Object.keys({
+  learnedAt: true, source: true, teller: true, how: true, knowsActor: true, blame: true, exaggerated: true, knownFalse: true,
+} satisfies Record<keyof Version, true>);
+const SOURCES: readonly Source[] = ['self', 'witness', 'public', 'told'];
+const HOWS: readonly How[] = ['seen', 'told', 'heard'];
+const CAST_FIELDS: readonly string[] = ['format', 'characters', 'transfers', 'facts', 'nextId'];
 
 /** Throws TypeError for data of the wrong shape (NewerFormatError for a newer format) and RangeError for out-of-range values. */
 export function readCast(data: unknown): ReadCast {
@@ -69,7 +87,10 @@ export function readCast(data: unknown): ReadCast {
   const characters = ((d.characters ?? []) as unknown[]).map((c, i) => readCharacter(c, `characters[${i}]`, ignored));
   if (d.transfers !== undefined && !Array.isArray(d.transfers)) throw new TypeError('transfers must be a list');
   const transfers = ((d.transfers ?? []) as unknown[]).map((t, i) => readTransfer(t, `transfers[${i}]`, ignored));
-  return { cast: castOf({ format: CAST_FORMAT, characters, transfers }), ignored };
+  if (d.facts !== undefined && !Array.isArray(d.facts)) throw new TypeError('facts must be a list');
+  const facts = ((d.facts ?? []) as unknown[]).map((f, i) => readFact(f, `facts[${i}]`, ignored));
+  if (d.nextId !== undefined && typeof d.nextId !== 'number') throw new TypeError('nextId must be a number');
+  return { cast: castOf({ format: CAST_FORMAT, characters, transfers, facts, nextId: d.nextId ?? 1 }), ignored };
 }
 
 /** As readCast, for callers that do not need to know what was ignored. */
@@ -95,7 +116,63 @@ function readCharacter(data: unknown, path: string, ignored: string[]): Characte
     ...(d.startingTemperament !== undefined && { startingTemperament: numbers(d.startingTemperament, `${path}.startingTemperament`, TRAITS, ignored) }),
     ...(d.condition !== undefined && { condition: condition(d.condition, `${path}.condition`, ignored) }),
     ...(d.inventory !== undefined && { inventory: inventory(d.inventory, `${path}.inventory`, ignored) }),
+    ...(d.knowledge !== undefined && { knowledge: knowledge(d.knowledge, `${path}.knowledge`, ignored) }),
   });
+}
+
+function readFact(value: unknown, path: string, ignored: string[]): Fact {
+  const d = object(value, path);
+  ignored.push(...Object.keys(d).filter((k) => !FACT_FIELDS.includes(k)).map((k) => `${path}.${k}`));
+  if (typeof d.id !== 'string') throw new TypeError(`${path}.id must be text`);
+  if (typeof d.kind !== 'string' || !FACT_KINDS.includes(d.kind as FactKind)) throw new TypeError(`${path}.kind must be a kind of fact`);
+  if (typeof d.at !== 'number') throw new TypeError(`${path}.at must be a number`);
+  if (!Array.isArray(d.witnesses) || !d.witnesses.every((w) => typeof w === 'string')) throw new TypeError(`${path}.witnesses must be a list of ids`);
+  const text = (k: 'actor' | 'victim' | 'business' | 'where' | 'cause' | 'story' | 'invented') => {
+    if (d[k] !== undefined && typeof d[k] !== 'string') throw new TypeError(`${path}.${k} must be text`);
+    return d[k] === undefined ? {} : { [k]: d[k] as string };
+  };
+  if (d.amount !== undefined && typeof d.amount !== 'number') throw new TypeError(`${path}.amount must be a number`);
+  if (d.hiddenActor !== undefined && d.hiddenActor !== true) throw new TypeError(`${path}.hiddenActor is true or absent`);
+  return {
+    id: d.id,
+    kind: d.kind as FactKind,
+    ...text('actor'),
+    ...text('victim'),
+    ...text('business'),
+    ...(d.amount !== undefined && { amount: d.amount }),
+    at: d.at,
+    ...text('where'),
+    ...text('cause'),
+    ...text('story'),
+    ...(d.hiddenActor === true && { hiddenActor: true }),
+    ...text('invented'),
+    witnesses: d.witnesses as string[],
+  };
+}
+
+function knowledge(value: unknown, path: string, ignored: string[]): Knowledge {
+  return Object.fromEntries(Object.entries(object(value, path)).map(([id, v]) => [id, version(v, `${path}.${id}`, ignored)]));
+}
+
+function version(value: unknown, path: string, ignored: string[]): Version {
+  const d = object(value, path);
+  ignored.push(...Object.keys(d).filter((k) => !VERSION_FIELDS.includes(k)).map((k) => `${path}.${k}`));
+  if (typeof d.learnedAt !== 'number') throw new TypeError(`${path}.learnedAt must be a number`);
+  if (!SOURCES.includes(d.source as Source)) throw new TypeError(`${path}.source must be one of ${SOURCES.join(', ')}`);
+  if (!HOWS.includes(d.how as How)) throw new TypeError(`${path}.how must be one of ${HOWS.join(', ')}`);
+  if (typeof d.knowsActor !== 'boolean') throw new TypeError(`${path}.knowsActor must be true or false`);
+  for (const k of ['teller', 'blame'] as const) if (d[k] !== undefined && typeof d[k] !== 'string') throw new TypeError(`${path}.${k} must be text`);
+  for (const k of ['exaggerated', 'knownFalse'] as const) if (d[k] !== undefined && d[k] !== true) throw new TypeError(`${path}.${k} is true or absent`);
+  return {
+    learnedAt: d.learnedAt,
+    source: d.source as Source,
+    ...(d.teller !== undefined && { teller: d.teller as string }),
+    how: d.how as How,
+    knowsActor: d.knowsActor,
+    ...(d.blame !== undefined && { blame: d.blame as string }),
+    ...(d.exaggerated === true && { exaggerated: true }),
+    ...(d.knownFalse === true && { knownFalse: true }),
+  };
 }
 
 function inventory(value: unknown, path: string, ignored: string[]): { cash?: number; items: HeldItem[] } {

@@ -7,7 +7,9 @@ import { bonusOf, passes, resolveCheck, type CheckResult, type Modifier } from '
 import { createCharacter, type CharacterInput, type CharacterRecord, type Id } from './character';
 import { conditionOf, effectModifiers, type Condition, type StoredEffect } from './condition';
 import { DICE } from './dice';
+import { auditFacts, factId, type Fact, type FactId, type FactInput } from './facts';
 import { DRINK_DC, ITEM_INFO, itemModifiers, type InventoryRecord, type Item, type ItemOptions, type ItemState } from './items';
+import { auditKnowledge, firstVersions, toldVersion, type Knowledge, type Version } from './knowledge';
 import type { Roller } from './random';
 import { SKILLS, attributeUsed, skillModifiers, type Proficiency, type Skill } from './skills';
 import type { Temperament } from './temperament';
@@ -16,13 +18,17 @@ import { WORLD, auditCash, type Party, type Transfer } from './transfers';
 import { seen, type Seen } from './view';
 
 /** Increment when the saved shape changes, and add a migration in save.ts. */
-export const CAST_FORMAT = 3;
+export const CAST_FORMAT = 4;
 
 export interface CastRecord {
   readonly format: number;
   readonly characters: readonly CharacterRecord[];
   /** Every cash transfer, in time order. */
   readonly transfers: readonly Transfer[];
+  /** Every fact, in time order. */
+  readonly facts: readonly Fact[];
+  /** The next number for an id made by the cast, such as a fact's. */
+  readonly nextId: number;
 }
 
 export interface Cast {
@@ -41,6 +47,14 @@ export interface Cast {
    * party not in the cast, or a time before the last transfer.
    */
   transfer(t: { readonly from: Party; readonly to: Party; readonly amount: number; readonly why: string; readonly now: number }): Cast;
+  readonly facts: readonly Fact[];
+  /** Throws RangeError for an id not recorded. */
+  fact(id: FactId): Fact;
+  /**
+   * Records a fact at `now`, learned by whoever did it, whoever it was done to and the witnesses. Throws RangeError for a
+   * fact that names someone not in the cast, or a time before the last fact.
+   */
+  record(fact: Omit<FactInput, 'invented'>, when: { readonly now: number; readonly witnesses?: readonly Id[] }): { readonly fact: Fact; readonly cast: Cast };
 }
 
 /** A skill as it stands for a character: their training, the attribute used and the bonus, with every part of it. */
@@ -66,6 +80,10 @@ export interface Character {
   readonly canAct: boolean;
   readonly inventory: InventoryRecord;
   readonly cash: number;
+  /** Their own version of each fact they know about. */
+  readonly knowledge: Knowledge;
+  /** Their version of a fact, or undefined if they do not know it. */
+  versionOf(fact: FactId): Version | undefined;
   /** A skill as it stands in a situation and with the items used for the check, such as Larceny for locks using lockpicks. */
   skill(skill: Skill, options?: ItemOptions): SkillStatus;
   /** Whether the character is resting at `now`. */
@@ -91,6 +109,12 @@ export interface Character {
   hide(item: Item): Cast;
   wear(item: Item): Cast;
   takeOff(item: Item): Cast;
+  /**
+   * A new cast in which the character has told the listener what they believe of a fact, at `now`. A listener who already
+   * knows it keeps their own version. Throws RangeError for a fact the character does not know, or one they know is false
+   * (telling it would be a lie).
+   */
+  tell(listener: Character, fact: FactId, when: { readonly now: number }): Cast;
   /** Drinks a bottle of spirits, which is used up: a Carousing check against DRINK_DC, and on a failure the character is drunk. */
   drink(roller: Roller): { readonly result: CheckResult; readonly drunk: boolean; readonly cast: Cast };
 }
@@ -100,12 +124,13 @@ export class ReplacedCastError extends Error {}
 
 /** A cast of the given characters. Throws as createCharacter does, and RangeError for an id given twice. */
 export function cast(given: { readonly characters?: readonly CharacterInput[] } = {}): Cast {
-  return castOf({ format: CAST_FORMAT, characters: (given.characters ?? []).map(createCharacter), transfers: [] });
+  return castOf({ format: CAST_FORMAT, characters: (given.characters ?? []).map(createCharacter), transfers: [], facts: [], nextId: 1 });
 }
 
 /**
- * A cast over a complete record of checked characters (from cast() or a save). Throws RangeError for an id used twice, and
- * for cash that does not agree with the transfers (auditCash).
+ * A cast over a complete record of checked characters (from cast() or a save). Throws RangeError for an id used twice, for
+ * cash that does not agree with the transfers (auditCash), for facts that are not valid (auditFacts), and for knowledge that
+ * does not fit them (auditKnowledge).
  */
 export function castOf(data: CastRecord): Cast {
   const records = new Map<Id, CharacterRecord>();
@@ -114,6 +139,9 @@ export function castOf(data: CastRecord): Cast {
     records.set(c.id, c);
   }
   auditCash(data.characters, data.transfers);
+  auditFacts(data.facts, new Set(records.keys()), data.nextId);
+  auditKnowledge(data.characters, data.facts);
+  const facts = new Map(data.facts.map((f) => [f.id, f]));
   const handles = new Map<Id, Character>();
   let current = true;
 
@@ -153,6 +181,26 @@ export function castOf(data: CastRecord): Cast {
           transfers: [...data.transfers, { from, to, amount, why, at: now }],
         };
       }),
+    facts: data.facts,
+    fact(id) {
+      const f = facts.get(id);
+      if (f === undefined) throw new RangeError(`no fact has the id ${id}`);
+      return f;
+    },
+    record(input, { now, witnesses = [] }) {
+      const made: Fact = { ...input, id: factId(data.nextId), at: now, witnesses: [...witnesses] };
+      const learners = new Map(firstVersions(made));
+      const next = change(() => ({
+        ...data,
+        facts: [...data.facts, made],
+        nextId: data.nextId + 1,
+        characters: data.characters.map((c) => {
+          const v = learners.get(c.id);
+          return v ? createCharacter({ ...c, knowledge: { ...c.knowledge, [made.id]: v } }) : c;
+        }),
+      }));
+      return { fact: made, cast: next };
+    },
   };
 
   /** A change to one character, whose new record is checked as any other. */
@@ -195,6 +243,8 @@ function characterHandle(data: CharacterRecord, owner: Cast, update: Update): Ch
     canAct: !condition.unconscious,
     inventory: data.inventory,
     cash: data.inventory.cash,
+    knowledge: data.knowledge,
+    versionOf: (fact) => data.knowledge[fact],
     restingAt(now) {
       assertTime(now);
       return data.condition.rest !== undefined && data.condition.rest.from <= now && now < data.condition.rest.until;
@@ -223,6 +273,16 @@ function characterHandle(data: CharacterRecord, owner: Cast, update: Update): Ch
     hide: (item) => move(item, 'shown', 'carried'),
     wear: (item) => move(item, 'carried', 'worn'),
     takeOff: (item) => move(item, 'worn', 'carried'),
+    tell(listener, fact, { now }) {
+      if (listener.cast !== owner) throw new RangeError(`${listener.name} is from another cast`);
+      if (listener.id === data.id) throw new RangeError(`${data.name} cannot tell themselves`);
+      const theirs = data.knowledge[fact];
+      if (theirs === undefined) throw new RangeError(`${data.name} does not know ${fact}`);
+      if (theirs.knownFalse) throw new RangeError(`${data.name} knows ${fact} is false, so telling it would be a lie`);
+      assertTime(now);
+      if (now < theirs.learnedAt) throw new RangeError(`${data.name} cannot tell ${fact} at ${now}, before learning it at ${theirs.learnedAt}`);
+      return update(listener.id, (c) => (c.knowledge[fact] ? c : { ...c, knowledge: { ...c.knowledge, [fact]: toldVersion(data.id, theirs, now) } }));
+    },
     drink(roller) {
       if (condition.unconscious) throw new RangeError(`${data.name} is unconscious`);
       if (!data.inventory.items.some((h) => h.item === 'bottle')) throw new RangeError(`${data.name} has no bottle of spirits`);

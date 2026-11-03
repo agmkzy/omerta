@@ -12,18 +12,18 @@ const rico = { id: 'rico', name: 'Rico', background: 'fighter', attributes: attr
 describe('cast', { tags: ['unit'] }, () => {
   test('holds every character, in the order given, as plain records with a format number', () => {
     const everyone = cast({ characters: [sam, rico] });
-    assert.deepEqual(everyone.data, { format: CAST_FORMAT, characters: [createCharacter(sam), createCharacter(rico)], transfers: [] });
+    assert.deepEqual(everyone.data, { format: CAST_FORMAT, characters: [createCharacter(sam), createCharacter(rico)], transfers: [], facts: [], nextId: 1 });
     assert.deepEqual(everyone.characters.map((c) => c.id), ['sam', 'rico']);
     assert.deepEqual(JSON.parse(JSON.stringify(everyone.data)), everyone.data);
   });
 
   test('is empty when given no one', () => {
-    assert.deepEqual(cast().data, { format: CAST_FORMAT, characters: [], transfers: [] });
+    assert.deepEqual(cast().data, { format: CAST_FORMAT, characters: [], transfers: [], facts: [], nextId: 1 });
   });
 
   test('refuses two characters with the same id', () => {
     assert.throws(() => cast({ characters: [sam, { id: 'sam', name: 'Another Sam' }] }), RangeError);
-    assert.throws(() => castOf({ format: CAST_FORMAT, characters: [createCharacter(sam), createCharacter(sam)], transfers: [] }), RangeError);
+    assert.throws(() => castOf({ format: CAST_FORMAT, characters: [createCharacter(sam), createCharacter(sam)], transfers: [], facts: [], nextId: 1 }), RangeError);
   });
 
   test('gives one handle per character, and refuses an id it does not hold', () => {

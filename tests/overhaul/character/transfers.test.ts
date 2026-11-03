@@ -71,7 +71,7 @@ describe('cash in a cast', { tags: ['unit'] }, () => {
 
   test('cannot be set directly: a cast whose cash disagrees with its transfers is refused', () => {
     assert.throws(() => cast({ characters: [{ id: 'sam', name: 'Sam', inventory: { cash: 100 } }] }), RangeError);
-    assert.throws(() => castOf({ format: 3, characters: [withCash('sam', 5)], transfers: [] }), RangeError);
+    assert.throws(() => castOf({ format: 3, characters: [withCash('sam', 5)], transfers: [], facts: [], nextId: 1 }), RangeError);
   });
 
   test('refuses paying more than the payer has, a party not in the cast, a time before the last transfer, or an invalid transfer', () => {

@@ -144,6 +144,49 @@ describe('loadCast', { tags: ['unit'] }, () => {
     assert.throws(() => loadCast(withTransfers([{ ...transfer, amount: 6 }])), RangeError);
   });
 
+  test('loads a cast saved in format 4, which must keep loading', () => {
+    const { cast: loaded, ignored } = readCast(fixture('cast-format4.json'));
+    assert.deepEqual(ignored, []);
+    assert.deepEqual(loaded.facts.map((f) => [f.id, f.kind]), [['f1', 'beating'], ['f2', 'robbery']]);
+    assert.equal(loaded.data.nextId, 3);
+    assert.deepEqual(loaded.character('rico').versionOf('f1'), { learnedAt: 1440, source: 'witness', how: 'seen', knowsActor: true });
+    assert.deepEqual(loaded.character('sam').versionOf('f2'), { learnedAt: 2000, source: 'told', teller: 'rico', how: 'told', knowsActor: false, blame: 'rico', exaggerated: true });
+  });
+
+  test('restores facts and knowledge, and leaves out fields it does not recognise', () => {
+    const recorded = loadCast(throughJson(everyone.data)).record({ kind: 'beating', actor: 'sam', victim: 'rico', amount: 3, where: 'the docks', story: 's1', hiddenActor: true }, { now: 10 });
+    const told = recorded.cast.character('sam').tell(recorded.cast.character('rico'), 'f1', { now: 20 });
+    const caused = told.record({ kind: 'threat', actor: 'rico', victim: 'sam', cause: 'f1', business: 'b1' }, { now: 30 }).cast;
+    assert.deepEqual(loadCast(throughJson(caused.data)).data, caused.data);
+    const { cast: loaded, ignored } = readCast({
+      format: CAST_FORMAT,
+      characters: [{ id: 'x', name: 'X', knowledge: { f1: { learnedAt: 0, source: 'self', how: 'seen', knowsActor: true, mood: 'proud' } } }],
+      facts: [{ id: 'f1', kind: 'theft', actor: 'x', at: 0, witnesses: [], weather: 'rain' }],
+      nextId: 2,
+    });
+    assert.deepEqual(loaded.character('x').versionOf('f1'), { learnedAt: 0, source: 'self', how: 'seen', knowsActor: true });
+    assert.deepEqual([...ignored].sort(), ['characters[0].knowledge.f1.mood', 'facts[0].weather']);
+  });
+
+  test('rejects facts and knowledge of the wrong shape, and knowledge that does not fit the facts', () => {
+    const f = { id: 'f1', kind: 'theft', actor: 'x', at: 0, witnesses: [] };
+    const withFacts = (facts: unknown, nextId: unknown = 2) => ({ format: CAST_FORMAT, characters: [{ id: 'x', name: 'X' }], facts, nextId });
+    assert.doesNotThrow(() => loadCast(withFacts([f])));
+    for (const [facts, nextId] of [[{}, 2], [[null], 2], [[{ ...f, id: 1 }], 2], [[{ ...f, kind: 'picnic' }], 2], [[{ ...f, at: '0' }], 2], [[{ ...f, witnesses: 'x' }], 2],
+      [[{ ...f, witnesses: [1] }], 2], [[{ ...f, actor: 1 }], 2], [[{ ...f, amount: '5' }], 2], [[{ ...f, hiddenActor: 'yes' }], 2], [[f], '2']] as const)
+      assert.throws(() => loadCast(withFacts(facts, nextId)), TypeError, JSON.stringify(facts));
+    assert.throws(() => loadCast(withFacts([f], 1)), RangeError);
+    const v = { learnedAt: 0, source: 'self', how: 'seen', knowsActor: true };
+    const knowing = (knowledge: unknown) => ({ ...withFacts([f]), characters: [{ id: 'x', name: 'X', knowledge }] });
+    assert.doesNotThrow(() => loadCast(knowing({ f1: v })));
+    for (const knowledge of [[], { f1: null }, { f1: { ...v, learnedAt: '0' } }, { f1: { ...v, source: 'dream' } }, { f1: { ...v, how: 'felt' } },
+      { f1: { ...v, knowsActor: 'yes' } }, { f1: { ...v, blame: 3 } }, { f1: { ...v, teller: 3 } }, { f1: { ...v, exaggerated: 1 } }, { f1: { ...v, knownFalse: false } }])
+      assert.throws(() => loadCast(knowing(knowledge)), TypeError, JSON.stringify(knowledge));
+    assert.throws(() => loadCast(knowing({ f2: v })), RangeError);
+    const invented = { format: CAST_FORMAT, characters: [{ id: 'x', name: 'X', knowledge: { f1: { ...v, knownFalse: true } } }], facts: [{ ...f, invented: 'x' }], nextId: 2 };
+    assert.deepEqual(loadCast(invented).character('x').versionOf('f1'), { ...v, knownFalse: true });
+  });
+
   test('rejects a condition of the wrong shape or out of range', () => {
     for (const condition of [[], { hitPoints: '3' }, { effects: 'shaken' }, { rest: { from: 0 } }, { rest: 5 }])
       assert.throws(() => loadCast(one({ id: 'x', name: 'X', condition })), TypeError, JSON.stringify(condition));
@@ -168,11 +211,20 @@ describe('migrations', { tags: ['unit'] }, () => {
 
   test('2 to 3 gives each character an empty inventory, and the cast no transfers', () => {
     const d: Record<string, unknown> = { format: 2, characters: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B', inventory: { cash: 0 } }, null] };
-    migrate(d, 2);
+    migrate(d, 2, MIGRATIONS.slice(0, 2));
     assert.deepEqual(d, { format: 2, characters: [{ id: 'a', name: 'A', inventory: {} }, { id: 'b', name: 'B', inventory: { cash: 0 } }, null], transfers: [] });
     const notAList: Record<string, unknown> = { format: 2, characters: 'none', transfers: ['kept'] };
-    migrate(notAList, 2);
+    migrate(notAList, 2, MIGRATIONS.slice(0, 2));
     assert.deepEqual(notAList, { format: 2, characters: 'none', transfers: ['kept'] });
+  });
+
+  test('3 to 4 gives the cast no facts and an id counter at 1, and each character no knowledge', () => {
+    const d: Record<string, unknown> = { format: 3, characters: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B', knowledge: {} }, null], transfers: [] };
+    migrate(d, 3);
+    assert.deepEqual(d, { format: 3, characters: [{ id: 'a', name: 'A', knowledge: {} }, { id: 'b', name: 'B', knowledge: {} }, null], transfers: [], facts: [], nextId: 1 });
+    const notAList: Record<string, unknown> = { format: 3, characters: 'none', facts: ['kept'], nextId: 7 };
+    migrate(notAList, 3);
+    assert.deepEqual(notAList, { format: 3, characters: 'none', facts: ['kept'], nextId: 7 });
   });
 
   test('run in order from the saved format to the newest', () => {
@@ -193,7 +245,7 @@ describe('saving and loading', { tags: ['property'] }, () => {
     fc.assert(
       fc.property(fc.integer(), fc.array(fc.constantFrom(...BACKGROUNDS), { maxLength: 4 }), fc.integer({ min: 2, max: 6 }), (seed, backgrounds, pb) => {
         const r = roller(seeded(seed));
-        const data = { format: CAST_FORMAT, characters: backgrounds.map((b, i) => rollCharacter(`c${i}`, `C${i}`, b, r, { proficiencyBonus: pb })), transfers: [] };
+        const data = { format: CAST_FORMAT, characters: backgrounds.map((b, i) => rollCharacter(`c${i}`, `C${i}`, b, r, { proficiencyBonus: pb })), transfers: [], facts: [], nextId: 1 };
         assert.deepEqual(loadCast(throughJson(castOf(data).data)).data, data);
       }),
     );

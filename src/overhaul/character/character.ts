@@ -4,6 +4,7 @@ import type { AttributeScores } from './attributes';
 import type { BackgroundName } from './backgrounds';
 import { conditionRecord, type ConditionRecord } from './condition';
 import { inventoryRecord, type HeldItem, type InventoryRecord, type Item } from './items';
+import type { Knowledge } from './knowledge';
 import { abilities, type Abilities, type Training } from './skills';
 import { temperament, type Temperament } from './temperament';
 
@@ -18,6 +19,8 @@ export interface CharacterRecord extends Abilities {
   readonly startingTemperament: Temperament;
   readonly condition: ConditionRecord;
   readonly inventory: InventoryRecord;
+  /** Their own version of each fact they know about, by fact id. */
+  readonly knowledge: Knowledge;
 }
 
 export interface CharacterInput {
@@ -31,11 +34,13 @@ export interface CharacterInput {
   readonly condition?: Partial<ConditionRecord>;
   /** Cash must agree with the cast's transfers, so a new character's cash comes from a transfer, not from here. */
   readonly inventory?: { readonly cash?: number; readonly items?: readonly (Item | HeldItem)[] };
+  /** Must agree with the cast's facts, so it comes from recording and telling facts, not from here. */
+  readonly knowledge?: Knowledge;
 }
 
 /**
- * A complete record: average attributes and temperament, no training, a proficiency bonus of 2, full health, no effects
- * and nothing held unless given. Throws TypeError for an id that is not a non-empty string, and RangeError for anything out of range.
+ * A complete record: average attributes and temperament, no training, a proficiency bonus of 2, full health, no effects,
+ * nothing held and nothing known unless given. Throws TypeError for an id that is not a non-empty string, and RangeError for anything out of range.
  */
 export function createCharacter(input: CharacterInput): CharacterRecord {
   if (typeof input.id !== 'string' || input.id === '') throw new TypeError('a character needs an id');
@@ -52,5 +57,6 @@ export function createCharacter(input: CharacterInput): CharacterRecord {
     startingTemperament: temperament(input.startingTemperament ?? {}),
     condition: conditionRecord(able, input.condition),
     inventory: inventoryRecord(input.inventory),
+    knowledge: { ...input.knowledge },
   };
 }
