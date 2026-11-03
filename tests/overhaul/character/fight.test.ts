@@ -182,13 +182,20 @@ describe('ambushes', { tags: ['unit'] }, () => {
 
   test('leaves a surprised target unable to chase anyone in the first round', () => {
     const spec = (rolls: FightRolls) =>
-      play({ attackers: [rec('sam', { startingTemperament: { courage: 0.1 } })], defenders: [rec('rico', { inventory: { items: ['pistol'] } })], kind: 'real', start: 'ambush' }, { initiative: [15, 5], nerve: [2], ...rolls });
-    // Sam's ambush catches Rico by surprise, but Sam loses his nerve against the pistol and runs: no one can catch him
+      play({ attackers: [rec('sam', { startingTemperament: { courage: 0.1 }, condition: { hitPoints: 5 } })], defenders: [rec('rico')], kind: 'real', start: 'ambush' }, { initiative: [15, 5], nerve: [2], ...rolls });
+    // Sam's ambush catches Rico by surprise, but Sam, already badly hurt, loses his nerve and runs: no one can catch him
     const surprised = spec({ stealth: [18] });
     assert.deepEqual(of(surprised, 'escape').map((e) => [e.from, e.got]), [[null, 'away']]);
     // noticed, Rico can chase him, and does
     const noticed = spec({ stealth: [2], escape: [2], chase: [18] });
     assert.deepEqual(of(noticed, 'escape').map((e) => [e.from, e.got]), [['rico', 'caught']]);
+  });
+
+  test('spares the ambusher the start-of-fight check against a surprised target’s weapon, but not a target who noticed', () => {
+    const spec = (rolls: FightRolls) =>
+      play({ attackers: [rec('sam')], defenders: [rec('rico', { inventory: { items: ['pistol'] } })], kind: 'real', start: 'ambush', maxRounds: 1 }, { initiative: [15, 5], ...rolls });
+    assert.deepEqual(of(spec({ stealth: [18], attack: [2] }), 'nerve'), []);
+    assert.deepEqual(of(spec({ stealth: [2], nerve: [15], attack: [2, 2] }), 'nerve').map((e) => [e.id, e.check.result.dc]), [['sam', 15]]);
   });
 
   test('comes first, before initiative, since it decides who is caught before anyone acts', () => {

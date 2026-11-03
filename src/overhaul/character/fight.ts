@@ -244,7 +244,9 @@ export function fight(spec: FightSpec, roller: Roller): FightResult {
     // At the start, every reason a fighter has to check their nerve is checked at once, at the highest DC among them.
     for (const f of order) {
       const dcs: number[] = [];
-      const faced = squad(otherSide(f.side)).map((o) => o.weapon).filter((w): w is Weapon => w !== 'none' && outclasses(w, f.weapon));
+      // (an ambusher faces no one's weapon in a target caught by surprise, who is not facing them yet)
+      const facing = squad(otherSide(f.side)).filter((o) => !(f.side === 'attacker' && o.surprised));
+      const faced = facing.map((o) => o.weapon).filter((w): w is Weapon => w !== 'none' && outclasses(w, f.weapon));
       if (faced.length) dcs.push(Math.max(...faced.map((w) => NERVE_DC[w])));
       if (start === 'set-upon' && f.side === 'defender') dcs.push(NERVE_DC['set-upon'] + NERVE_DC['set-upon-each-extra'] * (squad('attacker').length - 1));
       if (f.hp * 2 <= f.maxHp) {
