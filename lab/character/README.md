@@ -1,5 +1,8 @@
 # Character lab
 
+**Frozen as a reference.** Its rules are being ported into `src/overhaul/character/`, following
+[the character plan](../../docs/overhaul/plans/character/README.md); changes to the rules are made there, not here.
+
 An exploratory, self-contained prototype of a D&D-style character system: attributes, skills, temperament, checks and
 fights. It is intended to eventually replace the game's `Traits`/`Skills` (`src/types.ts`), but nothing here is
 connected to the game yet. The lab imports nothing from `src/`, and the game imports nothing from the lab.
