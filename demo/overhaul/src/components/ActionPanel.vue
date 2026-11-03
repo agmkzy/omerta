@@ -117,6 +117,9 @@ const tellOdds = computed(() => {
 });
 
 const when = (round: number) => (round === 0 ? 'At the start' : `Round ${round}`);
+const NERVE_WHY: Record<string, string> = { start: '', hurt: 'at half health, ', 'allies-down': 'half their side down, ' };
+const STATUS: Record<string, string> = { fighting: 'still standing', fleeing: 'turns to run', beaten: 'is beaten', 'knocked-out': 'is knocked out', fled: 'is gone' };
+const FINAL: Record<string, string> = { fighting: 'still standing', fleeing: 'still running', beaten: 'beaten', 'knocked-out': 'knocked out', fled: 'got away' };
 
 /** How a fight went, a line for each thing that happened. */
 function eventLine(e: FightEvent): string {
@@ -126,13 +129,13 @@ function eventLine(e: FightEvent): string {
     case 'initiative':
       return `Order: ${e.order.map(nameOf).join(', ')}`;
     case 'nerve':
-      return `${when(e.round)}: ${nameOf(e.id)} ${e.check.passed ? 'holds their nerve' : 'loses their nerve'} (${words(e.trigger)}, ${e.check.result.roll.total} against ${e.check.result.dc})${e.temper ? ', and loses their temper' : ''}`;
+      return `${when(e.round)}: ${nameOf(e.id)} ${e.check.passed ? 'holds their nerve' : 'loses their nerve'} (${NERVE_WHY[e.trigger]}${e.check.result.roll.total} against ${e.check.result.dc})${e.temper ? ', and loses their temper' : ''}`;
     case 'attack':
       return `${when(e.round)}: ${nameOf(e.by)} ${e.hit === 'miss' ? 'misses' : e.hit === 'critical' ? 'lands a critical hit on' : 'hits'} ${nameOf(e.target)}${e.hit === 'miss' ? '' : ` for ${e.damage} (${e.hp} left)`}${e.free ? ', as they run' : ''}`;
     case 'escape':
-      return `${when(e.round)}: ${nameOf(e.id)} ${e.got === 'caught' ? 'is caught' : e.got === 'away-chased' ? 'gets away, but not cleanly' : 'gets away'}`;
+      return `${when(e.round)}: ${nameOf(e.id)} ${e.got === 'caught' ? 'tries to get away, and is caught' : e.got === 'away-chased' ? `breaks away, but ${nameOf(e.from ?? undefined)} gets a hit in first` : 'gets away'}`;
     case 'status':
-      return `${when(e.round)}: ${nameOf(e.id)} ${words(e.status)}`;
+      return `${when(e.round)}: ${nameOf(e.id)} ${STATUS[e.status]}`;
     case 'end':
       return `End of round ${e.round}`;
   }
@@ -186,8 +189,8 @@ function doIt(): void {
         const out = squad(me, ...there(allies.value.filter((id) => id !== a && id !== t))).fight(squad(them, ...there(foes.value.filter((id) => id !== a && id !== t))), { kind: fightKind.value, start: fightStart.value }).roll(dice, { now, witnesses: ws });
         const r = out.result;
         const truth = [
-          r.winner === null ? 'A stalemate' : `${r.winner === 'attacker' ? me.name : them.name}'s side wins, in ${r.rounds} rounds`,
-          ...r.fighters.map((f) => `${nameOf(f.id)}: ${words(f.status)}, ${f.hp}/${f.maxHp} hit points${f.lostNerve ? ', lost their nerve' : ''}`),
+          `${r.winner === null ? 'A stalemate' : `${r.winner === 'attacker' ? me.name : them.name}'s side wins`}, ${r.rounds === 0 ? 'before the first round' : `in ${r.rounds} round${r.rounds === 1 ? '' : 's'}`}`,
+          ...r.fighters.map((f) => `${nameOf(f.id)}: ${FINAL[f.status]}, ${f.hp}/${f.maxHp} hit points${f.lostNerve ? ', lost their nerve' : ''}`),
           ...learners(out.cast, out.facts.map((f) => f.id)),
           ...r.events.filter((e) => e.kind !== 'end').map(eventLine),
         ];

@@ -179,6 +179,11 @@ describe('ambushes', { tags: ['unit'] }, () => {
     assert.deepEqual(of(r, 'ambush')[0]!.surprised, []);
     assert.deepEqual(of(r, 'attack').map((e) => e.by), ['sam', 'joe', 'rico']);
   });
+
+  test('comes first, before initiative, since it decides who is caught before anyone acts', () => {
+    const r = ambush([12, 11], { attack: [2, 2, 2] });
+    assert.deepEqual(r.events.slice(0, 2).map((e) => e.kind), ['ambush', 'initiative']);
+  });
 });
 
 describe('fleeing', { tags: ['unit'] }, () => {

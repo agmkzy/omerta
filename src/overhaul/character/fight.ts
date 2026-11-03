@@ -218,14 +218,7 @@ export function fight(spec: FightSpec, roller: Roller): FightResult {
     for (const f of fighting(side)) testNerve(f, 'allies-down', NERVE_DC['allies-down']);
   };
 
-  /** Initiative: Reflexes; highest first, defenders first on a tie, then squad order. */
-  const rolls = fighters.map((f, i) => ({ f, i, total: throwRoll(d20(fightModifiers(f.c, 'reflexes')), rolling({ kind: 'initiative', by: f.c.id })).total }));
-  const rank = (s: Side) => (s === 'defender' ? 0 : 1);
-  rolls.sort((a, b) => b.total - a.total || rank(a.f.side) - rank(b.f.side) || a.i - b.i);
-  const order = rolls.map((r) => r.f);
-  events.push({ kind: 'initiative', order: order.map((f) => f.c.id) });
-  const holder = order.find((f) => f.side === 'attacker')!;
-
+  // an ambush comes first: whether the targets notice the attackers before anyone acts
   if (real && start === 'ambush') {
     // the squad's lowest Stealth roll, the noisiest giving them away, against each target's passive Notice
     const stealth = squad('attacker')
@@ -238,6 +231,14 @@ export function fight(spec: FightSpec, roller: Roller): FightResult {
     for (const f of surprised) f.surprised = true;
     events.push({ kind: 'ambush', stealth, surprised: surprised.map((f) => f.c.id) });
   }
+
+  /** Initiative: Reflexes; highest first, defenders first on a tie, then squad order. */
+  const rolls = fighters.map((f, i) => ({ f, i, total: throwRoll(d20(fightModifiers(f.c, 'reflexes')), rolling({ kind: 'initiative', by: f.c.id })).total }));
+  const rank = (s: Side) => (s === 'defender' ? 0 : 1);
+  rolls.sort((a, b) => b.total - a.total || rank(a.f.side) - rank(b.f.side) || a.i - b.i);
+  const order = rolls.map((r) => r.f);
+  events.push({ kind: 'initiative', order: order.map((f) => f.c.id) });
+  const holder = order.find((f) => f.side === 'attacker')!;
 
   if (real) {
     // At the start, every reason a fighter has to check their nerve is checked at once, at the highest DC among them.
