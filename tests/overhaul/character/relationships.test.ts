@@ -9,10 +9,12 @@ import { DEED, GRUDGE, HEARD, LEARNED_AS, VIOLENT, learningChanges, meetings, ty
 import {
   FEELINGS,
   FEELING_RULES,
+  FIRST_MEETING_WEIGHT,
   MEETING,
   NEW_RELATIONSHIP,
   assertRelationship,
   feel,
+  firstRelationship,
   feelingModifiers,
   meet,
   type Relationship,
@@ -25,8 +27,31 @@ const at = (over: Partial<Relationship> = {}): Relationship => ({ ...NEW_RELATIO
 const now = { now: 0 };
 
 describe('a new relationship', { tags: ['unit'] }, () => {
-  test('starts with trust, respect and affection in the middle, and no grudge, fear or familiarity', () => {
+  test('starts, for a character of average traits, with trust, respect and affection in the middle, and no grudge, fear or familiarity', () => {
     assert.deepEqual(NEW_RELATIONSHIP, { trust: 0.5, respect: 0.5, affection: 0.5, grudge: 0, fear: 0, familiarity: 0 });
+    assert.deepEqual(firstRelationship({ caution: 0.5, agreeable: 0.5, sociability: 0.5 }), NEW_RELATIONSHIP);
+  });
+
+  test('starts from the character’s own traits: caution lowers trust, agreeableness raises it, sociability raises affection', () => {
+    assert.equal(FIRST_MEETING_WEIGHT, 0.3);
+    const wary = firstRelationship({ caution: 0.9, agreeable: 0.2, sociability: 0.4 });
+    close(wary.trust, 0.29);
+    close(wary.affection, 0.47);
+    assert.deepEqual([wary.respect, wary.grudge, wary.fear, wary.familiarity], [0.5, 0, 0, 0]);
+    const easy = firstRelationship({ caution: 0.3, agreeable: 0.8, sociability: 0.8 });
+    close(easy.trust, 0.65);
+    close(easy.affection, 0.59);
+  });
+
+  test('is begun from the current traits of whoever meets or learns of someone', () => {
+    const wary = { caution: 0.9, agreeable: 0.2, sociability: 0.4 };
+    const c = cast({ characters: [{ id: 'sam', name: 'Sam', startingTemperament: wary }, { id: 'rico', name: 'Rico' }] });
+    const met = c.character('sam').social.persuade(c.character('rico')).roll(scripted(10, 10), { now: 0 }).cast;
+    close(met.character('sam').towards(met.character('rico'))!.trust, 0.29);
+    close(met.character('rico').towards(met.character('sam'))!.trust, 0.5);
+    const heard = cast({ characters: [{ id: 'sam', name: 'Sam', startingTemperament: wary }, { id: 'rico', name: 'Rico' }, { id: 'vic', name: 'Vic' }] })
+      .record({ kind: 'theft', actor: 'rico', victim: 'vic' }, { now: 0, witnesses: ['sam'] }).cast;
+    close(heard.character('sam').towards(heard.character('vic'))!.trust, 0.29);
   });
 });
 

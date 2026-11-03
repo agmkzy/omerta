@@ -7,7 +7,7 @@ import { maxHitPoints } from './condition';
 import { currentTemperament } from './conduct';
 import type { Fact, FactId, FactKind } from './facts';
 import type { Version } from './knowledge';
-import { NEW_RELATIONSHIP, feel, meet, type Feeling, type Relationship } from './relationships';
+import { feel, firstRelationship, meet, type Feeling, type Relationship } from './relationships';
 import { HIGH } from './temperament';
 
 /** What a deed does to the respect of those who hear of it: for whoever did it, and for whoever it was done to (src/core.ts DEED). */
@@ -150,7 +150,7 @@ export function learnFact(c: CharacterRecord, f: Fact, v: Version, now: number):
   const actor = believedActor(f, v);
   const learner: Learner = { id: c.id, courage: currentTemperament(c).courage, maxHitPoints: maxHitPoints(c), affectionFor: (id) => c.relationships[id]?.affection };
   const relationships: Record<Id, Relationship> = { ...c.relationships };
-  for (const id of [actor, f.victim]) if (id !== undefined && id !== c.id) relationships[id] ??= NEW_RELATIONSHIP;
+  for (const id of [actor, f.victim]) if (id !== undefined && id !== c.id) relationships[id] ??= firstRelationship(currentTemperament(c));
   // the tables hold someone responsible for a fact once only, however often this character changes their mind about it
   const before = blamedFor(f, c.knowledge[f.id]);
   const counts = actor !== undefined && !before.includes(actor);
@@ -174,7 +174,7 @@ export function blamedFor(f: Fact, v: Version | undefined): readonly Id[] {
 export function meetPeople(c: CharacterRecord, others: readonly Id[], now: number): CharacterRecord {
   if (others.length === 0) return c;
   const relationships: Record<Id, Relationship> = { ...c.relationships };
-  for (const id of others) relationships[id] = meet(relationships[id] ?? NEW_RELATIONSHIP, now);
+  for (const id of others) relationships[id] = meet(relationships[id] ?? firstRelationship(currentTemperament(c)), now);
   return { ...c, relationships };
 }
 

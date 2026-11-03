@@ -109,8 +109,9 @@ These have caused, or could cause, confusion. Say which one is meant.
 - **Relationship** — how one character feels about another, one way. It exists once they have met or one has learned of
   the other.
 - **Stranger** — someone a character has no relationship with, so no feelings count.
-- **Feelings** — trust, respect, affection, grudge, fear and familiarity, each 0 to 1. A new relationship starts at 0.5 for
-  trust, respect and affection, and 0 for the rest.
+- **Feelings** — trust, respect, affection, grudge, fear and familiarity, each 0 to 1. A new relationship starts from the
+  character's traits: trust and affection about 0.5, moved by caution, agreeableness and sociability; respect at 0.5; the
+  rest at 0.
 - **Familiarity** — how well they know each other. Rises 0.02 each time they meet.
 - **Meet** — be together in something: take part in the same roll or fight (as actor, target, squad member or witness),
   one telling the other anything, or drinking together. Updates when they last met, and their familiarity.

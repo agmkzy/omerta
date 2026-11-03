@@ -234,7 +234,7 @@ rico.towards(sam);   // { trust: 0.4, respect: 0.7, affection: 0.2, grudge: 0.1,
 
 **Strangers:** a character has a relationship only with someone they have met or learned about. Two characters meet by being together in something: taking part in the same roll or fight (as actor, target, squad member or witness), one telling the other anything, or drinking together. Learning a fact about someone, such as seeing them beat someone, also creates the relationship, as in the game's `learn`. Between strangers there is no relationship, and so no relationship modifiers.
 
-**A new relationship** starts at 0.5 for trust, respect and affection, and at 0 for grudge, fear and familiarity, so meeting someone once does not count as low trust.
+**A new relationship** starts from the character's own current traits (decided 3 November 2026). Trust starts at 0.5, lowered by caution and raised by agreeableness; affection at 0.5, raised by sociability; each by 0.3 × (trait − 0.5). Respect starts at 0.5, since it is earned, and grudge, fear and familiarity at 0. So an average character starts neutral, and only a quite cautious and disagreeable one starts off distrusting people (a caution of 0.9 and agreeableness of 0.2 gives trust 0.29, which counts as low).
 
 **Familiarity** grows by 0.02 each time the two meet, as above. This is a starting value, tuned once built.
 

@@ -4,7 +4,7 @@
 // familiarity change through it too. See docs/overhaul/plans/character/README.md (Relationships).
 import type { Modifier } from './check';
 import type { FactId } from './facts';
-import { leaning } from './temperament';
+import { leaning, type Temperament } from './temperament';
 import { DAY } from './time';
 
 export const FEELINGS = ['trust', 'respect', 'affection', 'grudge', 'fear', 'familiarity'] as const;
@@ -35,8 +35,23 @@ export interface Relationship {
 
 export type Relationships = Readonly<Record<string, Relationship>>;
 
-/** A new relationship: trust, respect and affection in the middle, no grudge, fear or familiarity. */
+/**
+ * A relationship begun by a character of average traits: trust, respect and affection in the middle, no grudge, fear or
+ * familiarity. A character's own first relationships begin from their traits (firstRelationship).
+ */
 export const NEW_RELATIONSHIP: Relationship = { trust: 0.5, respect: 0.5, affection: 0.5, grudge: 0, fear: 0, familiarity: 0 };
+
+/** How far a trait moves a first relationship's feeling, for each point it is from average. */
+export const FIRST_MEETING_WEIGHT = 0.3;
+
+/**
+ * The relationship a character begins with someone, from their own current traits: a cautious character trusts less and an
+ * agreeable one more, and a sociable one likes people more. Respect is earned, so it begins in the middle.
+ */
+export function firstRelationship(t: Pick<Temperament, 'caution' | 'agreeable' | 'sociability'>): Relationship {
+  const by = (trait: number) => FIRST_MEETING_WEIGHT * (trait - 0.5);
+  return { ...NEW_RELATIONSHIP, trust: 0.5 - by(t.caution) + by(t.agreeable), affection: 0.5 + by(t.sociability) };
+}
 
 /** How much familiarity grows each time two characters meet, before damping. */
 export const MEETING = 0.02;
