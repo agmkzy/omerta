@@ -603,6 +603,7 @@ What must be built in the overhaul before it replaces the game's systems in one 
 - **Minor facts,** which change no one's respect, and stay out of gossip and history.
 - **The clock:** feelings fading when nothing feeds them, as the game's `feelingsWeek` does, traits easing back towards a character's starting traits, and healing over time without resting. Healing is its own rule: a night's sleep heals some, a serious beating takes days, so the resting rule as built (8 hours restores full health) is revisited with it.
 - **Sleeping** (decided 3 November 2026): someone asleep, by their own hours, is unavailable, as someone resting is.
+- **Character schedules:** where each character is, and what they are doing, at any hour, so who is there, who is available and who spends time together have one answer. The game's four separate answers are [mapped](game-schedules.md) (3 November 2026), with the questions the design has to answer.
 - **Attacking someone asleep,** a kind of ambush on someone resting.
 - **Taking by force and buying** items.
 - **What really drives loyalty, ambition and sociability:** keeping or breaking one's word, rank and standing, and a social life. For now they move only with the small signals in [Temperament moves with conduct](#temperament-moves-with-conduct).
