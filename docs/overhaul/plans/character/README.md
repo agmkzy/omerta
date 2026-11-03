@@ -605,6 +605,7 @@ What must be built in the overhaul before it replaces the game's systems in one 
 - **Attacking someone asleep,** a kind of ambush on someone resting.
 - **Taking by force and buying** items.
 - **What really drives loyalty, ambition and sociability:** keeping or breaking one's word, rank and standing, and a social life. For now they move only with the small signals in [Temperament moves with conduct](#temperament-moves-with-conduct).
+- **A personal problem** (decided 3 November 2026): gambling, debt, drink and the like, with how bad it is, is part of the character in the cast, read by the game's systems, and character rules can give it effects. Who knows of it comes from facts, by the rule below.
 - **What people reveal about themselves** (decided 3 November 2026): someone telling another what they want, who they get on with or not, what they owe, or that they mean to leave is a fact, that they said it; a false one is a lie, with its claim. The listener knows it as told, can pass it on, and cannot tell a true one from a lie. For every character, it replaces the game's `insight`, which only the player has, and its knowledge with no fact behind it (`encounters.ts`, `leave:<id>`).
 - **Lies told in front of others:** what witnesses to a deception believe.
 - **The price of a partial persuasion:** what the target wants in return, recorded as one of the game's favours owed (`addFavour`), and what follows if it is not paid.

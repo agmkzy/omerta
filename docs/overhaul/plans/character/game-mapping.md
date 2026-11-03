@@ -35,7 +35,7 @@ The game's `Character` has 54 fields, used in 155 of the game's files. Proposed:
 | **The cast, in its own shape** | `skills`, `hurtUntil`, `conduct`, `struggling`, `denied`, `insight` | The overhaul holds the same thing differently: attributes and eighteen skills, hit points, conduct steps, facts |
 | **The cast, to add** | `alive`, `diedAt`, `nick`, `look` | Character state the overhaul does not hold yet |
 | **Other records, keyed by the character's id** | 32 fields, `bg` (the player's backstory) among them | Organisation, books, police, commitments, standing, goals, decisions, daily life, conversation, the player's own interface |
-| **To decide** | `problem` | See [Decisions](#decisions) |
+| **To decide** | None: every field's place is decided or proposed | See [Decisions](#decisions) |
 | **Nowhere** | `isPlayer`, `hustle` | The cast has no player flag; `hustle` is only read to bring old saves across, which no longer happens |
 
 The cast should hold what the character rules use (rolls, condition, inventory, relationships, knowledge, temperament), and
@@ -74,7 +74,7 @@ learning tables, for example, read family as closeness to a victim.
 | `wake` | Hour they get up | 9, 5 | `world.ts`, `life.ts` | Daily life (`life.ts`), keyed by id | None; whether sleeping counts as resting is a decision |
 | `sleep` | Hour they go to bed | 6, 4 | `life.ts`, `world.ts` | Daily life, as `wake` | As `wake` |
 | `district` | Where they are now | 413, 85 | `jobs.ts`, `orders.ts`, `gigs.ts`, `world.ts` and 3 more | Daily life, keyed by id | None; callers use it to decide who is there |
-| `problem` | A personal problem (gambling, debt, drink…) and how bad | 153, 29 | `world.ts`, `people.ts`, `career.ts` | Its own record, keyed by id | Decide whether a problem becomes an effect on rolls |
+| `problem` | A personal problem (gambling, debt, drink…) and how bad | 153, 29 | `world.ts`, `people.ts`, `career.ts` | Cast, to add: the character's problem (decided) | Add it to the cast; admitting it becomes a fact |
 
 ### Relationships and knowledge
 
@@ -217,7 +217,7 @@ Proposals that need the owner, to take one at a time:
 | **What people reveal about themselves.** `insight` is what the player has been told in conversation about a person: what they want, who they get on with, what they owe, that they mean to leave (it is not inferred, as this list first said) | **Decided (3 November 2026):** facts, that they said it, with a false one a lie; for every character. See the design's Before the swap |
 | **Introductions.** `intro` is who the player has been introduced to; the game lets the player deal only with someone introduced or otherwise connected | **Decided (3 November 2026):** having met (a relationship with a last-met time) is what lets two characters deal with each other, and `intro` goes. An introduction is spending time together (`together`), with the introducer there; the favour owed for it stays in the game's commitments; the game's "trust at least 0.25" goes, since each side starts from their own traits |
 | **Stolen goods.** `cars` is a count of stolen cars on hand, and `goods` a value; `w.cars` records cars one by one only once they reach a chop shop | **Decided (3 November 2026):** both stay in the game's economy, not the inventory. Every stolen car has its `w.cars` record from the moment it is stolen, saying who holds it, and a man's cars on hand are read from those records, so the separate count goes. Goods stay a value held in the economy. The inventory keeps to items that change checks |
-| **Personal problems.** `problem`: gambling, debt, drink and so on, with how bad it is | Its own record, keyed by id; a problem that should change rolls (drink) does it through an effect |
+| **Personal problems.** `problem`: gambling, debt, family, drink, house, resentment or "woman", with how bad it is and since when; it shapes what he does (reliability, temptation, pressure) | **Decided (3 November 2026):** part of the character in the cast, a lasting part of who they are now; the game's systems read it there, and character rules can give it effects (a drink problem making someone likelier to end up drunk). `revealed` goes: admitting or passing it on is a fact |
 | **Sleeping.** The game's characters keep hours (`wake`, `sleep`) | Someone asleep is resting, so unavailable, which is also what attacking someone asleep needs |
 | **Who counts as there.** The overhaul has no places; the game has `district` | **Settled (follows from the design's Inputs):** the caller names who is there, and the game decides it from its districts |
 
