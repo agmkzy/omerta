@@ -8,6 +8,8 @@ import { BACKGROUNDS, type BackgroundName } from './backgrounds';
 import { CAST_FORMAT, castOf, type Cast } from './cast';
 import { createCharacter, type CharacterRecord } from './character';
 import { STORED_EFFECTS, type ConditionRecord, type StoredEffect } from './condition';
+import { ITEMS, type HeldItem, type InventoryRecord, type Item } from './items';
+import type { Transfer } from './transfers';
 import { PROFICIENCIES, SKILLS, type Proficiency, type Skill, type Training } from './skills';
 import { TRAITS } from './temperament';
 
@@ -20,6 +22,12 @@ export const MIGRATIONS: readonly Migration[] = [
   (d) => {
     for (const c of Array.isArray(d.characters) ? d.characters : [])
       if (typeof c === 'object' && c !== null && !('condition' in c)) (c as Record<string, unknown>).condition = {};
+  },
+  // 2 to 3: characters gained an inventory, and the cast a list of cash transfers. Format 2 had neither: no one held anything.
+  (d) => {
+    d.transfers ??= [];
+    for (const c of Array.isArray(d.characters) ? d.characters : [])
+      if (typeof c === 'object' && c !== null && !('inventory' in c)) (c as Record<string, unknown>).inventory = {};
   },
 ];
 
@@ -41,11 +49,14 @@ export interface ReadCast {
 /** Every field of a saved character; the type check fails if one is missing or misspelt. */
 const CHARACTER_FIELDS: readonly string[] = Object.keys({
   id: true, name: true, background: true, attributes: true, training: true, proficiencyBonus: true, startingTemperament: true, condition: true,
+  inventory: true,
 } satisfies Record<keyof CharacterRecord, true>);
 
 const CONDITION_FIELDS: readonly string[] = Object.keys({ hitPoints: true, effects: true, rest: true } satisfies Record<keyof ConditionRecord, true>);
 
-const CAST_FIELDS: readonly string[] = ['format', 'characters'];
+const INVENTORY_FIELDS: readonly string[] = Object.keys({ cash: true, items: true } satisfies Record<keyof InventoryRecord, true>);
+const TRANSFER_FIELDS: readonly string[] = Object.keys({ from: true, to: true, amount: true, why: true, at: true } satisfies Record<keyof Transfer, true>);
+const CAST_FIELDS: readonly string[] = ['format', 'characters', 'transfers'];
 
 /** Throws TypeError for data of the wrong shape (NewerFormatError for a newer format) and RangeError for out-of-range values. */
 export function readCast(data: unknown): ReadCast {
@@ -56,7 +67,9 @@ export function readCast(data: unknown): ReadCast {
   const ignored = Object.keys(d).filter((k) => !CAST_FIELDS.includes(k));
   if (d.characters !== undefined && !Array.isArray(d.characters)) throw new TypeError('characters must be a list');
   const characters = ((d.characters ?? []) as unknown[]).map((c, i) => readCharacter(c, `characters[${i}]`, ignored));
-  return { cast: castOf({ format: CAST_FORMAT, characters }), ignored };
+  if (d.transfers !== undefined && !Array.isArray(d.transfers)) throw new TypeError('transfers must be a list');
+  const transfers = ((d.transfers ?? []) as unknown[]).map((t, i) => readTransfer(t, `transfers[${i}]`, ignored));
+  return { cast: castOf({ format: CAST_FORMAT, characters, transfers }), ignored };
 }
 
 /** As readCast, for callers that do not need to know what was ignored. */
@@ -81,7 +94,31 @@ function readCharacter(data: unknown, path: string, ignored: string[]): Characte
     ...(d.proficiencyBonus !== undefined && { proficiencyBonus: d.proficiencyBonus }),
     ...(d.startingTemperament !== undefined && { startingTemperament: numbers(d.startingTemperament, `${path}.startingTemperament`, TRAITS, ignored) }),
     ...(d.condition !== undefined && { condition: condition(d.condition, `${path}.condition`, ignored) }),
+    ...(d.inventory !== undefined && { inventory: inventory(d.inventory, `${path}.inventory`, ignored) }),
   });
+}
+
+function inventory(value: unknown, path: string, ignored: string[]): { cash?: number; items: HeldItem[] } {
+  const d = object(value, path);
+  ignored.push(...Object.keys(d).filter((k) => !INVENTORY_FIELDS.includes(k)).map((k) => `${path}.${k}`));
+  if (d.cash !== undefined && typeof d.cash !== 'number') throw new TypeError(`${path}.cash must be a number`);
+  if (d.items !== undefined && !Array.isArray(d.items)) throw new TypeError(`${path}.items must be a list`);
+  const items: HeldItem[] = [];
+  ((d.items ?? []) as unknown[]).forEach((value, i) => {
+    const h = object(value, `${path}.items[${i}]`);
+    ignored.push(...Object.keys(h).filter((k) => k !== 'item' && k !== 'state').map((k) => `${path}.items[${i}].${k}`));
+    if (ITEMS.includes(h.item as Item)) items.push({ item: h.item as Item, state: (h.state ?? 'carried') as HeldItem['state'] });
+    else ignored.push(`${path}.items[${i}]`);
+  });
+  return { ...(d.cash !== undefined && { cash: d.cash }), items };
+}
+
+function readTransfer(value: unknown, path: string, ignored: string[]): Transfer {
+  const d = object(value, path);
+  ignored.push(...Object.keys(d).filter((k) => !TRANSFER_FIELDS.includes(k)).map((k) => `${path}.${k}`));
+  for (const k of ['from', 'to', 'why'] as const) if (typeof d[k] !== 'string') throw new TypeError(`${path}.${k} must be text`);
+  for (const k of ['amount', 'at'] as const) if (typeof d[k] !== 'number') throw new TypeError(`${path}.${k} must be a number`);
+  return { from: d.from as string, to: d.to as string, amount: d.amount as number, why: d.why as string, at: d.at as number };
 }
 
 function condition(value: unknown, path: string, ignored: string[]): Partial<ConditionRecord> {

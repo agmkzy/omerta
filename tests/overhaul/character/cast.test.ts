@@ -12,18 +12,18 @@ const rico = { id: 'rico', name: 'Rico', background: 'fighter', attributes: attr
 describe('cast', { tags: ['unit'] }, () => {
   test('holds every character, in the order given, as plain records with a format number', () => {
     const everyone = cast({ characters: [sam, rico] });
-    assert.deepEqual(everyone.data, { format: CAST_FORMAT, characters: [createCharacter(sam), createCharacter(rico)] });
+    assert.deepEqual(everyone.data, { format: CAST_FORMAT, characters: [createCharacter(sam), createCharacter(rico)], transfers: [] });
     assert.deepEqual(everyone.characters.map((c) => c.id), ['sam', 'rico']);
     assert.deepEqual(JSON.parse(JSON.stringify(everyone.data)), everyone.data);
   });
 
   test('is empty when given no one', () => {
-    assert.deepEqual(cast().data, { format: CAST_FORMAT, characters: [] });
+    assert.deepEqual(cast().data, { format: CAST_FORMAT, characters: [], transfers: [] });
   });
 
   test('refuses two characters with the same id', () => {
     assert.throws(() => cast({ characters: [sam, { id: 'sam', name: 'Another Sam' }] }), RangeError);
-    assert.throws(() => castOf({ format: CAST_FORMAT, characters: [createCharacter(sam), createCharacter(sam)] }), RangeError);
+    assert.throws(() => castOf({ format: CAST_FORMAT, characters: [createCharacter(sam), createCharacter(sam)], transfers: [] }), RangeError);
   });
 
   test('gives one handle per character, and refuses an id it does not hold', () => {
@@ -96,7 +96,7 @@ describe('what a character can see of another', { tags: ['unit'] }, () => {
   const everyone = cast({ characters: [sam, rico] });
 
   test('is only what anyone present can see: none of their private state', () => {
-    assert.deepEqual(everyone.character('rico').seenBy(everyone.character('sam')), { id: 'rico', name: 'Rico', looks: 'unhurt' });
+    assert.deepEqual(everyone.character('rico').seenBy(everyone.character('sam')), { id: 'rico', name: 'Rico', looks: 'unhurt', items: [] });
   });
 
   test('is refused for a viewer from another cast', () => {

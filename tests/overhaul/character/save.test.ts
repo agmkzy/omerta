@@ -7,6 +7,7 @@ import { BACKGROUNDS, rollCharacter } from '../../../src/overhaul/character/back
 import { CAST_FORMAT, cast, castOf } from '../../../src/overhaul/character/cast';
 import { createCharacter } from '../../../src/overhaul/character/character';
 import { roller, seeded } from '../../../src/overhaul/character/random';
+import { WORLD } from '../../../src/overhaul/character/transfers';
 import { MIGRATIONS, NewerFormatError, loadCast, migrate, readCast, type Migration } from '../../../src/overhaul/character/save';
 
 const everyone = cast({
@@ -109,6 +110,40 @@ describe('loadCast', { tags: ['unit'] }, () => {
     assert.deepEqual([...ignored].sort(), ['characters[0].condition.effects.sober', 'characters[0].condition.mood']);
   });
 
+  test('loads a cast saved in format 3, which must keep loading', () => {
+    const { cast: loaded, ignored } = readCast(fixture('cast-format3.json'));
+    assert.deepEqual(ignored, []);
+    assert.deepEqual(loaded.characters.map((c) => c.cash), [70, 50]);
+    assert.deepEqual(loaded.character('sam').seenBy(loaded.character('rico')).items, [{ item: 'good-suit', state: 'worn' }]);
+    assert.equal(loaded.data.transfers.length, 3);
+  });
+
+  test('restores cash, items and transfers, and leaves out items and fields it does not recognise', () => {
+    const funded = loadCast(throughJson(everyone.data)).transfer({ from: WORLD, to: 'sam', amount: 40, why: 'opening balance', now: 0 });
+    const paid = funded.character('sam').pay(funded.character('rico'), 15, { why: 'a debt', now: 30 });
+    assert.deepEqual(loadCast(throughJson(paid.data)).data, paid.data);
+    const { cast: loaded, ignored } = readCast({
+      format: CAST_FORMAT,
+      characters: [{ id: 'x', name: 'X', inventory: { cash: 5, items: [{ item: 'crowbar' }, { item: 'knife', state: 'shown', polish: 1 }, { item: 'bottle' }], wallet: 'brown' } }],
+      transfers: [{ from: WORLD, to: 'x', amount: 5, why: 'found it', at: 0, note: 'lucky' }],
+    });
+    assert.deepEqual(loaded.character('x').inventory, { cash: 5, items: [{ item: 'knife', state: 'shown' }, { item: 'bottle', state: 'carried' }] });
+    assert.deepEqual([...ignored].sort(), ['characters[0].inventory.items[0]', 'characters[0].inventory.items[1].polish', 'characters[0].inventory.wallet', 'transfers[0].note']);
+  });
+
+  test('rejects inventories and transfers of the wrong shape, and cash that disagrees with the transfers', () => {
+    for (const inventory of [[], { cash: '5' }, { items: 'knife' }, { items: ['knife'] }])
+      assert.throws(() => loadCast(one({ id: 'x', name: 'X', inventory })), TypeError, JSON.stringify(inventory));
+    assert.throws(() => loadCast(one({ id: 'x', name: 'X', inventory: { items: [{ item: 'knife', state: 'worn' }] } })), RangeError);
+    const transfer = { from: WORLD, to: 'x', amount: 5, why: 'found it', at: 0 };
+    const withTransfers = (transfers: unknown) => ({ format: CAST_FORMAT, characters: [{ id: 'x', name: 'X', inventory: { cash: 5 } }], transfers });
+    assert.doesNotThrow(() => loadCast(withTransfers([transfer])));
+    for (const transfers of [{}, [null], [{ ...transfer, from: 3 }], [{ ...transfer, why: null }], [{ ...transfer, amount: '5' }], [{ ...transfer, at: undefined }]])
+      assert.throws(() => loadCast(withTransfers(transfers)), TypeError, JSON.stringify(transfers));
+    assert.throws(() => loadCast(withTransfers([])), RangeError);
+    assert.throws(() => loadCast(withTransfers([{ ...transfer, amount: 6 }])), RangeError);
+  });
+
   test('rejects a condition of the wrong shape or out of range', () => {
     for (const condition of [[], { hitPoints: '3' }, { effects: 'shaken' }, { rest: { from: 0 } }, { rest: 5 }])
       assert.throws(() => loadCast(one({ id: 'x', name: 'X', condition })), TypeError, JSON.stringify(condition));
@@ -124,11 +159,20 @@ describe('migrations', { tags: ['unit'] }, () => {
 
   test('1 to 2 gives each character an empty condition, which loads as full health with no effects', () => {
     const d: Record<string, unknown> = { format: 1, characters: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B', condition: { hitPoints: 2 } }, null] };
-    migrate(d, 1);
+    migrate(d, 1, MIGRATIONS.slice(0, 1));
     assert.deepEqual(d.characters, [{ id: 'a', name: 'A', condition: {} }, { id: 'b', name: 'B', condition: { hitPoints: 2 } }, null]);
     const notAList: Record<string, unknown> = { format: 1, characters: 'none' };
-    migrate(notAList, 1);
+    migrate(notAList, 1, MIGRATIONS.slice(0, 1));
     assert.equal(notAList.characters, 'none');
+  });
+
+  test('2 to 3 gives each character an empty inventory, and the cast no transfers', () => {
+    const d: Record<string, unknown> = { format: 2, characters: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B', inventory: { cash: 0 } }, null] };
+    migrate(d, 2);
+    assert.deepEqual(d, { format: 2, characters: [{ id: 'a', name: 'A', inventory: {} }, { id: 'b', name: 'B', inventory: { cash: 0 } }, null], transfers: [] });
+    const notAList: Record<string, unknown> = { format: 2, characters: 'none', transfers: ['kept'] };
+    migrate(notAList, 2);
+    assert.deepEqual(notAList, { format: 2, characters: 'none', transfers: ['kept'] });
   });
 
   test('run in order from the saved format to the newest', () => {
@@ -149,7 +193,7 @@ describe('saving and loading', { tags: ['property'] }, () => {
     fc.assert(
       fc.property(fc.integer(), fc.array(fc.constantFrom(...BACKGROUNDS), { maxLength: 4 }), fc.integer({ min: 2, max: 6 }), (seed, backgrounds, pb) => {
         const r = roller(seeded(seed));
-        const data = { format: CAST_FORMAT, characters: backgrounds.map((b, i) => rollCharacter(`c${i}`, `C${i}`, b, r, { proficiencyBonus: pb })) };
+        const data = { format: CAST_FORMAT, characters: backgrounds.map((b, i) => rollCharacter(`c${i}`, `C${i}`, b, r, { proficiencyBonus: pb })), transfers: [] };
         assert.deepEqual(loadCast(throughJson(castOf(data).data)).data, data);
       }),
     );

@@ -14,6 +14,7 @@ describe('createCharacter', { tags: ['unit'] }, () => {
       proficiencyBonus: 2,
       startingTemperament: temperament({}),
       condition: { hitPoints: 10, effects: [] },
+      inventory: { cash: 0, items: [] },
     });
   });
 
