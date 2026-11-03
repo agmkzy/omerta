@@ -207,7 +207,7 @@ A beating is not a separate kind: it is a real fight that the attackers start by
 If the target fought back, it is recorded as a fight.
 
 ```ts
-squad(sam, joe).fight(rico, { kind: 'real', start: 'set-upon' });
+squad(sam, joe).fight(squad(rico), { kind: 'real', start: 'set-upon' });
 ```
 
 ## Words
