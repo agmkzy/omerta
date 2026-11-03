@@ -1,6 +1,6 @@
 # Character: one object for every character
 
-**Status:** design agreed in discussion on 2 November 2026. Nothing is built. The points under [Later](#later) are deliberately left for after the first version works.
+**Status:** design agreed in discussion on 2 November 2026. Nothing is built. What waits for slotting it into the game is under [Later](#later).
 
 ## Purpose
 
@@ -78,9 +78,9 @@ The player's temperament starts neutral (0.5 for every trait) and moves with wha
 
 | Effect | When it starts | What it does | How it ends |
 | --- | --- | --- | --- |
-| Hurt | Hit points at or below half. Read from hit points, not stored, so the two can never disagree. | −2 to skills using Strength, Agility or Constitution. Not applied during fights. | Healing back above half |
+| Hurt | Hit points at or below half. Read from hit points, not stored, so the two can never disagree. | −2 to skills using Strength, Agility or Constitution. Never applied during fights: the nerve check at half health already marks that moment, and a penalty on top would make fights snowball. | Healing back above half |
 | Shaken | Losing their nerve in a fight, or giving in to intimidation | −2 to Nerve, and −2 to resisting intimidation | Cleared explicitly, for example by resting |
-| Drunk | Set explicitly, or by drinking a bottle of spirits | −2 to skills using Agility or Intelligence, and to Insight and Notice; +2 to Nerve | Cleared explicitly, for example by sobering up |
+| Drunk | Set explicitly, or by failing a Carousing check (DC 12) on drinking a bottle of spirits; someone already drunk stays drunk | −2 to skills using Agility or Intelligence, and to Insight and Notice; +2 to Nerve | Cleared explicitly, for example by sobering up |
 
 An effect does not stack with itself; different effects add together. Each is named in explanations, for example "Hurt −2".
 
@@ -97,11 +97,19 @@ An effect does not stack with itself; different effects add together. Each is na
 | Lockpicks | +2 to Larceny for locks, when used |
 | Toolkit | +2 to Mechanics, when used |
 | Good suit | +1 to Persuasion, while worn |
-| Bottle of spirits | Drinking it makes the character Drunk |
+| Bottle of spirits | Drinking it means a Carousing check against DC 12; failing it makes the character Drunk |
 
 Armed intimidation works as it does in the lab: the target makes a nerve check against the weapon first, and the actor rolls with advantage. With an inventory, a character can intimidate armed only if they carry a weapon, and the weapon sets the nerve DC.
 
-Fights stay unarmed for now.
+### Weapons in fights
+
+| Weapon | Skill | Damage |
+| --- | --- | --- |
+| Unarmed | Brawling | 1d4 + Strength, as in the lab |
+| Knife | Brawling | 1d6 + Strength |
+| Pistol | Firearms | 2d6, with no Strength |
+
+Drawing a weapon during a fight makes each opponent take one nerve check against the weapon's DC (12 for a knife, 15 for a pistol), using the lab's existing "weapon drawn" trigger. These numbers change fight balance, so they are a starting point, checked and tuned with statistical tests on simulated fights once built.
 
 ## Relationships
 
@@ -145,6 +153,13 @@ A social result changes how the target feels about the actor. Values run from 0 
 | Deception: succeeds | None: the target does not know they were lied to. The lie is recorded as an event only the actor knows about, so it can come out later. |
 | Deception: caught lying | Trust −0.15, grudge +0.05 |
 
+Intimidation also changes how the actor feels about the target:
+
+| Result | Change in the actor's feelings |
+| --- | --- |
+| The target gives in | Respect −0.05 |
+| The target resists | Respect +0.05 |
+
 ## Knowledge
 
 Follows the game's model (`Fact` and `Knowledge` in `src/types.ts`, `addFact` and `learn` in `src/core.ts`):
@@ -178,7 +193,7 @@ One against one: `sam.fight(rico)`. Groups are called squads: `squad(sam, joe).f
 
 | Kind | Starts from | Nerve checks | Afterwards |
 | --- | --- | --- | --- |
-| Sparring | Full health | None: nobody flees or surrenders | Nothing lasts, and no event is recorded |
+| Sparring | Full health | None: nobody flees or surrenders | Ends when someone first drops to half health, and they lose. Nothing lasts, and no event is recorded |
 | Real fight | Current condition | As in the lab | Damage stays, and the fight is recorded as an event that witnesses learn about |
 
 ```ts
@@ -208,6 +223,14 @@ If the target fought back, it is recorded as a fight.
 
 ```ts
 squad(sam, joe).fight(squad(rico), { kind: 'real', start: 'set-upon' });
+```
+
+### Ambushes
+
+An ambush is a real fight that the attacking squad starts unseen. Before it begins, the squad's lowest Stealth roll (the noisiest of them gives them away) is compared with each target's passive Notice: 10 plus their Notice bonus. A target who does not notice is surprised and cannot act in the first round. If every target notices, it is an ordinary real fight.
+
+```ts
+squad(sam, joe).fight(squad(rico), { kind: 'real', start: 'ambush' });
 ```
 
 ### Fleeing
@@ -302,7 +325,7 @@ A roll made before a job or a move. Its result becomes modifiers on the checks t
 - There is one plan per job, and a job cannot be replanned.
 - The planner does not know exactly how good the plan is: a critical failure looks like a failure to them, so they follow a bad plan without knowing.
 - The modifier is named in each check's explanation, for example "A good plan +2".
-- Fight rolls are not affected.
+- Fight rolls are not affected. A plan helps a fight through the checks around it instead, such as the Stealth roll for an ambush.
 
 ```ts
 const plan = sam.planning.plan(burglary).helpedBy(joe).roll(dice);
@@ -313,20 +336,25 @@ squad(sam, joe).following(plan).larceny.check(15);   // includes "A good plan +2
 
 Where it would be used once this is slotted into the game, which now uses `brains` for these:
 
-- **Hiding a skim:** reporting less than was earned to a superior (`src/books.ts`), as an opposed check of the skimmer's Bookkeeping against the superior's.
-- **Spotting a skim:** the same check from the other side.
+- **Skimming:** reporting less than was earned to a superior (`src/books.ts`).
 - **Running a business, a loan book or a numbers game well:** in place of `brains` in a business's management quality (`src/econ.ts`).
 
-The rules for these are not set; they belong with slotting the character into the game.
+### Skimming
+
+The skimmer chooses how much of their earnings to hide. The superior checks the books: the superior's Bookkeeping against the skimmer's, opposed, with the skimmer at −1 for every 10% of earnings hidden, so hiding more is harder.
+
+| The superior's outcome | What happens |
+| --- | --- |
+| Success or better | They know: recorded as an event they saw for themselves in the books |
+| Partial success | They suspect: trust −0.05, with no event recorded |
+| Failure or worse | Nothing |
+
+### Running a business
+
+Left until the character is slotted into the game: it would replace the game's management-quality formula in `src/econ.ts`, which changes the game's economy, and this work stays separate from the game until then.
 
 ## Later
 
-Left out of the first version on purpose, each to be decided on its own:
+Left until the character is slotted into the game:
 
-- **Ambushes:** the attacking squad gets the first round if the targets do not notice them coming.
-- **Sparring's end:** whether a sparring match stops when someone first drops to half health, rather than at a knockout.
-- **Weapons in fights:** weapon damage changes fight balance, so it needs checking with the simulation.
-- **Hurt during fights,** and Planning's effect on fight rolls: both change fight balance in the same way.
-- **The actor's side of the aftermath:** whether the actor's feelings change too, such as contempt for someone who always gives in.
-- **Drinking:** whether drinking needs a Carousing check before a character becomes Drunk.
-- **Bookkeeping's rules,** as above.
+- **Running a business** with Bookkeeping, as above.
