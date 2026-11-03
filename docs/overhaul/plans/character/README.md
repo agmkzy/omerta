@@ -146,7 +146,7 @@ A person is a product of their experiences, so three things move traits: what a 
 | Standing by their squad | Holding their nerve when a member of their squad is not fighting: beaten, knocked out, fled or still running (decided 3 November 2026) | Loyalty + |
 | Running | Failing a nerve check and trying to flee, whether or not they get away | Courage −, Caution + |
 | Leaving their squad | Running while the rest of their squad fights on | Loyalty − |
-| Giving in during a fight | Failing a nerve check and giving in | Courage −, Pride − |
+| Surrendering in a fight | Failing a nerve check and surrendering | Courage −, Pride − |
 | Giving in to a threat | Being intimidated: partial success or better for the actor | Courage −, Pride − |
 | Standing up to a threat | Resisting intimidation: failure or critical failure for the actor | Courage +, Pride + |
 | Losing their temper | Being provoked, or [losing their temper in a fight](#losing-their-temper) | Volatility + |
@@ -304,7 +304,7 @@ Follows the game's model (`Fact` and `Knowledge` in `src/types.ts`, `addFact` an
 - **A fact is recorded once,** in the cast's list of facts: what kind of fact, who did it, who it was done to, any business or amount, when, where, the fact that caused it, and whether who did it is hidden.
 - **Each character holds their own version** of the facts they know about: when they learned it; where it came from (they did it, they witnessed it, it was public, or who told them); whether they know who did it; how they came by it (seen, told by a witness, heard second-hand); who they believe did it when they don't know, which can be wrong; and whether they heard it exaggerated.
 - **Each part of a version has its own provenance:** how they came by who did it, and how they came by how big it was, each seen, told by a witness, heard second-hand, or guessed. Whatever reads what someone knows of a part (such as a lie's modifier) reads that part's provenance.
-- **Who learns a fact when it is recorded:** whoever did it, whoever it was done to, and the witnesses named at the call, who are recorded on the fact. A witness must be there and conscious: naming one who is unconscious, or resting, is refused. In a fight, a fighter witnesses what happens to a loser only if they had not been knocked out or gone when that loser was beaten, knocked out or fled; someone who gave in is still there and sees. A fighter knocked out can still be the actor of a later fact, and learns it as their own act.
+- **Who learns a fact when it is recorded:** whoever did it, whoever it was done to, and the witnesses named at the call, who are recorded on the fact. A witness must be there and conscious: naming one who is unconscious, or resting, is refused. In a fight, a fighter witnesses what happens to a loser only if they had not been knocked out or gone when that loser was beaten, knocked out or fled; someone who surrendered is still there and sees. A fighter knocked out can still be the actor of a later fact, and learns it as their own act.
 - **Public facts:** a fact can also be made public to others named at the call (`public: [...]`), as the game's `broadcast` does. They learn it as public and heard; they know who did it unless the actor is hidden, and then they do not guess. They are not witnesses, and they do not meet those in it, though they are no longer strangers to them.
 - **Guessing a hidden actor:** the victim of a hidden actor, of a kind that changes feelings (`GRUDGE`), guesses who did it, with no randomness: among those they hold a grudge of at least 0.3 against (and, for a violent kind, know to have been violent), the one they hold the biggest grudge against; on a tie, no one. The guess is their belief, marked guessed, so a telling or a lie can change it; their feelings change towards the one they suspect through the learning tables, with the fact as the cause. Only the victim guesses; anyone they tell hears it as their guess. A player can frame someone by raising a victim's grudge against them first; that is accepted.
 - **Learning a fact changes feelings,** by the game's own tables, carried over from `learn`: respect for what someone has done, fear of someone violent (more for the less brave), and for the victim a grudge or fear by their courage, with less trust either way; and a grudge for anyone fond of the victim (affection high, 0.7 or more, since a new relationship here starts at 0.5, not the game's 0.1). Apart from the aftermath of social rolls, this is the only way facts change feelings, so nothing is counted twice: a beating changes the victim's feelings because they learn of it.
@@ -395,11 +395,11 @@ During a fight each fighter is fighting, fleeing (see [Fleeing](#fleeing)), beat
 
 | State | Meaning | Recorded as |
 | --- | --- | --- |
-| Beaten | Gave in while still conscious, whenever that happened, including straight away with no damage taken | A `beating` |
+| Beaten | Surrendered while still conscious, whenever that happened, including straight away with no damage taken | A `beating` |
 | Knocked out | Dropped to 0 hit points, and unconscious | A `beating`, whichever squad wins |
 | Fled | Got away | A `fight` |
 
-- **One fact for each loser and each attacker:** each member of the other squad who attacked them, or, if nobody did (they gave in at the start), every member of the other squad still fighting. A knocked-out winner is recorded as beaten by whoever dropped them. A winner who gave in is beaten by whoever hurt them; if no one did, it is a `fight` with those they gave in to, as for someone who fled, since no one was left to beat them (decided 3 November 2026). All the facts of one fight share a story id, as the game links the facts of one matter.
+- **One fact for each loser and each attacker:** each member of the other squad who attacked them, or, if nobody did (they surrendered at the start), every member of the other squad still fighting. A knocked-out winner is recorded as beaten by whoever dropped them. A winner who surrendered is beaten by whoever hurt them; if no one did, it is a `fight` with those they surrendered to, as for someone who fled, since no one was left to beat them (decided 3 November 2026). All the facts of one fight share a story id, as the game links the facts of one matter.
 - **Feelings:** the victim's feelings towards each attacker change once, through [learning the recorded fact](#fact-kinds), scaled by the damage they took. How badly a beaten character was hurt shows in their hit points.
 - **Killing** is out of scope until it is decided whether weapons can kill.
 
@@ -408,7 +408,7 @@ During a fight each fighter is fighting, fleeing (see [Fleeing](#fleeing)), beat
 A real fight can start with the attackers setting on a target:
 
 1. The attackers have advantage on their attacks in the first round, because the target is caught or held. After that the normal rules apply, including advantage for ganging up.
-2. The target makes a nerve check: DC 10, plus 2 for each attacker beyond the first. On a pass they fight back. On a failure their temperament decides, by the lab's nerve rules: low courage or high caution tries to flee; anyone else gives in, and is beaten.
+2. The target makes a nerve check: DC 10, plus 2 for each attacker beyond the first. On a pass they fight back. On a failure their temperament decides, by the lab's nerve rules: low courage or high caution tries to flee; anyone else surrenders, and is beaten.
 3. The usual nerve checks still apply, at half health and when half a side is down. A target who also faces a weapon that outclasses theirs makes one nerve check, at the higher of the two DCs, not two.
 
 ```ts
@@ -423,7 +423,7 @@ A volatile character (volatility high) who passes a nerve check in a real fight 
 - **The cost:** attacks against them have advantage until their next turn, explained as "Left themselves open".
 - **Stacking:** advantage and disadvantage combine as for any roll: they do not stack, and one of each cancels out.
 
-It applies to every nerve check in a fight: the start-of-fight check against weapons, being set upon, dropping to half health, and half their squad going down. A volatile target set upon gets it on their first attacks back. A failed check is unchanged: they flee or give in, by courage and caution. How much it changes who wins is checked with the same statistical tests on simulated fights as the weapon DCs.
+It applies to every nerve check in a fight: the start-of-fight check against weapons, being set upon, dropping to half health, and half their squad going down. A volatile target set upon gets it on their first attacks back. A failed check is unchanged: they flee or surrender, by courage and caution. How much it changes who wins is checked with the same statistical tests on simulated fights as the weapon DCs.
 
 ### Ambushes
 

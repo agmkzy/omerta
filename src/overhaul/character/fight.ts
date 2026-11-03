@@ -87,7 +87,7 @@ export interface FighterResult {
   readonly goneAt?: number;
   /** They failed a nerve check, so they are shaken afterwards. */
   readonly lostNerve: boolean;
-  /** How they reacted, as conduct: holding their nerve, running, giving in, losing their temper. */
+  /** How they reacted, as conduct: holding their nerve, running, surrendering, losing their temper. */
   readonly reactions: readonly Conduct[];
 }
 
@@ -182,7 +182,7 @@ export function fight(spec: FightSpec, roller: Roller): FightResult {
     events.push({ kind: 'status', round, id: f.c.id, status });
   };
 
-  /** A nerve check at a DC. Passing, a volatile fighter loses their temper; failing, they try to flee or give in, by temperament. */
+  /** A nerve check at a DC. Passing, a volatile fighter loses their temper; failing, they try to flee or surrender, by temperament. */
   const testNerve = (f: State, trigger: NerveTrigger, dc: number) => {
     const roll = d20([...fightModifiers(f.c, NERVE_ROLL.skill), ...temperamentModifiers(currentTemperament(f.c), NERVE_ROLL.situations)]);
     const check = nerveCheck(roll, dc, currentTemperament(f.c), rolling({ kind: 'nerve', by: f.c.id }));
@@ -203,7 +203,7 @@ export function fight(spec: FightSpec, roller: Roller): FightResult {
       if (squad(f.side).some((o) => o !== f && o.status === 'fighting')) f.reactions.push('leaving-their-squad');
       setStatus(f, 'fleeing');
     } else {
-      f.reactions.push('giving-in-in-a-fight');
+      f.reactions.push('surrendering');
       setStatus(f, 'beaten');
     }
   };

@@ -58,7 +58,7 @@ describe('a real fight', { tags: ['unit'] }, () => {
     assert.deepEqual(of(r, 'nerve').map((e) => [e.id, e.trigger, e.check.passed]), [['rico', 'hurt', false]]);
     assert.equal(r.winner, 'attacker');
     assert.deepEqual(statuses(r), { sam: 'fighting', rico: 'beaten' });
-    assert.deepEqual(fighter(r, 'rico'), { id: 'rico', side: 'defender', weapon: 'none', startHp: 8, hp: 4, maxHp: 8, status: 'beaten', attackedBy: [{ id: 'sam', damage: 4 }], endedAt: 3, lostNerve: true, reactions: ['giving-in-in-a-fight'] });
+    assert.deepEqual(fighter(r, 'rico'), { id: 'rico', side: 'defender', weapon: 'none', startHp: 8, hp: 4, maxHp: 8, status: 'beaten', attackedBy: [{ id: 'sam', damage: 4 }], endedAt: 3, lostNerve: true, reactions: ['surrendering'] });
   });
 
   test('puts defenders first on a tied initiative', () => {
@@ -101,7 +101,7 @@ describe('nerve at the start of a real fight', { tags: ['unit'] }, () => {
     assert.deepEqual(dc({}, { items: ['pistol'] }, { ...misses, nerve: [15] }), [['sam', 15]]);
   });
 
-  test('failing it, an average fighter gives in at once, with no damage taken', () => {
+  test('failing it, an average fighter surrenders at once, with no damage taken', () => {
     const r = play({ attackers: [rec('sam', { inventory: { items: ['pistol'] } })], defenders: [rec('rico')], kind: 'real' }, { initiative: [15, 5], nerve: [14] });
     assert.equal(r.rounds, 0);
     assert.deepEqual(statuses(r), { sam: 'fighting', rico: 'beaten' });
@@ -318,7 +318,7 @@ describe('what a real fight leaves behind', { tags: ['unit'] }, () => {
     close(onJoe.trust, 0.5 + BEATING_AT_LEAST.trust!);
   });
 
-  test('one who fled has a fight with each who attacked them, scaled with no minimum; one who gave in unattacked is beaten by everyone still fighting', () => {
+  test('one who fled has a fight with each who attacked them, scaled with no minimum; one who surrendered unattacked is beaten by everyone still fighting', () => {
     const { facts, data } = applyFight(
       four().data,
       result([{ id: 'sam' }, { id: 'joe' }, { id: 'rico', side: 'defender', status: 'fled', attackedBy: [{ id: 'sam', damage: 0 }] }, { id: 'vic', side: 'defender', status: 'beaten' }]),
@@ -340,11 +340,11 @@ describe('what a real fight leaves behind', { tags: ['unit'] }, () => {
     assert.deepEqual(stale.facts.map((f) => [f.kind, f.actor, f.victim]), [['fight', 'sam', 'rico']]);
   });
 
-  test('a winner who gave in, unhurt, backed out of a fight and was not beaten; one who was hurt is beaten by whoever attacked them', () => {
+  test('a winner who surrendered, unhurt, backed out of a fight and was not beaten; one who was hurt is beaten by whoever attacked them', () => {
     const won = (joe: Partial<FighterResult>) => {
       const r = result([
         { id: 'sam' },
-        { id: 'joe', status: 'beaten', reactions: ['giving-in-in-a-fight'], ...joe },
+        { id: 'joe', status: 'beaten', reactions: ['surrendering'], ...joe },
         { id: 'rico', side: 'defender', status: 'beaten', attackedBy: [{ id: 'sam', damage: 3 }] },
         { id: 'vic', side: 'defender', status: 'beaten', attackedBy: [{ id: 'sam', damage: 3 }] },
       ]);
@@ -354,7 +354,7 @@ describe('what a real fight leaves behind', { tags: ['unit'] }, () => {
     };
     const untouched = won({});
     assert.deepEqual(untouched.facts, [['fight', 'rico'], ['fight', 'vic']]);
-    assert.deepEqual([...new Set(untouched.joe.conduct.map((s) => s.conduct))], ['starting-a-fight', 'giving-in-in-a-fight']);
+    assert.deepEqual([...new Set(untouched.joe.conduct.map((s) => s.conduct))], ['starting-a-fight', 'surrendering']);
     assert.equal(untouched.joe.towards(untouched.cast.character('rico'))!.grudge, 0);
     assert.deepEqual(won({ attackedBy: [{ id: 'rico', damage: 0 }] }).facts, [['fight', 'rico']]);
     const hit = won({ attackedBy: [{ id: 'rico', damage: 2 }, { id: 'vic', damage: 0 }] });
@@ -370,9 +370,9 @@ describe('what a real fight leaves behind', { tags: ['unit'] }, () => {
 
   test('is the conduct of starting a fight, of each fighter’s reactions, and of beating someone who could not fight back', () => {
     const conduct = (r: FightResult, id: string, start = four()) => castOf(applyFight(start.data, r, { now: 0 }).data).character(id).conduct.map((s) => s.conduct);
-    const beaten = { id: 'rico', side: 'defender' as const, status: 'beaten' as const, attackedBy: [{ id: 'sam', damage: 2 }], reactions: ['giving-in-in-a-fight' as const] };
+    const beaten = { id: 'rico', side: 'defender' as const, status: 'beaten' as const, attackedBy: [{ id: 'sam', damage: 2 }], reactions: ['surrendering' as const] };
     assert.deepEqual([...new Set(conduct(result([{ id: 'sam' }, beaten]), 'sam'))], ['starting-a-fight']);
-    assert.deepEqual([...new Set(conduct(result([{ id: 'sam' }, beaten]), 'rico'))], ['beaten', 'giving-in-in-a-fight']);
+    assert.deepEqual([...new Set(conduct(result([{ id: 'sam' }, beaten]), 'rico'))], ['beaten', 'surrendering']);
     assert.ok(conduct(result([{ id: 'sam' }, beaten, { id: 'vic', side: 'defender' }]), 'sam').includes('starting-a-fight-outmatched'));
     assert.ok(conduct(result([{ id: 'sam' }, beaten, { id: 'vic', side: 'defender' }]), 'sam').includes('starting-a-fight-rashly'));
     assert.ok(conduct(result([{ id: 'sam', startHp: 4 }, beaten]), 'sam').includes('starting-a-fight-rashly'));
@@ -388,7 +388,7 @@ describe('what a real fight leaves behind', { tags: ['unit'] }, () => {
     // set upon by two, Rico beats one of them: being set upon made no one helpless but Rico
     const turned = result([{ id: 'sam', status: 'beaten', attackedBy: [{ id: 'rico', damage: 3 }] }, { id: 'joe' }, { id: 'rico', side: 'defender' }], { start: 'set-upon', winner: null });
     assert.ok(!conduct(turned, 'rico').includes('beating-the-helpless'));
-    // Sam, unarmed, gives in to Rico's pistol without being struck: Rico struck no one and did not start it
+    // Sam, unarmed, surrenders to Rico's pistol without being struck: Rico struck no one and did not start it
     const gaveIn = result([{ id: 'sam', status: 'beaten' }, { id: 'rico', side: 'defender', weapon: 'pistol' }], { winner: 'defender' });
     assert.ok(!conduct(gaveIn, 'rico').includes('beating-the-helpless'));
     const struck = result([{ id: 'sam', status: 'beaten', attackedBy: [{ id: 'rico', damage: 1 }] }, { id: 'rico', side: 'defender', weapon: 'pistol' }], { winner: 'defender' });
@@ -477,7 +477,7 @@ describe('fights', { tags: ['statistical'] }, () => {
     }
   });
 
-  test('pins the measured balance of an average fighter armed against one bare-handed: who wins, and how often the other gives in unhurt', () => {
+  test('pins the measured balance of an average fighter armed against one bare-handed: who wins, and how often the other surrenders unhurt', () => {
     // measured on 3 November 2026 and kept as a starting point (plan: Weapons); a change to fight balance shows here
     const rates = { pistol: { won: 0.95, unhurt: 0.7 }, knife: { won: 0.83, unhurt: 0.56 } } as const;
     for (const weapon of ['pistol', 'knife'] as const) {

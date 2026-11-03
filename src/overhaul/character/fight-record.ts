@@ -4,7 +4,7 @@
 //
 // Facts: one for each fighter who did not finish fighting and each member of the other squad who attacked them (if no one did,
 // every member of the other squad), a `beating` for anyone beaten or knocked out and a `fight` for anyone who fled. A
-// knocked-out winner is beaten only by whoever dropped them; a winner who gave in with no one having hurt them has a `fight`,
+// knocked-out winner is beaten only by whoever dropped them; a winner who surrendered with no one having hurt them has a `fight`,
 // not a beating, since no one was left to beat them. A stalemate is also a `fight` between the first fighter of each
 // squad. A fact's amount is the hit points that attacker took from them, which scales how the one beaten comes to feel. Every
 // fact of one fight shares a story id, has the other fighters and the named witnesses as its witnesses, and everyone there
@@ -72,7 +72,7 @@ export function applyFight(data: CastRecord, result: FightResult, options: Fight
         : f.attackedBy.length
           ? f.attackedBy.map((a) => a.id)
           : (others.some((o) => o.status === 'fighting') ? others.filter((o) => o.status === 'fighting') : others).map((o) => o.id);
-    // a winner who gave in with no one having hurt them was never beaten: they backed out of a fight
+    // a winner who surrendered with no one having hurt them was never beaten: they backed out of a fight
     const unhurtWinner = f.status === 'beaten' && result.winner === f.side && f.attackedBy.every((a) => a.damage === 0);
     for (const actor of attackers) {
       const amount = f.attackedBy.find((a) => a.id === actor)?.damage ?? 0;

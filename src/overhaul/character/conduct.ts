@@ -57,7 +57,7 @@ export const CONDUCT = {
   'standing-by-their-squad': fixed('Standing by their squad', ['loyalty', 1]),
   running: fixed('Running', ['courage', -1], ['caution', 1]),
   'leaving-their-squad': fixed('Leaving their squad', ['loyalty', -1]),
-  'giving-in-in-a-fight': fixed('Giving in during a fight', ['courage', -1], ['pride', -1]),
+  surrendering: fixed('Surrendering in a fight', ['courage', -1], ['pride', -1]),
   'giving-in-to-a-threat': fixed('Giving in to a threat', ['courage', -1], ['pride', -1]),
   'standing-up-to-a-threat': fixed('Standing up to a threat', ['courage', 1], ['pride', 1]),
   'losing-their-temper': fixed('Losing their temper', ['volatility', 1]),
