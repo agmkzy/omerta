@@ -186,6 +186,30 @@ sam.fight(rico, { kind: 'sparring' });
 squad(sam, joe).fight(squad(rico), { kind: 'real' });
 ```
 
+### Beatings
+
+A beating is not a separate kind: it is a real fight that the attackers start by setting on the target, and whether the target fights back is decided by their nerve and temperament, as with any nerve check.
+
+1. **The attackers have advantage on their attacks in the first round,** because the target is caught or held. After that the normal rules apply, including advantage for ganging up.
+2. **The target makes a nerve check when set upon:** DC 10, plus 2 for each attacker beyond the first. Nerve includes temperament, as it does in the lab.
+   - **Pass:** they fight back, and it is an ordinary real fight.
+   - **Fail:** temperament decides, by the lab's nerve rules: low courage or high caution flees; high volatility fights back anyway; anyone else takes it. Someone taking it does not attack, and the attackers keep their advantage against them.
+3. **The usual nerve checks still apply,** at half health and when half a side is down, so someone who fought back can still give in.
+4. **Someone taking it can snap:** at half health they make another nerve check, and on failing it a volatile character fights back.
+5. **The recorded event comes from what happened.** If the target took it, it is a beating, and the target's feelings towards each attacker change by their courage: a brave target bears a grudge, a timid one becomes afraid, and trust drops either way.
+
+| Change | Amount |
+| --- | --- |
+| Grudge | +0.15 × (0.4 + 0.6 × courage) |
+| Fear | +0.15 × (1 − courage) × 0.8 |
+| Trust | −0.075 |
+
+If the target fought back, it is recorded as a fight.
+
+```ts
+squad(sam, joe).fight(rico, { kind: 'real', start: 'set-upon' });
+```
+
 ## Words
 
 Where a lab word and a game word mean the same thing, the game's word is used. Each was decided separately.
@@ -280,7 +304,7 @@ The rules for these are not set; they belong with slotting the character into th
 
 Left out of the first version on purpose, each to be decided on its own:
 
-- **More fight kinds:** a beating (one side does not fight back) and an ambush (the attacking squad gets the first round).
+- **Ambushes:** the attacking squad gets the first round if the targets do not notice them coming.
 - **Sparring's end:** whether a sparring match stops when someone first drops to half health, rather than at a knockout.
 - **Weapons in fights:** weapon damage changes fight balance, so it needs checking with the simulation.
 - **Hurt during fights,** and Planning's effect on fight rolls: both change fight balance in the same way.
