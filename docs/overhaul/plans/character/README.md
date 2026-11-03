@@ -541,9 +541,12 @@ const started = everyone.startJob({ kind: 'burglary', dc: 15, members: ['sam', '
 const planned = started.cast.character('sam').planning.plan(started.job).helpedBy('joe').roll(dice, { now });
 const sam = planned.cast.character('sam');
 sam.check('larceny', 15).explain({ for: sam });   // includes "A good plan +2", as Sam believes it
+sam.check('larceny', 15).roll(dice, { now, witnesses: ['joe'] }).result({ for: joe });   // Joe watched, so sees how it went
 ```
 
 Each step uses the cast the previous one returned, so no handle is stale.
+
+**A roll's result is given only to those who were there:** the one who made a skill check and whoever watched it; the two in a social roll and its witnesses. Anyone else asking gets nothing, and can learn of it only by being told.
 
 ### Jobs
 

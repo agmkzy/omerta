@@ -142,9 +142,9 @@ export interface Explanation {
 /** A social roll's result as a viewer saw it. */
 export interface SeenResult {
   readonly action: SocialAction;
-  /** The exact ending, for the target; how it looked, for anyone else. */
-  readonly ending: Ending | Appearance;
-  readonly explanation: Explanation;
+  /** The exact ending, for the target; how it looked, for the actor and witnesses; nothing, for anyone who was not there. */
+  readonly ending: Ending | Appearance | null;
+  readonly explanation: Explanation | null;
 }
 
 /** What really happened: for the simulation and tests, never shown to a character. */
@@ -469,6 +469,7 @@ export function socialCheck<C extends CastLike>(setup: SocialSetup, owner: C, co
         truth: { ...truth, facts },
         result: ({ for: v }) => {
           const id = viewerIn(v, owner, cast);
+          if (!there.some((c) => c?.id === id)) return { action: setup.action, ending: null, explanation: null };
           return { action: setup.action, ending: id === setup.target.id ? truth.ending : info.appearance[truth.ending]!, explanation: explainFor(setup, id) };
         },
       };

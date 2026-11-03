@@ -273,6 +273,13 @@ describe('rolling a persuasion', { tags: ['unit'] }, () => {
     assert.equal(partial.result({ for: partial.cast.character('rico') }).ending, 'partial');
     assert.equal(partial.result({ for: partial.cast.character('sam') }).ending, 'agrees, for something in return');
   });
+
+  test('is seen by those who were there, and by no one else', () => {
+    const { sam, rico } = who(people());
+    const out = sam.social.persuade(rico).roll(scripted(11, 10), { now: 0, witnesses: ['vic'] });
+    assert.equal(out.result({ for: out.cast.character('vic') }).ending, 'agrees, for something in return');
+    assert.deepEqual(out.result({ for: out.cast.character('joe') }), { action: 'persuade', ending: null, explanation: null });
+  });
 });
 
 describe('a lie about who did it', { tags: ['unit'] }, () => {

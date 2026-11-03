@@ -259,10 +259,21 @@ describe('skill checks', { tags: ['unit'] }, () => {
     const check = sam.check('larceny', 15, { situation: 'locks', using: ['lockpicks'] });
     assert.deepEqual(reasons(check.explain({ for: sam })), ['Agility 14 2', 'Trained in Larceny 2', 'Lockpicks 2']);
     assert.deepEqual(reasons(check.explain({ for: c.character('rico') })), ['Lockpicks 2']);
-    const out = check.with({ value: 1, reason: 'A quiet street' }).roll(scripted(9), { now: 0 });
+    assert.ok(check.odds({ for: sam }).success > check.odds({ for: c.character('rico') }).success);
+    const out = check.with({ value: 1, reason: 'A quiet street' }).roll(scripted(9), { now: 0, witnesses: ['rico'] });
     assert.deepEqual([out.truth.roll.total, out.truth.outcome], [16, 'partial']);
     assert.deepEqual(out.result({ for: out.cast.character('rico') }), { outcome: 'partial', explanation: [{ value: 2, reason: 'Lockpicks' }, { value: 1, reason: 'A quiet street' }] });
-    assert.ok(check.odds({ for: sam }).success > check.odds({ for: c.character('rico') }).success);
+  });
+
+  test('give their result only to the one who made it and whoever watched', () => {
+    const people = () => cast({ characters: ['sam', 'rico', 'joe'].map((id) => ({ id, name: id[0]!.toUpperCase() + id.slice(1) })) });
+    const out = people().character('sam').check('stealth', 10).roll(scripted(15), { now: 0, witnesses: ['rico'] });
+    assert.equal(out.result({ for: out.cast.character('sam') }).outcome, 'success');
+    assert.equal(out.result({ for: out.cast.character('rico') }).outcome, 'success');
+    assert.deepEqual(out.result({ for: out.cast.character('joe') }), { outcome: null, explanation: null });
+    assert.throws(() => people().character('sam').check('stealth', 10).roll(scripted(15), { now: 0, witnesses: ['nobody'] }), RangeError);
+    const resting = people().character('rico').rest({ now: 0, hours: 8 });
+    assert.throws(() => resting.character('sam').check('stealth', 10).roll(scripted(15), { now: 60, witnesses: ['rico'] }), /resting/);
   });
 
   test('are refused by someone unconscious, against a DC that is not a whole number, for a viewer from another cast, or from a replaced cast', () => {

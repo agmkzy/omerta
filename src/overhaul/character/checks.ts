@@ -39,8 +39,14 @@ export interface SkillCheck<C extends CastLike> {
   with(modifier: Modifier): SkillCheck<C>;
   odds(o: { readonly for: Viewer }): Odds;
   explain(o: { readonly for: Viewer }): readonly Modifier[];
-  /** Rolls it: refused if the cast it came from has been replaced. A plan's advantage, if this is its chosen check, is used up. */
-  roll(roller: Roller, when: { readonly now: number }): { readonly cast: C; readonly truth: CheckResult; result(o: { readonly for: Viewer }): { readonly outcome: Outcome; readonly explanation: readonly Modifier[] } };
+  /**
+   * Rolls it, with whoever watched: refused if the cast it came from has been replaced. A plan's advantage, if this is its
+   * chosen check, is used up. Its result is given to the one who made it and those who watched; anyone else gets nothing.
+   */
+  roll(
+    roller: Roller,
+    when: { readonly now: number; readonly witnesses?: readonly Id[] },
+  ): { readonly cast: C; readonly truth: CheckResult; result(o: { readonly for: Viewer }): { readonly outcome: Outcome | null; readonly explanation: readonly Modifier[] | null } };
 }
 
 interface SkillSetup {
@@ -71,12 +77,24 @@ export function skillCheck<C extends CastLike>(setup: SkillSetup, owner: C, comm
       return checkOdds({ ...d20(seenBy(parts, id), edgeFor(advantage, id)), dc: setup.dc });
     },
     explain: ({ for: v }) => seenBy(parts, viewerIn(v, owner)),
-    roll(roller, { now }) {
+    roll(roller, { now, witnesses = [] }) {
       assertTime(now);
-      assertAvailable(setup.c, now, 'make a check');
+      const there = [setup.c.id, ...witnesses];
+      for (const id of there) {
+        const c = setup.data.characters.find((x) => x.id === id);
+        if (c === undefined) throw new RangeError(`${id} is not in the cast`);
+        assertAvailable(c, now, id === setup.c.id ? 'make a check' : 'watch it');
+      }
       const truth = resolveCheck({ ...d20(truthOf(parts), edgeFor(advantage, null)), dc: setup.dc }, roller);
       const cast = commit(marking(advantage));
-      return { cast, truth, result: ({ for: v }) => ({ outcome: truth.outcome, explanation: seenBy(parts, viewerIn(v, owner, cast)) }) };
+      return {
+        cast,
+        truth,
+        result: ({ for: v }) => {
+          const id = viewerIn(v, owner, cast);
+          return there.includes(id) ? { outcome: truth.outcome, explanation: seenBy(parts, id) } : { outcome: null, explanation: null };
+        },
+      };
     },
   };
 }
