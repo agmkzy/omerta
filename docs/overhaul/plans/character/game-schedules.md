@@ -4,6 +4,9 @@ How the game decides, today, when each character acts, where they are at a given
 It is mapped before character schedules are designed, as the [game mapping](game-mapping.md) was for the character's
 fields. Nothing here is decided. It ends with the questions the design has to answer.
 
+**Corrected by the schedules design:** checked against the source, the game has six answers, not four, and hours follow
+belonging to a crime family, not being made; see its [corrections to this mapping](../schedules/README.md#corrections-to-the-mapping).
+
 Written 3 November 2026, at commit d080184, from reading `src/core.ts`, `src/engine.ts`, `src/city.ts`, `src/where.ts`,
 `src/places.ts`, `src/clubdata.ts`, `src/meetings.ts`, `src/enterprise.ts` and `src/orders.ts`, and from the compiler's
 references to `wake`, `sleep` and `district`.
