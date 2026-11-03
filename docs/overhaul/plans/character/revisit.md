@@ -19,7 +19,6 @@ Choices made while building that the plan did not settle. Each is built as descr
 
 | Point | Where it came up | Now |
 | --- | --- | --- |
-| **Sparring** can knock someone out (a single hit past half health), uses everyone's effects, such as drunk, and makes the fighters meet. | Step 9 | Built this way. |
 | **Which checks a plan counts on.** Every skill check by a member while the job is open: `check`, both rolls of a social check, drinking, and an ambush's Stealth (the plan's own example of a check around a fight); never a fight's own rolls. A character's `skills` show them as they stand, without any plan. | Step 10 | Built this way. |
 | **The chosen check.** A critical success's advantage is on one check chosen when planning: the first check of a chosen skill by a chosen member. | Step 10 | Built this way; the plan says "one check of the planner's choosing". |
 | **Who believes the plan.** Every member of the job, not only the planner, sees the plan as the planner does: a critical failure as a failure. Anyone outside the job knows nothing of it. | Step 10 | Built this way. |
@@ -74,3 +73,4 @@ These were reported when they were made and stand unless revisited.
 - **Trying counts as conduct:** persuading, lying and intimidating move the actor's traits whatever the outcome, since every roll records its fact, which is what the conduct table counts (step 8).
 - **A beating is scaled by each attacker's damage:** the fact for each attacker records the hit points that attacker took, so the one beaten resents most whoever hurt them most (step 9).
 - **A beating recorded directly,** with `cast.record` and no amount, changes feelings by the game's rows, unscaled (step 9).
+- **Sparring** can end with someone knocked out (one hit taking them past half health), though nothing lasts; it uses everyone's current effects, such as drunk; and the fighters meet (step 9).
