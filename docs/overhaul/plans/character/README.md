@@ -145,7 +145,7 @@ A person is a product of their experiences, so three things move traits: what a 
 | Giving in during a fight | Failing a nerve check and giving in | Courage −, Pride − |
 | Giving in to a threat | Being intimidated: partial success or better for the actor | Courage −, Pride − |
 | Standing up to a threat | Resisting intimidation: failure or critical failure for the actor | Courage +, Pride + |
-| Losing their temper | Being provoked | Volatility + |
+| Losing their temper | Being provoked, or [losing their temper in a fight](#losing-their-temper) | Volatility + |
 
 **What is done to them:**
 
@@ -380,6 +380,16 @@ A real fight can start with the attackers setting on a target:
 ```ts
 squad(sam, joe).fight(squad(rico), { kind: 'real', start: 'set-upon' });
 ```
+
+### Losing their temper
+
+A volatile character (volatility high) who passes a nerve check in a real fight loses their temper. They fight on, but recklessly:
+
+- **Their next turn:** their attacks have advantage, explained as "Lost their temper".
+- **The cost:** attacks against them have advantage until their next turn, explained as "Left themselves open".
+- **Stacking:** advantage and disadvantage combine as for any roll: they do not stack, and one of each cancels out.
+
+It applies to every nerve check in a fight: the start-of-fight check against weapons, being set upon, dropping to half health, and half their squad going down. A volatile target set upon gets it on their first attacks back. A failed check is unchanged: they flee or give in, by courage and caution. How much it changes who wins is checked with the same statistical tests on simulated fights as the weapon DCs.
 
 ### Ambushes
 
