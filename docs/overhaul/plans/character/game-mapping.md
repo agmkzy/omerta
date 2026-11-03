@@ -4,6 +4,10 @@ Where each field of the game's `Character` (`src/types.ts`) lands when the overh
 systems read and change it, and what has to change in the game at the swap. This is the plan's [Mapping the game's
 records](README.md#before-the-swap), and it sizes "the rest of the game's characters" on the same list.
 
+**The swap is a clean break** (decided 3 November 2026): no character or save from before it comes across, so nothing here
+is converted. This maps which record holds each thing after the swap, and what the game's systems must do differently to
+use it.
+
 Written 3 November 2026, at commit 1ff4f86. **Where a field lands is proposed, not decided.** Each proposal follows the
 plan's principles (one record per thing, knowledge with a source, every change through one function), and anything marked
 "decide" needs the owner.
@@ -28,11 +32,11 @@ The game's `Character` has 54 fields, used in 155 of the game's files. Proposed:
 | Where it lands | Fields | |
 | --- | --- | --- |
 | **The cast, as it is** | `id`, `name`, `traits`, `rels`, `known`, `cash` | Same meaning; each needs every change routed through the cast |
-| **The cast, after a mapping** | `skills`, `bg`, `hurtUntil`, `conduct`, `struggling`, `denied` | Different shape: five skills onto eighteen, a time onto hit points, counts onto conduct steps |
+| **The cast, in its own shape** | `skills`, `bg`, `hurtUntil`, `conduct`, `struggling`, `denied` | The overhaul holds the same thing differently: attributes and eighteen skills, hit points, conduct steps, facts |
 | **The cast, to add** | `alive`, `diedAt`, `nick`, `look` | Character state the overhaul does not hold yet |
 | **Other records, keyed by the character's id** | 31 fields | Organisation, books, police, commitments, standing, goals, decisions, daily life, conversation, the player's own interface |
 | **To decide** | `insight`, `intro`, `cars`, `goods`, `problem` | See [Decisions](#decisions) |
-| **Nowhere** | `isPlayer`, `hustle` | The cast has no player flag; `hustle` is only read to bring old saves across |
+| **Nowhere** | `isPlayer`, `hustle` | The cast has no player flag; `hustle` is only read to bring old saves across, which no longer happens |
 
 The cast should hold what the character rules use (rolls, condition, inventory, relationships, knowledge, temperament), and
 no more. Rank, family, books and the rest stay in the game's own records, keyed by id, which is how the game already treats
@@ -49,7 +53,7 @@ learning tables, for example, read family as closeness to a victim.
 | `name` | Full name | 3668, 127 | `conv/gate1.ts`, `world.ts` | Cast: `name` | None |
 | `nick` | A nickname given by the crew | 7, 3 | `crewlife.ts` | Cast, to add: optional `nick` | Carry it across |
 | `look` | Portrait choices | 7, 4 | `web.ts` | Cast, to add: optional `look`, kept opaque | Carry it across; the portrait code reads it as now |
-| `bg` | The player's background (`hustler`, `wheelman`…) | 6, 2 | `background.ts` | Cast: `background`, after mapping the game's six onto the overhaul's eight | Decide the mapping |
+| `bg` | The player's background (`hustler`, `wheelman`…) | 6, 2 | `background.ts` | Cast: `background` | Character creation offers the overhaul's backgrounds; decide which |
 | `isPlayer` | Marks the player | 532, 72 | `world.ts` | Nowhere: the cast has no player flag; `w.playerId` already says who it is | Replace every read with `id === w.playerId` |
 
 ### Abilities and temperament
@@ -57,7 +61,7 @@ learning tables, for example, read family as closeness to a victim.
 | Field | What it is | Used (references, files) | Changed by | Lands in | Work at the swap |
 | --- | --- | --- | --- | --- | --- |
 | `traits` | Seven traits, 0 to 1 | 346, 66 | `world.ts` | Cast: starting traits plus conduct; the overhaul has the same seven and seven more | Replace each direct trait change with conduct, or remove it |
-| `skills` | Five skills (`muscle`, `driving`, `charm`, `nerve`, `brains`) | 47, 23 | `background.ts`, `world.ts`, `engine.ts` | Cast: six attributes and eighteen skills | Decide the mapping, including which courage to keep |
+| `skills` | Five skills (`muscle`, `driving`, `charm`, `nerve`, `brains`) | 47, 23 | `background.ts`, `world.ts`, `engine.ts` | Cast: six attributes and eighteen skills | The world generator makes characters by the overhaul's rules, fit for their rank; decide how |
 | `conduct` | The player's counts of threats, force, lies and so on (`temper.ts`) | 5, 2 | `temper.ts`, `conv/minds.ts` | Cast: conduct steps, for every character | Map each count to a conduct row; some have no row yet |
 
 ### Condition and life
@@ -98,7 +102,7 @@ learning tables, for example, read family as closeness to a victim.
 | `kickRate` | Share of earnings passed up | 82, 19 | `books.ts`, `pulse.ts`, `goals.ts`, `meetings.ts` and 12 more | Organisation | None |
 | `cars` | Stolen cars on hand | 38, 7 | `jobs.ts`, `orders.ts`, `background.ts`, `world.ts` and 1 more | Cast items, or the game's goods, to decide | Decide |
 | `goods` | Value of stolen goods on hand | 34, 10 | `jobs.ts`, `orders.ts`, `background.ts`, `world.ts` and 3 more | As `cars` | Decide |
-| `hustle` | A line of work from before Stage 4, read only to bring old saves across | 2, 1 | none | Nowhere: the game's own migration | None |
+| `hustle` | A line of work from before Stage 4, read only to bring old saves across | 2, 1 | none | Nowhere: old saves do not come across | Remove it |
 
 ### Organisation and career
 
@@ -204,9 +208,10 @@ Proposals that need the owner, to take one at a time:
 
 | Decision | Proposal |
 | --- | --- |
-| **The game's skills onto the overhaul's.** Five skills (each 0 to 1, rolled by rank) onto six attributes and eighteen skills | A table from each game skill to an attribute and the skills it trains: `muscle` to Strength with Brawling, `driving` to Agility with Driving, `charm` to Charisma with Persuasion, `nerve` to Nerve, `brains` to Intelligence with Bookkeeping and Planning |
+| **Making characters by rank.** The game's world generator rolls five skills, better for higher ranks (0.2 to 0.85, against 0.1 to 0.6 for civilians), and one gift | The generator rolls overhaul characters with a background suited to their role and a proficiency bonus by rank: 2 for civilians and associates, rising to 4 for a boss |
+| **Skills growing with use.** In the game every job adds 0.025 to the skills it needs (`people.ts` `grow`); the overhaul's training never changes | To decide: training that rises with practice, or none |
 | **Which courage to keep.** The game has the `courage` trait and the `nerve` skill | Keep both, as the overhaul does: courage decides what someone does after failing a nerve check, Nerve decides whether they fail it |
-| **The game's backgrounds onto the overhaul's.** Six (`hustler`, `connected`, `business`, `union`, `bookmaker`, `wheelman`) onto eight | A table, or the overhaul takes the game's six as its own |
+| **Backgrounds at character creation.** The game offers six (`hustler`, `connected`, `business`, `union`, `bookmaker`, `wheelman`), each with two skills and starting cash; the overhaul has eight | The creation screen offers the overhaul's backgrounds, or the overhaul takes the game's six as its own |
 | **Starting relationships.** The game begins some at 0.25 to 0.4, the overhaul at 0.5 | Let the caller give a first relationship its values when it has a reason (a boss meeting a new man is wary), and keep 0.5 otherwise |
 | **Spending time together.** The game marks meeting in 35 places with no roll | Add a plain operation for it: people who spent time together meet, at a time, with nothing else changing |
 | **Inferred knowledge.** `insight` is what the player has worked out about people | A fourth provenance, inferred, next to seen, told and heard, as invariant A already names |

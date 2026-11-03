@@ -64,8 +64,8 @@ outcome.cast;                   // a new cast, with Sam, Rico and any new facts 
 The overhaul replaces the game's systems in one sweep, not one system at a time, so there is never a time when both hold characters, and no writer between two records. Until then the overhaul stays apart from the game, as it is.
 
 1. **Everything first:** what the swap needs is built in the overhaul first: see [Before the swap](#before-the-swap).
-2. **A shadow run:** the overhaul runs alongside the game on the same seeds and actions in a test harness, and what each records is compared. The swap waits until they agree, or differ only where it has been decided they should.
-3. **The swap:** every game system that reads or writes characters moves to the cast at once, with one save migration from the game's format to the cast's.
+2. **A shadow run:** worlds are run on the same seeds and actions with the game's systems and with the overhaul's, in a test harness, and how they behave is compared over many runs: how much money moves, how often people fight, are promoted or fall out. Their characters are made differently, so the runs are compared as a whole, not record by record. The swap waits until they agree, or differ only where it has been decided they should.
+3. **The swap:** every game system that reads or writes characters moves to the cast at once. **It is a clean break** (decided 3 November 2026): no character or save from the game before the swap comes across. A new game starts with characters made by the overhaul's rules, and saves from before the swap do not load in it.
 
 **The player and NPCs are the same type.** There is no player flag in the character. Every character has an id.
 
@@ -580,8 +580,8 @@ What must be built in the overhaul before it replaces the game's systems in one 
 - **The price of a partial persuasion:** what the target wants in return, recorded as one of the game's favours owed (`addFavour`), and what follows if it is not paid.
 - **Clearing a name:** whether learning someone was falsely blamed repairs the feelings the lie caused.
 - **Retention:** pruning old facts and transfers, with the summaries and balances they leave.
-- **The shadow run,** and the save migration from the game's format.
+- **The shadow run.**
 
 - **Skimming:** an opposed Bookkeeping check between the skimmer and their superior. The chance of the superior catching it must scale with the gap they can see, as the game's own check does now. Running a check only when someone is skimming would leak who is, and a suspicion must be recorded as an inferred fact, not as a change in trust with no recorded cause.
 - **Running a business** with Bookkeeping, in place of `brains` in the game's management quality. This changes the game's economy.
-- **Mapping the game's records** ([mapped field by field](game-mapping.md), 3 November 2026, with the decisions it needs): the game's five skills onto the six attributes and eighteen skills; which courage to keep (the game has two); hit points against the game's `hurtUntil`; the player's `conduct`; cash against the ledger; and the save migration from the game's current format.
+- **Mapping the game's records** ([mapped field by field](game-mapping.md), 3 November 2026, with the decisions it needs): where each field of the game's characters lands, how the game's world generator and character creation make overhaul characters, which courage to keep (the game has two), hurt as hit points, the player's `conduct`, and cash against the ledger. Nothing is converted: the swap is a clean break.
