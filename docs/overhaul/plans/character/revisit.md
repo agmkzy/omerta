@@ -19,8 +19,6 @@ Choices made while building that the plan did not settle. Each is built as descr
 
 | Point | Where it came up | Now |
 | --- | --- | --- |
-| **Who knows a modifier.** Situational modifiers added with `.with()` are known to everyone present. Anyone but the target judges a shown weapon by the weapons the target shows. Anyone who saw a fact with the target knows the target saw it; whoever told the target knows what they told. | Step 7 | Built this way. |
-| **Lies and witnesses.** Witnesses to a deception meet those in it but learn nothing, and the lie fact records no witnesses. | Step 7 | As the plan has it for now; what witnesses believe is under the plan's Later. |
 | **Provoked counts as resisting.** A provoked target holds a grudge (+0.1), and the actor's respect for them rises as for any target who resists (+0.05). | Step 7 | Built this way; the plan's two tables do not say which applies. |
 | **Shaken on giving in.** Any target who gives in to intimidation (partial success or better) is shaken. | Step 7 | Built this way. |
 | **Trying counts as conduct.** Persuading, lying and intimidating move the actor's traits whatever the roll's outcome. | Step 8 | Built this way; the plan says "a persuasion" or "a lie", which every roll records. |
@@ -79,3 +77,5 @@ These were reported when they were made and stand unless revisited.
 - **A planning helper must be there,** as the planner must (building the decisions).
 - **An unconscious character can rest,** and heals by it as anyone does (building the decisions).
 - **Drinking takes a time and whoever else is there** (`drink(roller, { now, with })`), and drinking together, like any telling, makes those there meet (step 8; meeting decided 3 November 2026).
+- **Who knows a modifier** follows from knowledge having a source: a situational modifier added with `.with()` is known to everyone there; anyone but the target judges a shown weapon by the weapons the target shows; anyone who saw a fact with the target knows the target saw it, and whoever told the target knows what they told (step 7).
+- **Witnesses to a lie meet those in it but learn nothing,** and the lie fact records no witnesses, until what they believe is built (the plan's Before the swap, Lies told in front of others) (step 7).
