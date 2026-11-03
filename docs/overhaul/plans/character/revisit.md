@@ -19,7 +19,6 @@ Choices made while building that the plan did not settle. Each is built as descr
 
 | Point | Where it came up | Now |
 | --- | --- | --- |
-| **One nerve check at the start.** Every reason to check at the start of a fight (a weapon that outclasses theirs, being set upon, already being at half health) is one check at the highest DC. | Step 9 | Built this way; the plan combines only the weapon and being set upon. |
 | **A lone runner loses at once.** A squad with no one still fighting has lost, so a fighter on their own who fails their nerve and runs makes their one last escape straight away: away, or caught and beaten. | Step 9 | Follows the plan's rule; it means a lone runner has one chance. |
 | **Who beat a winner who gave in.** A fighter on the winning squad who gave in is beaten by whoever attacked them, or, if no one did, by everyone on the other squad. | Step 9 | Built this way; the plan covers only a knocked-out winner. |
 | **Standing by their squad** counts a squad member as down if they are not fighting, including one who is running. | Step 9 | Built this way. |

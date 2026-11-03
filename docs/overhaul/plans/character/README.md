@@ -387,6 +387,8 @@ squad(sam, joe).fight(squad(rico), { kind: 'real' });
 
 A fighter who starts a real fight at or below half health makes the half-health nerve check at the start, since they are already past that point.
 
+**One nerve check at the start** (decided 3 November 2026): however many reasons a fighter has to check at the start (a weapon that outclasses theirs, being set upon, already being at half health), they make one check, at the hardest of the DCs. It is one moment of standing or running, not a series of them.
+
 ### How a fight ends
 
 During a fight each fighter is fighting, fleeing (see [Fleeing](#fleeing)), beaten, knocked out or fled. A squad loses when none of its members is still fighting. Anyone on it still fleeing then makes one last escape check: getting away means fled, and being caught means beaten. If both squads still have someone fighting after the round limit (12, as in the lab), it is a stalemate: nobody else is beaten, and the fight is recorded as a `fight` between the first fighter of each squad.
