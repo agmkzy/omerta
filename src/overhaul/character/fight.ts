@@ -296,7 +296,8 @@ export function fight(spec: FightSpec, roller: Roller): FightResult {
   const escape = (f: State, last: boolean) => {
     // (held through the first round, including an escape made before it starts)
     const held = start === 'set-upon' && round <= 1 && f.side === 'defender' && holder.status === 'fighting';
-    const chasers = fighting(otherSide(f.side));
+    // (a target caught by surprise cannot act in the first round, so cannot chase anyone then either)
+    const chasers = fighting(otherSide(f.side)).filter((o) => !(o.surprised && round <= 1));
     if (!chasers.length) {
       events.push({ kind: 'escape', round, id: f.c.id, from: null, result: null, got: 'away' });
       return setStatus(f, 'fled');

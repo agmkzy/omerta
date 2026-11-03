@@ -431,7 +431,7 @@ It applies to every nerve check in a fight: the start-of-fight check against wea
 
 ### Ambushes
 
-An ambush is a real fight that the attacking squad starts unseen. Before it begins, the squad's lowest Stealth roll (the noisiest of them gives them away) is compared with each target's passive Notice: 10 plus their Notice bonus. A roll that meets or beats it goes unnoticed; one below it is noticed. A target who does not notice is surprised and cannot act in the first round. If every target notices, it is an ordinary real fight.
+An ambush is a real fight that the attacking squad starts unseen. Before it begins, the squad's lowest Stealth roll (the noisiest of them gives them away) is compared with each target's passive Notice: 10 plus their Notice bonus. A roll that meets or beats it goes unnoticed; one below it is noticed. A target who does not notice is surprised and cannot act in the first round, which includes chasing anyone who runs (decided 3 November 2026). If every target notices, it is an ordinary real fight.
 
 ```ts
 squad(sam, joe).fight(squad(rico), { kind: 'real', start: 'ambush' });
