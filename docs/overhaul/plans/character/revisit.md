@@ -5,24 +5,6 @@ left for a later step, and anything not yet verified. It is updated after every 
 into the plan and is taken off this list. What the plan itself leaves for before the overhaul replaces the game's systems is
 under its [Before the swap](README.md#before-the-swap).
 
-## Decided, to build
-
-Decided on 3 November 2026 after an outside review, and written into the plan; not yet built.
-
-| Decision | Where it is in the plan |
-| --- | --- |
-| **Learning the truth.** Per-part provenance; filling a gap needs no roll, contradicting a belief is Persuasion against DC 10; feelings count once per fact and person blamed; an honest correction keeps the teller's provenance; a lie comes out only when the part it changed is overturned. This also fixes re-belief counting feelings again each time a belief changes, and a later lie reading the wrong part's provenance. | Knowledge |
-| **Guessing a hidden actor,** deterministically, marked as a guess. | Knowledge |
-| **Public facts** (`public: [...]`, the game's `broadcast`). | Knowledge |
-| **Witnesses must be there and conscious,** and in a fight by the order things happened. | Knowledge |
-| **Items change hands by recorded transfers,** in the same log as cash, with `give`. | Inventory |
-| **Social facts record their ending,** and a lie its claim; fighting when provoked is recorded. | Knowledge, conduct tables |
-| **Beating the helpless:** two bugs fixed; a beating with no blow struck is not violence. Fight rates pinned in a statistical test. | Fights, Fact kinds |
-| **Resting:** a full night to heal fully, and unavailable while resting. | Condition |
-| **Being fond of a victim** means affection high (0.7 or more). | Knowledge |
-
-These change the saved shape (per-part provenance, a fact's ending and a lie's claim, item transfers), in one new save format.
-
 ## For the game's integrity register
 
 Found in the outside review, in the game itself (`docs/architecture/INTEGRITY.md`), not in the overhaul:
@@ -60,9 +42,13 @@ Choices made while building that the plan did not settle. Each is built as descr
 | **The chosen check.** A critical success's advantage is on one check chosen when planning: the first check of a chosen skill by a chosen member. | Step 10 | Built this way; the plan says "one check of the planner's choosing". |
 | **Who believes the plan.** Every member of the job, not only the planner, sees the plan as the planner does: a critical failure as a failure. Anyone outside the job knows nothing of it. | Step 10 | Built this way. |
 | **What a job is.** A job's kind is free text, and a job records no outcome: it is open until the caller ends it. Starting and ending a job record no facts. A job of DC 20 or more is hard, and its members grow more ambitious when it starts. | Step 10 | Built this way. |
-| **Telling.** A character telling another what they believe is an operation the plan implies (versions record who told them; Deception depends on told or heard) but does not name. | Step 5 | Built as `tell`. |
 | **Taking damage.** `damage(n)` is a plain method the plan does not name. | Step 3 | Built for fights (step 9) and tests. |
 | **Feelings follow whom someone is told did it.** The game's `learn` changes feelings only for someone who knows who did it; here, someone who only believes it (told "Joe did it") has their feelings change towards the one they blame, as the plan's re-belief has it. | Step 6 | Built this way. |
+| **Telling meets only when it rolls.** A telling that fills a gap, or of a fact the listener had not heard, needs no roll and does not make the two meet; only a contradiction, which rolls, does. | Building the decisions | Built this way; follows the row below. |
+| **Adding a character with items needs a time.** `add(input, { now })` records their items as transfers at `now`, and is refused without it; a character with no items can be added without one. | Building the decisions | Built this way. |
+| **Paying in person needs both there.** `pay` to another character is refused if either is unconscious or resting; paying the world needs only the payer. A plain `cast.transfer` checks no one. | Building the decisions | Built this way. |
+| **A planning helper must be there,** as the planner must. | Building the decisions | Built this way. |
+| **An unconscious character can rest,** and heals by it as anyone does. | Building the decisions | Built this way; the plan does not say. |
 | **Telling is not meeting.** Two characters meet by taking part in the same roll, fight or recorded fact; being told a fact makes the listener no longer a stranger to those in it, but does not make teller and listener meet, so their familiarity does not grow. | Step 6 | Built this way. |
 
 ## Waiting for a later step
@@ -95,4 +81,5 @@ These were reported when they were made and stand unless revisited.
 - **The game's fact kinds and learning tables are read from its source as text** by tests, so they cannot drift apart without the overhaul importing the game (steps 5 and 6).
 - **Learning about someone makes them no longer a stranger,** even for a fact whose kind changes no feelings, such as a theft (step 6).
 - **Social checks roll a d20,** as the plan's other checks do; the lab's choice of dice (2d10, 3d6) is not carried over (step 7).
+- **A saved transfer of an item no longer recognised is left out and reported,** as the item is from the inventory that holds it, so the item audit still balances (building the decisions).
 - **"Impossible" is a modifier of −100,** large enough that no roll can succeed, explained with its reason (step 7).
