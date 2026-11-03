@@ -235,6 +235,33 @@ describe('learningChanges', { tags: ['unit'] }, () => {
   });
 });
 
+describe('spending time together', { tags: ['unit'] }, () => {
+  const crew = () => cast({ characters: ['sam', 'rico', 'joe', 'vic'].map((id) => ({ id, name: id[0]!.toUpperCase() + id.slice(1) })) });
+
+  test('makes everyone named meet everyone else, and changes nothing else', () => {
+    const before = crew();
+    const after = before.together(['sam', 'rico', 'joe'], { now: 60 });
+    for (const [a, b] of [['sam', 'rico'], ['rico', 'joe'], ['joe', 'sam']] as const) {
+      const r = after.character(a).towards(after.character(b))!;
+      assert.deepEqual(r, meet(NEW_RELATIONSHIP, 60));
+    }
+    assert.equal(after.character('vic').towards(after.character('sam')), undefined);
+    assert.deepEqual([after.facts, after.data.transfers, after.character('sam').conduct], [[], [], []]);
+    const again = after.together(['sam', 'rico'], { now: 120 });
+    close(again.character('sam').towards(again.character('rico'))!.familiarity, feel(meet(NEW_RELATIONSHIP, 60), 'familiarity', MEETING, { now: 120 }).familiarity);
+  });
+
+  test('is refused for fewer than two, anyone named twice or not in the cast, anyone unable to be there, or a time that is not one', () => {
+    const c = crew();
+    for (const people of [[], ['sam'], ['sam', 'sam'], ['sam', 'nobody']]) assert.throws(() => c.together(people, { now: 0 }), RangeError, JSON.stringify(people));
+    assert.throws(() => c.together(['sam', 'rico'], { now: -1 }), RangeError);
+    const out = crew().character('rico').damage(10);
+    assert.throws(() => out.together(['sam', 'rico'], { now: 0 }), /unconscious/);
+    const resting = crew().character('rico').rest({ now: 0, hours: 8 });
+    assert.throws(() => resting.together(['sam', 'rico'], { now: 60 }), /resting/);
+  });
+});
+
 describe('meetings', { tags: ['unit'] }, () => {
   test('everyone a fact names meets everyone else it names', () => {
     assert.deepEqual([...meetings({ id: 'f1', kind: 'beating', actor: 'sam', victim: 'rico', at: 0, witnesses: ['joe'] })], [

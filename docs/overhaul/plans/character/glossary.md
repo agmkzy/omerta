@@ -114,7 +114,8 @@ These have caused, or could cause, confusion. Say which one is meant.
   rest at 0.
 - **Familiarity** — how well they know each other. Rises 0.02 each time they meet.
 - **Meet** — be together in something: take part in the same roll or fight (as actor, target, squad member or witness),
-  one telling the other anything, or drinking together. Updates when they last met, and their familiarity.
+  one telling the other anything, drinking together, or spending time together (`together`). Updates when they last met, and
+  their familiarity.
 - **Grudge reason / regard reason** — the event that did most to raise a grudge, or trust and affection.
 
 ## Knowledge

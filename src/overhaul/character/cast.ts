@@ -73,6 +73,12 @@ export interface Cast {
    * not able to be there (unconscious or resting), anyone made public to who is named in it, or a time before the last fact.
    */
   record(fact: Omit<FactInput, 'invented'>, when: { readonly now: number; readonly witnesses?: readonly Id[]; readonly public?: readonly Id[] }): { readonly fact: Fact; readonly cast: Cast };
+  /**
+   * People who spent time together at `now`, such as a shift at the same bar or a crew's meeting: everyone named meets
+   * everyone else, and nothing else changes. Throws RangeError for fewer than two people, anyone named twice or not in the
+   * cast, or anyone not able to be there (unconscious or resting).
+   */
+  together(people: readonly Id[], when: { readonly now: number }): Cast;
   readonly jobs: readonly Job[];
   /** Throws RangeError for an id not recorded. */
   job(id: JobId): Job;
@@ -364,6 +370,17 @@ export function castOf(data: CastRecord): Cast {
       if (j.endedAt !== undefined) throw new RangeError(`job ${id} has already ended`);
       assertTime(now);
       return change((d) => ({ ...d, jobs: d.jobs.map((x) => (x.id === id ? { ...x, endedAt: now } : x)) }));
+    },
+    together(people, { now }) {
+      assertTime(now);
+      if (people.length < 2 || new Set(people).size !== people.length) throw new RangeError('spending time together needs two or more people, each named once');
+      for (const id of people) {
+        const c = records.get(id);
+        if (c === undefined) throw new RangeError(`${id} is not in the cast`);
+        assertAvailable(c, now, 'be there');
+      }
+      const meets = allMeet(people);
+      return change((d) => ({ ...d, characters: d.characters.map((c) => (meets.has(c.id) ? meetPeople(c, meets.get(c.id)!, now) : c)) }));
     },
     record(input, when) {
       const there = [input.actor, ...(when.witnesses ?? [])].flatMap((id) => (id === undefined ? [] : [records.get(id)]));

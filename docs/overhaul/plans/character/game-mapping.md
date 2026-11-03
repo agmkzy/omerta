@@ -213,7 +213,7 @@ Proposals that need the owner, to take one at a time:
 | **Which courage to keep.** The game has the `courage` trait and the `nerve` skill | Keep both, as the overhaul does: courage decides what someone does after failing a nerve check, Nerve decides whether they fail it |
 | **Backgrounds at character creation.** The game offers six (`hustler`, `connected`, `business`, `union`, `bookmaker`, `wheelman`), each with two skills and starting cash; the overhaul has eight | The creation screen offers the overhaul's backgrounds, or the overhaul takes the game's six as its own |
 | **Starting relationships.** The game begins some at 0.25 to 0.4, set by the situation | **Decided and built (3 November 2026):** a first relationship starts from the character's own traits, not the situation (see the design's Relationships) |
-| **Spending time together.** The game marks meeting in 35 places with no roll | Add a plain operation for it: people who spent time together meet, at a time, with nothing else changing |
+| **Spending time together.** The game marks meeting in 35 places with no roll | **Decided and built (3 November 2026):** `cast.together(people, { now })`: everyone named meets, and nothing else changes |
 | **Inferred knowledge.** `insight` is what the player has worked out about people | A fourth provenance, inferred, next to seen, told and heard, as invariant A already names |
 | **Introductions.** `intro` is who the player has been introduced to | An introduction is a meeting, by the operation above, so `intro` goes |
 | **Stolen goods.** `cars` and `goods` are counts and values | Stolen cars become items, since a car is a thing with a history (`w.cars` already tracks them); stolen goods stay a value in the economy |
