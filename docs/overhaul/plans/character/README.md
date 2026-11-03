@@ -10,7 +10,7 @@ Until it is slotted in, the game's own `Character` (`src/types.ts`) stays the ga
 
 ## Where it lives and how it is built
 
-- **Folders, kept separate from the game:** the overhaul's code goes in `src/overhaul/` and its tests in `tests/overhaul/`, so this plan's code is `src/overhaul/character/` with its tests in `tests/overhaul/character/`. Nothing in `src/overhaul/` imports from the rest of `src/`, and nothing in the game imports from `src/overhaul/` until it is slotted in; an architecture test fails if either happens.
+- **Folders, kept separate from the game:** the overhaul's code goes in `src/overhaul/` and its tests in `tests/overhaul/`, so this plan's code is `src/overhaul/character/` with its tests in `tests/overhaul/character/`. Nothing in `src/overhaul/` imports from the rest of `src/`, from `lab/` or from any package, and nothing in the game imports from `src/overhaul/` until it is slotted in; an architecture test (`tests/overhaul/boundary.test.ts`) fails if either happens.
 - **Its own configuration:** a tsconfig, a Vitest config and npm scripts (`overhaul:test`, `overhaul:typecheck`, `overhaul:cov`), as the lab has. The game's Vitest config finds tests only in `src/tests/`, so it does not run these.
 - **Two changes to the game's configuration:** the game's coverage counts all of `src/`, so it excludes `src/overhaul/**`; and CI (`.github/workflows/ci.yml`) gains an overhaul job that runs the overhaul's typecheck and tests, so the boundary test runs on every push.
 - **Types:** the lab's stricter settings (`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `verbatimModuleSyntax` and the rest), with the game's `lib` setting, so that code passing the overhaul's typecheck also passes the game's (which covers all of `src/`).

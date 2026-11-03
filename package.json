@@ -27,7 +27,11 @@
     "lab:watch": "vitest --config lab/character/vitest.config.ts",
     "lab:cov": "vitest run --config lab/character/vitest.config.ts --coverage",
     "lab:typecheck": "tsc -p lab/character",
-    "lab:dev": "vite --config lab/character/vite.config.ts"
+    "lab:dev": "vite --config lab/character/vite.config.ts",
+    "overhaul:test": "vitest run --config vitest.overhaul.config.ts",
+    "overhaul:watch": "vitest --config vitest.overhaul.config.ts",
+    "overhaul:cov": "vitest run --config vitest.overhaul.config.ts --coverage",
+    "overhaul:typecheck": "tsc -p tsconfig.overhaul.json"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

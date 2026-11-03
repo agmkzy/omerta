@@ -1,0 +1,26 @@
+{
+  // The overhaul (src/overhaul/, tests/overhaul/) is held to the character lab's stricter standard: no index can be assumed to
+  // exist, optional means absent (never `undefined`), and type-only imports are marked as such. `lib` is left to the target, as
+  // in the game's tsconfig.json, which also typechecks src/overhaul/: code that passes here passes there.
+  // See docs/overhaul/plans/character/README.md.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["src/overhaul", "tests/overhaul", "vitest.overhaul.config.ts"]
+}
