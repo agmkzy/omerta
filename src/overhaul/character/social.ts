@@ -10,7 +10,7 @@ import { assertAvailable } from './condition';
 import { currentTemperament, withConduct, type Conduct } from './conduct';
 import { FACT_KINDS, type Fact, type FactId, type FactKind, type LieClaim } from './facts';
 import { ITEM_INFO, WEAPON_THREAT, strongestWeapon } from './items';
-import { usingAdvantage } from './jobs';
+import { usingAdvantage, type JobId } from './jobs';
 import { partOf, rebelieve, toldVersion, type Part as KnowledgePartName, type Version } from './knowledge';
 import { believedActor, isViolent, learnFact } from './learning';
 import type { Roller } from './random';
@@ -169,6 +169,8 @@ export interface SocialSetup {
   readonly target: CharacterRecord;
   readonly claim?: Claim;
   readonly extra: readonly Modifier[];
+  /** The job the roll is made for, whose plan counts on the rolls of those taking part in it. */
+  readonly job?: JobId;
 }
 
 /** The weapon the actor shows against what the target carries. Anyone but the target judges by the weapons the target shows. */
@@ -265,8 +267,8 @@ function partsOf(s: SocialSetup): { readonly active: readonly Part[]; readonly p
     feelingModifiers(s.action, { name: actor.name, ...(whose === 'actor' && actor.relationships[target.id] && { towards: actor.relationships[target.id] }) }, { name: target.name, ...(whose === 'target' && target.relationships[actor.id] && { towards: target.relationships[actor.id] }) }).map((m) =>
       knownBy([whose === 'actor' ? actor.id : target.id], m),
     );
-  const own = rollParts(data, actor, info.skill, info.actorSituations);
-  const resisting = rollParts(data, target, info.resist, info.targetSituations);
+  const own = rollParts(data, actor, info.skill, info.actorSituations, {}, s.job);
+  const resisting = rollParts(data, target, info.resist, info.targetSituations, {}, s.job);
   return {
     edges: [own.advantage, resisting.advantage],
     active: [
@@ -305,6 +307,9 @@ export function oddsFor(s: SocialSetup, viewer: Id | null): Readonly<Record<Endi
  */
 export function assertSetup(s: SocialSetup): void {
   if (s.actor.id === s.target.id) throw new RangeError(`${s.actor.name} cannot ${s.action} themselves`);
+  // a roll for a job has someone taking part in it on one side or the other, such as a guard talking to a burglar
+  if (s.job !== undefined && s.data.jobs.some((j) => j.id === s.job && !j.members.includes(s.actor.id) && !j.members.includes(s.target.id)))
+    throw new RangeError(`neither ${s.actor.name} nor ${s.target.name} is taking part in job ${s.job}`);
   for (const c of [s.actor, s.target]) if (s.data.characters.find((x) => x.id === c.id)!.condition.hitPoints === 0) throw new RangeError(`${c.name} is unconscious`);
   if (s.action === 'deceive') {
     if (s.claim === undefined) throw new RangeError('a lie needs a claim');

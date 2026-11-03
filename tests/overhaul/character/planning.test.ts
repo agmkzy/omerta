@@ -4,7 +4,7 @@ import { attributeScores } from '../../../src/overhaul/character/attributes';
 import { ReplacedCastError, cast, castOf, squad, type Cast } from '../../../src/overhaul/character/cast';
 import { OUTCOMES, checkOdds } from '../../../src/overhaul/character/check';
 import { DICE } from '../../../src/overhaul/character/dice';
-import { HARD_JOB_DC, PLAN_BANDS, PLAN_EFFECT, assertJobs, believedOutcome, type Job } from '../../../src/overhaul/character/jobs';
+import { HARD_JOB_DC, PLAN_BANDS, PLAN_EFFECT, assertJobs, believedOutcome, planEffect, type Job } from '../../../src/overhaul/character/jobs';
 import { DAY } from '../../../src/overhaul/character/time';
 import { labelled, scripted } from './support';
 
@@ -151,10 +151,10 @@ describe('a plan', { tags: ['unit'] }, () => {
 });
 
 describe('a plan’s effect on the job’s checks', { tags: ['unit'] }, () => {
-  test('is on every member’s skill check while the job is open, as they believe it; anyone outside it knows nothing of it', () => {
+  test('is on every member’s skill check made for the job, as they believe it; anyone outside it knows nothing of it', () => {
     const c = planned(12); // 16 against 15: partial success
     const joe = c.character('joe');
-    const check = joe.check('stealth', 12);
+    const check = joe.check('stealth', 12, { job: 'j1' });
     assert.deepEqual(reasons(check.explain({ for: joe })), ['Agility 10 0', 'A rough plan 1']);
     assert.deepEqual(reasons(check.explain({ for: c.character('sam') })), ['A rough plan 1']);
     assert.deepEqual(check.explain({ for: c.character('vic') }), []);
@@ -162,10 +162,29 @@ describe('a plan’s effect on the job’s checks', { tags: ['unit'] }, () => {
     assert.deepEqual(reasons(c.character('rico').check('stealth', 12).explain({ for: c.character('rico') })), ['Agility 10 0']);
   });
 
+  test('is on nothing else its members do while the job is open', () => {
+    const c = planned(16); // 20 against 15: success
+    const { sam, rico } = { sam: c.character('sam'), rico: c.character('rico') };
+    assert.ok(!reasons(sam.check('larceny', 12).explain({ for: sam })).includes('A good plan 2'));
+    assert.ok(!reasons(sam.social.persuade(rico).explain({ for: sam }).actor).includes('A good plan 2'));
+    assert.equal(sam.drink(scripted(10), { now: 20 }).result.roll.total, 10);
+  });
+
+  test('is refused for a check by someone not taking part, for a job that has ended or does not exist', () => {
+    const c = planned(16);
+    assert.throws(() => c.character('rico').check('stealth', 12, { job: 'j1' }), /not taking part/);
+    assert.throws(() => c.character('rico').social.persuade(c.character('vic'), { job: 'j1' }), /neither Rico nor Vic/);
+    assert.throws(() => c.character('sam').check('stealth', 12, { job: 'j9' }), /no job/);
+    assert.throws(() => planEffect(c.data.jobs, 'sam', 'stealth', 'j9'), /no job/);
+    const ended = c.endJob('j1', { now: 30 });
+    assert.throws(() => ended.character('sam').check('stealth', 12, { job: 'j1' }), /has ended/);
+    assert.throws(() => squad(c.character('rico')).fight(squad(c.character('sam')), { kind: 'real', start: 'ambush', job: 'j1' }), /attacking squad/);
+  });
+
   test('counts for real on a critical failure, though its members do not see it', () => {
     const s = started(20);
     const c = s.cast.character('sam').planning.plan(s.job).roll(scripted(1), { now: 0 }).cast;
-    const check = c.character('joe').check('stealth', 10);
+    const check = c.character('joe').check('stealth', 10, { job: s.job });
     assert.deepEqual(reasons(check.explain({ for: c.character('joe') })), ['Agility 10 0']);
     assert.equal(check.roll(scripted(11), { now: 5 }).truth.outcome, 'failure');
   });
@@ -174,30 +193,37 @@ describe('a plan’s effect on the job’s checks', { tags: ['unit'] }, () => {
     const s = started(10);
     const c = s.cast.character('sam').planning.plan(s.job, { advantageOn: { member: 'sam', skill: 'larceny' } }).roll(scripted(19), { now: 10 }).cast; // 23 against 10
     const sam = c.character('sam');
-    const first = sam.check('larceny', 15, { situation: 'locks' }).roll(scripted(4, 17), { now: 20 });
+    const forJob = sam.check('larceny', 15, { job: 'j1' });
+    assert.equal(forJob.odds({ for: sam })['critical-success'] > forJob.odds({ for: c.character('vic') })['critical-success'], true);
+    // a check of the chosen skill that is not for the job neither gets it nor uses it up
+    const other = sam.check('larceny', 15).roll(scripted(4), { now: 15 });
+    assert.equal(other.truth.roll.edge, 'none');
+    const first = other.cast.character('sam').check('larceny', 15, { situation: 'locks', job: 'j1' }).roll(scripted(4, 17), { now: 20 });
     assert.equal(first.truth.roll.edge, 'advantage');
     assert.equal(first.cast.job('j1').plan!.advantageUsed, true);
-    const second = first.cast.character('sam').check('larceny', 15).roll(scripted(4), { now: 30 });
+    const second = first.cast.character('sam').check('larceny', 15, { job: 'j1' }).roll(scripted(4), { now: 30 });
     assert.equal(second.truth.roll.edge, 'none');
-    assert.equal(second.cast.character('joe').check('larceny', 15).roll(scripted(4), { now: 40 }).truth.roll.edge, 'none');
-    assert.equal(sam.check('larceny', 15).odds({ for: sam })['critical-success'] > sam.check('larceny', 15).odds({ for: c.character('vic') })['critical-success'], true);
+    assert.equal(second.cast.character('joe').check('larceny', 15, { job: 'j1' }).roll(scripted(4), { now: 40 }).truth.roll.edge, 'none');
   });
 
   test('ends with the job', () => {
     const c = planned(12).endJob('j1', { now: 50 });
-    assert.deepEqual(reasons(c.character('joe').check('stealth', 12).explain({ for: c.character('joe') })), ['Agility 10 0']);
+    assert.throws(() => c.character('joe').check('stealth', 12, { job: 'j1' }), RangeError);
   });
 
-  test('counts on social rolls, on drinking and on an ambush’s Stealth, but not on fight rolls', () => {
+  test('counts on social rolls, telling, drinking and an ambush’s Stealth made for the job, but not on fight rolls', () => {
     const c = planned(16); // 20 against 15: success
     const { sam, rico } = { sam: c.character('sam'), rico: c.character('rico') };
-    assert.ok(reasons(sam.social.persuade(rico).explain({ for: sam }).actor).includes('A good plan 2'));
-    assert.ok(reasons(rico.social.persuade(sam).explain({ for: sam }).target).includes('A good plan 2'));
-    const drunk = sam.drink(scripted(10), { now: 20 });
+    assert.ok(reasons(sam.social.persuade(rico, { job: 'j1' }).explain({ for: sam }).actor).includes('A good plan 2'));
+    // a roll for the job by someone outside it, such as a guard talking to a burglar, counts the plan on the member's side
+    assert.ok(reasons(rico.social.persuade(sam, { job: 'j1' }).explain({ for: sam }).target).includes('A good plan 2'));
+    const { cast: seen, fact } = castOf(c.data).record({ kind: 'theft', actor: 'vic' }, { now: 5, witnesses: ['sam'] });
+    assert.ok(reasons(seen.character('sam').social.tell(seen.character('rico'), fact.id, { job: 'j1' }).explain({ for: seen.character('sam') })).includes('A good plan 2'));
+    const drunk = sam.drink(scripted(10), { now: 20, job: 'j1' });
     assert.equal(drunk.result.roll.total, 10 + 0 + 2);
     const after = drunk.cast;
     const fought = squad(after.character('sam'), after.character('joe'))
-      .fight(squad(after.character('rico')), { kind: 'real', start: 'ambush' })
+      .fight(squad(after.character('rico')), { kind: 'real', start: 'ambush', job: 'j1' })
       .roll(labelled({ initiative: [15, 14, 5], stealth: [8, 8], attack: [20], damage: [4, 4], nerve: [2] }), { now: 20 });
     const ambush = fought.result.events.find((e) => e.kind === 'ambush')!;
     assert.ok(ambush.kind === 'ambush' && ambush.stealth.modifiers.some((m) => m.reason === 'A good plan'));
@@ -211,15 +237,15 @@ describe('a plan’s effect on the job’s checks', { tags: ['unit'] }, () => {
       return s.cast.character('sam').planning.plan(s.job, { advantageOn: { member: 'sam', skill } }).roll(scripted(19), { now: 0 }).cast;
     };
     const persuaded = plan('persuasion');
-    const p = persuaded.character('sam').social.persuade(persuaded.character('rico')).roll(scripted(3, 18, 10), { now: 5 });
+    const p = persuaded.character('sam').social.persuade(persuaded.character('rico'), { job: 'j1' }).roll(scripted(3, 18, 10), { now: 5 });
     assert.equal(p.truth.check.active.edge, 'advantage');
     assert.equal(p.cast.job('j1').plan!.advantageUsed, true);
     const drinking = plan('carousing');
-    const d = drinking.character('sam').drink(scripted(3, 18), { now: 5 });
+    const d = drinking.character('sam').drink(scripted(3, 18), { now: 5, job: 'j1' });
     assert.equal(d.result.roll.edge, 'advantage');
     assert.equal(d.cast.job('j1').plan!.advantageUsed, true);
     const ambushing = plan('stealth');
-    const f = squad(ambushing.character('sam')).fight(squad(ambushing.character('rico')), { kind: 'real', start: 'ambush' }).roll(labelled({ initiative: [15, 5], stealth: [2, 18], attack: [20], damage: [4, 4], nerve: [2] }), { now: 5 });
+    const f = squad(ambushing.character('sam')).fight(squad(ambushing.character('rico')), { kind: 'real', start: 'ambush', job: 'j1' }).roll(labelled({ initiative: [15, 5], stealth: [2, 18], attack: [20], damage: [4, 4], nerve: [2] }), { now: 5 });
     assert.equal(f.cast.job('j1').plan!.advantageUsed, true);
   });
 });
@@ -230,7 +256,7 @@ describe('two jobs at once', { tags: ['unit'] }, () => {
     const b = a.cast.startJob({ kind: 'scam', dc: 10, members: ['rico', 'vic'], now: 0 });
     const planned = b.cast.character('sam').planning.plan('j1', { advantageOn: { member: 'sam', skill: 'larceny' } }).helpedBy(b.cast.character('joe')).roll(scripted(19, 2), { now: 1 }).cast;
     assert.equal(planned.job('j2').plan, undefined);
-    const used = planned.character('sam').check('larceny', 10).roll(scripted(5, 6), { now: 2 }).cast;
+    const used = planned.character('sam').check('larceny', 10, { job: 'j1' }).roll(scripted(5, 6), { now: 2 }).cast;
     assert.deepEqual([used.job('j1').plan!.advantageUsed, used.job('j2').plan], [true, undefined]);
     const ended = used.endJob('j1', { now: 3 });
     assert.deepEqual([ended.job('j1').endedAt, ended.job('j2').endedAt], [3, undefined]);
@@ -239,7 +265,7 @@ describe('two jobs at once', { tags: ['unit'] }, () => {
   test('a failed plan adds nothing to an ambush’s Stealth', () => {
     const s = started(20);
     const c = s.cast.character('sam').planning.plan(s.job).roll(scripted(8), { now: 0 }).cast;
-    const f = squad(c.character('sam')).fight(squad(c.character('rico')), { kind: 'real', start: 'ambush' }).roll(labelled({ initiative: [15, 5], stealth: [12], attack: [20], damage: [4, 4], nerve: [2] }), { now: 1 });
+    const f = squad(c.character('sam')).fight(squad(c.character('rico')), { kind: 'real', start: 'ambush', job: s.job }).roll(labelled({ initiative: [15, 5], stealth: [12], attack: [20], damage: [4, 4], nerve: [2] }), { now: 1 });
     const ambush = f.result.events.find((e) => e.kind === 'ambush')!;
     assert.ok(ambush.kind === 'ambush' && ambush.stealth.modifiers.every((m) => !m.reason.includes('plan')));
   });

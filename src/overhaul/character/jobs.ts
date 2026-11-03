@@ -60,7 +60,7 @@ export function openJobOf(jobs: readonly Job[], id: Id): Job | undefined {
   return jobs.find((j) => j.endedAt === undefined && j.members.includes(id));
 }
 
-/** What a character's open job's plan does to one of their checks: truly, and as its members believe it. */
+/** What a job's plan does to one of its members' checks made for it: truly, and as its members believe it. */
 export interface PlanEffect {
   readonly job: Job;
   readonly truth: Modifier | null;
@@ -69,12 +69,25 @@ export interface PlanEffect {
   readonly advantage: boolean;
 }
 
-export function planEffect(jobs: readonly Job[], id: Id, skill: Skill): PlanEffect | null {
-  const job = openJobOf(jobs, id);
-  const plan = job?.plan;
-  if (job === undefined || plan === undefined) return null;
+/**
+ * The plan's effect on a check of a skill made for a job: nothing for a check made for no job, by someone not taking part in
+ * it, or for a job with no plan. A plan helps only the checks made for its job. Throws RangeError for a job that does not
+ * exist or has ended.
+ */
+export function planEffect(jobs: readonly Job[], id: Id, skill: Skill, forJob: JobId | undefined): PlanEffect | null {
+  if (forJob === undefined) return null;
+  const job = jobs.find((j) => j.id === forJob);
+  if (job === undefined) throw new RangeError(`no job has the id ${forJob}`);
+  if (job.endedAt !== undefined) throw new RangeError(`job ${forJob} has ended`);
+  const plan = job.plan;
+  if (!job.members.includes(id) || plan === undefined) return null;
   const advantage = plan.outcome === 'critical-success' && !plan.advantageUsed && plan.advantageOn?.member === id && plan.advantageOn.skill === skill;
   return { job, truth: PLAN_EFFECT[plan.outcome], believed: PLAN_EFFECT[believedOutcome(plan.outcome)], advantage };
+}
+
+/** Throws RangeError unless whoever makes a check for a job is taking part in it. */
+export function assertOnJob(jobs: readonly Job[], c: { readonly id: Id; readonly name: string }, forJob: JobId | undefined): void {
+  if (forJob !== undefined && jobs.some((j) => j.id === forJob && !j.members.includes(c.id))) throw new RangeError(`${c.name} is not taking part in job ${forJob}`);
 }
 
 /** The jobs with a plan's advantage marked used. */

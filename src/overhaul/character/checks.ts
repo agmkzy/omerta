@@ -7,7 +7,7 @@ import type { CharacterRecord, Id } from './character';
 import { assertAvailable } from './condition';
 import { withConduct } from './conduct';
 import type { ItemOptions } from './items';
-import { PLAN_BANDS, believedOutcome, usingAdvantage, type Job, type JobId } from './jobs';
+import { PLAN_BANDS, assertOnJob, believedOutcome, usingAdvantage, type Job, type JobId } from './jobs';
 import { d20, everyone, rollParts, seenBy, truthOf, type Part, type PlanAdvantage } from './parts';
 import type { Roller } from './random';
 import { withCharacter } from './records';
@@ -56,10 +56,12 @@ interface SkillSetup {
   readonly dc: number;
   readonly items: ItemOptions;
   readonly extra: readonly Modifier[];
+  /** The job the check is made for, whose plan counts on it. */
+  readonly job?: JobId;
 }
 
 function skillPartsOf(s: SkillSetup): { parts: Part[]; advantage: PlanAdvantage } {
-  const { parts, advantage } = rollParts(s.data, s.c, s.skill, [], s.items);
+  const { parts, advantage } = rollParts(s.data, s.c, s.skill, [], s.items, s.job);
   return { parts: [...parts, ...s.extra.map(everyone)], advantage };
 }
 
@@ -67,6 +69,7 @@ function skillPartsOf(s: SkillSetup): { parts: Part[]; advantage: PlanAdvantage 
 export function skillCheck<C extends CastLike>(setup: SkillSetup, owner: C, commit: Commit<C>): SkillCheck<C> {
   if (!Number.isInteger(setup.dc)) throw new RangeError(`a DC is a whole number, got ${setup.dc}`);
   if (setup.c.condition.hitPoints === 0) throw new RangeError(`${setup.c.name} is unconscious`);
+  assertOnJob(setup.data.jobs, setup.c, setup.job);
   const { parts, advantage } = skillPartsOf(setup);
   return {
     skill: setup.skill,

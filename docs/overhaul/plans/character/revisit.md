@@ -19,8 +19,7 @@ Choices made while building that the plan did not settle. Each is built as descr
 
 | Point | Where it came up | Now |
 | --- | --- | --- |
-| **Which checks a plan counts on.** Every skill check by a member while the job is open: `check`, both rolls of a social check, drinking, and an ambush's Stealth (the plan's own example of a check around a fight); never a fight's own rolls. A character's `skills` show them as they stand, without any plan. | Step 10 | Built this way. |
-| **The chosen check.** A critical success's advantage is on one check chosen when planning: the first check of a chosen skill by a chosen member. | Step 10 | Built this way; the plan says "one check of the planner's choosing". |
+| **The chosen check.** A critical success's advantage is on one check chosen when planning: the first check of a chosen skill by a chosen member, made for the job. | Step 10 | Built this way; the plan says "one check of the planner's choosing". |
 | **Who believes the plan.** Every member of the job, not only the planner, sees the plan as the planner does: a critical failure as a failure. Anyone outside the job knows nothing of it. | Step 10 | Built this way. |
 | **What a job is.** A job's kind is free text, and a job records no outcome: it is open until the caller ends it. Starting and ending a job record no facts. A job of DC 20 or more is hard, and its members grow more ambitious when it starts. | Step 10 | Built this way. |
 | **Feelings follow whom someone is told did it.** The game's `learn` changes feelings only for someone who knows who did it; here, someone who only believes it (told "Joe did it") has their feelings change towards the one they blame, as the plan's re-belief has it. | Step 6 | Built this way. |

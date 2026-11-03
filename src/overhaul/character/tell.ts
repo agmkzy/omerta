@@ -10,6 +10,7 @@ import { checkOdds, resolveCheck, succeeded, type CheckResult, type Modifier, ty
 import type { CharacterRecord, Id } from './character';
 import { assertAvailable } from './condition';
 import { withConduct } from './conduct';
+import { assertOnJob, type JobId } from './jobs';
 import type { Fact, FactId } from './facts';
 import { partOf, passOn, rebelieve, toldVersion, type Belief, type Part as KnowledgePart, type Version } from './knowledge';
 import { believedActor, learnFact, meetPeople } from './learning';
@@ -40,6 +41,8 @@ export interface TellSetup {
   readonly teller: CharacterRecord;
   readonly listener: CharacterRecord;
   readonly fact: FactId;
+  /** The job the telling is for, whose plan counts on the teller's Persuasion. */
+  readonly job?: JobId;
 }
 
 /** What really happened when telling: for the simulation and tests, never shown to a character. */
@@ -97,7 +100,8 @@ export function tellCheck<C extends CastLike>(setup: TellSetup, owner: C, commit
   const { contradicted } = theirs ? compare(f, mine, theirs) : { contradicted: [] };
 
   // the roll's parts: the teller's Persuasion, how the listener feels about the teller, and what the listener knows of the parts told
-  const persuasion = rollParts(data, teller, 'persuasion', ['persuade']);
+  assertOnJob(data.jobs, teller, setup.job);
+  const persuasion = rollParts(data, teller, 'persuasion', ['persuade'], {}, setup.job);
   const feelings = (whose: 'actor' | 'target') =>
     feelingModifiers(
       'persuade',

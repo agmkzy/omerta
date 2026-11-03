@@ -50,12 +50,20 @@ export interface PlanAdvantage {
 const NO_ADVANTAGE: PlanAdvantage = { truth: false, knownTo: () => false };
 
 /**
- * A skill roll's parts in a cast: its own, and the plan of the character's open job, as it truly is and as the job's members
- * believe it; anyone outside the job knows nothing of it. With it, the plan's advantage if this is the chosen check.
+ * A skill roll's parts in a cast: its own, and, for a roll made for a job they are taking part in, the job's plan, as it truly
+ * is and as the job's members believe it; anyone outside the job knows nothing of it. With it, the plan's advantage if this
+ * is the chosen check.
  */
-export function rollParts(data: CastRecord, c: CharacterRecord, skill: Skill, situations: readonly Situation[], items: ItemOptions = {}): { readonly parts: Part[]; readonly advantage: PlanAdvantage } {
+export function rollParts(
+  data: CastRecord,
+  c: CharacterRecord,
+  skill: Skill,
+  situations: readonly Situation[],
+  items: ItemOptions = {},
+  job?: JobId,
+): { readonly parts: Part[]; readonly advantage: PlanAdvantage } {
   const own = skillParts(c, skill, situations, items);
-  const plan = planEffect(data.jobs, c.id, skill);
+  const plan = planEffect(data.jobs, c.id, skill, job);
   if (plan === null) return { parts: own, advantage: NO_ADVANTAGE };
   const members = plan.job.members;
   const part: Part = { truth: plan.truth, knownTo: (v) => (members.includes(v) ? plan.believed : null) };

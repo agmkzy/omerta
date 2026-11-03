@@ -9,7 +9,7 @@ import { FULL_REST, assertAvailable, conditionOf, effectModifiers, restingAt, ty
 import { currentTemperament, withConduct, type ConductStep } from './conduct';
 import { DICE } from './dice';
 import { auditFacts, type Fact, type FactId, type FactInput } from './facts';
-import { HARD_JOB_DC, assertJobs, jobId, openJobOf, planEffect, usingAdvantage, type Job, type JobId } from './jobs';
+import { HARD_JOB_DC, assertJobs, assertOnJob, jobId, openJobOf, planEffect, usingAdvantage, type Job, type JobId } from './jobs';
 import { rollParts, truthOf } from './parts';
 import { assertFight, fight, type FightKind, type FightResult, type FightStart } from './fight';
 import { applyFight, type FightRecordOptions } from './fight-record';
@@ -150,30 +150,38 @@ export interface Character {
   takeOff(item: Item): Cast;
   /**
    * Drinks a bottle of spirits at `now`, with anyone else there, and the bottle is used up: a Carousing check against
-   * DRINK_DC, and on a failure the character is drunk.
+   * DRINK_DC, and on a failure the character is drunk. Drinking for a job (with a mark, say) counts its plan.
    */
-  drink(roller: Roller, when: { readonly now: number; readonly with?: readonly Character[] }): { readonly result: CheckResult; readonly drunk: boolean; readonly cast: Cast };
-  /** A skill check against a DC, in a situation and with items used: a check to inspect, then roll. */
-  check(skill: Skill, dc: number, options?: ItemOptions): SkillCheck<Cast>;
+  drink(roller: Roller, when: { readonly now: number; readonly with?: readonly Character[] } & ForJob): { readonly result: CheckResult; readonly drunk: boolean; readonly cast: Cast };
+  /** A skill check against a DC, in a situation and with items used, and for a job if it is part of one: a check to inspect, then roll. */
+  check(skill: Skill, dc: number, options?: ItemOptions & ForJob): SkillCheck<Cast>;
   /** Planning a job they are taking part in, optionally choosing the check a critical success gives advantage on. */
   readonly planning: { plan(job: Job | JobId, options?: { readonly advantageOn?: { readonly member: Id; readonly skill: Skill } }): PlanCheck<Cast> };
   /** A fight with another character in the cast: one against one, as `squad(this).fight(squad(other), options)`. */
   fight(other: Character, options: FightOptions): FightCheck;
   /** Social actions on another character in the cast, each a check to inspect, then roll. */
   readonly social: {
-    intimidate(target: Character): SocialCheck<Cast>;
-    persuade(target: Character): SocialCheck<Cast>;
+    intimidate(target: Character, options?: ForJob): SocialCheck<Cast>;
+    persuade(target: Character, options?: ForJob): SocialCheck<Cast>;
     /** A lie needs its claim before it can be rolled. */
-    deceive(target: Character): { claim(claim: Claim): SocialCheck<Cast> };
+    deceive(target: Character, options?: ForJob): { claim(claim: Claim): SocialCheck<Cast> };
     /**
      * Telling the listener what they believe of a fact: a check, since telling someone something that contradicts what they
      * believe is a roll. Throws RangeError for a fact they do not know, or one they know is false (telling it would be a lie).
      */
-    tell(listener: Character, fact: FactId): TellCheck<Cast>;
+    tell(listener: Character, fact: FactId, options?: ForJob): TellCheck<Cast>;
   };
 }
 
-export interface FightOptions {
+/**
+ * The job a check is made for, if it is part of one. A plan counts only on the checks made for its job, by those taking part
+ * in it; anything else they do while the job is open is unaffected.
+ */
+export interface ForJob {
+  readonly job?: Job | JobId;
+}
+
+export interface FightOptions extends ForJob {
   readonly kind: FightKind;
   /** How a real fight starts. Default an ordinary fight. */
   readonly start?: FightStart;
@@ -201,13 +209,15 @@ export function squad(...members: Character[]): Squad {
   if (members.some((m) => m.cast !== first.cast)) throw new RangeError('a squad’s members must be from one cast');
   return {
     members,
-    fight(other, { kind, start }) {
+    fight(other, { kind, start, job }) {
       if (other.members[0]!.cast !== first.cast) throw new RangeError('the other squad is from another cast');
+      const forJob = job === undefined ? undefined : jobIn(first.cast.data, job);
+      if (forJob && !members.some((m) => forJob.members.includes(m.id))) throw new RangeError(`no one in the attacking squad is taking part in job ${forJob.id}`);
       const spec = (d: CastRecord) => {
         const of = (s: readonly Character[]) => s.map((m) => d.characters.find((c) => c.id === m.id)!);
-        // an ambush's Stealth rolls are checks around the fight, so the attackers' plans count on them
+        // an ambush's Stealth rolls are checks around the fight, so for a fight that is part of a job its plan counts on them
         const stealth = new Map(members.flatMap((m) => {
-          const plan = planEffect(d.jobs, m.id, 'stealth');
+          const plan = planEffect(d.jobs, m.id, 'stealth', forJob?.id);
           return plan ? [[m.id, { modifiers: plan.truth ? [plan.truth] : [], edge: plan.advantage ? ('advantage' as const) : ('none' as const), ...(plan.advantage && { job: plan.job.id }) }] as const] : [];
         }));
         return { attackers: of(members), defenders: of(other.members), kind, ...(start && { start }), stealth };
@@ -469,20 +479,22 @@ function characterHandleOf(data: CharacterRecord, owner: Cast, commit: Commit): 
     hide: (item) => move(item, 'shown', 'carried'),
     wear: (item) => move(item, 'carried', 'worn'),
     takeOff: (item) => move(item, 'worn', 'carried'),
-    drink(roller, { now, with: company = [] }) {
+    drink(roller, { now, with: company = [], job }) {
       assertTime(now);
       for (const other of company) if (other.cast !== owner || other.id === data.id) throw new RangeError(`${other.name} is not someone else in this cast`);
       for (const c of [data, ...company.map((o) => o.data)]) assertAvailable(c, now, 'drink');
       if (!data.inventory.items.some((h) => h.item === 'bottle')) throw new RangeError(`${data.name} has no bottle of spirits`);
-      const carousing = rollParts(owner.data, data, 'carousing', []);
+      const forJob = job === undefined ? undefined : jobIn(owner.data, job).id;
+      assertOnJob(owner.data.jobs, data, forJob);
+      const carousing = rollParts(owner.data, data, 'carousing', [], {}, forJob);
       const result = resolveCheck({ dice: DICE.d20, edge: carousing.advantage.truth ? 'advantage' : 'none', modifiers: truthOf(carousing.parts), dc: DRINK_DC }, roller);
       const drunk = !passes(result.margin) || condition.effects.includes('drunk');
-      const job = carousing.advantage.truth ? carousing.advantage.job : undefined;
+      const advantageOf = carousing.advantage.truth ? carousing.advantage.job : undefined;
       const spent = (d: CastRecord): CastRecord => ({ ...d, transfers: [...d.transfers, { from: data.id, to: WORLD, amount: 1, item: 'bottle', why: 'drunk', at: now }] });
       // drinking together means being together: everyone there meets
       const together = allMeet([data.id, ...company.map((o) => o.id)]);
       const met = (d: CastRecord): CastRecord => ({ ...d, characters: d.characters.map((c) => (together.has(c.id) ? meetPeople(c, together.get(c.id)!, now) : c)) });
-      const next = commit((d) => withCharacter(met(spent(job ? { ...d, jobs: usingAdvantage(d.jobs, job) } : d)), data.id, (c) => {
+      const next = commit((d) => withCharacter(met(spent(advantageOf ? { ...d, jobs: usingAdvantage(d.jobs, advantageOf) } : d)), data.id, (c) => {
         const i = c.inventory.items.findIndex((h) => h.item === 'bottle');
         return withConduct(
           {
@@ -501,22 +513,24 @@ function characterHandleOf(data: CharacterRecord, owner: Cast, commit: Commit): 
     fight(other, options) {
       return squad(self).fight(squad(other), options);
     },
-    check: (skill, dc, options = {}) => skillCheck({ data: owner.data, c: data, skill, dc, items: options, extra: [] }, owner, commit),
+    check: (skill, dc, { job, ...items } = {}) =>
+      skillCheck({ data: owner.data, c: data, skill, dc, items, extra: [], ...(job !== undefined && { job: jobIn(owner.data, job).id }) }, owner, commit),
     planning: {
       plan: (job, options = {}) => planCheck({ data: owner.data, planner: data, job: jobIn(owner.data, job), ...(options.advantageOn && { advantageOn: options.advantageOn }) }, owner, commit),
     },
     get social() {
-      const check = (action: SocialAction, target: Character, claim?: Claim) => {
+      const forJob = ({ job }: ForJob) => (job === undefined ? {} : { job: jobIn(owner.data, job).id });
+      const check = (action: SocialAction, target: Character, options: ForJob, claim?: Claim) => {
         if (target.cast !== owner) throw new RangeError(`${target.name} is from another cast`);
-        return socialCheck({ action, data: owner.data, actor: data, target: target.data, extra: [], ...(claim && { claim }) }, owner, commit);
+        return socialCheck({ action, data: owner.data, actor: data, target: target.data, extra: [], ...(claim && { claim }), ...forJob(options) }, owner, commit);
       };
       return {
-        intimidate: (target: Character) => check('intimidate', target),
-        persuade: (target: Character) => check('persuade', target),
-        deceive: (target: Character) => ({ claim: (claim: Claim) => check('deceive', target, claim) }),
-        tell: (listener: Character, fact: FactId) => {
+        intimidate: (target: Character, options: ForJob = {}) => check('intimidate', target, options),
+        persuade: (target: Character, options: ForJob = {}) => check('persuade', target, options),
+        deceive: (target: Character, options: ForJob = {}) => ({ claim: (claim: Claim) => check('deceive', target, options, claim) }),
+        tell: (listener: Character, fact: FactId, options: ForJob = {}) => {
           if (listener.cast !== owner) throw new RangeError(`${listener.name} is from another cast`);
-          return tellCheck({ data: owner.data, teller: data, listener: listener.data, fact }, owner, commit);
+          return tellCheck({ data: owner.data, teller: data, listener: listener.data, fact, ...forJob(options) }, owner, commit);
         },
       };
     },

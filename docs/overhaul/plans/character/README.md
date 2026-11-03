@@ -513,7 +513,7 @@ An optional roll made before a job or a move. Its result becomes modifiers on th
 
 - One character plans, rolling Planning (Intelligence or Wisdom, whichever is higher) against a DC the job sets: for example 10 for a simple job, 15 for a tricky one, 20 for a hard one.
 - One other character taking part in the job can help, giving the planner advantage on the roll. More helpers add nothing more.
-- The result applies to every skill check made by anyone taking part in the job while it is open. Following the plan is not optional, so a bad plan cannot be dodged. A plan has its own bands: a critical failure needs a margin of −11 or worse, rather than the usual −6 or worse.
+- The result applies to every skill check made for the job, by anyone taking part in it, while it is open: the caller names the job on the check (`{ job }`), and nothing else they do meanwhile is affected (decided 3 November 2026). A social roll for the job counts it on the side of whoever is taking part, so a guard talking to a burglar meets the burglar's plan. Following the plan is not optional, so a bad plan cannot be dodged on the job's own checks. A plan has its own bands: a critical failure needs a margin of −11 or worse, rather than the usual −6 or worse.
 
 | Outcome | Margin | Effect on the job's checks |
 | --- | --- | --- |
@@ -543,8 +543,9 @@ So a capable planner helps, and an untrained one planning a hard job alone makes
 const started = everyone.startJob({ kind: 'burglary', dc: 15, members: ['sam', 'joe'], now });
 const planned = started.cast.character('sam').planning.plan(started.job).helpedBy('joe').roll(dice, { now });
 const sam = planned.cast.character('sam');
-sam.check('larceny', 15).explain({ for: sam });   // includes "A good plan +2", as Sam believes it
-sam.check('larceny', 15).roll(dice, { now, witnesses: ['joe'] }).result({ for: joe });   // Joe watched, so sees how it went
+sam.check('larceny', 15, { job: started.job }).explain({ for: sam });   // includes "A good plan +2", as Sam believes it
+sam.check('larceny', 15).explain({ for: sam });                         // not for the job: no plan
+sam.check('larceny', 15, { job: started.job }).roll(dice, { now, witnesses: ['joe'] }).result({ for: joe });   // Joe watched, so sees how it went
 ```
 
 Each step uses the cast the previous one returned, so no handle is stale.
@@ -553,7 +554,7 @@ Each step uses the cast the previous one returned, so no handle is stale.
 
 ### Jobs
 
-A job is a record in the cast: an id, its kind, its members, the DC a plan for it rolls against, its plan if it has one, and when it started and ended. While it is open, every skill check by a member, other than fight rolls, includes the plan's modifier. It ends when the caller ends it (`cast.endJob(job, { now })`), and a member can belong to one open job at a time.
+A job is a record in the cast: an id, its kind, its members, the DC a plan for it rolls against, its plan if it has one, and when it started and ended. While it is open, every skill check made for it by a member, other than fight rolls, includes the plan's modifier. It ends when the caller ends it (`cast.endJob(job, { now })`), and a member can belong to one open job at a time.
 
 ## Bookkeeping
 

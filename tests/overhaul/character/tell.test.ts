@@ -146,7 +146,7 @@ describe('telling what one only believes', { tags: ['unit'] }, () => {
     assert.equal(known[1]!.value, 1);
     const { cast: working, job } = c.startJob({ kind: 'talking round', dc: 5, members: ['joe'], now: 25 });
     const planned = working.character('joe').planning.plan(job, { advantageOn: { member: 'joe', skill: 'persuasion' } }).roll(scripted(20), { now: 25 }).cast;
-    const check = planned.character('joe').social.tell(planned.character('rico'), 'f1');
+    const check = planned.character('joe').social.tell(planned.character('rico'), 'f1', { job });
     assert.ok(check.odds({ for: planned.character('joe') }).success > check.odds({ for: planned.character('rico') }).success);
     const out = check.roll(scripted(2, 18), { now: 30 });
     assert.equal(out.truth.roll!.roll.edge, 'advantage');
