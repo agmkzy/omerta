@@ -519,9 +519,11 @@ How a character gets better over time (direction decided 3 November 2026; not ye
 - **Rank has no part in it:** rank follows what a character does, and never sets their abilities ([Before the swap](#before-the-swap)).
 - **Every character advances,** the player included.
 - **Auto-levelling:** a character whose points no one chooses puts them where their background's priorities say (the same
-  attribute order that placed their rolled scores). The player chooses their own.
+  attribute order that placed their rolled scores), taking turns through the top three: a fighter's go to Strength, then
+  Constitution, then Charisma, then Strength again. An attribute already at 20 is passed over for the next in the order.
+  The player chooses their own.
 
-Open: the auto-levelling strategy itself (for example, always the top priority, or keeping to the order), whether the
+Open: whether the
 proficiency bonus rises with level, what unlocks each skill's training, and whether expert is unlocked the same way as
 trained. These replace the game's skills growing with use (`people.ts` `grow`).
 
