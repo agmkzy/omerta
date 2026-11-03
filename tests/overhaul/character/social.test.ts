@@ -267,6 +267,12 @@ describe('rolling a persuasion', { tags: ['unit'] }, () => {
     assert.equal(partial.truth.ending, 'partial');
     assert.equal(partial.cast.character('rico').towards(partial.cast.character('sam'))!.trust, 0.5);
   });
+
+  test('a partial success is seen by the persuader as agreeing for something in return, since the target says so', () => {
+    const partial = roll(11, 10);
+    assert.equal(partial.result({ for: partial.cast.character('rico') }).ending, 'partial');
+    assert.equal(partial.result({ for: partial.cast.character('sam') }).ending, 'agrees, for something in return');
+  });
 });
 
 describe('a lie about who did it', { tags: ['unit'] }, () => {

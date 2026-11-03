@@ -19,7 +19,7 @@ Choices made while building that the plan did not settle. Each is built as descr
 
 | Point | Where it came up | Now |
 | --- | --- | --- |
-| **How a social roll looks to others.** Only the target knows exactly how it went. Anyone else sees: for intimidation, gives in, resists or provoked; for persuasion, agrees or declines; for deception, no sign, unless the target sees through it. So a liar cannot tell whether a lie was believed. | Step 7 | Built this way. |
+| **How a roll looks to someone who was not there.** `result({ for: viewer })` gives the target the true ending and anyone else in the cast how it looked, whether or not they were the actor or a witness, so someone who was not there can still ask. | Point 2 of the review | Built this way; it should probably give them nothing. |
 | **Who knows a modifier.** Situational modifiers added with `.with()` are known to everyone present. Anyone but the target judges a shown weapon by the weapons the target shows. Anyone who saw a fact with the target knows the target saw it; whoever told the target knows what they told. | Step 7 | Built this way. |
 | **Lies and witnesses.** Witnesses to a deception meet those in it but learn nothing, and the lie fact records no witnesses. | Step 7 | As the plan has it for now; what witnesses believe is under the plan's Later. |
 | **Lies the liar may tell.** A claim must differ from what the liar believes (otherwise it is telling, not lying), and a lie about a fact the liar invented is refused: a new lie invents a new fact. | Step 7 | Built this way. |

@@ -28,7 +28,7 @@ export type Ending = Outcome | 'provoked';
 export const ENDINGS = [...OUTCOMES, 'provoked'] as const satisfies readonly Ending[];
 
 /** How an ending looks to anyone but the target, who alone knows exactly how it went for them. */
-export type Appearance = 'gives in' | 'resists' | 'provoked' | 'agrees' | 'declines' | 'sees through it' | 'no sign';
+export type Appearance = 'gives in' | 'resists' | 'provoked' | 'agrees' | 'agrees, for something in return' | 'declines' | 'sees through it' | 'no sign';
 
 export interface SocialActionInfo {
   readonly name: string;
@@ -75,7 +75,8 @@ export const SOCIAL_ACTION_INFO: { readonly [A in SocialAction]: SocialActionInf
       failure: 'declines',
       'critical-failure': 'declines and is put off, making them harder to persuade next time',
     },
-    appearance: { 'critical-success': 'agrees', success: 'agrees', partial: 'agrees', failure: 'declines', 'critical-failure': 'declines' },
+    // a price is said out loud, so anyone there hears it
+    appearance: { 'critical-success': 'agrees', success: 'agrees', partial: 'agrees, for something in return', failure: 'declines', 'critical-failure': 'declines' },
     fact: 'persuasion',
   },
   deceive: {

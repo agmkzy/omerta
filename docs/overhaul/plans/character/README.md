@@ -285,6 +285,16 @@ Intimidation also changes how the actor feels about the target:
 
 **Provoked** is returned as an outcome of its own, and the caller decides what follows, such as starting a fight. The roll never starts one itself.
 
+**How a roll looks to anyone but the target** (decided 3 November 2026): only the target knows exactly how it ended. Everyone else there, the actor included, sees what the target says or does, never what they only feel:
+
+| Action | What everyone else sees |
+| --- | --- |
+| Intimidate | Gives in (partial success or better), resists (failure or critical failure), or provoked |
+| Persuade | Agrees (success or better); agrees, for something in return (partial success, since the target says so); declines (failure or critical failure) |
+| Deceive | No sign, unless the target sees through it (critical failure) |
+
+So resentment after giving in, doubts about a lie, and being put off persuasion stay private, and a liar cannot tell whether a lie was believed. What a price is, and what follows if it is not paid, is for the caller; it is [before the swap](#before-the-swap).
+
 **Each social roll records a fact,** and that fact is the recorded cause of its aftermath: see [Fact kinds](#fact-kinds).
 
 ## Knowledge
@@ -560,6 +570,7 @@ What must be built in the overhaul before it replaces the game's systems in one 
 - **Taking by force and buying** items.
 - **What really drives loyalty, ambition and sociability:** keeping or breaking one's word, rank and standing, and a social life. For now they move only with the small signals in [Temperament moves with conduct](#temperament-moves-with-conduct).
 - **Lies told in front of others:** what witnesses to a deception believe.
+- **The price of a partial persuasion:** what the target wants in return, recorded as one of the game's favours owed (`addFavour`), and what follows if it is not paid.
 - **Clearing a name:** whether learning someone was falsely blamed repairs the feelings the lie caused.
 - **Retention:** pruning old facts and transfers, with the summaries and balances they leave.
 - **The shadow run,** and the save migration from the game's format.
