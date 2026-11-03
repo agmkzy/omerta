@@ -16,6 +16,7 @@ describe('createCharacter', { tags: ['unit'] }, () => {
       condition: { hitPoints: 10, effects: [] },
       inventory: { cash: 0, items: [] },
       knowledge: {},
+      relationships: {},
     });
   });
 

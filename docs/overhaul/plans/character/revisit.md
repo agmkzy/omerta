@@ -18,6 +18,10 @@ into the plan and is taken off this list. What the plan itself leaves for slotti
 | **Taking damage.** `damage(n)` is a plain method the plan does not name. | Step 3 | Built for fights (step 9) and tests. |
 | **A victim always learns.** The game can record a fact its victim does not know about yet (`victimKnows: false`), and can make a fact public to others (`broadcast`). | Step 5 | Neither is ported. |
 | **Unconscious witnesses.** Anyone named as a witness learns a fact, even if unconscious at the time. | Step 5 | Not checked. |
+| **Feelings follow whom someone is told did it.** The game's `learn` changes feelings only for someone who knows who did it; here, someone who only believes it (told "Joe did it") has their feelings change towards the one they blame, as the plan's re-belief has it. | Step 6 | Built this way. |
+| **Telling is not meeting.** Two characters meet by taking part in the same roll, fight or recorded fact; being told a fact makes the listener no longer a stranger to those in it, but does not make teller and listener meet, so their familiarity does not grow. | Step 6 | Built this way. |
+| **Who is close to a victim.** The game's `learn` has anyone fond of a victim, or in their family, resent whoever hurt them. | Step 6 | Only affection counts: the overhaul has no families yet. |
+| **Minor facts.** The game's `minor` facts change no one's respect. | Step 6 | Not ported: the overhaul's facts have no `minor`. |
 
 ## Waiting for a later step
 
@@ -25,6 +29,9 @@ into the plan and is taken off this list. What the plan itself leaves for slotti
 | --- | --- | --- |
 | **Pruning old facts and transfers.** Nothing is pruned yet. The short summary a version keeps once its fact is gone, and the balance kept when old transfers go, are not built, since keeping them now would copy facts and balances that still exist. | Steps 4 and 5 | Retention |
 | **Results given to a viewer.** Drinking returns the plain check result. | Step 4 | Social checks (step 7) |
+| **Feelings as modifiers on social checks.** The plan's tables are built (`feelingModifiers`) but nothing rolls a social check yet. | Step 6 | Social checks (step 7) |
+| **A beating's change scaled by damage.** The plan scales the victim's change by the share of hit points lost, never below a successful intimidation's, and a fled fight's with no minimum. For now a `beating` or `fight` fact changes feelings by the game's rows unscaled. | Step 6 | Fights (step 9) |
+| **Courage from current traits.** Learning uses the learner's starting courage. | Step 6 | Conduct (step 8), which works out current traits |
 | **The lab's playground.** It still runs on the lab's code. | Step 1 | Fights in the overhaul (step 9), then it can be pointed at the overhaul and the lab's code removed |
 
 ## Not yet verified
@@ -43,4 +50,5 @@ These were reported when they were made and stand unless revisited.
 - **A new character's cash cannot be set directly:** opening balances are transfers from the world (step 4).
 - **Only weapons can be shown, and only clothing worn** (step 4).
 - **Time is in minutes,** as in the game (step 3).
-- **The game's fact kinds are read from its source as text** by a test, so they cannot drift apart without the overhaul importing the game (step 5).
+- **The game's fact kinds and learning tables are read from its source as text** by tests, so they cannot drift apart without the overhaul importing the game (steps 5 and 6).
+- **Learning about someone makes them no longer a stranger,** even for a fact whose kind changes no feelings, such as a theft (step 6).

@@ -10,7 +10,9 @@ import { DICE } from './dice';
 import { auditFacts, factId, type Fact, type FactId, type FactInput } from './facts';
 import { DRINK_DC, ITEM_INFO, itemModifiers, type InventoryRecord, type Item, type ItemOptions, type ItemState } from './items';
 import { auditKnowledge, firstVersions, toldVersion, type Knowledge, type Version } from './knowledge';
+import { learnFact, meetPeople, meetings } from './learning';
 import type { Roller } from './random';
+import type { Relationship, Relationships } from './relationships';
 import { SKILLS, attributeUsed, skillModifiers, type Proficiency, type Skill } from './skills';
 import type { Temperament } from './temperament';
 import { HOUR, assertTime } from './time';
@@ -18,7 +20,7 @@ import { WORLD, auditCash, type Party, type Transfer } from './transfers';
 import { seen, type Seen } from './view';
 
 /** Increment when the saved shape changes, and add a migration in save.ts. */
-export const CAST_FORMAT = 4;
+export const CAST_FORMAT = 5;
 
 export interface CastRecord {
   readonly format: number;
@@ -51,8 +53,9 @@ export interface Cast {
   /** Throws RangeError for an id not recorded. */
   fact(id: FactId): Fact;
   /**
-   * Records a fact at `now`, learned by whoever did it, whoever it was done to and the witnesses. Throws RangeError for a
-   * fact that names someone not in the cast, or a time before the last fact.
+   * Records a fact at `now`. Everyone it names meets, and whoever did it, whoever it was done to and the witnesses learn it,
+   * their feelings changing by the learning tables. Throws RangeError for a fact that names someone not in the cast, or a
+   * time before the last fact.
    */
   record(fact: Omit<FactInput, 'invented'>, when: { readonly now: number; readonly witnesses?: readonly Id[] }): { readonly fact: Fact; readonly cast: Cast };
 }
@@ -84,6 +87,9 @@ export interface Character {
   readonly knowledge: Knowledge;
   /** Their version of a fact, or undefined if they do not know it. */
   versionOf(fact: FactId): Version | undefined;
+  readonly relationships: Relationships;
+  /** How they feel about another character, or undefined if they are strangers. */
+  towards(other: Character): Relationship | undefined;
   /** A skill as it stands in a situation and with the items used for the check, such as Larceny for locks using lockpicks. */
   skill(skill: Skill, options?: ItemOptions): SkillStatus;
   /** Whether the character is resting at `now`. */
@@ -110,9 +116,9 @@ export interface Character {
   wear(item: Item): Cast;
   takeOff(item: Item): Cast;
   /**
-   * A new cast in which the character has told the listener what they believe of a fact, at `now`. A listener who already
-   * knows it keeps their own version. Throws RangeError for a fact the character does not know, or one they know is false
-   * (telling it would be a lie).
+   * A new cast in which the character has told the listener what they believe of a fact, at `now`, and the listener's
+   * feelings have changed by the learning tables. A listener who already knows it keeps their own version. Throws RangeError
+   * for a fact the character does not know, or one they know is false (telling it would be a lie).
    */
   tell(listener: Character, fact: FactId, when: { readonly now: number }): Cast;
   /** Drinks a bottle of spirits, which is used up: a Carousing check against DRINK_DC, and on a failure the character is drunk. */
@@ -141,6 +147,8 @@ export function castOf(data: CastRecord): Cast {
   auditCash(data.characters, data.transfers);
   auditFacts(data.facts, new Set(records.keys()), data.nextId);
   auditKnowledge(data.characters, data.facts);
+  for (const c of data.characters)
+    for (const id of Object.keys(c.relationships)) if (!records.has(id)) throw new RangeError(`${c.id} has a relationship with ${id}, who is not in the cast`);
   const facts = new Map(data.facts.map((f) => [f.id, f]));
   const handles = new Map<Id, Character>();
   let current = true;
@@ -190,13 +198,15 @@ export function castOf(data: CastRecord): Cast {
     record(input, { now, witnesses = [] }) {
       const made: Fact = { ...input, id: factId(data.nextId), at: now, witnesses: [...witnesses] };
       const learners = new Map(firstVersions(made));
+      const meets = meetings(made);
       const next = change(() => ({
         ...data,
         facts: [...data.facts, made],
         nextId: data.nextId + 1,
         characters: data.characters.map((c) => {
+          // (everyone who learns a fact as it is recorded is named in it, so meets the others it names)
           const v = learners.get(c.id);
-          return v ? createCharacter({ ...c, knowledge: { ...c.knowledge, [made.id]: v } }) : c;
+          return v ? createCharacter(learnFact(meetPeople(c, meets.get(c.id)!, now), made, v, now)) : c;
         }),
       }));
       return { fact: made, cast: next };
@@ -245,6 +255,11 @@ function characterHandle(data: CharacterRecord, owner: Cast, update: Update): Ch
     cash: data.inventory.cash,
     knowledge: data.knowledge,
     versionOf: (fact) => data.knowledge[fact],
+    relationships: data.relationships,
+    towards(other) {
+      if (other.cast !== owner) throw new RangeError(`${other.name} is from another cast`);
+      return data.relationships[other.id];
+    },
     restingAt(now) {
       assertTime(now);
       return data.condition.rest !== undefined && data.condition.rest.from <= now && now < data.condition.rest.until;
@@ -281,7 +296,7 @@ function characterHandle(data: CharacterRecord, owner: Cast, update: Update): Ch
       if (theirs.knownFalse) throw new RangeError(`${data.name} knows ${fact} is false, so telling it would be a lie`);
       assertTime(now);
       if (now < theirs.learnedAt) throw new RangeError(`${data.name} cannot tell ${fact} at ${now}, before learning it at ${theirs.learnedAt}`);
-      return update(listener.id, (c) => (c.knowledge[fact] ? c : { ...c, knowledge: { ...c.knowledge, [fact]: toldVersion(data.id, theirs, now) } }));
+      return update(listener.id, (c) => (c.knowledge[fact] ? c : learnFact(c, owner.fact(fact), toldVersion(data.id, theirs, now), now)));
     },
     drink(roller) {
       if (condition.unconscious) throw new RangeError(`${data.name} is unconscious`);

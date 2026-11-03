@@ -7,6 +7,7 @@ import { BACKGROUNDS, rollCharacter } from '../../../src/overhaul/character/back
 import { CAST_FORMAT, cast, castOf } from '../../../src/overhaul/character/cast';
 import { createCharacter } from '../../../src/overhaul/character/character';
 import { roller, seeded } from '../../../src/overhaul/character/random';
+import { NEW_RELATIONSHIP } from '../../../src/overhaul/character/relationships';
 import { WORLD } from '../../../src/overhaul/character/transfers';
 import { MIGRATIONS, NewerFormatError, loadCast, migrate, readCast, type Migration } from '../../../src/overhaul/character/save';
 
@@ -187,6 +188,34 @@ describe('loadCast', { tags: ['unit'] }, () => {
     assert.deepEqual(loadCast(invented).character('x').versionOf('f1'), { ...v, knownFalse: true });
   });
 
+  test('loads a cast saved in format 5, which must keep loading', () => {
+    const { cast: loaded, ignored } = readCast(fixture('cast-format5.json'));
+    assert.deepEqual(ignored, []);
+    const ricoOnSam = loaded.character('rico').towards(loaded.character('sam'))!;
+    assert.equal(ricoOnSam.grudge, 0.35);
+    assert.deepEqual(ricoOnSam.grudgeReason, { fact: 'f1', at: 1440, amount: 0.35 });
+    assert.equal(loaded.character('sam').towards(loaded.character('rico'))!.lastMet, 1440);
+  });
+
+  test('restores relationships, filling in feelings not saved, and leaves out fields it does not recognise', () => {
+    const recorded = loadCast(throughJson(everyone.data)).record({ kind: 'beating', actor: 'sam', victim: 'rico' }, { now: 10 }).cast;
+    assert.deepEqual(loadCast(throughJson(recorded.data)).data, recorded.data);
+    const { cast: loaded, ignored } = readCast({
+      format: CAST_FORMAT,
+      characters: [{ id: 'x', name: 'X', relationships: { y: { fear: 0.4, mood: 'wary', regardReason: { fact: 'f1', at: 0, amount: 0.1, note: 'kind' } } } }, { id: 'y', name: 'Y' }],
+    });
+    assert.deepEqual(loaded.character('x').towards(loaded.character('y')), { ...NEW_RELATIONSHIP, fear: 0.4, regardReason: { fact: 'f1', at: 0, amount: 0.1 } });
+    assert.deepEqual([...ignored].sort(), ['characters[0].relationships.y.mood', 'characters[0].relationships.y.regardReason.note']);
+  });
+
+  test('rejects relationships of the wrong shape, out of range, or with someone not in the cast', () => {
+    const relating = (relationships: unknown) => ({ format: CAST_FORMAT, characters: [{ id: 'x', name: 'X', relationships }, { id: 'y', name: 'Y' }] });
+    for (const relationships of [[], { y: null }, { y: { trust: '1' } }, { y: { lastMet: '0' } }, { y: { grudgeReason: { at: 0, amount: 1 } } }, { y: { grudgeReason: { fact: 'f1', at: '0', amount: 1 } } }])
+      assert.throws(() => loadCast(relating(relationships)), TypeError, JSON.stringify(relationships));
+    for (const relationships of [{ y: { trust: 2 } }, { z: {} }, { x: {} }])
+      assert.throws(() => loadCast(relating(relationships)), RangeError, JSON.stringify(relationships));
+  });
+
   test('rejects a condition of the wrong shape or out of range', () => {
     for (const condition of [[], { hitPoints: '3' }, { effects: 'shaken' }, { rest: { from: 0 } }, { rest: 5 }])
       assert.throws(() => loadCast(one({ id: 'x', name: 'X', condition })), TypeError, JSON.stringify(condition));
@@ -220,11 +249,20 @@ describe('migrations', { tags: ['unit'] }, () => {
 
   test('3 to 4 gives the cast no facts and an id counter at 1, and each character no knowledge', () => {
     const d: Record<string, unknown> = { format: 3, characters: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B', knowledge: {} }, null], transfers: [] };
-    migrate(d, 3);
+    migrate(d, 3, MIGRATIONS.slice(0, 3));
     assert.deepEqual(d, { format: 3, characters: [{ id: 'a', name: 'A', knowledge: {} }, { id: 'b', name: 'B', knowledge: {} }, null], transfers: [], facts: [], nextId: 1 });
     const notAList: Record<string, unknown> = { format: 3, characters: 'none', facts: ['kept'], nextId: 7 };
-    migrate(notAList, 3);
+    migrate(notAList, 3, MIGRATIONS.slice(0, 3));
     assert.deepEqual(notAList, { format: 3, characters: 'none', facts: ['kept'], nextId: 7 });
+  });
+
+  test('4 to 5 gives each character no relationships', () => {
+    const d: Record<string, unknown> = { format: 4, characters: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B', relationships: {} }, null] };
+    migrate(d, 4, MIGRATIONS.slice(0, 4));
+    assert.deepEqual(d, { format: 4, characters: [{ id: 'a', name: 'A', relationships: {} }, { id: 'b', name: 'B', relationships: {} }, null] });
+    const notAList: Record<string, unknown> = { format: 4, characters: 'none' };
+    migrate(notAList, 4, MIGRATIONS.slice(0, 4));
+    assert.deepEqual(notAList, { format: 4, characters: 'none' });
   });
 
   test('run in order from the saved format to the newest', () => {

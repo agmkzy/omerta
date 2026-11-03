@@ -11,6 +11,7 @@ import { STORED_EFFECTS, type ConditionRecord, type StoredEffect } from './condi
 import { FACT_KINDS, type Fact, type FactKind } from './facts';
 import { ITEMS, type HeldItem, type InventoryRecord, type Item } from './items';
 import type { How, Knowledge, Source, Version } from './knowledge';
+import { FEELINGS, NEW_RELATIONSHIP, type Reason, type Relationship, type Relationships } from './relationships';
 import type { Transfer } from './transfers';
 import { PROFICIENCIES, SKILLS, type Proficiency, type Skill, type Training } from './skills';
 import { TRAITS } from './temperament';
@@ -38,6 +39,11 @@ export const MIGRATIONS: readonly Migration[] = [
     for (const c of Array.isArray(d.characters) ? d.characters : [])
       if (typeof c === 'object' && c !== null && !('knowledge' in c)) (c as Record<string, unknown>).knowledge = {};
   },
+  // 4 to 5: characters gained relationships. Format 4 had none: everyone was a stranger.
+  (d) => {
+    for (const c of Array.isArray(d.characters) ? d.characters : [])
+      if (typeof c === 'object' && c !== null && !('relationships' in c)) (c as Record<string, unknown>).relationships = {};
+  },
 ];
 
 /** Brings data saved in format `from` up to the newest of `migrations`, in order. */
@@ -58,7 +64,7 @@ export interface ReadCast {
 /** Every field of a saved character; the type check fails if one is missing or misspelt. */
 const CHARACTER_FIELDS: readonly string[] = Object.keys({
   id: true, name: true, background: true, attributes: true, training: true, proficiencyBonus: true, startingTemperament: true, condition: true,
-  inventory: true, knowledge: true,
+  inventory: true, knowledge: true, relationships: true,
 } satisfies Record<keyof CharacterRecord, true>);
 
 const CONDITION_FIELDS: readonly string[] = Object.keys({ hitPoints: true, effects: true, rest: true } satisfies Record<keyof ConditionRecord, true>);
@@ -72,6 +78,9 @@ const FACT_FIELDS: readonly string[] = Object.keys({
 const VERSION_FIELDS: readonly string[] = Object.keys({
   learnedAt: true, source: true, teller: true, how: true, knowsActor: true, blame: true, exaggerated: true, knownFalse: true,
 } satisfies Record<keyof Version, true>);
+const RELATIONSHIP_FIELDS: readonly string[] = Object.keys({
+  trust: true, respect: true, affection: true, grudge: true, fear: true, familiarity: true, lastMet: true, grudgeReason: true, regardReason: true,
+} satisfies Record<keyof Relationship, true>);
 const SOURCES: readonly Source[] = ['self', 'witness', 'public', 'told'];
 const HOWS: readonly How[] = ['seen', 'told', 'heard'];
 const CAST_FIELDS: readonly string[] = ['format', 'characters', 'transfers', 'facts', 'nextId'];
@@ -117,7 +126,35 @@ function readCharacter(data: unknown, path: string, ignored: string[]): Characte
     ...(d.condition !== undefined && { condition: condition(d.condition, `${path}.condition`, ignored) }),
     ...(d.inventory !== undefined && { inventory: inventory(d.inventory, `${path}.inventory`, ignored) }),
     ...(d.knowledge !== undefined && { knowledge: knowledge(d.knowledge, `${path}.knowledge`, ignored) }),
+    ...(d.relationships !== undefined && { relationships: relationships(d.relationships, `${path}.relationships`, ignored) }),
   });
+}
+
+function relationships(value: unknown, path: string, ignored: string[]): Relationships {
+  return Object.fromEntries(Object.entries(object(value, path)).map(([id, r]) => [id, relationship(r, `${path}.${id}`, ignored)]));
+}
+
+/** A relationship, with any feeling not saved at its value for a new relationship. */
+function relationship(value: unknown, path: string, ignored: string[]): Relationship {
+  const d = object(value, path);
+  ignored.push(...Object.keys(d).filter((k) => !RELATIONSHIP_FIELDS.includes(k)).map((k) => `${path}.${k}`));
+  const feelings = numbers(Object.fromEntries(FEELINGS.filter((f) => f in d).map((f) => [f, d[f]])), path, FEELINGS, ignored);
+  if (d.lastMet !== undefined && typeof d.lastMet !== 'number') throw new TypeError(`${path}.lastMet must be a number`);
+  return {
+    ...NEW_RELATIONSHIP,
+    ...feelings,
+    ...(d.lastMet !== undefined && { lastMet: d.lastMet }),
+    ...(d.grudgeReason !== undefined && { grudgeReason: reason(d.grudgeReason, `${path}.grudgeReason`, ignored) }),
+    ...(d.regardReason !== undefined && { regardReason: reason(d.regardReason, `${path}.regardReason`, ignored) }),
+  };
+}
+
+function reason(value: unknown, path: string, ignored: string[]): Reason {
+  const d = object(value, path);
+  ignored.push(...Object.keys(d).filter((k) => !['fact', 'at', 'amount'].includes(k)).map((k) => `${path}.${k}`));
+  if (typeof d.fact !== 'string') throw new TypeError(`${path}.fact must be text`);
+  if (typeof d.at !== 'number' || typeof d.amount !== 'number') throw new TypeError(`${path} needs a time and an amount`);
+  return { fact: d.fact, at: d.at, amount: d.amount };
 }
 
 function readFact(value: unknown, path: string, ignored: string[]): Fact {
