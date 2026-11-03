@@ -32,10 +32,10 @@ The game's `Character` has 54 fields, used in 155 of the game's files. Proposed:
 | Where it lands | Fields | |
 | --- | --- | --- |
 | **The cast, as it is** | `id`, `name`, `traits`, `rels`, `known`, `cash` | Same meaning; each needs every change routed through the cast |
-| **The cast, in its own shape** | `skills`, `hurtUntil`, `conduct`, `struggling`, `denied` | The overhaul holds the same thing differently: attributes and eighteen skills, hit points, conduct steps, facts |
+| **The cast, in its own shape** | `skills`, `hurtUntil`, `conduct`, `struggling`, `denied`, `insight` | The overhaul holds the same thing differently: attributes and eighteen skills, hit points, conduct steps, facts |
 | **The cast, to add** | `alive`, `diedAt`, `nick`, `look` | Character state the overhaul does not hold yet |
 | **Other records, keyed by the character's id** | 32 fields, `bg` (the player's backstory) among them | Organisation, books, police, commitments, standing, goals, decisions, daily life, conversation, the player's own interface |
-| **To decide** | `insight`, `intro`, `cars`, `goods`, `problem` | See [Decisions](#decisions) |
+| **To decide** | `intro`, `cars`, `goods`, `problem` | See [Decisions](#decisions) |
 | **Nowhere** | `isPlayer`, `hustle` | The cast has no player flag; `hustle` is only read to bring old saves across, which no longer happens |
 
 The cast should hold what the character rules use (rolls, condition, inventory, relationships, knowledge, temperament), and
@@ -83,7 +83,7 @@ learning tables, for example, read family as closeness to a victim.
 | `rels` | How they feel about each other character | 229, 67 | `world.ts` | Cast: `relationships` (`known` becomes familiarity, `why` the grudge's reason, `bond` the regard's reason) | Route every change through the cast; see below |
 | `known` | Their version of each fact | 258, 63 | `politics.ts`, `world.ts` | Cast: `knowledge` (`from` becomes source and teller, `how` seen, told or heard, `big` exaggerated) | Route every change through `record` and `tell` |
 | `struggling` | Businesses they know are struggling, and since when | 6, 3 | `world.ts` | Cast: a fact of its own kind, known like any other | Record it as a fact |
-| `insight` | What the player has worked out about people | 16, 9 | `deeds.ts`, `powers2.ts`, `crewlife.ts` | Cast: knowledge inferred, which has no provenance yet (invariant A names inference) | Design inferred knowledge |
+| `insight` | What the player has been told about people in conversation | 16, 9 | `deeds.ts`, `powers2.ts`, `crewlife.ts` | Cast: facts, that they said it (decided) | Record what people reveal about themselves as facts |
 | `denied` | Matters they lied to the player about | 5, 4 | `matters.ts`, `deeds.ts`, `conv/visit.ts` | Cast: `lie` facts, which record their claim | Read the lie facts instead |
 | `intro` | Who the player has been introduced to, and when | 20, 11 | `deeds.ts`, `life.ts`, `background.ts`, `world.ts` and 4 more | Cast: a relationship, begun by meeting | Decide whether an introduction is a meeting |
 | `notes` | The player's own contact book | 14, 5 | `notebook.ts`, `deeds.ts` | The player's interface state, not the character | Move it out of the character |
@@ -214,7 +214,7 @@ Proposals that need the owner, to take one at a time:
 | **Backgrounds at character creation.** The game offers six (`hustler`, `connected`, `business`, `union`, `bookmaker`, `wheelman`), each with two skills, starting cash and belongings or connections; the overhaul has eight | **Decided (3 November 2026):** they are two things. The game's six become the player's **backstory**: their story, and the cash, belongings and connections it starts them with; their two skills go. The overhaul's eight stay the **background**: what kind of character they are, which every character has. At creation the player picks one of each |
 | **Starting relationships.** The game begins some at 0.25 to 0.4, set by the situation | **Decided and built (3 November 2026):** a first relationship starts from the character's own traits, not the situation (see the design's Relationships) |
 | **Spending time together.** The game marks meeting in 35 places with no roll | **Decided and built (3 November 2026):** `cast.together(people, { now })`: everyone named meets, and nothing else changes |
-| **Inferred knowledge.** `insight` is what the player has worked out about people | A fourth provenance, inferred, next to seen, told and heard, as invariant A already names |
+| **What people reveal about themselves.** `insight` is what the player has been told in conversation about a person: what they want, who they get on with, what they owe, that they mean to leave (it is not inferred, as this list first said) | **Decided (3 November 2026):** facts, that they said it, with a false one a lie; for every character. See the design's Before the swap |
 | **Introductions.** `intro` is who the player has been introduced to | An introduction is a meeting, by the operation above, so `intro` goes |
 | **Stolen goods.** `cars` and `goods` are counts and values | Stolen cars become items, since a car is a thing with a history (`w.cars` already tracks them); stolen goods stay a value in the economy |
 | **Personal problems.** `problem`: gambling, debt, drink and so on, with how bad it is | Its own record, keyed by id; a problem that should change rolls (drink) does it through an effect |
