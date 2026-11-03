@@ -1,0 +1,483 @@
+{
+  "format": 8,
+  "characters": [
+    {
+      "id": "sam",
+      "name": "Sam",
+      "attributes": {
+        "str": 10,
+        "agi": 10,
+        "con": 10,
+        "int": 10,
+        "wis": 10,
+        "cha": 10
+      },
+      "training": {},
+      "proficiencyBonus": 2,
+      "startingTemperament": {
+        "greed": 0.5,
+        "violence": 0.5,
+        "ambition": 0.5,
+        "caution": 0.5,
+        "sociability": 0.5,
+        "vice": 0.5,
+        "courage": 0.5,
+        "pride": 0.5,
+        "volatility": 0.5,
+        "agreeable": 0.5,
+        "empathy": 0.5,
+        "loyalty": 0.5,
+        "honesty": 0.5,
+        "cruelty": 0.5
+      },
+      "conduct": [
+        {
+          "conduct": "intimidating",
+          "trait": "violence",
+          "direction": 1,
+          "at": 20,
+          "cause": {
+            "fact": "f2"
+          }
+        },
+        {
+          "conduct": "lying",
+          "trait": "honesty",
+          "direction": -1,
+          "at": 25,
+          "cause": {
+            "fact": "f3"
+          }
+        }
+      ],
+      "condition": {
+        "hitPoints": 10,
+        "effects": []
+      },
+      "inventory": {
+        "cash": 50,
+        "items": []
+      },
+      "knowledge": {
+        "f1": {
+          "learnedAt": 0,
+          "source": "self",
+          "how": "seen",
+          "knowsActor": true
+        },
+        "f2": {
+          "learnedAt": 20,
+          "source": "self",
+          "how": "seen",
+          "knowsActor": true
+        },
+        "f3": {
+          "learnedAt": 25,
+          "source": "self",
+          "how": "seen",
+          "knowsActor": true
+        },
+        "f4": {
+          "learnedAt": 27,
+          "source": "self",
+          "how": "seen",
+          "knowsActor": true
+        }
+      },
+      "relationships": {
+        "vic": {
+          "trust": 0.5,
+          "respect": 0.5,
+          "affection": 0.5,
+          "grudge": 0,
+          "fear": 0,
+          "familiarity": 0.039599999999999996,
+          "lastMet": 25
+        },
+        "rico": {
+          "trust": 0.5,
+          "respect": 0.5,
+          "affection": 0.5,
+          "grudge": 0,
+          "fear": 0,
+          "familiarity": 0
+        },
+        "joe": {
+          "trust": 0.5,
+          "respect": 0.45,
+          "affection": 0.5,
+          "grudge": 0,
+          "fear": 0,
+          "familiarity": 0.039599999999999996,
+          "lastMet": 27
+        }
+      }
+    },
+    {
+      "id": "rico",
+      "name": "Rico",
+      "attributes": {
+        "str": 10,
+        "agi": 10,
+        "con": 10,
+        "int": 10,
+        "wis": 10,
+        "cha": 10
+      },
+      "training": {},
+      "proficiencyBonus": 2,
+      "startingTemperament": {
+        "greed": 0.5,
+        "violence": 0.5,
+        "ambition": 0.5,
+        "caution": 0.5,
+        "sociability": 0.5,
+        "vice": 0.5,
+        "courage": 0.5,
+        "pride": 0.5,
+        "volatility": 0.5,
+        "agreeable": 0.5,
+        "empathy": 0.5,
+        "loyalty": 0.5,
+        "honesty": 0.5,
+        "cruelty": 0.5
+      },
+      "conduct": [],
+      "condition": {
+        "hitPoints": 10,
+        "effects": []
+      },
+      "inventory": {
+        "cash": 0,
+        "items": [
+          {
+            "item": "pistol",
+            "state": "carried"
+          }
+        ]
+      },
+      "knowledge": {
+        "f1": {
+          "learnedAt": 0,
+          "source": "witness",
+          "how": "seen",
+          "knowsActor": true,
+          "who": {
+            "how": "told",
+            "teller": "vic"
+          },
+          "blamed": [
+            "joe",
+            "sam"
+          ]
+        }
+      },
+      "relationships": {
+        "joe": {
+          "trust": 0.3,
+          "respect": 0.5,
+          "affection": 0.5,
+          "grudge": 0.7,
+          "fear": 0,
+          "familiarity": 0,
+          "grudgeReason": {
+            "fact": "f1",
+            "at": 0,
+            "amount": 0.19999999999999996
+          }
+        },
+        "vic": {
+          "trust": 0.5,
+          "respect": 0.5,
+          "affection": 0.5,
+          "grudge": 0,
+          "fear": 0,
+          "familiarity": 0.039599999999999996,
+          "lastMet": 10
+        },
+        "sam": {
+          "trust": 0.3,
+          "respect": 0.5,
+          "affection": 0.5,
+          "grudge": 0.4,
+          "fear": 0,
+          "familiarity": 0,
+          "grudgeReason": {
+            "fact": "f1",
+            "at": 10,
+            "amount": 0.4
+          }
+        }
+      }
+    },
+    {
+      "id": "joe",
+      "name": "Joe",
+      "attributes": {
+        "str": 10,
+        "agi": 10,
+        "con": 10,
+        "int": 10,
+        "wis": 10,
+        "cha": 10
+      },
+      "training": {},
+      "proficiencyBonus": 2,
+      "startingTemperament": {
+        "greed": 0.5,
+        "violence": 0.5,
+        "ambition": 0.5,
+        "caution": 0.5,
+        "sociability": 0.5,
+        "vice": 0.5,
+        "courage": 0.5,
+        "pride": 0.5,
+        "volatility": 0.5,
+        "agreeable": 0.5,
+        "empathy": 0.5,
+        "loyalty": 0.5,
+        "honesty": 0.5,
+        "cruelty": 0.5
+      },
+      "conduct": [
+        {
+          "conduct": "giving-in-to-a-threat",
+          "trait": "courage",
+          "direction": -1,
+          "at": 20,
+          "cause": {
+            "fact": "f2"
+          }
+        },
+        {
+          "conduct": "giving-in-to-a-threat",
+          "trait": "pride",
+          "direction": -1,
+          "at": 20,
+          "cause": {
+            "fact": "f2"
+          }
+        }
+      ],
+      "condition": {
+        "hitPoints": 10,
+        "effects": [
+          "shaken"
+        ]
+      },
+      "inventory": {
+        "cash": 0,
+        "items": []
+      },
+      "knowledge": {
+        "f2": {
+          "learnedAt": 20,
+          "source": "witness",
+          "how": "seen",
+          "knowsActor": true
+        },
+        "f1": {
+          "learnedAt": 26,
+          "source": "told",
+          "teller": "vic",
+          "how": "told",
+          "knowsActor": true,
+          "exaggerated": true,
+          "size": {
+            "how": "told",
+            "teller": "sam"
+          }
+        }
+      },
+      "relationships": {
+        "sam": {
+          "trust": 0.45,
+          "respect": 0.5075,
+          "affection": 0.5,
+          "grudge": 0.05,
+          "fear": 0.1,
+          "familiarity": 0.039599999999999996,
+          "lastMet": 27,
+          "grudgeReason": {
+            "fact": "f2",
+            "at": 20,
+            "amount": 0.05
+          }
+        },
+        "rico": {
+          "trust": 0.5,
+          "respect": 0.485,
+          "affection": 0.5,
+          "grudge": 0,
+          "fear": 0,
+          "familiarity": 0
+        }
+      }
+    },
+    {
+      "id": "vic",
+      "name": "Vic",
+      "attributes": {
+        "str": 10,
+        "agi": 10,
+        "con": 10,
+        "int": 10,
+        "wis": 10,
+        "cha": 10
+      },
+      "training": {},
+      "proficiencyBonus": 2,
+      "startingTemperament": {
+        "greed": 0.5,
+        "violence": 0.5,
+        "ambition": 0.5,
+        "caution": 0.5,
+        "sociability": 0.5,
+        "vice": 0.5,
+        "courage": 0.5,
+        "pride": 0.5,
+        "volatility": 0.5,
+        "agreeable": 0.5,
+        "empathy": 0.5,
+        "loyalty": 0.5,
+        "honesty": 0.5,
+        "cruelty": 0.5
+      },
+      "conduct": [
+        {
+          "conduct": "lied-to",
+          "trait": "agreeable",
+          "direction": -1,
+          "at": 25,
+          "cause": {
+            "fact": "f3"
+          }
+        }
+      ],
+      "condition": {
+        "hitPoints": 10,
+        "effects": []
+      },
+      "inventory": {
+        "cash": 0,
+        "items": []
+      },
+      "knowledge": {
+        "f1": {
+          "learnedAt": 0,
+          "source": "witness",
+          "how": "seen",
+          "knowsActor": true
+        },
+        "f3": {
+          "learnedAt": 25,
+          "source": "witness",
+          "how": "seen",
+          "knowsActor": true
+        }
+      },
+      "relationships": {
+        "sam": {
+          "trust": 0.35,
+          "respect": 0.5075,
+          "affection": 0.5,
+          "grudge": 0.05,
+          "fear": 0,
+          "familiarity": 0.039599999999999996,
+          "lastMet": 25,
+          "grudgeReason": {
+            "fact": "f3",
+            "at": 25,
+            "amount": 0.05
+          }
+        },
+        "rico": {
+          "trust": 0.5,
+          "respect": 0.485,
+          "affection": 0.5,
+          "grudge": 0,
+          "fear": 0,
+          "familiarity": 0.039599999999999996,
+          "lastMet": 10
+        }
+      }
+    }
+  ],
+  "transfers": [
+    {
+      "from": "world",
+      "to": "sam",
+      "amount": 1,
+      "item": "pistol",
+      "why": "starting items",
+      "at": 0
+    },
+    {
+      "from": "sam",
+      "to": "rico",
+      "amount": 1,
+      "item": "pistol",
+      "why": "making amends",
+      "at": 30,
+      "cause": "f1"
+    },
+    {
+      "from": "world",
+      "to": "sam",
+      "amount": 50,
+      "why": "wages",
+      "at": 40,
+      "cause": "f2"
+    }
+  ],
+  "facts": [
+    {
+      "kind": "poach",
+      "actor": "sam",
+      "victim": "rico",
+      "hiddenActor": true,
+      "id": "f1",
+      "at": 0,
+      "witnesses": [
+        "vic"
+      ]
+    },
+    {
+      "kind": "threat",
+      "actor": "sam",
+      "victim": "joe",
+      "ending": "success",
+      "id": "f2",
+      "at": 20,
+      "witnesses": []
+    },
+    {
+      "kind": "lie",
+      "actor": "sam",
+      "victim": "vic",
+      "ending": "critical-failure",
+      "cause": "f1",
+      "claim": {
+        "exaggerated": true
+      },
+      "id": "f3",
+      "at": 25,
+      "witnesses": []
+    },
+    {
+      "kind": "lie",
+      "actor": "sam",
+      "victim": "joe",
+      "ending": "critical-success",
+      "cause": "f1",
+      "claim": {
+        "exaggerated": true
+      },
+      "id": "f4",
+      "at": 27,
+      "witnesses": []
+    }
+  ],
+  "jobs": [],
+  "nextId": 5
+}

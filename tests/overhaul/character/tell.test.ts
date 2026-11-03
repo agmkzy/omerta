@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'vitest';
 import { cast, type Cast } from '../../../src/overhaul/character/cast';
 import { partOf } from '../../../src/overhaul/character/knowledge';
+import { NEW_RELATIONSHIP } from '../../../src/overhaul/character/relationships';
 import { TELL_DC } from '../../../src/overhaul/character/tell';
 import { scripted } from './support';
 
@@ -121,6 +122,34 @@ describe('asking the odds of telling', { tags: ['unit'] }, () => {
     const heard = c.character('joe').social.tell(c.character('al'), 'f1').roll(scripted(), { now: 15 }).cast;
     const out = heard.character('al').social.tell(heard.character('rico'), 'f1').roll(scripted(19), { now: 20 });
     assert.deepEqual(out.cast.character('rico').versionOf('f1')!.who, { how: 'heard', teller: 'al' });
+  });
+});
+
+describe('telling what one only believes', { tags: ['unit'] }, () => {
+  test('fills a gap with whom the teller blames, heard second-hand from them', () => {
+    const c = lied();
+    // Vic was robbed unseen, so knows of it but not who did it; Rico was told it was Joe
+    const out = c.character('rico').social.tell(c.character('vic'), 'f1').roll(scripted(), { now: 20 });
+    assert.deepEqual(out.truth, { roll: null, changed: ['who'], exposed: [] });
+    const vic = out.cast.character('vic').versionOf('f1')!;
+    assert.deepEqual([vic.knowsActor, vic.blame, vic.who], [false, 'joe', { how: 'heard', teller: 'rico' }]);
+  });
+
+  test('counts how the teller feels about the listener, and a plan’s advantage on the teller’s Persuasion, known only to those in the job', () => {
+    // as lied(), but Joe knows Rico well
+    const close = cast({ characters: ['sam', 'rico', 'joe', 'vic'].map((id) => ({ id, name: id[0]!.toUpperCase() + id.slice(1), ...(id === 'joe' && { relationships: { rico: { ...NEW_RELATIONSHIP, familiarity: 0.8 } } }) })) })
+      .record({ kind: 'robbery', actor: 'sam', victim: 'vic', hiddenActor: true }, { now: 0, witnesses: ['joe'] }).cast;
+    const c = close.character('sam').social.deceive(close.character('rico')).claim({ about: 'f1', blame: 'joe' }).roll(scripted(15, 5), { now: 10 }).cast;
+    const known = c.character('joe').social.tell(c.character('rico'), 'f1').explain({ for: c.character('joe') });
+    assert.equal(known.length, 2);
+    assert.equal(known[1]!.value, 1);
+    const { cast: working, job } = c.startJob({ kind: 'talking round', dc: 5, members: ['joe'], now: 25 });
+    const planned = working.character('joe').planning.plan(job, { advantageOn: { member: 'joe', skill: 'persuasion' } }).roll(scripted(20), { now: 25 }).cast;
+    const check = planned.character('joe').social.tell(planned.character('rico'), 'f1');
+    assert.ok(check.odds({ for: planned.character('joe') }).success > check.odds({ for: planned.character('rico') }).success);
+    const out = check.roll(scripted(2, 18), { now: 30 });
+    assert.equal(out.truth.roll!.roll.edge, 'advantage');
+    assert.deepEqual(out.truth.changed, ['who']);
   });
 });
 

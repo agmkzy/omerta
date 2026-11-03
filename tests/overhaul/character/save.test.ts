@@ -21,6 +21,29 @@ const everyone = cast({
 const throughJson = (data: unknown): unknown => JSON.parse(JSON.stringify(data));
 const one = (character: Record<string, unknown>) => ({ format: CAST_FORMAT, characters: [character] });
 const fixture = (name: string): unknown => JSON.parse(readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'));
+/**
+ * A cast using what format 8 added: Rico guesses who poached from him, then Vic, who saw it, tells him otherwise; Sam threatens
+ * Joe, lies to Vic and, once Vic has told Joe of it, to Joe; Sam hands Rico his pistol over the poaching, and is paid for the threat.
+ */
+const formatEight = () => {
+  const ids = ['sam', 'rico', 'joe', 'vic'];
+  let c = cast({
+    characters: ids.map((id) => ({
+      id,
+      name: id[0]!.toUpperCase() + id.slice(1),
+      ...(id === 'sam' && { inventory: { items: ['pistol' as const] } }),
+      ...(id === 'rico' && { relationships: { joe: { ...NEW_RELATIONSHIP, grudge: 0.5 } } }),
+    })),
+  });
+  c = c.record({ kind: 'poach', actor: 'sam', victim: 'rico', hiddenActor: true }, { now: 0, witnesses: ['vic'] }).cast;
+  c = c.character('vic').social.tell(c.character('rico'), 'f1').roll(scripted(19), { now: 10 }).cast;
+  c = c.character('sam').social.intimidate(c.character('joe')).roll(scripted(15, 5), { now: 20 }).cast;
+  c = c.character('sam').social.deceive(c.character('vic')).claim({ about: 'f1', exaggerated: true }).roll(scripted(15, 5), { now: 25 }).cast;
+  c = c.character('vic').social.tell(c.character('joe'), 'f1').roll(scripted(), { now: 26 }).cast;
+  c = c.character('sam').social.deceive(c.character('joe')).claim({ about: 'f1', exaggerated: true }).roll(scripted(19, 1), { now: 27 }).cast;
+  c = c.character('sam').give(c.character('rico'), 'pistol', { why: 'making amends', now: 30, cause: 'f1' });
+  return c.transfer({ from: WORLD, to: 'sam', amount: 50, why: 'wages', now: 40, cause: 'f2' });
+};
 
 describe('loadCast', { tags: ['unit'] }, () => {
   test('restores a saved cast through JSON', () => {
@@ -249,6 +272,49 @@ describe('loadCast', { tags: ['unit'] }, () => {
     assert.deepEqual(loaded.character('sam').conduct.at(-1)!.cause, { job: 'j3' });
   });
 
+  test('loads a cast saved in format 8, which must keep loading', () => {
+    const { cast: loaded, ignored } = readCast(fixture('cast-format8.json'));
+    assert.deepEqual(ignored, []);
+    assert.deepEqual(loaded.data, formatEight().data);
+  });
+
+  test('restores each part’s provenance, blame, a fact’s ending, a lie’s claim, and items handed over for a reason', () => {
+    const c = formatEight();
+    assert.deepEqual(loadCast(throughJson(c.data)).data, c.data);
+    const rico = c.character('rico').versionOf('f1')!;
+    assert.deepEqual([rico.who, rico.blamed], [{ how: 'told', teller: 'vic' }, ['joe', 'sam']]);
+    assert.deepEqual(c.character('joe').versionOf('f1')!.size, { how: 'told', teller: 'sam' });
+    assert.deepEqual(c.data.facts.map((f) => [f.ending, f.claim]), [[undefined, undefined], ['success', undefined], ['critical-failure', { exaggerated: true }], ['critical-success', { exaggerated: true }]]);
+    assert.deepEqual(c.data.transfers.slice(1).map((t) => [t.item, t.cause]), [['pistol', 'f1'], [undefined, 'f2']]);
+    // a guess, and the other claims a lie can make
+    const guessed = { learnedAt: 0, source: 'witness', how: 'seen', knowsActor: false, blame: 'x', who: { how: 'guessed' } };
+    const facts = [
+      { id: 'f1', kind: 'poach', actor: 'y', victim: 'x', hiddenActor: true, at: 0, witnesses: [] },
+      { id: 'f2', kind: 'lie', actor: 'y', victim: 'x', cause: 'f1', at: 0, witnesses: [], ending: 'failure', claim: { blame: 'x' } },
+      { id: 'f3', kind: 'lie', actor: 'y', victim: 'x', at: 0, witnesses: [], ending: 'failure', claim: { invented: true } },
+    ];
+    const read = loadCast({ format: CAST_FORMAT, characters: [{ id: 'x', name: 'X', knowledge: { f1: guessed } }, { id: 'y', name: 'Y' }], facts, nextId: 4 });
+    assert.deepEqual(read.character('x').versionOf('f1')!.who, { how: 'guessed' });
+    assert.deepEqual(read.data.facts.map((f) => f.claim), [undefined, { blame: 'x' }, { invented: true }]);
+  });
+
+  test('rejects provenance, blame, endings, claims and transfers of the wrong shape, and leaves out a transfer of an item it does not recognise', () => {
+    const v = { learnedAt: 0, source: 'witness', how: 'seen', knowsActor: true };
+    const fact = { id: 'f1', kind: 'theft', actor: 'y', at: 0, witnesses: [] };
+    const withVersion = (version: unknown) => ({ format: CAST_FORMAT, characters: [{ id: 'x', name: 'X', knowledge: { f1: version } }, { id: 'y', name: 'Y' }], facts: [fact], nextId: 2 });
+    for (const version of [{ ...v, who: 'seen' }, { ...v, who: { how: 'dreamt' } }, { ...v, size: { how: 'told', teller: 1 } }, { ...v, blamed: 'y' }, { ...v, blamed: [1] }])
+      assert.throws(() => loadCast(withVersion(version)), TypeError, JSON.stringify(version));
+    const withFact = (f: unknown) => ({ format: CAST_FORMAT, characters: [{ id: 'x', name: 'X' }, { id: 'y', name: 'Y' }], facts: [f], nextId: 2 });
+    for (const f of [{ ...fact, ending: 'great' }, { ...fact, kind: 'lie', claim: 'x' }, { ...fact, kind: 'lie', claim: {} }])
+      assert.throws(() => loadCast(withFact(f)), TypeError, JSON.stringify(f));
+    for (const transfer of [{ from: WORLD, to: 'x', amount: 1, why: 'w', at: 0, item: 1 }, { from: WORLD, to: 'x', amount: 1, why: 'w', at: 0, cause: 1 }])
+      assert.throws(() => loadCast({ format: CAST_FORMAT, characters: [{ id: 'x', name: 'X' }], transfers: [transfer] }), TypeError, JSON.stringify(transfer));
+    // a crowbar (no longer an item, say) is left out of the inventory, and its transfer with it
+    const { cast: loaded, ignored } = readCast({ format: 7, characters: [{ id: 'x', name: 'X', inventory: { items: [{ item: 'crowbar' }, { item: 'knife' }] } }] });
+    assert.deepEqual(loaded.character('x').inventory.items, [{ item: 'knife', state: 'carried' }]);
+    assert.deepEqual([...ignored].sort(), ['characters[0].inventory.items[0]', 'transfers[0]']);
+  });
+
   test('restores jobs and their plans, and leaves out fields it does not recognise', () => {
     const started = loadCast(throughJson(everyone.data)).startJob({ kind: 'burglary', dc: 20, members: ['sam', 'rico'], now: 0 });
     const planned = started.cast.character('sam').planning.plan(started.job, { advantageOn: { member: 'rico', skill: 'stealth' } }).helpedBy('rico').roll(scripted(20, 20), { now: 5 }).cast;
@@ -334,6 +400,23 @@ describe('migrations', { tags: ['unit'] }, () => {
     const d: Record<string, unknown> = { format: 6 };
     migrate(d, 6, MIGRATIONS.slice(0, 6));
     assert.deepEqual(d, { format: 6, jobs: [] });
+  });
+
+  test('7 to 8 gives each character what they held as transfers from the world at the start, before any other transfer', () => {
+    const d: Record<string, unknown> = {
+      format: 7,
+      characters: [{ id: 'a', name: 'A', inventory: { items: [{ item: 'knife' }, { item: 'bottle' }, { item: 'bottle' }] } }, { id: 'b', name: 'B' }, null],
+      transfers: [{ from: WORLD, to: 'a', amount: 5, why: 'wages', at: 3 }],
+    };
+    migrate(d, 7, MIGRATIONS.slice(0, 7));
+    assert.deepEqual(d.transfers, [
+      { from: WORLD, to: 'a', amount: 1, item: 'knife', why: 'starting items', at: 0 },
+      { from: WORLD, to: 'a', amount: 2, item: 'bottle', why: 'starting items', at: 0 },
+      { from: WORLD, to: 'a', amount: 5, why: 'wages', at: 3 },
+    ]);
+    const notLists: Record<string, unknown> = { format: 7, characters: 'none', transfers: 'none' };
+    migrate(notLists, 7, MIGRATIONS.slice(0, 7));
+    assert.deepEqual(notLists.transfers, []);
   });
 
   test('run in order from the saved format to the newest', () => {

@@ -98,6 +98,17 @@ describe('cash in a cast', { tags: ['unit'] }, () => {
   });
 });
 
+describe('transfers with a cause', { tags: ['unit'] }, () => {
+  test('record the fact they are for, which must be recorded before them', () => {
+    const c = cast({ characters: [{ id: 'sam', name: 'Sam' }] }).record({ kind: 'theft', actor: 'sam' }, { now: 10 }).cast;
+    assert.equal(castOf(c.data).transfer({ from: WORLD, to: 'sam', amount: 5, why: 'the takings', now: 10, cause: 'f1' }).data.transfers[0]!.cause, 'f1');
+    assert.throws(() => c.transfer({ from: WORLD, to: 'sam', amount: 5, why: 'the takings', now: 5, cause: 'f1' }), RangeError);
+    assert.throws(() => c.transfer({ from: WORLD, to: 'sam', amount: 5, why: 'the takings', now: 10, cause: 'f9' }), RangeError);
+    const paid = castOf(c.data).transfer({ from: WORLD, to: 'sam', amount: 5, why: 'wages', now: 10 }).character('sam').pay(WORLD, 2, { why: 'a fine', now: 20, cause: 'f1' });
+    assert.equal(paid.data.transfers.at(-1)!.cause, 'f1');
+  });
+});
+
 describe('cash in a cast', { tags: ['property'] }, () => {
   test('is conserved: whatever valid payments are made, the characters’ cash adds up to what came from the world', () => {
     const pay = fc.record({ from: fc.integer({ min: 0, max: 2 }), to: fc.integer({ min: 0, max: 2 }), amount: fc.integer({ min: 1, max: 60 }) });

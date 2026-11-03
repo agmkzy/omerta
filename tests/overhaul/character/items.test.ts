@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'vitest';
 import { attributeScores } from '../../../src/overhaul/character/attributes';
-import { ReplacedCastError, cast } from '../../../src/overhaul/character/cast';
+import { ReplacedCastError, cast, castOf, type CastRecord } from '../../../src/overhaul/character/cast';
 import { DRINK_DC, ITEMS, ITEM_INFO, SKILL_SITUATIONS, inventoryRecord, itemModifiers } from '../../../src/overhaul/character/items';
 import { SKILLS } from '../../../src/overhaul/character/skills';
 import { scripted } from './support';
@@ -149,5 +149,53 @@ describe('items on a character', { tags: ['unit'] }, () => {
     sam.show('pistol');
     assert.throws(() => sam.wear('good-suit'), ReplacedCastError);
     assert.throws(() => sam.drink(scripted(10), { now: 0 }), ReplacedCastError);
+  });
+});
+
+describe('items changing hands', { tags: ['unit'] }, () => {
+  const everyone = () => cast({ characters: [{ id: 'sam', name: 'Sam', inventory: { items: ['pistol', 'knife'] } }, { id: 'rico', name: 'Rico' }] });
+
+  test('come to a character from the world at the start, recorded as transfers at the time given', () => {
+    assert.deepEqual(everyone().data.transfers.map((t) => [t.from, t.to, t.item, t.at]), [['world', 'sam', 'knife', 0], ['world', 'sam', 'pistol', 0]]);
+    const added = everyone().add({ id: 'joe', name: 'Joe', inventory: { items: ['bottle', 'bottle'] } }, { now: 60 });
+    assert.deepEqual(added.data.transfers.at(-1), { from: 'world', to: 'joe', amount: 2, item: 'bottle', why: 'starting items', at: 60 });
+    assert.throws(() => everyone().add({ id: 'joe', name: 'Joe', inventory: { items: ['bottle'] } }), RangeError);
+    assert.doesNotThrow(() => everyone().add({ id: 'joe', name: 'Joe' }));
+  });
+
+  test('are handed over by giving, recorded as a transfer with its reason and any cause', () => {
+    const c = everyone().record({ kind: 'threat', actor: 'rico', victim: 'sam' }, { now: 0 }).cast;
+    const given = c.character('sam').give(c.character('rico'), 'pistol', { why: 'to keep the peace', now: 10, cause: 'f1' });
+    assert.deepEqual(given.character('sam').inventory.items, [{ item: 'knife', state: 'carried' }]);
+    assert.deepEqual(given.character('rico').inventory.items, [{ item: 'pistol', state: 'carried' }]);
+    assert.deepEqual(given.data.transfers.at(-1), { from: 'sam', to: 'rico', amount: 1, item: 'pistol', why: 'to keep the peace', at: 10, cause: 'f1' });
+    const back = given.character('rico').give(given.character('sam'), 'pistol', { why: 'returned', now: 20 });
+    assert.equal('cause' in back.data.transfers.at(-1)!, false);
+  });
+
+  test('cannot be given unless carried and not shown, to oneself or someone from another cast, or by or to someone unable to be there', () => {
+    const c = everyone();
+    const sam = c.character('sam');
+    const rico = c.character('rico');
+    const why = { why: 'w', now: 0 };
+    assert.throws(() => rico.give(sam, 'pistol', why), RangeError);
+    assert.throws(() => sam.give(sam, 'pistol', why), RangeError);
+    assert.throws(() => sam.give(cast({ characters: [{ id: 'rico', name: 'Rico' }] }).character('rico'), 'pistol', why), RangeError);
+    const shown = everyone().character('sam').show('pistol');
+    assert.throws(() => shown.character('sam').give(shown.character('rico'), 'pistol', why), RangeError);
+    const resting = everyone().character('rico').rest({ now: 0, hours: 8 });
+    assert.throws(() => resting.character('sam').give(resting.character('rico'), 'knife', { why: 'w', now: 60 }), /resting/);
+    const out = everyone().character('sam').damage(10);
+    assert.throws(() => out.character('sam').give(out.character('rico'), 'knife', why), /unconscious/);
+  });
+
+  test('are audited: a cast whose items disagree with the transfers, that gives an item not held, or names an unknown item is refused', () => {
+    const data = everyone().data;
+    const edited = (d: Partial<CastRecord>) => () => castOf({ ...data, ...d });
+    const [sam, rico] = data.characters;
+    assert.throws(edited({ characters: [sam!, { ...rico!, inventory: { ...rico!.inventory, items: [{ item: 'knife', state: 'carried' }] } }] }), RangeError);
+    const fromRico = { from: 'rico', to: 'sam', amount: 1, item: 'bottle' as const, why: 'w', at: 0 };
+    assert.throws(edited({ characters: [{ ...sam!, inventory: { ...sam!.inventory, items: [...sam!.inventory.items, { item: 'bottle', state: 'carried' }] } }, rico!], transfers: [...data.transfers, fromRico] }), /without holding/);
+    assert.throws(edited({ transfers: [...data.transfers, { from: 'world', to: 'sam', amount: 1, item: 'crowbar' as never, why: 'w', at: 0 }] }), /unknown item/);
   });
 });

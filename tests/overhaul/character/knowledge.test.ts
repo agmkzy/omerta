@@ -35,6 +35,7 @@ describe('assertFact and auditFacts', { tags: ['unit'] }, () => {
   test('accept a complete, consistent fact', () => {
     assert.doesNotThrow(() => assertFact(fact({ witnesses: ['joe'], amount: 40, where: 'the docks', story: 'fight-1' }), ids, new Set()));
     assert.doesNotThrow(() => assertFact(fact({ id: 'f2', cause: 'f1' }), ids, new Set(['f1'])));
+    assert.doesNotThrow(() => assertFact(fact({ kind: 'lie', ending: 'provoked', claim: { blame: 'joe' } }), ids, new Set()));
   });
 
   test('refuse a fact that is incomplete or inconsistent', () => {
@@ -42,6 +43,7 @@ describe('assertFact and auditFacts', { tags: ['unit'] }, () => {
       fact({ kind: 'picnic' as never }), fact({ at: -1 }), fact({ actor: 'nobody' }), fact({ witnesses: ['nobody'] }), fact({ witnesses: ['sam'] }),
       fact({ victim: 'sam' }), fact({ cause: 'f9' }), fact({ amount: -5 }), fact({ amount: 1.5 }), fact({ actor: undefined, hiddenActor: true } as never),
       fact({ invented: 'nobody' }), fact({ invented: 'joe', witnesses: ['joe'], actor: 'rico', victim: 'sam' }),
+      fact({ ending: 'great' as never }), fact({ claim: { blame: 'joe' } }), fact({ kind: 'lie', claim: { blame: 'nobody' } }),
     ])
       assert.throws(() => assertFact(bad, ids, new Set()), RangeError, JSON.stringify(bad));
   });
@@ -329,6 +331,8 @@ describe('who can be there', { tags: ['unit'] }, () => {
     assert.throws(() => resting().record({ kind: 'theft', actor: 'joe' }, { now: 60 }), RangeError);
     assert.doesNotThrow(() => resting().record({ kind: 'theft', actor: 'sam', victim: 'joe' }, { now: 60 }));
     assert.doesNotThrow(() => resting().record({ kind: 'theft', actor: 'sam' }, { now: 8 * 60, witnesses: ['joe'] }));
+    // a fact with no one known to have done it needs only its witnesses there
+    assert.throws(() => resting().record({ kind: 'theft', victim: 'sam' }, { now: 60, witnesses: ['joe'] }), RangeError);
   });
 
   test('in a social roll, the two in it and any witnesses must be there', () => {
@@ -336,5 +340,7 @@ describe('who can be there', { tags: ['unit'] }, () => {
     assert.throws(() => out.character('sam').social.persuade(out.character('rico')).roll(scripted(10, 10), { now: 0, witnesses: ['joe'] }), RangeError);
     const resting = people().character('rico').rest({ now: 0, hours: 8 });
     assert.throws(() => resting.character('sam').social.persuade(resting.character('rico')).roll(scripted(10, 10), { now: 60 }), RangeError);
+    const p = people();
+    assert.throws(() => p.character('sam').social.persuade(p.character('rico')).roll(scripted(10, 10), { now: 0, witnesses: ['nobody'] }), RangeError);
   });
 });
