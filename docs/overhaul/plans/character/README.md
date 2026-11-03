@@ -1,6 +1,6 @@
 # Character: one object for every character
 
-**Status:** design agreed in discussion on 2 and 3 November 2026, and revised after two adversarial reviews. Nothing is built. What waits for slotting it into the game is under [Later](#later).
+**Status:** design agreed in discussion on 2 and 3 November 2026, and revised after two adversarial reviews. Being built, step by step; what building has left open is in [Points to revisit](revisit.md). What waits for slotting it into the game is under [Later](#later).
 
 ## Purpose
 
