@@ -15,7 +15,8 @@ import { assertFight, fight, type FightKind, type FightResult, type FightStart }
 import { applyFight, type FightRecordOptions } from './fight-record';
 import { DRINK_DC, ITEMS, ITEM_INFO, itemModifiers, type InventoryRecord, type Item, type ItemOptions, type ItemState } from './items';
 import { auditKnowledge, type Knowledge, type Version } from './knowledge';
-import { recordFact, withCharacter } from './records';
+import { meetPeople } from './learning';
+import { allMeet, recordFact, withCharacter } from './records';
 import type { Roller } from './random';
 import type { Relationship, Relationships } from './relationships';
 import { SKILLS, attributeUsed, skillModifiers, type Proficiency, type Skill } from './skills';
@@ -478,7 +479,10 @@ function characterHandleOf(data: CharacterRecord, owner: Cast, commit: Commit): 
       const drunk = !passes(result.margin) || condition.effects.includes('drunk');
       const job = carousing.advantage.truth ? carousing.advantage.job : undefined;
       const spent = (d: CastRecord): CastRecord => ({ ...d, transfers: [...d.transfers, { from: data.id, to: WORLD, amount: 1, item: 'bottle', why: 'drunk', at: now }] });
-      const next = commit((d) => withCharacter(spent(job ? { ...d, jobs: usingAdvantage(d.jobs, job) } : d), data.id, (c) => {
+      // drinking together means being together: everyone there meets
+      const together = allMeet([data.id, ...company.map((o) => o.id)]);
+      const met = (d: CastRecord): CastRecord => ({ ...d, characters: d.characters.map((c) => (together.has(c.id) ? meetPeople(c, together.get(c.id)!, now) : c)) });
+      const next = commit((d) => withCharacter(met(spent(job ? { ...d, jobs: usingAdvantage(d.jobs, job) } : d)), data.id, (c) => {
         const i = c.inventory.items.findIndex((h) => h.item === 'bottle');
         return withConduct(
           {

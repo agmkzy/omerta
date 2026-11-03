@@ -2,8 +2,9 @@
 // in what they know (they know of it, but not who did it), is accepted as any telling is. Telling them what they already
 // believe changes nothing. Telling them something that contradicts what they believe is a roll: the teller's Persuasion
 // against TELL_DC, with what the listener knows of that part of the fact and how they feel about the teller as modifiers. If
-// the belief it overturns came from a lie, told as something the liar saw, the lie comes out. Asking the odds reveals nothing
-// more of the listener's version than a lie's odds would. See docs/overhaul/plans/character/README.md (Knowledge).
+// the belief it overturns came from a lie, told as something the liar saw, the lie comes out. However it goes, the two have
+// met: telling someone anything means being with them. Asking the odds reveals nothing more of the listener's version than a
+// lie's odds would. See docs/overhaul/plans/character/README.md (Knowledge).
 import type { CastRecord } from './cast';
 import { checkOdds, resolveCheck, succeeded, type CheckResult, type Modifier, type Odds } from './check';
 import type { CharacterRecord, Id } from './character';
@@ -128,9 +129,10 @@ export function tellCheck<C extends CastLike>(setup: TellSetup, owner: C, commit
       const exposed: FactId[] = [];
       let changed: TellTruth['changed'] = [];
       const cast = commit((d) => {
+        const met = (x: CastRecord) => withCharacter(withCharacter(x, listener.id, (c) => meetPeople(c, [teller.id], now)), teller.id, (c) => meetPeople(c, [listener.id], now));
         if (theirs === undefined) {
           changed = 'all';
-          return withCharacter(d, listener.id, (c) => learnFact(c, f, toldVersion(teller.id, mine, now), now));
+          return met(withCharacter(d, listener.id, (c) => learnFact(c, f, toldVersion(teller.id, mine, now), now)));
         }
         const { gaps } = compare(f, mine, theirs);
         const overturned = result && succeeded(result.outcome) ? contradicted : [];
@@ -138,7 +140,7 @@ export function tellCheck<C extends CastLike>(setup: TellSetup, owner: C, commit
         let after = theirs;
         for (const part of changed) after = teach(after, mine, teller.id, part);
         let next = changed.length ? withCharacter(d, listener.id, (c) => learnFact(c, f, after, now)) : d;
-        if (result) next = withCharacter(withCharacter(next, listener.id, (c) => meetPeople(c, [teller.id], now)), teller.id, (c) => meetPeople(c, [listener.id], now));
+        next = met(next);
         for (const part of overturned) {
           const lie = lieBehind(next, f, theirs, listener.id, part);
           if (lie === undefined) continue;

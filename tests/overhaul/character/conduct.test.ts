@@ -189,8 +189,13 @@ describe('conduct from drinking', { tags: ['unit'] }, () => {
     assert.deepEqual(moves(alone.conduct), ['vice +', 'sociability -']);
     assert.deepEqual(alone.conduct[0]!.cause, { item: 'bottle' });
     const c = withBottle();
-    const together = c.character('sam').drink(scripted(15), { now: 0, with: [c.character('rico')] }).cast.character('sam');
+    const after = c.character('sam').drink(scripted(15), { now: 30, with: [c.character('rico')] }).cast;
+    const together = after.character('sam');
     assert.deepEqual(moves(together.conduct), ['vice +', 'sociability +']);
+    // drinking together means being together
+    assert.equal(together.towards(after.character('rico'))!.lastMet, 30);
+    assert.equal(after.character('rico').towards(together)!.lastMet, 30);
+    assert.deepEqual(alone.relationships, {});
   });
 
   test('needs its company to be someone else in the cast', () => {

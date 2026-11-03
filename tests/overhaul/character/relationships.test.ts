@@ -256,8 +256,9 @@ describe('relationships in a cast', { tags: ['unit'] }, () => {
     const told = recorded.character('rico').social.tell(recorded.character('vic'), 'f1').roll(scripted(), { now: 120 }).cast;
     const vic = told.character('vic');
     close(vic.towards(told.character('sam'))!.fear, 0.02);
-    assert.equal(vic.towards(told.character('rico'))!.lastMet, undefined);
-    assert.equal(vic.towards(told.character('rico'))!.familiarity, 0);
+    // telling someone means being with them, so Vic and Rico have met
+    assert.equal(vic.towards(told.character('rico'))!.lastMet, 120);
+    assert.equal(told.character('rico').towards(vic)!.lastMet, 120);
   });
 
   test('a victim of a hidden hand changes nothing towards anyone, knowing no one to blame', () => {

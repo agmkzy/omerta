@@ -21,14 +21,9 @@ Choices made while building that the plan did not settle. Each is built as descr
 | --- | --- | --- |
 | **Who knows a modifier.** Situational modifiers added with `.with()` are known to everyone present. Anyone but the target judges a shown weapon by the weapons the target shows. Anyone who saw a fact with the target knows the target saw it; whoever told the target knows what they told. | Step 7 | Built this way. |
 | **Lies and witnesses.** Witnesses to a deception meet those in it but learn nothing, and the lie fact records no witnesses. | Step 7 | As the plan has it for now; what witnesses believe is under the plan's Later. |
-| **Lies the liar may tell.** A claim must differ from what the liar believes (otherwise it is telling, not lying), and a lie about a fact the liar invented is refused: a new lie invents a new fact. | Step 7 | Built this way. |
 | **Provoked counts as resisting.** A provoked target holds a grudge (+0.1), and the actor's respect for them rises as for any target who resists (+0.05). | Step 7 | Built this way; the plan's two tables do not say which applies. |
 | **Shaken on giving in.** Any target who gives in to intimidation (partial success or better) is shaken. | Step 7 | Built this way. |
-| **What counts as a week.** Each kind of conduct moves a character's traits at most once in any seven days, counted back from now, not by calendar week. | Step 8 | Built this way. |
 | **Trying counts as conduct.** Persuading, lying and intimidating move the actor's traits whatever the roll's outcome. | Step 8 | Built this way; the plan says "a persuasion" or "a lie", which every roll records. |
-| **Drinking in company.** `drink` now takes a time and whoever else is there. Drinking together does not count as meeting. | Step 8 | Built this way. |
-| **Traits before the experience.** When a fact is recorded, learning it reads the traits the character had before it happened; the conduct it is for them comes after. Lying to someone who trusts the liar reads their trust before the lie. | Step 8 | Built this way. |
-| **Conduct of an unknown kind in a save** is left out and reported, like anything else not recognised, so the character's current traits lose that step. | Step 8 | Built this way. |
 | **One nerve check at the start.** Every reason to check at the start of a fight (a weapon that outclasses theirs, being set upon, already being at half health) is one check at the highest DC. | Step 9 | Built this way; the plan combines only the weapon and being set upon. |
 | **A lone runner loses at once.** A squad with no one still fighting has lost, so a fighter on their own who fails their nerve and runs makes their one last escape straight away: away, or caught and beaten. | Step 9 | Follows the plan's rule; it means a lone runner has one chance. |
 | **A beating scaled by each attacker's damage.** A fight's fact for each attacker records the hit points that attacker took, and the one beaten feels it by that share, so they resent most whoever hurt them most. | Step 9 | Built this way; the plan says "scaled by the damage they took". |
@@ -40,14 +35,7 @@ Choices made while building that the plan did not settle. Each is built as descr
 | **The chosen check.** A critical success's advantage is on one check chosen when planning: the first check of a chosen skill by a chosen member. | Step 10 | Built this way; the plan says "one check of the planner's choosing". |
 | **Who believes the plan.** Every member of the job, not only the planner, sees the plan as the planner does: a critical failure as a failure. Anyone outside the job knows nothing of it. | Step 10 | Built this way. |
 | **What a job is.** A job's kind is free text, and a job records no outcome: it is open until the caller ends it. Starting and ending a job record no facts. A job of DC 20 or more is hard, and its members grow more ambitious when it starts. | Step 10 | Built this way. |
-| **Taking damage.** `damage(n)` is a plain method the plan does not name. | Step 3 | Built for fights (step 9) and tests. |
 | **Feelings follow whom someone is told did it.** The game's `learn` changes feelings only for someone who knows who did it; here, someone who only believes it (told "Joe did it") has their feelings change towards the one they blame, as the plan's re-belief has it. | Step 6 | Built this way. |
-| **Telling meets only when it rolls.** A telling that fills a gap, or of a fact the listener had not heard, needs no roll and does not make the two meet; only a contradiction, which rolls, does. | Building the decisions | Built this way; follows the row below. |
-| **Adding a character with items needs a time.** `add(input, { now })` records their items as transfers at `now`, and is refused without it; a character with no items can be added without one. | Building the decisions | Built this way. |
-| **Paying in person needs both there.** `pay` to another character is refused if either is unconscious or resting; paying the world needs only the payer. A plain `cast.transfer` checks no one. | Building the decisions | Built this way. |
-| **A planning helper must be there,** as the planner must. | Building the decisions | Built this way. |
-| **An unconscious character can rest,** and heals by it as anyone does. | Building the decisions | Built this way; the plan does not say. |
-| **Telling is not meeting.** Two characters meet by taking part in the same roll, fight or recorded fact; being told a fact makes the listener no longer a stranger to those in it, but does not make teller and listener meet, so their familiarity does not grow. | Step 6 | Built this way. |
 
 ## Waiting for a later step
 
@@ -81,3 +69,13 @@ These were reported when they were made and stand unless revisited.
 - **Social checks roll a d20,** as the plan's other checks do; the lab's choice of dice (2d10, 3d6) is not carried over (step 7).
 - **A saved transfer of an item no longer recognised is left out and reported,** as the item is from the inventory that holds it, so the item audit still balances (building the decisions).
 - **"Impossible" is a modifier of −100,** large enough that no roll can succeed, explained with its reason (step 7).
+- **A lie must differ from what the liar believes** (otherwise it is telling), and a lie about a fact the liar invented is refused: a new lie invents a new fact (step 7).
+- **A week for conduct is the seven days counted back from now,** not a calendar week (step 8).
+- **Learning a fact reads the traits a character had before it happened;** the conduct it is for them comes after, and a lie to someone who trusts the liar reads their trust before the lie (step 8).
+- **Conduct of an unknown kind in a save is left out and reported,** like anything else not recognised (step 8).
+- **`damage(n)`** is a plain method for fights and tests (step 3).
+- **Adding a character with items needs a time,** `add(input, { now })`, since the world gives them their items then (building the decisions).
+- **Paying in person needs both there;** paying the world needs only the payer, and a plain `cast.transfer` checks no one (building the decisions).
+- **A planning helper must be there,** as the planner must (building the decisions).
+- **An unconscious character can rest,** and heals by it as anyone does (building the decisions).
+- **Drinking takes a time and whoever else is there** (`drink(roller, { now, with })`), and drinking together, like any telling, makes those there meet (step 8; meeting decided 3 November 2026).
