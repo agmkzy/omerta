@@ -281,7 +281,7 @@ Intimidation also changes how the actor feels about the target:
 | Outcome | Change in the actor's feelings |
 | --- | --- |
 | The target gives in (partial success or better) | Respect −0.05 |
-| The target resists | Respect +0.05 |
+| The target resists, provoked or not (decided 3 November 2026) | Respect +0.05 |
 
 **Provoked** is returned as an outcome of its own, and the caller decides what follows, such as starting a fight. The roll never starts one itself.
 

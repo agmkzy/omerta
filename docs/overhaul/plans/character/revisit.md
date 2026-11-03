@@ -19,7 +19,6 @@ Choices made while building that the plan did not settle. Each is built as descr
 
 | Point | Where it came up | Now |
 | --- | --- | --- |
-| **Provoked counts as resisting.** A provoked target holds a grudge (+0.1), and the actor's respect for them rises as for any target who resists (+0.05). | Step 7 | Built this way; the plan's two tables do not say which applies. |
 | **Shaken on giving in.** Any target who gives in to intimidation (partial success or better) is shaken. | Step 7 | Built this way. |
 | **Trying counts as conduct.** Persuading, lying and intimidating move the actor's traits whatever the roll's outcome. | Step 8 | Built this way; the plan says "a persuasion" or "a lie", which every roll records. |
 | **One nerve check at the start.** Every reason to check at the start of a fight (a weapon that outclasses theirs, being set upon, already being at half health) is one check at the highest DC. | Step 9 | Built this way; the plan combines only the weapon and being set upon. |
