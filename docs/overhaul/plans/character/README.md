@@ -2,6 +2,8 @@
 
 **Words:** what each term means is in the [glossary](glossary.md).
 
+**Demo:** a browser page for trying the built code by hand is in [demo/overhaul/](../../../../demo/overhaul/README.md) (`npm run demo:dev`).
+
 **Status:** design agreed in discussion on 2 and 3 November 2026, and revised after two adversarial reviews. Built step by step; what building has left open is in [Points to revisit](revisit.md), and the decisions taken on it after building (3 November 2026) are written into the sections below. What must still be built before it replaces the game's systems is under [Before the swap](#before-the-swap).
 
 ## Purpose

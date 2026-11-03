@@ -28,7 +28,7 @@ export function within(path: string, folder: string): boolean {
   return r === '' || (!r.startsWith('..') && !isAbsolute(r));
 }
 
-const SOURCE = /\.(?:[cm]?ts|tsx|[cm]?js|jsx)$/;
+const SOURCE = /\.(?:[cm]?ts|tsx|[cm]?js|jsx|vue)$/;
 // Installed packages, git's own files, coverage reports and builds, wherever they are: none of it is source.
 const NOT_SOURCE = new Set(['node_modules', '.git', 'coverage', 'dist']);
 

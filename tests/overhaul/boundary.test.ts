@@ -13,6 +13,8 @@ const SRC = join(ROOT, 'src');
 const OVERHAUL = join(SRC, 'overhaul');
 const TESTS = join(ROOT, 'tests', 'overhaul');
 const LAB = join(ROOT, 'lab');
+/** The overhaul's demo page (npm run demo:dev), which shows the overhaul in a browser and so is the one thing outside it that uses it. */
+const DEMO = join(ROOT, 'demo', 'overhaul');
 
 const where = (found: readonly Found[]) => found.map((f) => `${relative(ROOT, f.file)}:${f.line} imports '${f.specifier}'`);
 
@@ -88,8 +90,16 @@ describe('the boundary', { tags: ['architecture'] }, () => {
     assert.deepEqual(where(found.filter((f) => outside(f.target))), []);
   });
 
-  test('nothing outside the overhaul imports from it', () => {
-    const files = sourceFiles(ROOT, [OVERHAUL, TESTS]);
+  test("the demo page imports nothing from the game or the lab", () => {
+    const files = sourceFiles(DEMO);
+    assert.ok(files.some((f) => f.endsWith('.vue')), 'the scan found none of the demo’s components');
+    const found = importsOf(files, ROOT);
+    const outside = (t: string | null) => t !== null && ((within(t, SRC) && !within(t, OVERHAUL)) || within(t, LAB));
+    assert.deepEqual(where(found.filter((f) => outside(f.target))), []);
+  });
+
+  test('nothing outside the overhaul imports from it, but its tests and its demo page', () => {
+    const files = sourceFiles(ROOT, [OVERHAUL, TESTS, DEMO]);
     // (the scan must see the game, or an empty list would pass)
     assert.ok(files.some((f) => within(f, SRC)) && files.some((f) => within(f, LAB)), 'the scan found no game or lab files');
     const found = importsOf(files, ROOT);
