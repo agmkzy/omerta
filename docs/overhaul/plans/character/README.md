@@ -525,7 +525,16 @@ How a character gets better over time (direction decided 3 November 2026; not ye
 - **The proficiency bonus rises with level,** as in D&D: 2 at the start, rising a step every few levels to 6. How many
   levels each step takes is decided with the levels themselves.
 
-Open: what unlocks each skill's training, and whether expert is unlocked the same way as trained. These replace the game's skills growing with use (`people.ts` `grow`).
+- **What unlocks training** (decided 3 November 2026), three kinds of thing, mixed:
+  - **Practice:** succeeding at the skill often enough in real situations, such as winning real fights for Brawling.
+  - **Being taught:** spending time with someone trained in it who is willing, such as a crew's driver teaching Driving.
+  - **Particular events,** for a few skills where it makes sense, such as time in prison for Streetwise.
+
+  Practice and being taught cover most skills. Expert is unlocked the same ways, needing more: more practice, or being taught
+  by an expert.
+
+Open: the numbers (how much practice, how long being taught takes), which events unlock which skills, and the levels and XP
+themselves. These replace the game's skills growing with use (`people.ts` `grow`).
 
 ## Planning
 

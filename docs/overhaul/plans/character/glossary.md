@@ -195,7 +195,8 @@ Not yet built; see the design's [Advancement](README.md#advancement).
 
 - **XP** — experience, earned by what a character does. What earns it is to be decided.
 - **Level** — reached with enough XP. Each level gives a point to put into an attribute.
-- **Unlocking** — gaining training in a skill because of something that happened in the game, not by spending XP.
+- **Unlocking** — gaining training in a skill because of something that happened in the game, not by spending XP: practice
+  (succeeding at it often enough), being taught by someone trained, or a particular event.
 
 ## Jobs and plans
 
