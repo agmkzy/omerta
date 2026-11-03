@@ -32,9 +32,9 @@ The game's `Character` has 54 fields, used in 155 of the game's files. Proposed:
 | Where it lands | Fields | |
 | --- | --- | --- |
 | **The cast, as it is** | `id`, `name`, `traits`, `rels`, `known`, `cash` | Same meaning; each needs every change routed through the cast |
-| **The cast, in its own shape** | `skills`, `bg`, `hurtUntil`, `conduct`, `struggling`, `denied` | The overhaul holds the same thing differently: attributes and eighteen skills, hit points, conduct steps, facts |
+| **The cast, in its own shape** | `skills`, `hurtUntil`, `conduct`, `struggling`, `denied` | The overhaul holds the same thing differently: attributes and eighteen skills, hit points, conduct steps, facts |
 | **The cast, to add** | `alive`, `diedAt`, `nick`, `look` | Character state the overhaul does not hold yet |
-| **Other records, keyed by the character's id** | 31 fields | Organisation, books, police, commitments, standing, goals, decisions, daily life, conversation, the player's own interface |
+| **Other records, keyed by the character's id** | 32 fields, `bg` (the player's backstory) among them | Organisation, books, police, commitments, standing, goals, decisions, daily life, conversation, the player's own interface |
 | **To decide** | `insight`, `intro`, `cars`, `goods`, `problem` | See [Decisions](#decisions) |
 | **Nowhere** | `isPlayer`, `hustle` | The cast has no player flag; `hustle` is only read to bring old saves across, which no longer happens |
 
