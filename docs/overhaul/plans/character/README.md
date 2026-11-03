@@ -399,7 +399,7 @@ During a fight each fighter is fighting, fleeing (see [Fleeing](#fleeing)), beat
 | Knocked out | Dropped to 0 hit points, and unconscious | A `beating`, whichever squad wins |
 | Fled | Got away | A `fight` |
 
-- **One fact for each loser and each attacker:** each member of the other squad who attacked them, or, if nobody did (they gave in at the start), every member of the other squad still fighting. A knocked-out winner is recorded as beaten by whoever dropped them. All the facts of one fight share a story id, as the game links the facts of one matter.
+- **One fact for each loser and each attacker:** each member of the other squad who attacked them, or, if nobody did (they gave in at the start), every member of the other squad still fighting. A knocked-out winner is recorded as beaten by whoever dropped them. A winner who gave in is beaten by whoever hurt them; if no one did, it is a `fight` with those they gave in to, as for someone who fled, since no one was left to beat them (decided 3 November 2026). All the facts of one fight share a story id, as the game links the facts of one matter.
 - **Feelings:** the victim's feelings towards each attacker change once, through [learning the recorded fact](#fact-kinds), scaled by the damage they took. How badly a beaten character was hurt shows in their hit points.
 - **Killing** is out of scope until it is decided whether weapons can kill.
 

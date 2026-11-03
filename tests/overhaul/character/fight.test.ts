@@ -340,6 +340,28 @@ describe('what a real fight leaves behind', { tags: ['unit'] }, () => {
     assert.deepEqual(stale.facts.map((f) => [f.kind, f.actor, f.victim]), [['fight', 'sam', 'rico']]);
   });
 
+  test('a winner who gave in, unhurt, backed out of a fight and was not beaten; one who was hurt is beaten by whoever attacked them', () => {
+    const won = (joe: Partial<FighterResult>) => {
+      const r = result([
+        { id: 'sam' },
+        { id: 'joe', status: 'beaten', reactions: ['giving-in-in-a-fight'], ...joe },
+        { id: 'rico', side: 'defender', status: 'beaten', attackedBy: [{ id: 'sam', damage: 3 }] },
+        { id: 'vic', side: 'defender', status: 'beaten', attackedBy: [{ id: 'sam', damage: 3 }] },
+      ]);
+      const out = applyFight(four().data, r, { now: 0 });
+      const after = castOf(out.data);
+      return { facts: out.facts.filter((f) => f.victim === 'joe').map((f) => [f.kind, f.actor]), joe: after.character('joe'), cast: after };
+    };
+    const untouched = won({});
+    assert.deepEqual(untouched.facts, [['fight', 'rico'], ['fight', 'vic']]);
+    assert.deepEqual([...new Set(untouched.joe.conduct.map((s) => s.conduct))], ['starting-a-fight', 'giving-in-in-a-fight']);
+    assert.equal(untouched.joe.towards(untouched.cast.character('rico'))!.grudge, 0);
+    assert.deepEqual(won({ attackedBy: [{ id: 'rico', damage: 0 }] }).facts, [['fight', 'rico']]);
+    const hit = won({ attackedBy: [{ id: 'rico', damage: 2 }, { id: 'vic', damage: 0 }] });
+    assert.deepEqual(hit.facts, [['beating', 'rico'], ['beating', 'vic']]);
+    assert.ok(hit.joe.conduct.some((s) => s.conduct === 'beaten'));
+  });
+
   test('links its facts to whatever caused the fight', () => {
     const c = four().record({ kind: 'threat', actor: 'rico', victim: 'sam' }, { now: 0 }).cast;
     const { facts } = applyFight(c.data, result([{ id: 'sam' }, { id: 'rico', side: 'defender', status: 'beaten', attackedBy: [{ id: 'sam', damage: 1 }] }]), { now: 10, cause: 'f1' });

@@ -19,7 +19,6 @@ Choices made while building that the plan did not settle. Each is built as descr
 
 | Point | Where it came up | Now |
 | --- | --- | --- |
-| **Who beat a winner who gave in.** A fighter on the winning squad who gave in is beaten by whoever attacked them, or, if no one did, by everyone on the other squad. | Step 9 | Built this way; the plan covers only a knocked-out winner. |
 | **Standing by their squad** counts a squad member as down if they are not fighting, including one who is running. | Step 9 | Built this way. |
 | **Sparring** can knock someone out (a single hit past half health), uses everyone's effects, such as drunk, and makes the fighters meet. | Step 9 | Built this way. |
 | **Which checks a plan counts on.** Every skill check by a member while the job is open: `check`, both rolls of a social check, drinking, and an ambush's Stealth (the plan's own example of a check around a fight); never a fight's own rolls. A character's `skills` show them as they stand, without any plan. | Step 10 | Built this way. |
