@@ -509,6 +509,19 @@ One set of traits, each 0 to 1, worked out from a character's starting traits an
 | Honesty | dishonest | honest | Lab only |
 | Cruelty | kind | cruel | Lab only |
 
+## Advancement
+
+How a character gets better over time (direction decided 3 November 2026; not yet built):
+
+- **Experience (XP)** is earned, and reaching a level gives a point to put into an attribute.
+- **Levels, and what earns XP,** are to be decided.
+- **Training in a skill is unlocked by things that happen in the game,** not bought with XP or levels.
+- **Rank has no part in it:** rank follows what a character does, and never sets their abilities ([Before the swap](#before-the-swap)).
+
+Open: whether every character advances or only the player, how a character other than the player chooses where their point
+goes, whether the proficiency bonus rises with level, what unlocks each skill's training, and whether expert is unlocked the
+same way as trained. These replace the game's skills growing with use (`people.ts` `grow`).
+
 ## Planning
 
 An optional roll made before a job or a move. Its result becomes modifiers on the checks that follow.

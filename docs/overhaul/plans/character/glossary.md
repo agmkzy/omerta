@@ -188,6 +188,14 @@ These have caused, or could cause, confusion. Say which one is meant.
 - **Winner / stalemate** — a squad wins when the other has no one fighting. After 12 rounds with both still fighting, it is
   a stalemate.
 
+## Advancement
+
+Not yet built; see the design's [Advancement](README.md#advancement).
+
+- **XP** — experience, earned by what a character does. What earns it is to be decided.
+- **Level** — reached with enough XP. Each level gives a point to put into an attribute.
+- **Unlocking** — gaining training in a skill because of something that happened in the game, not by spending XP.
+
 ## Jobs and plans
 
 - **Job** — characters doing something together, from when it starts until it is ended. One open job per character.
