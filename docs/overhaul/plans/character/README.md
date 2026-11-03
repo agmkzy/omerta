@@ -517,10 +517,13 @@ How a character gets better over time (direction decided 3 November 2026; not ye
 - **Levels, and what earns XP,** are to be decided.
 - **Training in a skill is unlocked by things that happen in the game,** not bought with XP or levels.
 - **Rank has no part in it:** rank follows what a character does, and never sets their abilities ([Before the swap](#before-the-swap)).
+- **Every character advances,** the player included.
+- **Auto-levelling:** a character whose points no one chooses puts them where their background's priorities say (the same
+  attribute order that placed their rolled scores). The player chooses their own.
 
-Open: whether every character advances or only the player, how a character other than the player chooses where their point
-goes, whether the proficiency bonus rises with level, what unlocks each skill's training, and whether expert is unlocked the
-same way as trained. These replace the game's skills growing with use (`people.ts` `grow`).
+Open: the auto-levelling strategy itself (for example, always the top priority, or keeping to the order), whether the
+proficiency bonus rises with level, what unlocks each skill's training, and whether expert is unlocked the same way as
+trained. These replace the game's skills growing with use (`people.ts` `grow`).
 
 ## Planning
 
