@@ -210,6 +210,25 @@ If the target fought back, it is recorded as a fight.
 squad(sam, joe).fight(squad(rico), { kind: 'real', start: 'set-upon' });
 ```
 
+### Fleeing
+
+Wanting to flee and getting away are separate. A failed nerve check (for a character whose temperament makes them run), or a character's own choice, makes them try to flee; getting away is a roll. This replaces the lab's rule, where fleeing takes a character out of the fight at once.
+
+On their turn, instead of attacking, a fleeing character makes an escape check: their Reflexes against the highest Reflexes among the enemies still fighting, opposed, with ties going to the chaser as in every opposed check.
+
+| Outcome | What happens |
+| --- | --- |
+| Critical success | They get away cleanly |
+| Success | They get away cleanly |
+| Partial success | They get away, but the nearest enemy gets one free attack first |
+| Failure | Caught: still in the fight, and attacks against them have advantage until their next turn, when they try again |
+| Critical failure | Caught and cornered: they cannot try again, and their temperament decides whether they fight back or take it |
+
+- **Held:** in the first round of a beating the target is held, so breaking free is Brawling against the holder's Brawling instead.
+- **No one to chase them:** with no enemy still fighting, they get away without a roll.
+- **Choosing to run:** anyone can choose to flee on their turn. The player chooses for themselves; NPCs flee only by the nerve rules, for now.
+- **Balance:** fleeing characters now stay in the fight longer and can be hit while running, so the numbers are checked with statistical tests on simulated fights once built.
+
 ## Words
 
 Where a lab word and a game word mean the same thing, the game's word is used. Each was decided separately.
