@@ -7,6 +7,7 @@ import {
   BASE_HIT_POINTS,
   EFFECT_INFO,
   EFFECT_RULES,
+  FULL_REST,
   STORED_EFFECTS,
   conditionOf,
   conditionRecord,
@@ -17,6 +18,7 @@ import {
 } from '../../../src/overhaul/character/condition';
 import { SKILLS, abilities, attributesFor } from '../../../src/overhaul/character/skills';
 import { DAY, HOUR, assertTime } from '../../../src/overhaul/character/time';
+import { scripted } from './support';
 
 const average = abilities();
 const at = (hitPoints: number, effects: Condition['effects'] = [], a = average) => conditionOf(a, conditionRecord(a, { hitPoints, effects }));
@@ -201,6 +203,39 @@ describe('condition on a character', { tags: ['unit'] }, () => {
     assert.deepEqual(rested.condition, { hitPoints: 10, effects: [], rest: { from: 3 * DAY, until: 3 * DAY + 8 * HOUR }, maxHitPoints: 10, hurt: false, unconscious: false });
     assert.deepEqual([3 * DAY - 1, 3 * DAY, 3 * DAY + 8 * HOUR - 1, 3 * DAY + 8 * HOUR].map((t) => rested.restingAt(t)), [false, true, true, false]);
     assert.equal(worn.restingAt(0), false);
+  });
+
+  test('a rest shorter than a full night heals its share of the hit points missing, rounded down, and clears nothing', () => {
+    assert.equal(FULL_REST, 8 * HOUR);
+    const worn = () => everyone().character('sam').damage(9).character('sam').affect('drunk').character('sam');
+    const after = (hours: number) => worn().rest({ now: 0, hours }).character('sam').condition;
+    assert.deepEqual([4, 1, 0.5, 7.5].map((h) => after(h).hitPoints), [1 + 4, 1 + 1, 1 + 0, 1 + 8]);
+    assert.deepEqual(after(4).effects, ['drunk']);
+    assert.deepEqual(after(12).effects, []);
+  });
+
+  test('while resting, a character cannot make a check, plan, drink in company or alone, tell or be told; money can still reach them', () => {
+    const setup = () => {
+      const c = cast({ characters: [{ id: 'sam', name: 'Sam', inventory: { items: ['bottle'] } }, { id: 'rico', name: 'Rico', inventory: { items: ['bottle'] } }] })
+        .record({ kind: 'theft', actor: 'rico' }, { now: 0, witnesses: ['sam'] }).cast;
+      const { cast: working, job } = c.startJob({ kind: 'burglary', dc: 10, members: ['sam', 'rico'], now: 0 });
+      return { resting: working.character('sam').rest({ now: 60, hours: 8 }), job };
+    };
+    const { resting, job } = setup();
+    const sam = resting.character('sam');
+    const rico = resting.character('rico');
+    const during = { now: 120 };
+    assert.throws(() => sam.check('larceny', 10).roll(scripted(10), during), /resting/);
+    assert.throws(() => sam.planning.plan(job).roll(scripted(10), during), /resting/);
+    assert.throws(() => rico.planning.plan(job).helpedBy(sam).roll(scripted(10, 10), during), /resting/);
+    assert.throws(() => sam.drink(scripted(10), during), /resting/);
+    assert.throws(() => rico.drink(scripted(10), { ...during, with: [sam] }), /resting/);
+    assert.throws(() => sam.social.tell(rico, 'f1').roll(scripted(), during), /resting/);
+    assert.throws(() => rico.social.tell(sam, 'f1').roll(scripted(), during), /resting/);
+    assert.equal(resting.transfer({ from: 'world', to: 'sam', amount: 5, why: 'wages', now: 120 }).character('sam').cash, 5);
+    const awake = { now: 60 + 8 * HOUR };
+    assert.doesNotThrow(() => setup().resting.character('sam').check('larceny', 10).roll(scripted(10), awake));
+    assert.doesNotThrow(() => setup().resting.character('sam').drink(scripted(10), awake));
   });
 
   test('a rest takes a time and a duration of whole minutes', () => {

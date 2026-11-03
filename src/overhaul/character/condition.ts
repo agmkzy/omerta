@@ -1,9 +1,10 @@
 // Condition: hit points, and the temporary effects that change a character's rolls. Hurt and unconscious are read from hit
-// points, never stored, so the two can never disagree; shaken and drunk are stored until rest or an explicit clear ends them.
+// points, never stored, so the two can never disagree; shaken and drunk are stored until a full rest or an explicit clear ends them.
 // Every effect's modifiers are listed in one table. See docs/overhaul/plans/character/README.md (Condition and temporary effects).
 import { ATTRIBUTE_INFO, abilityModifier, type Attribute } from './attributes';
 import { totalOf, type Modifier, type Total } from './check';
 import { trainingModifier, type Abilities, type Skill } from './skills';
+import { HOUR } from './time';
 
 /** Hit points before Constitution and Toughness, as for a D&D d10 hit die at first level. */
 export const BASE_HIT_POINTS = 10;
@@ -41,6 +42,9 @@ export interface ConditionRecord {
   /** The last rest, from when it started until when it ends, in minutes. */
   readonly rest?: { readonly from: number; readonly until: number };
 }
+
+/** A full night's rest, in minutes: resting this long restores full health and clears Shaken and Drunk. A shorter rest heals its share of what is missing and clears nothing. */
+export const FULL_REST = 8 * HOUR;
 
 /** Whether a character with this condition is resting at `now`. */
 export function restingAt(c: ConditionRecord, now: number): boolean {

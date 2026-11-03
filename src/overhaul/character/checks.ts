@@ -4,6 +4,7 @@
 import type { CastRecord } from './cast';
 import { checkOdds, resolveCheck, type CheckResult, type Modifier, type Odds, type Outcome } from './check';
 import type { CharacterRecord, Id } from './character';
+import { assertAvailable } from './condition';
 import { withConduct } from './conduct';
 import type { ItemOptions } from './items';
 import { PLAN_BANDS, believedOutcome, usingAdvantage, type Job, type JobId } from './jobs';
@@ -72,6 +73,7 @@ export function skillCheck<C extends CastLike>(setup: SkillSetup, owner: C, comm
     explain: ({ for: v }) => seenBy(parts, viewerIn(v, owner)),
     roll(roller, { now }) {
       assertTime(now);
+      assertAvailable(setup.c, now, 'make a check');
       const truth = resolveCheck({ ...d20(truthOf(parts), edgeFor(advantage, null)), dc: setup.dc }, roller);
       const cast = commit(marking(advantage));
       return { cast, truth, result: ({ for: v }) => ({ outcome: truth.outcome, explanation: seenBy(parts, viewerIn(v, owner, cast)) }) };
@@ -122,8 +124,9 @@ export function planCheck<C extends CastLike>(setup: PlanSetup, owner: C, commit
     explain: ({ for: v }) => seenBy(parts, viewerIn(v, owner)),
     roll(roller, { now }) {
       assertTime(now);
-      const truth = resolveCheck(roll(truthOf(parts)), roller);
       const { job, planner, helper, advantageOn } = setup;
+      for (const c of setup.data.characters) if (c.id === planner.id || c.id === helper) assertAvailable(c, now, 'plan');
+      const truth = resolveCheck(roll(truthOf(parts)), roller);
       const cast = commit((d) => {
         const plan = { planner: planner.id, ...(helper !== undefined && { helper }), outcome: truth.outcome, margin: truth.margin, at: now, ...(advantageOn && { advantageOn }) };
         const planned: CastRecord = { ...d, jobs: d.jobs.map((j) => (j.id === job.id ? { ...j, plan } : j)) };

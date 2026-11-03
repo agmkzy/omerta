@@ -7,6 +7,7 @@
 import type { CastRecord } from './cast';
 import { checkOdds, resolveCheck, succeeded, type CheckResult, type Modifier, type Odds } from './check';
 import type { CharacterRecord, Id } from './character';
+import { assertAvailable } from './condition';
 import { withConduct } from './conduct';
 import type { Fact, FactId } from './facts';
 import { partOf, passOn, rebelieve, toldVersion, type Belief, type Part as KnowledgePart, type Version } from './knowledge';
@@ -121,6 +122,7 @@ export function tellCheck<C extends CastLike>(setup: TellSetup, owner: C, commit
     explain: ({ for: v }) => seenBy(parts, viewerIn(v)),
     roll(roller, { now }) {
       assertTime(now);
+      for (const c of [teller, listener]) assertAvailable(c, now, 'be told or tell anything');
       if (now < mine.learnedAt) throw new RangeError(`${teller.name} cannot tell ${f.id} at ${now}, before learning it at ${mine.learnedAt}`);
       const result = contradicted.length ? resolveCheck(roll(truthOf(parts)), roller) : null;
       const exposed: FactId[] = [];

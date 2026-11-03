@@ -5,7 +5,7 @@
 import type { Attribute } from './attributes';
 import { bonusOf, passes, resolveCheck, type CheckResult, type Modifier } from './check';
 import { createCharacter, type CharacterInput, type CharacterRecord, type Id } from './character';
-import { assertAvailable, conditionOf, effectModifiers, type Condition, type StoredEffect } from './condition';
+import { FULL_REST, assertAvailable, conditionOf, effectModifiers, restingAt, type Condition, type StoredEffect } from './condition';
 import { currentTemperament, withConduct, type ConductStep } from './conduct';
 import { DICE } from './dice';
 import { auditFacts, type Fact, type FactId, type FactInput } from './facts';
@@ -129,8 +129,9 @@ export interface Character {
   /** A new cast in which the character no longer has the effect. */
   clear(effect: StoredEffect): Cast;
   /**
-   * A new cast in which the character rests from `now` for `hours`, a whole number of minutes: they are back to full hit
-   * points, no longer shaken or drunk, and recorded as resting for that time.
+   * A new cast in which the character rests from `now` for `hours`, a whole number of minutes, and is recorded as resting for
+   * that time, unable to take part in anything. A full night (FULL_REST, 8 hours) or more brings them back to full hit points,
+   * no longer shaken or drunk; a shorter rest heals its share of the hit points missing, rounded down, and clears nothing.
    */
   rest(when: { readonly now: number; readonly hours: number }): Cast;
   /** A new cast in which the character has paid `amount` to another character in the cast, or to the world. */
@@ -424,7 +425,7 @@ function characterHandleOf(data: CharacterRecord, owner: Cast, commit: Commit): 
     },
     restingAt(now) {
       assertTime(now);
-      return data.condition.rest !== undefined && data.condition.rest.from <= now && now < data.condition.rest.until;
+      return restingAt(data.condition, now);
     },
     seenBy(viewer) {
       if (viewer.cast !== owner) throw new RangeError(`${viewer.name} is from another cast`);
@@ -440,7 +441,10 @@ function characterHandleOf(data: CharacterRecord, owner: Cast, commit: Commit): 
       assertTime(now);
       const minutes = hours * HOUR;
       if (!Number.isInteger(minutes) || minutes < 1) throw new RangeError(`a rest lasts a whole number of minutes from 1, got ${hours} hours`);
-      return withCondition(() => ({ hitPoints: condition.maxHitPoints, effects: [], rest: { from: now, until: now + minutes } }));
+      const rest = { from: now, until: now + minutes };
+      if (minutes >= FULL_REST) return withCondition(() => ({ hitPoints: condition.maxHitPoints, effects: [], rest }));
+      const healed = Math.floor(((condition.maxHitPoints - condition.hitPoints) * minutes) / FULL_REST);
+      return withCondition((c) => ({ ...c, hitPoints: c.hitPoints + healed, rest }));
     },
     pay(to, amount, { why, now, cause }) {
       if (to !== WORLD && to.cast !== owner) throw new RangeError(`${to.name} is from another cast`);
@@ -465,8 +469,9 @@ function characterHandleOf(data: CharacterRecord, owner: Cast, commit: Commit): 
     wear: (item) => move(item, 'carried', 'worn'),
     takeOff: (item) => move(item, 'worn', 'carried'),
     drink(roller, { now, with: company = [] }) {
-      if (condition.unconscious) throw new RangeError(`${data.name} is unconscious`);
+      assertTime(now);
       for (const other of company) if (other.cast !== owner || other.id === data.id) throw new RangeError(`${other.name} is not someone else in this cast`);
+      for (const c of [data, ...company.map((o) => o.data)]) assertAvailable(c, now, 'drink');
       if (!data.inventory.items.some((h) => h.item === 'bottle')) throw new RangeError(`${data.name} has no bottle of spirits`);
       const carousing = rollParts(owner.data, data, 'carousing', []);
       const result = resolveCheck({ dice: DICE.d20, edge: carousing.advantage.truth ? 'advantage' : 'none', modifiers: truthOf(carousing.parts), dc: DRINK_DC }, roller);
