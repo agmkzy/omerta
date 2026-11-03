@@ -23,7 +23,7 @@ const one = (character: Record<string, unknown>) => ({ format: CAST_FORMAT, char
 const fixture = (name: string): unknown => JSON.parse(readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'));
 /**
  * A cast using what format 8 added: Rico guesses who poached from him, then Vic, who saw it, tells him otherwise; Sam threatens
- * Joe, lies to Vic and, once Vic has told Joe of it, to Joe; Sam hands Rico his pistol over the poaching, and is paid for the threat.
+ * Joe and lies to him that Vic did it, which comes out when Vic tells him otherwise; Rico lies to Joe about its size; Sam hands Rico his pistol over the poaching, and is paid for the threat.
  */
 const formatEight = () => {
   const ids = ['sam', 'rico', 'joe', 'vic'];
@@ -38,9 +38,9 @@ const formatEight = () => {
   c = c.record({ kind: 'poach', actor: 'sam', victim: 'rico', hiddenActor: true }, { now: 0, witnesses: ['vic'] }).cast;
   c = c.character('vic').social.tell(c.character('rico'), 'f1').roll(scripted(19), { now: 10 }).cast;
   c = c.character('sam').social.intimidate(c.character('joe')).roll(scripted(15, 5), { now: 20 }).cast;
-  c = c.character('sam').social.deceive(c.character('vic')).claim({ about: 'f1', exaggerated: true }).roll(scripted(15, 5), { now: 25 }).cast;
-  c = c.character('vic').social.tell(c.character('joe'), 'f1').roll(scripted(), { now: 26 }).cast;
-  c = c.character('sam').social.deceive(c.character('joe')).claim({ about: 'f1', exaggerated: true }).roll(scripted(19, 1), { now: 27 }).cast;
+  c = c.character('sam').social.deceive(c.character('joe')).claim({ about: 'f1', blame: 'vic' }).roll(scripted(15, 5), { now: 25 }).cast;
+  c = c.character('vic').social.tell(c.character('joe'), 'f1').roll(scripted(19), { now: 26 }).cast;
+  c = c.character('rico').social.deceive(c.character('joe')).claim({ about: 'f1', exaggerated: true }).roll(scripted(19, 1), { now: 27 }).cast;
   c = c.character('sam').give(c.character('rico'), 'pistol', { why: 'making amends', now: 30, cause: 'f1' });
   return c.transfer({ from: WORLD, to: 'sam', amount: 50, why: 'wages', now: 40, cause: 'f2' });
 };
@@ -283,8 +283,8 @@ describe('loadCast', { tags: ['unit'] }, () => {
     assert.deepEqual(loadCast(throughJson(c.data)).data, c.data);
     const rico = c.character('rico').versionOf('f1')!;
     assert.deepEqual([rico.who, rico.blamed], [{ how: 'told', teller: 'vic' }, ['joe', 'sam']]);
-    assert.deepEqual(c.character('joe').versionOf('f1')!.size, { how: 'told', teller: 'sam' });
-    assert.deepEqual(c.data.facts.map((f) => [f.ending, f.claim]), [[undefined, undefined], ['success', undefined], ['critical-failure', { exaggerated: true }], ['critical-success', { exaggerated: true }]]);
+    assert.deepEqual(c.character('joe').versionOf('f1')!.size, { how: 'told', teller: 'rico' });
+    assert.deepEqual(c.data.facts.map((f) => [f.ending, f.claim]), [[undefined, undefined], ['success', undefined], ['success', { blame: 'vic' }], ['critical-success', { exaggerated: true }]]);
     assert.deepEqual(c.data.transfers.slice(1).map((t) => [t.item, t.cause]), [['pistol', 'f1'], [undefined, 'f2']]);
     // a guess, and the other claims a lie can make
     const guessed = { learnedAt: 0, source: 'witness', how: 'seen', knowsActor: false, blame: 'x', who: { how: 'guessed' } };

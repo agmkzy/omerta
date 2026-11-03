@@ -298,13 +298,19 @@ export function oddsFor(s: SocialSetup, viewer: Id | null): Readonly<Record<Endi
   return { ...odds, 'critical-failure': provoked ? 0 : odds['critical-failure'], provoked: provoked ? odds['critical-failure'] : 0 };
 }
 
-/** Throws RangeError for a social action that cannot be tried: on oneself, by or on someone unconscious, or a lie with no valid claim. */
+/**
+ * Throws RangeError for a social action that cannot be tried: on oneself, by or on someone unconscious, a lie with no valid
+ * claim, or a lie the liar knows cannot work (an invented fact naming the target, or a fact the liar saw the target see).
+ */
 export function assertSetup(s: SocialSetup): void {
   if (s.actor.id === s.target.id) throw new RangeError(`${s.actor.name} cannot ${s.action} themselves`);
   for (const c of [s.actor, s.target]) if (s.data.characters.find((x) => x.id === c.id)!.condition.hitPoints === 0) throw new RangeError(`${c.name} is unconscious`);
   if (s.action === 'deceive') {
     if (s.claim === undefined) throw new RangeError('a lie needs a claim');
     assertClaim(s.data, s.actor, s.claim);
+    // a lie the liar knows cannot work is not one they would tell; one that only the target knows cannot work is tried, and fails
+    const known = claimPart(s.data, s.target, s.claim).map((p) => p.knownTo(s.actor.id)).find((m) => m?.value === IMPOSSIBLE);
+    if (known) throw new RangeError(`${s.actor.name} would not tell that lie: ${known.reason}`);
   }
 }
 

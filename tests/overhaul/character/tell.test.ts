@@ -51,8 +51,10 @@ describe('telling someone something that contradicts what they believe', { tags:
 
   test('cannot overturn what they saw themselves', () => {
     const c = people().record({ kind: 'robbery', actor: 'sam', victim: 'vic' }, { now: 0, witnesses: ['joe'] }).cast;
-    const vic = c.character('sam').social.deceive(c.character('vic')).claim({ about: 'f1', exaggerated: true });
-    assert.ok(reasons(vic.explain({ for: c.character('vic') }).actor).includes('Vic saw it themselves -100'));
+    // Rico was told of it by Joe, so does not know Vic saw it
+    const told = c.character('joe').social.tell(c.character('rico'), 'f1').roll(scripted(), { now: 5 }).cast;
+    const vic = told.character('rico').social.deceive(told.character('vic')).claim({ about: 'f1', exaggerated: true });
+    assert.ok(reasons(vic.explain({ for: told.character('vic') }).actor).includes('Vic saw it themselves -100'));
   });
 
   test('brings no lie out when the belief overturned came second-hand from someone honestly mistaken', () => {
@@ -79,13 +81,12 @@ describe('telling someone something that contradicts what they believe', { tags:
 
 describe('a later lie', { tags: ['unit'] }, () => {
   test('reads the provenance of the part it changes, not of the version: a lie about who did it leaves how big it was as they saw it', () => {
-    const c = people().record({ kind: 'beating', actor: 'sam', victim: 'rico' }, { now: 0, witnesses: ['joe'] }).cast;
-    // Rico saw who beat him, so a lie about who did it cannot work; but Joe's lie that it was smaller is about a part Rico saw too
-    const who = c.character('joe').social.deceive(c.character('rico')).claim({ about: 'f1', blame: 'vic' });
-    assert.ok(reasons(who.explain({ for: c.character('rico') }).actor).includes('Rico saw it themselves -100'));
+    // Rico was robbed unseen: he saw how big it was, not who did it. Vic, told of it by Sam, does not know what Rico saw.
     const hidden = people().record({ kind: 'robbery', actor: 'sam', victim: 'rico', hiddenActor: true }, { now: 0 }).cast;
-    const lied1 = hidden.character('sam').social.deceive(hidden.character('rico')).claim({ about: 'f1', blame: 'joe' }).roll(scripted(15, 5), { now: 5 }).cast;
-    const size = lied1.character('sam').social.deceive(lied1.character('rico')).claim({ about: 'f1', exaggerated: true });
+    const told = hidden.character('sam').social.tell(hidden.character('vic'), 'f1').roll(scripted(), { now: 2 }).cast;
+    const lied1 = told.character('vic').social.deceive(told.character('rico')).claim({ about: 'f1', blame: 'joe' }).roll(scripted(15, 5), { now: 5 }).cast;
+    assert.equal(lied1.character('rico').versionOf('f1')!.blame, 'joe');
+    const size = lied1.character('vic').social.deceive(lied1.character('rico')).claim({ about: 'f1', exaggerated: true });
     assert.ok(reasons(size.explain({ for: lied1.character('rico') }).actor).includes('Rico saw it themselves -100'));
   });
 

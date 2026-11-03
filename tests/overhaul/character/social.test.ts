@@ -317,11 +317,20 @@ describe('a lie about who did it', { tags: ['unit'] }, () => {
 
   test('cannot fool someone who saw it, and anyone who saw it with them knows that', () => {
     const c = people().record({ kind: 'robbery', actor: 'sam', victim: 'vic' }, { now: 0, witnesses: ['rico'] }).cast;
-    const { sam, rico, joe, vic } = who(c);
-    const check = sam.social.deceive(rico).claim({ about: 'f1', blame: 'joe' });
+    // Joe was only told of it, so does not know Rico saw it
+    const told = c.character('sam').social.tell(c.character('joe'), 'f1').roll(scripted(), { now: 5 }).cast;
+    const { rico, joe, vic } = who(told);
+    const check = joe.social.deceive(rico).claim({ about: 'f1', blame: 'vic' });
     assert.ok(reasons(check.explain({ for: vic }).actor).includes(`Rico saw it themselves ${IMPOSSIBLE}`));
-    assert.equal(check.explain({ for: joe }).actor.length, 0);
+    assert.ok(!check.explain({ for: joe }).actor.some((m) => m.value === IMPOSSIBLE));
     for (const e of ['partial', 'success', 'critical-success'] as const) assert.equal(trueOdds(check)[e], 0);
+    assert.equal(trueOdds(check)['critical-failure'], 1);
+  });
+
+  test('is not told by someone who saw the target see it: the liar knows it cannot work', () => {
+    const c = people().record({ kind: 'robbery', actor: 'sam', victim: 'vic' }, { now: 0, witnesses: ['rico'] }).cast;
+    assert.throws(() => c.character('sam').social.deceive(c.character('rico')).claim({ about: 'f1', blame: 'joe' }), /Sam would not tell that lie: Rico saw it themselves/);
+    assert.throws(() => c.character('vic').social.deceive(c.character('rico')).claim({ about: 'f1', blame: 'joe' }), /would not tell that lie/);
   });
 
   test('is −4 against what a witness told them, −2 against what they heard, and +2 for matching what they believe', () => {
@@ -375,10 +384,11 @@ describe('a lie about a fact that never happened', { tags: ['unit'] }, () => {
     assert.equal(out.cast.character('rico').versionOf('f1'), undefined);
   });
 
-  test('cannot fool the one it claims was involved', () => {
+  test('is not told to the one it claims was involved: anyone can see it would not work', () => {
     const { sam, rico } = who(people());
-    const check = sam.social.deceive(rico).claim({ invented: { kind: 'robbery', actor: 'joe', victim: 'rico' } });
-    assert.ok(reasons(check.explain({ for: sam }).actor).some((r) => r.startsWith('Rico would know')));
+    assert.throws(() => sam.social.deceive(rico).claim({ invented: { kind: 'robbery', actor: 'joe', victim: 'rico' } }), /Sam would not tell that lie: Rico would know: it would have been them/);
+    assert.throws(() => sam.social.deceive(rico).claim({ invented: { kind: 'beating', actor: 'rico', victim: 'joe' } }), /Rico would know/);
+    assert.doesNotThrow(() => sam.social.deceive(rico).claim({ invented: { kind: 'beating', actor: 'vic', victim: 'joe' } }));
   });
 });
 

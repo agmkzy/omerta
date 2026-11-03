@@ -76,12 +76,6 @@
           "source": "self",
           "how": "seen",
           "knowsActor": true
-        },
-        "f4": {
-          "learnedAt": 27,
-          "source": "self",
-          "how": "seen",
-          "knowsActor": true
         }
       },
       "relationships": {
@@ -91,8 +85,8 @@
           "affection": 0.5,
           "grudge": 0,
           "fear": 0,
-          "familiarity": 0.039599999999999996,
-          "lastMet": 25
+          "familiarity": 0.02,
+          "lastMet": 0
         },
         "rico": {
           "trust": 0.5,
@@ -109,7 +103,7 @@
           "grudge": 0,
           "fear": 0,
           "familiarity": 0.039599999999999996,
-          "lastMet": 27
+          "lastMet": 25
         }
       }
     },
@@ -142,7 +136,17 @@
         "honesty": 0.5,
         "cruelty": 0.5
       },
-      "conduct": [],
+      "conduct": [
+        {
+          "conduct": "lying",
+          "trait": "honesty",
+          "direction": -1,
+          "at": 27,
+          "cause": {
+            "fact": "f4"
+          }
+        }
+      ],
       "condition": {
         "hitPoints": 10,
         "effects": []
@@ -170,6 +174,12 @@
             "joe",
             "sam"
           ]
+        },
+        "f4": {
+          "learnedAt": 27,
+          "source": "self",
+          "how": "seen",
+          "knowsActor": true
         }
       },
       "relationships": {
@@ -179,12 +189,13 @@
           "affection": 0.5,
           "grudge": 0.7,
           "fear": 0,
-          "familiarity": 0,
+          "familiarity": 0.02,
           "grudgeReason": {
             "fact": "f1",
             "at": 0,
             "amount": 0.19999999999999996
-          }
+          },
+          "lastMet": 27
         },
         "vic": {
           "trust": 0.5,
@@ -257,6 +268,15 @@
           "cause": {
             "fact": "f2"
           }
+        },
+        {
+          "conduct": "lied-to",
+          "trait": "agreeable",
+          "direction": -1,
+          "at": 26,
+          "cause": {
+            "fact": "f3"
+          }
         }
       ],
       "condition": {
@@ -277,40 +297,64 @@
           "knowsActor": true
         },
         "f1": {
-          "learnedAt": 26,
+          "learnedAt": 25,
           "source": "told",
-          "teller": "vic",
+          "teller": "sam",
           "how": "told",
           "knowsActor": true,
           "exaggerated": true,
+          "who": {
+            "how": "told",
+            "teller": "vic"
+          },
           "size": {
             "how": "told",
-            "teller": "sam"
-          }
+            "teller": "rico"
+          },
+          "blamed": [
+            "vic",
+            "sam"
+          ]
+        },
+        "f3": {
+          "learnedAt": 26,
+          "source": "witness",
+          "how": "seen",
+          "knowsActor": true
         }
       },
       "relationships": {
         "sam": {
-          "trust": 0.45,
+          "trust": 0.30000000000000004,
           "respect": 0.5075,
           "affection": 0.5,
-          "grudge": 0.05,
+          "grudge": 0.0975,
           "fear": 0.1,
           "familiarity": 0.039599999999999996,
-          "lastMet": 27,
+          "lastMet": 25,
           "grudgeReason": {
-            "fact": "f2",
-            "at": 20,
-            "amount": 0.05
+            "fact": "f3",
+            "at": 26,
+            "amount": 0.0475
           }
         },
-        "rico": {
+        "vic": {
           "trust": 0.5,
-          "respect": 0.485,
+          "respect": 0.5075,
           "affection": 0.5,
           "grudge": 0,
           "fear": 0,
-          "familiarity": 0
+          "familiarity": 0.02,
+          "lastMet": 26
+        },
+        "rico": {
+          "trust": 0.5,
+          "respect": 0.47,
+          "affection": 0.5,
+          "grudge": 0,
+          "fear": 0,
+          "familiarity": 0.02,
+          "lastMet": 27
         }
       }
     },
@@ -343,17 +387,7 @@
         "honesty": 0.5,
         "cruelty": 0.5
       },
-      "conduct": [
-        {
-          "conduct": "lied-to",
-          "trait": "agreeable",
-          "direction": -1,
-          "at": 25,
-          "cause": {
-            "fact": "f3"
-          }
-        }
-      ],
+      "conduct": [],
       "condition": {
         "hitPoints": 10,
         "effects": []
@@ -368,28 +402,17 @@
           "source": "witness",
           "how": "seen",
           "knowsActor": true
-        },
-        "f3": {
-          "learnedAt": 25,
-          "source": "witness",
-          "how": "seen",
-          "knowsActor": true
         }
       },
       "relationships": {
         "sam": {
-          "trust": 0.35,
+          "trust": 0.5,
           "respect": 0.5075,
           "affection": 0.5,
-          "grudge": 0.05,
+          "grudge": 0,
           "fear": 0,
-          "familiarity": 0.039599999999999996,
-          "lastMet": 25,
-          "grudgeReason": {
-            "fact": "f3",
-            "at": 25,
-            "amount": 0.05
-          }
+          "familiarity": 0.02,
+          "lastMet": 0
         },
         "rico": {
           "trust": 0.5,
@@ -399,6 +422,15 @@
           "fear": 0,
           "familiarity": 0.039599999999999996,
           "lastMet": 10
+        },
+        "joe": {
+          "trust": 0.5,
+          "respect": 0.5,
+          "affection": 0.5,
+          "grudge": 0,
+          "fear": 0,
+          "familiarity": 0.02,
+          "lastMet": 26
         }
       }
     }
@@ -454,11 +486,11 @@
     {
       "kind": "lie",
       "actor": "sam",
-      "victim": "vic",
-      "ending": "critical-failure",
+      "victim": "joe",
+      "ending": "success",
       "cause": "f1",
       "claim": {
-        "exaggerated": true
+        "blame": "vic"
       },
       "id": "f3",
       "at": 25,
@@ -466,7 +498,7 @@
     },
     {
       "kind": "lie",
-      "actor": "sam",
+      "actor": "rico",
       "victim": "joe",
       "ending": "critical-success",
       "cause": "f1",

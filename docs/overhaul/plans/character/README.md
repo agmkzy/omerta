@@ -350,6 +350,11 @@ The modifier comes from what the target knows of the part of the fact the claim 
 | Does not know it | None |
 | The lie matches what they already believe, such as who they blame | +2 |
 
+**A lie the liar knows cannot work is never told** (decided 3 November 2026). An impossible lie is tried only when the liar does not know it is impossible, and is then a certain critical failure: the target sees through it. A lie the liar can see would fail is refused before any roll, so it has no odds:
+
+- **An invented fact naming the target,** as whoever did it or whoever it was done to: "you killed a man", or "Joe robbed you". The target would know, and so does the liar.
+- **A fact the liar saw the target see:** Sam and Rico both watched John kill Tom, so Sam knows Rico knows; "Frank killed Tom" is refused. Joe, who was only told of it, does not know Rico saw it, so the same lie from Joe is tried, and fails.
+
 ## Checks and modifiers
 
 - **The roll decides the response** in social checks, as decided in the lab ([Social actions](../../../../lab/character/README.md#social-actions)). What the target knows, what is at stake for them, how each feels about the other and their temperament are all modifiers on the roll. A certain outcome is the same as a modifier large enough to make the check impossible, so social checks have no automatic success.
