@@ -13,6 +13,12 @@ Found in the outside review, in the game itself (`docs/architecture/INTEGRITY.md
 - `suspect` raises a grudge with no recorded reason, bypassing `bear` (`src/core.ts`).
 - `broadcast`'s comment says listeners do not learn who did it; its code lets them, unless the actor is hidden.
 
+Found in mapping the game's character fields ([game-mapping.md](game-mapping.md)):
+
+- Characters' cash is changed directly in 254 places in 42 files, the ledger records only movements inside the player's circle, and no check proves a character's cash adds up (`ledgerCheck` and `audit` cover businesses and debts). Invariant H.
+- Someone can be told a fact without their feelings changing (`revenge.ts`, `deeds.ts` `toldDirect`), bypassing `learn`. Invariant A.
+- `encounters.ts` stores knowledge that has no fact behind it (`known['leave:<id>']`), so it has no recorded cause. Invariants A and D.
+
 ## To confirm
 
 Nothing is open. Every choice made while building was settled with the owner on 3 November 2026: those that changed or settled the design are written into the plan, and those that only follow from it are under [Choices made while building](#choices-made-while-building).
