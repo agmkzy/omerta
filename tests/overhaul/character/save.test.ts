@@ -10,6 +10,7 @@ import { roller, seeded } from '../../../src/overhaul/character/random';
 import { NEW_RELATIONSHIP } from '../../../src/overhaul/character/relationships';
 import { WORLD } from '../../../src/overhaul/character/transfers';
 import { MIGRATIONS, NewerFormatError, loadCast, migrate, readCast, type Migration } from '../../../src/overhaul/character/save';
+import { scripted } from './support';
 
 const everyone = cast({
   characters: [
@@ -239,6 +240,36 @@ describe('loadCast', { tags: ['unit'] }, () => {
     assert.throws(() => loadCast(one({ id: 'x', name: 'X', conduct: [{ ...step, cause: { fact: 'f1' } }] })), RangeError);
   });
 
+  test('loads a cast saved in format 7, which must keep loading', () => {
+    const { cast: loaded, ignored } = readCast(fixture('cast-format7.json'));
+    assert.deepEqual(ignored, []);
+    assert.deepEqual(loaded.job('j3').plan!.outcome, 'critical-success');
+    assert.deepEqual(loaded.character('sam').conduct.at(-1)!.cause, { job: 'j3' });
+  });
+
+  test('restores jobs and their plans, and leaves out fields it does not recognise', () => {
+    const started = loadCast(throughJson(everyone.data)).startJob({ kind: 'burglary', dc: 20, members: ['sam', 'rico'], now: 0 });
+    const planned = started.cast.character('sam').planning.plan(started.job, { advantageOn: { member: 'rico', skill: 'stealth' } }).helpedBy('rico').roll(scripted(20, 20), { now: 5 }).cast;
+    const ended = planned.endJob('j1', { now: 50 });
+    assert.deepEqual(loadCast(throughJson(ended.data)).data, ended.data);
+    const job = { id: 'j1', kind: 'scam', members: ['x'], dc: 10, startedAt: 0, note: 'quick', plan: { planner: 'x', outcome: 'success', margin: 5, at: 0, advantageUsed: true, mood: 'sure' } };
+    const { cast: loaded, ignored } = readCast({ format: CAST_FORMAT, characters: [{ id: 'x', name: 'X' }], jobs: [job], nextId: 2 });
+    assert.equal(loaded.job('j1').plan!.advantageUsed, true);
+    assert.deepEqual([...ignored].sort(), ['jobs[0].note', 'jobs[0].plan.mood']);
+  });
+
+  test('rejects jobs of the wrong shape or that do not fit the cast', () => {
+    const job = { id: 'j1', kind: 'scam', members: ['x'], dc: 10, startedAt: 0 };
+    const plan = { planner: 'x', outcome: 'success', margin: 5, at: 0 };
+    const withJobs = (jobs: unknown) => ({ format: CAST_FORMAT, characters: [{ id: 'x', name: 'X' }], jobs, nextId: 2 });
+    for (const jobs of [{}, [null], [{ ...job, id: 1 }], [{ ...job, members: 'x' }], [{ ...job, dc: '10' }], [{ ...job, endedAt: '5' }],
+      [{ ...job, plan: { ...plan, planner: 1 } }], [{ ...job, plan: { ...plan, helper: 1 } }], [{ ...job, plan: { ...plan, outcome: 'great' } }], [{ ...job, plan: { ...plan, at: '0' } }],
+      [{ ...job, plan: { ...plan, advantageUsed: false } }], [{ ...job, plan: { ...plan, advantageOn: { member: 'x', skill: 'juggling' } } }]])
+      assert.throws(() => loadCast(withJobs(jobs)), TypeError, JSON.stringify(jobs));
+    for (const jobs of [[{ ...job, members: ['y'] }], [{ ...job, id: 'j5' }], [job, { ...job, id: 'j1' }]])
+      assert.throws(() => loadCast(withJobs(jobs)), RangeError, JSON.stringify(jobs));
+  });
+
   test('rejects a condition of the wrong shape or out of range', () => {
     for (const condition of [[], { hitPoints: '3' }, { effects: 'shaken' }, { rest: { from: 0 } }, { rest: 5 }])
       assert.throws(() => loadCast(one({ id: 'x', name: 'X', condition })), TypeError, JSON.stringify(condition));
@@ -297,6 +328,12 @@ describe('migrations', { tags: ['unit'] }, () => {
     assert.deepEqual(notAList, { format: 5, characters: 'none' });
   });
 
+  test('6 to 7 gives the cast no jobs', () => {
+    const d: Record<string, unknown> = { format: 6 };
+    migrate(d, 6, MIGRATIONS.slice(0, 6));
+    assert.deepEqual(d, { format: 6, jobs: [] });
+  });
+
   test('run in order from the saved format to the newest', () => {
     const steps: Migration[] = [(d) => void ((d.seen as string[]).push('1 to 2')), (d) => void ((d.seen as string[]).push('2 to 3'))];
     const from = (format: number) => {
@@ -315,7 +352,7 @@ describe('saving and loading', { tags: ['property'] }, () => {
     fc.assert(
       fc.property(fc.integer(), fc.array(fc.constantFrom(...BACKGROUNDS), { maxLength: 4 }), fc.integer({ min: 2, max: 6 }), (seed, backgrounds, pb) => {
         const r = roller(seeded(seed));
-        const data = { format: CAST_FORMAT, characters: backgrounds.map((b, i) => rollCharacter(`c${i}`, `C${i}`, b, r, { proficiencyBonus: pb })), transfers: [], facts: [], nextId: 1 };
+        const data = { format: CAST_FORMAT, characters: backgrounds.map((b, i) => rollCharacter(`c${i}`, `C${i}`, b, r, { proficiencyBonus: pb })), transfers: [], facts: [], jobs: [], nextId: 1 };
         assert.deepEqual(loadCast(throughJson(castOf(data).data)).data, data);
       }),
     );

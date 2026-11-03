@@ -3,21 +3,21 @@
 // about the two characters is a modifier on it: temperament, effects, items, weapons, feelings and what the target knows.
 // Odds, explanations and results are given to a viewer, and count another character's private state only where the viewer
 // knows it. Each roll records a fact, which is the cause of its aftermath. See docs/overhaul/plans/character/README.md.
-import { OUTCOMES, opposedOdds, resolveOpposed, succeeded, type Modifier, type OpposedResult, type Outcome, type Roll } from './check';
+import { OUTCOMES, opposedOdds, resolveOpposed, succeeded, type Modifier, type OpposedResult, type Outcome } from './check';
 import type { CastRecord } from './cast';
 import type { CharacterRecord, Id } from './character';
-import { conditionOf, effectParts } from './condition';
 import { currentTemperament, withConduct, type Conduct } from './conduct';
-import { DICE } from './dice';
 import { FACT_KINDS, type Fact, type FactId, type FactKind } from './facts';
-import { ITEM_INFO, WEAPON_THREAT, itemParts, strongestWeapon } from './items';
+import { ITEM_INFO, WEAPON_THREAT, strongestWeapon } from './items';
+import { usingAdvantage } from './jobs';
 import { rebelieve, toldVersion, type Version } from './knowledge';
 import { LEARNED_AS, VIOLENT, believedActor, learnFact } from './learning';
 import type { Roller } from './random';
 import { allMeet, recordFact, withCharacter } from './records';
 import { feel, feelingModifiers, type Feeling, type SocialAction } from './relationships';
-import { attributeUsed, skillModifiers, type Skill } from './skills';
-import { HIGH, leaning, temperamentModifiers, type Situation } from './temperament';
+import { d20, everyone, knownBy, rollParts, seenBy, truthOf, type Part, type PlanAdvantage } from './parts';
+import type { Skill } from './skills';
+import { HIGH, leaning, type Situation } from './temperament';
 
 export type { SocialAction };
 export const SOCIAL_ACTIONS = ['intimidate', 'persuade', 'deceive'] as const satisfies readonly SocialAction[];
@@ -154,19 +154,6 @@ export interface SocialTruth {
   readonly facts: readonly Fact[];
 }
 
-/** A modifier as it truly is (null if it truly is none), and how each viewer would count it: as it is, as they believe it to be, or not at all (null). */
-interface Part {
-  readonly truth: Modifier | null;
-  knownTo(viewer: Id): Modifier | null;
-}
-
-const everyone = (modifier: Modifier): Part => ({ truth: modifier, knownTo: () => modifier });
-const knownBy = (ids: readonly (Id | undefined)[], modifier: Modifier): Part => ({ truth: modifier, knownTo: (v) => (ids.includes(v) ? modifier : null) });
-/** A modifier of a character's own that anyone present can see, if `visible`, and otherwise only they know. */
-const ownPart = (visible: boolean, owner: Id, modifier: Modifier): Part => (visible ? everyone(modifier) : knownBy([owner], modifier));
-/** Item effects that anyone present can see: those of items shown or worn. */
-const VISIBLE_ITEMS: readonly string[] = ['shown', 'worn'];
-
 /** Whether a viewer saw the fact happen, with `who` there: then they know `who` saw it too. */
 function sawWith(data: CastRecord, viewer: Id, f: Fact, who: Id): boolean {
   const v = data.characters.find((c) => c.id === viewer)?.knowledge[f.id];
@@ -180,17 +167,6 @@ export interface SocialSetup {
   readonly target: CharacterRecord;
   readonly claim?: Claim;
   readonly extra: readonly Modifier[];
-}
-
-/** A skill roll's own parts: the skill, the effects (only hurt is visible) and the items (those shown or worn are visible). */
-function skillParts(c: CharacterRecord, skill: Skill, situations: readonly Situation[]): Part[] {
-  const condition = conditionOf(c, c.condition);
-  return [
-    ...skillModifiers(c, skill).map((m) => knownBy([c.id], m)),
-    ...effectParts(condition, skill, attributeUsed(c, skill)).map((p) => ownPart(p.effect === 'hurt', c.id, p.modifier)),
-    ...itemParts(c.inventory, skill).map((p) => ownPart(VISIBLE_ITEMS.includes(p.when), c.id, p.modifier)),
-    ...temperamentModifiers(currentTemperament(c), situations).map((m) => knownBy([c.id], m)),
-  ];
 }
 
 /** The weapon the actor shows against what the target carries. Anyone but the target judges by the weapons the target shows. */
@@ -265,30 +241,31 @@ function claimPart(data: CastRecord, target: CharacterRecord, claim: Claim): Par
   return [{ truth: modifier, knownTo: (viewer) => (viewer === target.id || viewer === v.teller || (modifier.value === IMPOSSIBLE && sawWith(data, viewer, f, target.id)) ? modifier : null) }];
 }
 
-/** Every part of the two rolls, with who can know each. */
-function partsOf(s: SocialSetup): { readonly active: readonly Part[]; readonly passive: readonly Part[] } {
+/** Every part of the two rolls, with who can know each, and each roll's advantage from a plan. */
+function partsOf(s: SocialSetup): { readonly active: readonly Part[]; readonly passive: readonly Part[]; readonly edges: readonly [PlanAdvantage, PlanAdvantage] } {
   const info = SOCIAL_ACTION_INFO[s.action];
   const { actor, target, data } = s;
   const feelings = (whose: 'actor' | 'target') =>
     feelingModifiers(s.action, { name: actor.name, ...(whose === 'actor' && actor.relationships[target.id] && { towards: actor.relationships[target.id] }) }, { name: target.name, ...(whose === 'target' && target.relationships[actor.id] && { towards: target.relationships[actor.id] }) }).map((m) =>
       knownBy([whose === 'actor' ? actor.id : target.id], m),
     );
+  const own = rollParts(data, actor, info.skill, info.actorSituations);
+  const resisting = rollParts(data, target, info.resist, info.targetSituations);
   return {
+    edges: [own.advantage, resisting.advantage],
     active: [
-      ...skillParts(actor, info.skill, info.actorSituations),
+      ...own.parts,
       ...(s.action === 'intimidate' ? [...weaponPart(actor, target), ...violencePart(data, actor, target)] : []),
       ...(s.claim ? claimPart(data, target, s.claim) : []),
       ...feelings('target'),
       ...feelings('actor'),
       ...s.extra.map(everyone),
     ],
-    passive: skillParts(target, info.resist, info.targetSituations),
+    passive: resisting.parts,
   };
 }
 
-const rollOf = (modifiers: readonly Modifier[]): Roll => ({ dice: DICE.d20, edge: 'none', modifiers });
-const seenBy = (parts: readonly Part[], viewer: Id) => parts.flatMap((p) => p.knownTo(viewer) ?? []);
-const truthOf = (parts: readonly Part[]) => parts.flatMap((p) => p.truth ?? []);
+const edgeFor = (a: PlanAdvantage, viewer: Id | null) => ((viewer === null ? a.truth : a.knownTo(viewer)) ? 'advantage' : 'none');
 const provokes = (s: SocialSetup) => s.action === 'intimidate' && leaning(currentTemperament(s.target).volatility) === 'high';
 
 /** The modifiers a viewer knows of on each roll. */
@@ -299,9 +276,9 @@ export function explainFor(s: SocialSetup, viewer: Id): Explanation {
 
 /** The chance of each ending as a viewer can judge it. Only the target knows whether they are volatile enough to be provoked. */
 export function oddsFor(s: SocialSetup, viewer: Id | null): Readonly<Record<Ending, number>> {
-  const { active, passive } = partsOf(s);
+  const { active, passive, edges } = partsOf(s);
   const pick = (parts: readonly Part[]) => (viewer === null ? truthOf(parts) : seenBy(parts, viewer));
-  const odds = opposedOdds({ active: rollOf(pick(active)), passive: rollOf(pick(passive)) });
+  const odds = opposedOdds({ active: d20(pick(active), edgeFor(edges[0], viewer)), passive: d20(pick(passive), edgeFor(edges[1], viewer)) });
   const provoked = provokes(s) && (viewer === null || viewer === s.target.id);
   return { ...odds, 'critical-failure': provoked ? 0 : odds['critical-failure'], provoked: provoked ? odds['critical-failure'] : 0 };
 }
@@ -318,10 +295,12 @@ export function assertSetup(s: SocialSetup): void {
 
 /** Rolls the check and returns what really happened, and the record after it: its fact, aftermath and any change of belief. */
 export function rollSocial(s: SocialSetup, roller: Roller, when: { readonly now: number; readonly witnesses?: readonly Id[] }): { readonly truth: Omit<SocialTruth, 'facts'>; readonly next: (data: CastRecord) => { data: CastRecord; facts: Fact[] } } {
-  const { active, passive } = partsOf(s);
-  const check = resolveOpposed({ active: rollOf(truthOf(active)), passive: rollOf(truthOf(passive)) }, roller);
+  const { active, passive, edges } = partsOf(s);
+  const check = resolveOpposed({ active: d20(truthOf(active), edgeFor(edges[0], null)), passive: d20(truthOf(passive), edgeFor(edges[1], null)) }, roller);
   const ending: Ending = check.outcome === 'critical-failure' && provokes(s) ? 'provoked' : check.outcome;
-  return { truth: { action: s.action, ending, check }, next: (data) => applySocial(data, s, ending, when) };
+  // (a plan's advantage, if either roll was its chosen check, is used up)
+  const used = (d: CastRecord) => edges.reduce((x, a) => (a.truth && a.job ? { ...x, jobs: usingAdvantage(x.jobs, a.job) } : x), d);
+  return { truth: { action: s.action, ending, check }, next: (data) => applySocial(used(data), s, ending, when) };
 }
 
 function applySocial(data: CastRecord, s: SocialSetup, ending: Ending, when: { readonly now: number; readonly witnesses?: readonly Id[] }): { data: CastRecord; facts: Fact[] } {

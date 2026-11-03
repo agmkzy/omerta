@@ -6,6 +6,7 @@
 import type { CharacterRecord } from './character';
 import type { Fact, FactId, FactKind } from './facts';
 import type { Item } from './items';
+import type { JobId } from './jobs';
 import { TRAITS, leaning, temperament, type Temperament, type Trait } from './temperament';
 import { DAY, assertTime } from './time';
 
@@ -68,8 +69,8 @@ export const CONDUCT = {
 export type Conduct = keyof typeof CONDUCT;
 export const CONDUCTS = Object.keys(CONDUCT) as Conduct[];
 
-/** What caused a step: a fact, or an item used up. (A job's plan is a fact when jobs are recorded.) */
-export type Cause = { readonly fact: FactId } | { readonly item: Item };
+/** What caused a step: a fact, an item used up, or a job (its plan, or taking part in it). */
+export type Cause = { readonly fact: FactId } | { readonly item: Item } | { readonly job: JobId };
 
 /** One step of a character's conduct: a trait moved one step up or down, by a kind of conduct, at a time, for a cause. */
 export interface ConductStep {

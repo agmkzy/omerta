@@ -9,6 +9,8 @@ import { conditionOf, effectModifiers, type Condition, type StoredEffect } from 
 import { currentTemperament, withConduct, type ConductStep } from './conduct';
 import { DICE } from './dice';
 import { auditFacts, type Fact, type FactId, type FactInput } from './facts';
+import { HARD_JOB_DC, assertJobs, jobId, openJobOf, planEffect, usingAdvantage, type Job, type JobId } from './jobs';
+import { rollParts, truthOf } from './parts';
 import { assertFight, fight, type FightKind, type FightResult, type FightStart } from './fight';
 import { applyFight, type FightRecordOptions } from './fight-record';
 import { DRINK_DC, ITEM_INFO, itemModifiers, type InventoryRecord, type Item, type ItemOptions, type ItemState } from './items';
@@ -19,13 +21,14 @@ import type { Roller } from './random';
 import type { Relationship, Relationships } from './relationships';
 import { SKILLS, attributeUsed, skillModifiers, type Proficiency, type Skill } from './skills';
 import { socialCheck, type Claim, type SocialAction, type SocialCheck } from './social';
+import { jobIn, planCheck, skillCheck, type PlanCheck, type SkillCheck } from './checks';
 import type { Temperament } from './temperament';
 import { HOUR, assertTime } from './time';
 import { WORLD, auditCash, type Party, type Transfer } from './transfers';
 import { seen, type Seen } from './view';
 
 /** Increment when the saved shape changes, and add a migration in save.ts. */
-export const CAST_FORMAT = 6;
+export const CAST_FORMAT = 7;
 
 export interface CastRecord {
   readonly format: number;
@@ -34,7 +37,9 @@ export interface CastRecord {
   readonly transfers: readonly Transfer[];
   /** Every fact, in time order. */
   readonly facts: readonly Fact[];
-  /** The next number for an id made by the cast, such as a fact's. */
+  /** Every job, in the order they started. */
+  readonly jobs: readonly Job[];
+  /** The next number for an id made by the cast, for a fact or a job. */
   readonly nextId: number;
 }
 
@@ -63,6 +68,16 @@ export interface Cast {
    * time before the last fact.
    */
   record(fact: Omit<FactInput, 'invented'>, when: { readonly now: number; readonly witnesses?: readonly Id[] }): { readonly fact: Fact; readonly cast: Cast };
+  readonly jobs: readonly Job[];
+  /** Throws RangeError for an id not recorded. */
+  job(id: JobId): Job;
+  /**
+   * Starts a job at `now`. Its members take part in it until it ends; a member of a hard job (DC 20 or more) grows more
+   * ambitious. Throws RangeError for members not in the cast or already in an open job, or a DC that is not a whole number from 1.
+   */
+  startJob(job: { readonly kind: string; readonly dc: number; readonly members: readonly Id[]; readonly now: number }): { readonly job: Job; readonly cast: Cast };
+  /** Ends an open job at `now`, and with it its plan. */
+  endJob(job: JobId, when: { readonly now: number }): Cast;
 }
 
 /** A skill as it stands for a character: their training, the attribute used and the bonus, with every part of it. */
@@ -133,6 +148,10 @@ export interface Character {
    * DRINK_DC, and on a failure the character is drunk.
    */
   drink(roller: Roller, when: { readonly now: number; readonly with?: readonly Character[] }): { readonly result: CheckResult; readonly drunk: boolean; readonly cast: Cast };
+  /** A skill check against a DC, in a situation and with items used: a check to inspect, then roll. */
+  check(skill: Skill, dc: number, options?: ItemOptions): SkillCheck<Cast>;
+  /** Planning a job they are taking part in, optionally choosing the check a critical success gives advantage on. */
+  readonly planning: { plan(job: Job | JobId, options?: { readonly advantageOn?: { readonly member: Id; readonly skill: Skill } }): PlanCheck<Cast> };
   /** A fight with another character in the cast: one against one, as `squad(this).fight(squad(other), options)`. */
   fight(other: Character, options: FightOptions): FightCheck;
   /** Social actions on another character in the cast, each a check to inspect, then roll. */
@@ -176,7 +195,12 @@ export function squad(...members: Character[]): Squad {
       if (other.members[0]!.cast !== first.cast) throw new RangeError('the other squad is from another cast');
       const spec = (d: CastRecord) => {
         const of = (s: readonly Character[]) => s.map((m) => d.characters.find((c) => c.id === m.id)!);
-        return { attackers: of(members), defenders: of(other.members), kind, ...(start && { start }) };
+        // an ambush's Stealth rolls are checks around the fight, so the attackers' plans count on them
+        const stealth = new Map(members.flatMap((m) => {
+          const plan = planEffect(d.jobs, m.id, 'stealth');
+          return plan ? [[m.id, { modifiers: plan.truth ? [plan.truth] : [], edge: plan.advantage ? ('advantage' as const) : ('none' as const), ...(plan.advantage && { job: plan.job.id }) }] as const] : [];
+        }));
+        return { attackers: of(members), defenders: of(other.members), kind, ...(start && { start }), stealth };
       };
       assertFight(spec(first.cast.data));
       return {
@@ -184,8 +208,11 @@ export function squad(...members: Character[]): Squad {
           let result: FightResult | undefined;
           let facts: readonly Fact[] = [];
           const next = commits.get(first)!((d) => {
-            result = fight(spec(d), roller);
-            const applied = applyFight(d, result, when);
+            const s = spec(d);
+            result = fight(s, roller);
+            // (a plan's advantage on Stealth is used up if the ambush rolled it)
+            const used = result.start === 'ambush' ? [...s.stealth.values()].flatMap((x) => ('job' in x && x.job ? [x.job] : [])) : [];
+            const applied = applyFight(used.reduce((x, j) => ({ ...x, jobs: usingAdvantage(x.jobs, j) }), d), result, when);
             facts = applied.facts;
             return applied.data;
           });
@@ -201,7 +228,7 @@ export class ReplacedCastError extends Error {}
 
 /** A cast of the given characters. Throws as createCharacter does, and RangeError for an id given twice. */
 export function cast(given: { readonly characters?: readonly CharacterInput[] } = {}): Cast {
-  return castOf({ format: CAST_FORMAT, characters: (given.characters ?? []).map(createCharacter), transfers: [], facts: [], nextId: 1 });
+  return castOf({ format: CAST_FORMAT, characters: (given.characters ?? []).map(createCharacter), transfers: [], facts: [], jobs: [], nextId: 1 });
 }
 
 /**
@@ -217,12 +244,16 @@ export function castOf(data: CastRecord): Cast {
   }
   auditCash(data.characters, data.transfers);
   auditFacts(data.facts, new Set(records.keys()), data.nextId);
+  assertJobs(data.jobs, new Set(records.keys()), data.nextId);
+  const jobs = new Map(data.jobs.map((j) => [j.id, j]));
   auditKnowledge(data.characters, data.facts);
   const facts = new Map(data.facts.map((f) => [f.id, f]));
   for (const c of data.characters) {
     for (const id of Object.keys(c.relationships)) if (!records.has(id)) throw new RangeError(`${c.id} has a relationship with ${id}, who is not in the cast`);
-    for (const s of c.conduct)
+    for (const s of c.conduct) {
       if ('fact' in s.cause && !((facts.get(s.cause.fact)?.at ?? Infinity) <= s.at)) throw new RangeError(`${c.id}'s conduct names ${s.cause.fact}, which is not recorded before it`);
+      if ('job' in s.cause && !((jobs.get(s.cause.job)?.startedAt ?? Infinity) <= s.at)) throw new RangeError(`${c.id}'s conduct names ${s.cause.job}, which is not started before it`);
+    }
   }
   const handles = new Map<Id, Character>();
   let current = true;
@@ -268,6 +299,30 @@ export function castOf(data: CastRecord): Cast {
       const f = facts.get(id);
       if (f === undefined) throw new RangeError(`no fact has the id ${id}`);
       return f;
+    },
+    jobs: data.jobs,
+    job(id) {
+      const j = jobs.get(id);
+      if (j === undefined) throw new RangeError(`no job has the id ${id}`);
+      return j;
+    },
+    startJob({ kind, dc, members, now }) {
+      assertTime(now);
+      for (const m of members) if (openJobOf(data.jobs, m)) throw new RangeError(`${m} is already in an open job`);
+      const made: Job = { id: jobId(data.nextId), kind, members: [...members], dc, startedAt: now };
+      const next = change((d) => {
+        let after: CastRecord = { ...d, jobs: [...d.jobs, made], nextId: d.nextId + 1 };
+        // (a member not in the cast changes no one here, and the new cast's check refuses the job)
+        if (dc >= HARD_JOB_DC) for (const m of members) after = withCharacter(after, m, (c) => withConduct(c, 'taking-a-hard-job', now, { job: made.id }));
+        return after;
+      });
+      return { job: made, cast: next };
+    },
+    endJob(id, { now }) {
+      const j = self.job(id);
+      if (j.endedAt !== undefined) throw new RangeError(`job ${id} has already ended`);
+      assertTime(now);
+      return change((d) => ({ ...d, jobs: d.jobs.map((x) => (x.id === id ? { ...x, endedAt: now } : x)) }));
     },
     record(input, when) {
       let made: Fact | undefined;
@@ -374,9 +429,11 @@ function characterHandleOf(data: CharacterRecord, owner: Cast, commit: Commit): 
       if (condition.unconscious) throw new RangeError(`${data.name} is unconscious`);
       for (const other of company) if (other.cast !== owner || other.id === data.id) throw new RangeError(`${other.name} is not someone else in this cast`);
       if (!data.inventory.items.some((h) => h.item === 'bottle')) throw new RangeError(`${data.name} has no bottle of spirits`);
-      const result = resolveCheck({ dice: DICE.d20, edge: 'none', modifiers: status('carousing').modifiers, dc: DRINK_DC }, roller);
+      const carousing = rollParts(owner.data, data, 'carousing', []);
+      const result = resolveCheck({ dice: DICE.d20, edge: carousing.advantage.truth ? 'advantage' : 'none', modifiers: truthOf(carousing.parts), dc: DRINK_DC }, roller);
       const drunk = !passes(result.margin) || condition.effects.includes('drunk');
-      const next = update(data.id, (c) => {
+      const job = carousing.advantage.truth ? carousing.advantage.job : undefined;
+      const next = commit((d) => withCharacter(job ? { ...d, jobs: usingAdvantage(d.jobs, job) } : d, data.id, (c) => {
         const i = c.inventory.items.findIndex((h) => h.item === 'bottle');
         return withConduct(
           {
@@ -389,11 +446,15 @@ function characterHandleOf(data: CharacterRecord, owner: Cast, commit: Commit): 
           { item: 'bottle' },
           { inCompany: company.length > 0 },
         );
-      });
+      }));
       return { result, drunk, cast: next };
     },
     fight(other, options) {
       return squad(self).fight(squad(other), options);
+    },
+    check: (skill, dc, options = {}) => skillCheck({ data: owner.data, c: data, skill, dc, items: options, extra: [] }, owner, commit),
+    planning: {
+      plan: (job, options = {}) => planCheck({ data: owner.data, planner: data, job: jobIn(owner.data, job), ...(options.advantageOn && { advantageOn: options.advantageOn }) }, owner, commit),
     },
     get social() {
       const check = (action: SocialAction, target: Character, claim?: Claim) => {

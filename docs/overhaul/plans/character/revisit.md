@@ -32,6 +32,10 @@ into the plan and is taken off this list. What the plan itself leaves for slotti
 | **Standing by their squad** counts a squad member as down if they are not fighting, including one who is running. | Step 9 | Built this way. |
 | **Sparring** can knock someone out (a single hit past half health), uses everyone's effects, such as drunk, and makes the fighters meet. | Step 9 | Built this way. |
 | **Beatings recorded directly.** A `beating` recorded with `cast.record` and no amount changes feelings by the game's rows, unscaled. | Step 9 | Built this way. |
+| **Which checks a plan counts on.** Every skill check by a member while the job is open: `check`, both rolls of a social check, drinking, and an ambush's Stealth (the plan's own example of a check around a fight); never a fight's own rolls. A character's `skills` show them as they stand, without any plan. | Step 10 | Built this way. |
+| **The chosen check.** A critical success's advantage is on one check chosen when planning: the first check of a chosen skill by a chosen member. | Step 10 | Built this way; the plan says "one check of the planner's choosing". |
+| **Who believes the plan.** Every member of the job, not only the planner, sees the plan as the planner does: a critical failure as a failure. Anyone outside the job knows nothing of it. | Step 10 | Built this way. |
+| **What a job is.** A job's kind is free text, and a job records no outcome: it is open until the caller ends it. Starting and ending a job record no facts. A job of DC 20 or more is hard, and its members grow more ambitious when it starts. | Step 10 | Built this way. |
 | **Telling.** A character telling another what they believe is an operation the plan implies (versions record who told them; Deception depends on told or heard) but does not name. | Step 5 | Built as `tell`. |
 | **Items changing hands.** There is no giving or taking items: they come from a character's input and leave only when used up. | Step 4 | Moving an item should be recorded, as cash transfers are; how is to be decided. |
 | **What resting stops.** A rest is recorded with its time, but nothing yet reads it except `restingAt`. | Step 3 | What a resting character cannot do is for when jobs and the game's clock arrive. |
@@ -50,7 +54,6 @@ into the plan and is taken off this list. What the plan itself leaves for slotti
 | --- | --- | --- |
 | **Pruning old facts and transfers.** Nothing is pruned yet. The short summary a version keeps once its fact is gone, and the balance kept when old transfers go, are not built, since keeping them now would copy facts and balances that still exist. | Steps 4 and 5 | Retention |
 | **Results given to a viewer for drinking.** Social checks give their odds, explanations and results to a viewer; drinking still returns the plain check result. | Steps 4 and 7 | Undecided: drinking has no one else in it yet |
-| **Conduct in jobs.** Planning a job and taking part in a hard one are in the conduct table. A step's cause can be a fact or an item used up; a job's plan becomes a fact when jobs are recorded. | Step 8 | Planning and jobs (step 10) |
 | **Finding out they were lied to, later.** Seeing through a lie makes the target less agreeable; learning the truth later would too, but is not built. | Step 8 | Learning the truth (see To decide) |
 | **The lab's playground.** It still runs on the lab's code. The overhaul now has fights, but not the lab's stepping through a fight roll by roll, its exact fight odds, its fight descriptions or its assessment of how a fight will go, which the playground uses. | Steps 1 and 9 | Porting those, then pointing the playground at the overhaul and removing the lab's code |
 | **Fight results for a viewer.** A fight's result is given whole, as anyone there sees it; it is not given to a viewer as social checks' are. | Step 9 | Undecided: a fight is seen by everyone in it |
@@ -67,7 +70,8 @@ into the plan and is taken off this list. What the plan itself leaves for slotti
 These were reported when they were made and stand unless revisited.
 
 - **Changing a replaced cast is refused, not merged,** even when the two changes would not conflict (step 2).
-- **Character ids are given by the caller.** The cast's counter makes ids only for facts, and later jobs (steps 2 and 5).
+- **Character ids are given by the caller.** The cast's counter makes ids only for facts and jobs, which share it (steps 2, 5 and 10).
+- **A conduct step's cause** is a fact, an item used up, or a job (step 10).
 - **The overhaul imports no packages,** not only nothing of the game's; the boundary test enforces it (step 0).
 - **A new character's cash cannot be set directly:** opening balances are transfers from the world (step 4).
 - **Only weapons can be shown, and only clothing worn** (step 4).

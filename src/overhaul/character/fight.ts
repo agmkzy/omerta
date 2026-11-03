@@ -105,6 +105,8 @@ export interface FightSpec {
   readonly start?: FightStart;
   /** The round limit; default MAX_ROUNDS. */
   readonly maxRounds?: number;
+  /** Anything more on an attacker's Stealth roll for an ambush, such as their job's plan. */
+  readonly stealth?: ReadonlyMap<Id, { readonly modifiers: readonly Modifier[]; readonly edge: Edge }>;
 }
 
 interface State {
@@ -219,7 +221,10 @@ export function fight(spec: FightSpec, roller: Roller): FightResult {
   if (real && start === 'ambush') {
     // the squad's lowest Stealth roll, the noisiest giving them away, against each target's passive Notice
     const stealth = squad('attacker')
-      .map((f) => throwRoll(d20(fightModifiers(f.c, 'stealth')), rolling({ kind: 'stealth', by: f.c.id })))
+      .map((f) => {
+        const more = spec.stealth?.get(f.c.id);
+        return throwRoll(d20([...fightModifiers(f.c, 'stealth'), ...(more?.modifiers ?? [])], more?.edge ?? 'none'), rolling({ kind: 'stealth', by: f.c.id }));
+      })
       .reduce((low, r) => (r.total < low.total ? r : low));
     const surprised = squad('defender').filter((f) => stealth.total >= 10 + bonusOf(fightModifiers(f.c, 'notice')));
     for (const f of surprised) f.surprised = true;
