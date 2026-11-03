@@ -208,7 +208,7 @@ Proposals that need the owner, to take one at a time:
 
 | Decision | Proposal |
 | --- | --- |
-| **Making characters by rank.** The game's world generator rolls five skills, better for higher ranks (0.2 to 0.85, against 0.1 to 0.6 for civilians), and one gift | The generator rolls overhaul characters with a background suited to their role and a proficiency bonus by rank: 2 for civilians and associates, rising to 4 for a boss |
+| **Rank and a character's abilities.** The game's world generator rolls five skills, better for higher ranks (0.2 to 0.85, against 0.1 to 0.6 for civilians), and one gift | **Decided (3 November 2026): rank is detached from attributes, skills, training and the proficiency bonus.** Rank never sets them and no rule reads them from rank. How the world generator makes characters, and how the proficiency bonus is set, is open; for now every character's is 2 |
 | **Skills growing with use.** In the game every job adds 0.025 to the skills it needs (`people.ts` `grow`); the overhaul's training never changes | To decide: training that rises with practice, or none |
 | **Which courage to keep.** The game has the `courage` trait and the `nerve` skill | Keep both, as the overhaul does: courage decides what someone does after failing a nerve check, Nerve decides whether they fail it |
 | **Backgrounds at character creation.** The game offers six (`hustler`, `connected`, `business`, `union`, `bookmaker`, `wheelman`), each with two skills and starting cash; the overhaul has eight | The creation screen offers the overhaul's backgrounds, or the overhaul takes the game's six as its own |
