@@ -30,6 +30,7 @@ Nothing is open. Every choice made while building was settled with the owner on 
 | **Results given to a viewer for drinking.** Social checks give their odds, explanations and results to a viewer; drinking still returns the plain check result. | Steps 4 and 7 | Undecided: drinking has no one else in it yet |
 | **Retention and the shadow run** are on the plan's [Before the swap](README.md#before-the-swap) list. | Steps 4 and 5 | The swap |
 | **The lab's playground.** It still runs on the lab's code. The overhaul now has fights, but not the lab's stepping through a fight roll by roll, its exact fight odds, its fight descriptions or its assessment of how a fight will go, which the playground uses. | Steps 1 and 9 | Porting those, then pointing the playground at the overhaul and removing the lab's code |
+| **How fast injuries heal.** A rest of 8 hours or more restores full health, so if sleep healed by it, everyone would be fully healed each night. Sleep makes someone unavailable but does not heal by this rule; healing gets its own rule with the clock. | Mapping the game (sleeping) | Healing over time (the design's Before the swap: The clock) |
 | **Fight results for a viewer.** A fight's result is given whole, as anyone there sees it; it is not given to a viewer as social checks' are. | Step 9 | Undecided: a fight is seen by everyone in it |
 
 ## Not yet verified
