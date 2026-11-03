@@ -116,6 +116,8 @@ These have caused, or could cause, confusion. Say which one is meant.
 - **Meet** — be together in something: take part in the same roll or fight (as actor, target, squad member or witness),
   one telling the other anything, drinking together, or spending time together (`together`). Updates when they last met, and
   their familiarity.
+- **Having met** — a relationship with a last-met time, as against only having heard of someone. It is what lets two
+  characters deal with each other (decided 3 November 2026); an introduction is spending time together.
 - **Grudge reason / regard reason** — the event that did most to raise a grudge, or trust and affection.
 
 ## Knowledge
