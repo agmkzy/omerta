@@ -18,6 +18,11 @@ into the plan and is taken off this list. What the plan itself leaves for slotti
 | **Lies the liar may tell.** A claim must differ from what the liar believes (otherwise it is telling, not lying), and a lie about a fact the liar invented is refused: a new lie invents a new fact. | Step 7 | Built this way. |
 | **Provoked counts as resisting.** A provoked target holds a grudge (+0.1), and the actor's respect for them rises as for any target who resists (+0.05). | Step 7 | Built this way; the plan's two tables do not say which applies. |
 | **Shaken on giving in.** Any target who gives in to intimidation (partial success or better) is shaken. | Step 7 | Built this way. |
+| **What counts as a week.** Each kind of conduct moves a character's traits at most once in any seven days, counted back from now, not by calendar week. | Step 8 | Built this way. |
+| **Trying counts as conduct.** Persuading, lying and intimidating move the actor's traits whatever the roll's outcome. | Step 8 | Built this way; the plan says "a persuasion" or "a lie", which every roll records. |
+| **Drinking in company.** `drink` now takes a time and whoever else is there. Drinking together does not count as meeting. | Step 8 | Built this way. |
+| **Traits before the experience.** When a fact is recorded, learning it reads the traits the character had before it happened; the conduct it is for them comes after. Lying to someone who trusts the liar reads their trust before the lie. | Step 8 | Built this way. |
+| **Conduct of an unknown kind in a save** is left out and reported, like anything else not recognised, so the character's current traits lose that step. | Step 8 | Built this way. |
 | **Telling.** A character telling another what they believe is an operation the plan implies (versions record who told them; Deception depends on told or heard) but does not name. | Step 5 | Built as `tell`. |
 | **Items changing hands.** There is no giving or taking items: they come from a character's input and leave only when used up. | Step 4 | Moving an item should be recorded, as cash transfers are; how is to be decided. |
 | **What resting stops.** A rest is recorded with its time, but nothing yet reads it except `restingAt`. | Step 3 | What a resting character cannot do is for when jobs and the game's clock arrive. |
@@ -36,9 +41,10 @@ into the plan and is taken off this list. What the plan itself leaves for slotti
 | --- | --- | --- |
 | **Pruning old facts and transfers.** Nothing is pruned yet. The short summary a version keeps once its fact is gone, and the balance kept when old transfers go, are not built, since keeping them now would copy facts and balances that still exist. | Steps 4 and 5 | Retention |
 | **Results given to a viewer for drinking.** Social checks give their odds, explanations and results to a viewer; drinking still returns the plain check result. | Steps 4 and 7 | Undecided: drinking has no one else in it yet |
-| **Conduct from social rolls.** Intimidating, persuading, lying, giving in and standing up to a threat move traits by the plan's conduct tables. | Step 7 | Conduct (step 8) |
+| **Conduct in fights.** Starting a fight, ambushes, beating the helpless, fighting when provoked, holding their nerve, standing by or leaving their squad, running, giving in, and losing their temper in a fight are in the conduct table, but nothing records them yet. | Step 8 | Fights (step 9) |
+| **Conduct in jobs.** Planning a job and taking part in a hard one are in the conduct table. A step's cause can be a fact or an item used up; a job's plan becomes a fact when jobs are recorded. | Step 8 | Planning and jobs (step 10) |
+| **Finding out they were lied to, later.** Seeing through a lie makes the target less agreeable; learning the truth later would too, but is not built. | Step 8 | Learning the truth (see To decide) |
 | **A beating's change scaled by damage.** The plan scales the victim's change by the share of hit points lost, never below a successful intimidation's, and a fled fight's with no minimum. For now a `beating` or `fight` fact changes feelings by the game's rows unscaled. | Step 6 | Fights (step 9) |
-| **Courage from current traits.** Learning uses the learner's starting courage. | Step 6 | Conduct (step 8), which works out current traits |
 | **The lab's playground.** It still runs on the lab's code. | Step 1 | Fights in the overhaul (step 9), then it can be pointed at the overhaul and the lab's code removed |
 
 ## Not yet verified
@@ -46,6 +52,7 @@ into the plan and is taken off this list. What the plan itself leaves for slotti
 | Point | Where it came up |
 | --- | --- |
 | **The overhaul's CI job** has not run, because nothing has been pushed. | Step 0 |
+| **Whether traits drift to the ends.** The plan asks for long simulated runs to check that NPCs' choices, which follow their traits, do not push every trait to an end. Nothing chooses for NPCs in the overhaul yet, so there is nothing to run. | Step 8 |
 
 ## Choices made while building
 

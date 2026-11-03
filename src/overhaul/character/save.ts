@@ -8,13 +8,14 @@ import { BACKGROUNDS, type BackgroundName } from './backgrounds';
 import { CAST_FORMAT, castOf, type Cast } from './cast';
 import { createCharacter, type CharacterRecord } from './character';
 import { STORED_EFFECTS, type ConditionRecord, type StoredEffect } from './condition';
+import { CONDUCT, type Cause, type Conduct, type ConductStep } from './conduct';
 import { FACT_KINDS, type Fact, type FactKind } from './facts';
 import { ITEMS, type HeldItem, type InventoryRecord, type Item } from './items';
 import type { How, Knowledge, Source, Version } from './knowledge';
 import { FEELINGS, NEW_RELATIONSHIP, type Reason, type Relationship, type Relationships } from './relationships';
 import type { Transfer } from './transfers';
 import { PROFICIENCIES, SKILLS, type Proficiency, type Skill, type Training } from './skills';
-import { TRAITS } from './temperament';
+import { TRAITS, type Trait } from './temperament';
 
 /** Changes saved data in place from one format to the next. */
 export type Migration = (data: Record<string, unknown>) => void;
@@ -44,6 +45,11 @@ export const MIGRATIONS: readonly Migration[] = [
     for (const c of Array.isArray(d.characters) ? d.characters : [])
       if (typeof c === 'object' && c !== null && !('relationships' in c)) (c as Record<string, unknown>).relationships = {};
   },
+  // 5 to 6: characters gained conduct, which moves their traits. Format 5 had none: everyone's traits were as they started.
+  (d) => {
+    for (const c of Array.isArray(d.characters) ? d.characters : [])
+      if (typeof c === 'object' && c !== null && !('conduct' in c)) (c as Record<string, unknown>).conduct = [];
+  },
 ];
 
 /** Brings data saved in format `from` up to the newest of `migrations`, in order. */
@@ -64,8 +70,9 @@ export interface ReadCast {
 /** Every field of a saved character; the type check fails if one is missing or misspelt. */
 const CHARACTER_FIELDS: readonly string[] = Object.keys({
   id: true, name: true, background: true, attributes: true, training: true, proficiencyBonus: true, startingTemperament: true, condition: true,
-  inventory: true, knowledge: true, relationships: true,
+  inventory: true, knowledge: true, relationships: true, conduct: true,
 } satisfies Record<keyof CharacterRecord, true>);
+const STEP_FIELDS: readonly string[] = Object.keys({ conduct: true, trait: true, direction: true, at: true, cause: true } satisfies Record<keyof ConductStep, true>);
 
 const CONDITION_FIELDS: readonly string[] = Object.keys({ hitPoints: true, effects: true, rest: true } satisfies Record<keyof ConditionRecord, true>);
 
@@ -127,6 +134,30 @@ function readCharacter(data: unknown, path: string, ignored: string[]): Characte
     ...(d.inventory !== undefined && { inventory: inventory(d.inventory, `${path}.inventory`, ignored) }),
     ...(d.knowledge !== undefined && { knowledge: knowledge(d.knowledge, `${path}.knowledge`, ignored) }),
     ...(d.relationships !== undefined && { relationships: relationships(d.relationships, `${path}.relationships`, ignored) }),
+    ...(d.conduct !== undefined && { conduct: conduct(d.conduct, `${path}.conduct`, ignored) }),
+  });
+}
+
+/**
+ * A character's conduct. A step of a kind of conduct this version does not know is left out, and reported, like anything
+ * else it does not recognise; their current traits then lose that step.
+ */
+function conduct(value: unknown, path: string, ignored: string[]): ConductStep[] {
+  if (!Array.isArray(value)) throw new TypeError(`${path} must be a list`);
+  return value.flatMap((v: unknown, i): ConductStep[] => {
+    const d = object(v, `${path}[${i}]`);
+    ignored.push(...Object.keys(d).filter((k) => !STEP_FIELDS.includes(k)).map((k) => `${path}[${i}].${k}`));
+    if (typeof d.conduct !== 'string' || !(d.conduct in CONDUCT)) {
+      ignored.push(`${path}[${i}]`);
+      return [];
+    }
+    if (!TRAITS.includes(d.trait as Trait)) throw new TypeError(`${path}[${i}].trait must be a trait`);
+    if (d.direction !== 1 && d.direction !== -1) throw new TypeError(`${path}[${i}].direction is 1 or -1`);
+    if (typeof d.at !== 'number') throw new TypeError(`${path}[${i}].at must be a number`);
+    const c = object(d.cause, `${path}[${i}].cause`);
+    const cause: Cause | undefined = typeof c.fact === 'string' ? { fact: c.fact } : ITEMS.includes(c.item as Item) ? { item: c.item as Item } : undefined;
+    if (cause === undefined) throw new TypeError(`${path}[${i}].cause must be a fact or an item`);
+    return [{ conduct: d.conduct as Conduct, trait: d.trait as Trait, direction: d.direction, at: d.at, cause }];
   });
 }
 

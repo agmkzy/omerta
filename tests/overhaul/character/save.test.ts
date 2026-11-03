@@ -216,6 +216,29 @@ describe('loadCast', { tags: ['unit'] }, () => {
       assert.throws(() => loadCast(relating(relationships)), RangeError, JSON.stringify(relationships));
   });
 
+  test('loads a cast saved in format 6, which must keep loading', () => {
+    const { cast: loaded, ignored } = readCast(fixture('cast-format6.json'));
+    assert.deepEqual(ignored, []);
+    assert.deepEqual(loaded.character('sam').conduct.map((c) => [c.conduct, c.trait, c.direction]), [['robbing', 'greed', 1], ['robbing', 'violence', 1], ['drinking', 'vice', 1], ['drinking', 'sociability', -1]]);
+    assert.equal(loaded.character('sam').temperament.greed, 0.5 + 0.01 * 0.5);
+  });
+
+  test('restores conduct, and leaves out steps of kinds and fields it does not recognise', () => {
+    const robbed = loadCast(throughJson(everyone.data)).record({ kind: 'robbery', actor: 'sam', victim: 'rico' }, { now: 10 }).cast;
+    assert.deepEqual(loadCast(throughJson(robbed.data)).data, robbed.data);
+    const step = { conduct: 'lying', trait: 'honesty', direction: -1, at: 0, cause: { item: 'bottle' } };
+    const { cast: loaded, ignored } = readCast(one({ id: 'x', name: 'X', conduct: [{ ...step, conduct: 'juggling' }, { ...step, mood: 'sly' }] }));
+    assert.deepEqual(loaded.character('x').conduct, [step]);
+    assert.deepEqual([...ignored].sort(), ['characters[0].conduct[0]', 'characters[0].conduct[1].mood']);
+  });
+
+  test('rejects conduct of the wrong shape, or whose cause is not recorded', () => {
+    const step = { conduct: 'lying', trait: 'honesty', direction: -1, at: 0, cause: { item: 'bottle' } };
+    for (const conduct of [{}, [null], [{ ...step, trait: 'whimsy' }], [{ ...step, direction: 0 }], [{ ...step, at: '0' }], [{ ...step, cause: null }], [{ ...step, cause: { item: 'crowbar' } }]])
+      assert.throws(() => loadCast(one({ id: 'x', name: 'X', conduct })), TypeError, JSON.stringify(conduct));
+    assert.throws(() => loadCast(one({ id: 'x', name: 'X', conduct: [{ ...step, cause: { fact: 'f1' } }] })), RangeError);
+  });
+
   test('rejects a condition of the wrong shape or out of range', () => {
     for (const condition of [[], { hitPoints: '3' }, { effects: 'shaken' }, { rest: { from: 0 } }, { rest: 5 }])
       assert.throws(() => loadCast(one({ id: 'x', name: 'X', condition })), TypeError, JSON.stringify(condition));
@@ -263,6 +286,15 @@ describe('migrations', { tags: ['unit'] }, () => {
     const notAList: Record<string, unknown> = { format: 4, characters: 'none' };
     migrate(notAList, 4, MIGRATIONS.slice(0, 4));
     assert.deepEqual(notAList, { format: 4, characters: 'none' });
+  });
+
+  test('5 to 6 gives each character no conduct', () => {
+    const d: Record<string, unknown> = { format: 5, characters: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B', conduct: [] }, null] };
+    migrate(d, 5, MIGRATIONS.slice(0, 5));
+    assert.deepEqual(d, { format: 5, characters: [{ id: 'a', name: 'A', conduct: [] }, { id: 'b', name: 'B', conduct: [] }, null] });
+    const notAList: Record<string, unknown> = { format: 5, characters: 'none' };
+    migrate(notAList, 5, MIGRATIONS.slice(0, 5));
+    assert.deepEqual(notAList, { format: 5, characters: 'none' });
   });
 
   test('run in order from the saved format to the newest', () => {

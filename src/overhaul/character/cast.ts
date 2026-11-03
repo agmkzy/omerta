@@ -6,6 +6,7 @@ import type { Attribute } from './attributes';
 import { bonusOf, passes, resolveCheck, type CheckResult, type Modifier } from './check';
 import { createCharacter, type CharacterInput, type CharacterRecord, type Id } from './character';
 import { conditionOf, effectModifiers, type Condition, type StoredEffect } from './condition';
+import { currentTemperament, withConduct, type ConductStep } from './conduct';
 import { DICE } from './dice';
 import { auditFacts, type Fact, type FactId, type FactInput } from './facts';
 import { DRINK_DC, ITEM_INFO, itemModifiers, type InventoryRecord, type Item, type ItemOptions, type ItemState } from './items';
@@ -22,7 +23,7 @@ import { WORLD, auditCash, type Party, type Transfer } from './transfers';
 import { seen, type Seen } from './view';
 
 /** Increment when the saved shape changes, and add a migration in save.ts. */
-export const CAST_FORMAT = 5;
+export const CAST_FORMAT = 6;
 
 export interface CastRecord {
   readonly format: number;
@@ -78,8 +79,10 @@ export interface Character {
   /** The cast this handle came from. */
   readonly cast: Cast;
   readonly skills: { readonly [S in Skill]: SkillStatus };
-  /** The character's current traits. */
+  /** The character's current traits: their starting traits, moved by their conduct. */
   readonly temperament: Temperament;
+  /** Every step by which their conduct has moved their traits, in order. */
+  readonly conduct: readonly ConductStep[];
   readonly condition: Condition;
   /** False while unconscious: no check can be made by them. */
   readonly canAct: boolean;
@@ -123,8 +126,11 @@ export interface Character {
    * for a fact the character does not know, or one they know is false (telling it would be a lie).
    */
   tell(listener: Character, fact: FactId, when: { readonly now: number }): Cast;
-  /** Drinks a bottle of spirits, which is used up: a Carousing check against DRINK_DC, and on a failure the character is drunk. */
-  drink(roller: Roller): { readonly result: CheckResult; readonly drunk: boolean; readonly cast: Cast };
+  /**
+   * Drinks a bottle of spirits at `now`, with anyone else there, and the bottle is used up: a Carousing check against
+   * DRINK_DC, and on a failure the character is drunk.
+   */
+  drink(roller: Roller, when: { readonly now: number; readonly with?: readonly Character[] }): { readonly result: CheckResult; readonly drunk: boolean; readonly cast: Cast };
   /** Social actions on another character in the cast, each a check to inspect, then roll. */
   readonly social: {
     intimidate(target: Character): SocialCheck<Cast>;
@@ -144,8 +150,8 @@ export function cast(given: { readonly characters?: readonly CharacterInput[] } 
 
 /**
  * A cast over a complete record of checked characters (from cast() or a save). Throws RangeError for an id used twice, for
- * cash that does not agree with the transfers (auditCash), for facts that are not valid (auditFacts), and for knowledge that
- * does not fit them (auditKnowledge).
+ * cash that does not agree with the transfers (auditCash), for facts that are not valid (auditFacts), for knowledge that
+ * does not fit them (auditKnowledge), and for relationships or conduct naming someone or something not recorded.
  */
 export function castOf(data: CastRecord): Cast {
   const records = new Map<Id, CharacterRecord>();
@@ -156,9 +162,12 @@ export function castOf(data: CastRecord): Cast {
   auditCash(data.characters, data.transfers);
   auditFacts(data.facts, new Set(records.keys()), data.nextId);
   auditKnowledge(data.characters, data.facts);
-  for (const c of data.characters)
-    for (const id of Object.keys(c.relationships)) if (!records.has(id)) throw new RangeError(`${c.id} has a relationship with ${id}, who is not in the cast`);
   const facts = new Map(data.facts.map((f) => [f.id, f]));
+  for (const c of data.characters) {
+    for (const id of Object.keys(c.relationships)) if (!records.has(id)) throw new RangeError(`${c.id} has a relationship with ${id}, who is not in the cast`);
+    for (const s of c.conduct)
+      if ('fact' in s.cause && !((facts.get(s.cause.fact)?.at ?? Infinity) <= s.at)) throw new RangeError(`${c.id}'s conduct names ${s.cause.fact}, which is not recorded before it`);
+  }
   const handles = new Map<Id, Character>();
   let current = true;
 
@@ -247,8 +256,9 @@ function characterHandle(data: CharacterRecord, owner: Cast, commit: Commit): Ch
     },
     skill: status,
     get temperament() {
-      return data.startingTemperament;
+      return currentTemperament(data);
     },
+    conduct: data.conduct,
     condition,
     canAct: !condition.unconscious,
     inventory: data.inventory,
@@ -298,18 +308,25 @@ function characterHandle(data: CharacterRecord, owner: Cast, commit: Commit): Ch
       if (now < theirs.learnedAt) throw new RangeError(`${data.name} cannot tell ${fact} at ${now}, before learning it at ${theirs.learnedAt}`);
       return update(listener.id, (c) => (c.knowledge[fact] ? c : learnFact(c, owner.fact(fact), toldVersion(data.id, theirs, now), now)));
     },
-    drink(roller) {
+    drink(roller, { now, with: company = [] }) {
       if (condition.unconscious) throw new RangeError(`${data.name} is unconscious`);
+      for (const other of company) if (other.cast !== owner || other.id === data.id) throw new RangeError(`${other.name} is not someone else in this cast`);
       if (!data.inventory.items.some((h) => h.item === 'bottle')) throw new RangeError(`${data.name} has no bottle of spirits`);
       const result = resolveCheck({ dice: DICE.d20, edge: 'none', modifiers: status('carousing').modifiers, dc: DRINK_DC }, roller);
       const drunk = !passes(result.margin) || condition.effects.includes('drunk');
       const next = update(data.id, (c) => {
         const i = c.inventory.items.findIndex((h) => h.item === 'bottle');
-        return {
-          ...c,
-          condition: { ...c.condition, effects: drunk ? [...c.condition.effects, 'drunk'] : c.condition.effects },
-          inventory: { ...c.inventory, items: c.inventory.items.filter((_, j) => j !== i) },
-        };
+        return withConduct(
+          {
+            ...c,
+            condition: { ...c.condition, effects: drunk ? [...c.condition.effects, 'drunk'] : c.condition.effects },
+            inventory: { ...c.inventory, items: c.inventory.items.filter((_, j) => j !== i) },
+          },
+          'drinking',
+          now,
+          { item: 'bottle' },
+          { inCompany: company.length > 0 },
+        );
       });
       return { result, drunk, cast: next };
     },

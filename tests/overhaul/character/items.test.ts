@@ -122,32 +122,32 @@ describe('items on a character', { tags: ['unit'] }, () => {
   });
 
   test('drinking a bottle uses it up; failing the Carousing check makes the character drunk', () => {
-    const passed = everyone().character('sam').drink(scripted(12));
+    const passed = everyone().character('sam').drink(scripted(12), { now: 0 });
     assert.equal(passed.result.dc, DRINK_DC);
     assert.equal(passed.drunk, false);
     assert.deepEqual(passed.cast.character('sam').inventory.items.map((h) => h.item), ['pistol', 'lockpicks', 'good-suit']);
     assert.deepEqual(passed.cast.character('sam').condition.effects, []);
-    const failed = everyone().character('sam').drink(scripted(11));
+    const failed = everyone().character('sam').drink(scripted(11), { now: 0 });
     assert.equal(failed.drunk, true);
     assert.deepEqual(failed.cast.character('sam').condition.effects, ['drunk']);
   });
 
   test('someone already drunk stays drunk, whatever they roll', () => {
     const drunk = everyone().character('sam').affect('drunk');
-    const again = drunk.character('sam').drink(scripted(20));
+    const again = drunk.character('sam').drink(scripted(20), { now: 0 });
     assert.equal(again.drunk, true);
     assert.deepEqual(again.cast.character('sam').condition.effects, ['drunk']);
   });
 
   test('drinking needs a bottle, and a character who can act', () => {
-    assert.throws(() => everyone().character('rico').drink(scripted(10)), RangeError);
-    assert.throws(() => everyone().character('sam').damage(10).character('sam').drink(scripted(10)), RangeError);
+    assert.throws(() => everyone().character('rico').drink(scripted(10), { now: 0 }), RangeError);
+    assert.throws(() => everyone().character('sam').damage(10).character('sam').drink(scripted(10), { now: 0 }), RangeError);
   });
 
   test('item changes from a replaced cast are refused', () => {
     const sam = everyone().character('sam');
     sam.show('pistol');
     assert.throws(() => sam.wear('good-suit'), ReplacedCastError);
-    assert.throws(() => sam.drink(scripted(10)), ReplacedCastError);
+    assert.throws(() => sam.drink(scripted(10), { now: 0 }), ReplacedCastError);
   });
 });

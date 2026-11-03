@@ -1,0 +1,247 @@
+{
+  "format": 6,
+  "characters": [
+    {
+      "id": "sam",
+      "name": "Sam",
+      "attributes": {
+        "str": 10,
+        "agi": 14,
+        "con": 10,
+        "int": 12,
+        "wis": 10,
+        "cha": 13
+      },
+      "training": {
+        "larceny": "trained",
+        "persuasion": "trained"
+      },
+      "proficiencyBonus": 2,
+      "startingTemperament": {
+        "greed": 0.5,
+        "violence": 0.5,
+        "ambition": 0.5,
+        "caution": 0.8,
+        "sociability": 0.5,
+        "vice": 0.5,
+        "courage": 0.5,
+        "pride": 0.5,
+        "volatility": 0.5,
+        "agreeable": 0.5,
+        "empathy": 0.5,
+        "loyalty": 0.5,
+        "honesty": 0.5,
+        "cruelty": 0.5
+      },
+      "condition": {
+        "hitPoints": 10,
+        "effects": []
+      },
+      "inventory": {
+        "cash": 70,
+        "items": [
+          {
+            "item": "lockpicks",
+            "state": "carried"
+          },
+          {
+            "item": "good-suit",
+            "state": "worn"
+          },
+          {
+            "item": "pistol",
+            "state": "carried"
+          }
+        ]
+      },
+      "knowledge": {
+        "f1": {
+          "learnedAt": 1440,
+          "source": "self",
+          "how": "seen",
+          "knowsActor": true
+        },
+        "f2": {
+          "learnedAt": 2000,
+          "source": "told",
+          "teller": "rico",
+          "how": "told",
+          "knowsActor": false,
+          "blame": "rico",
+          "exaggerated": true
+        }
+      },
+      "relationships": {
+        "rico": {
+          "trust": 0.5,
+          "respect": 0.5,
+          "affection": 0.5,
+          "grudge": 0,
+          "fear": 0,
+          "familiarity": 0.02,
+          "lastMet": 1440
+        }
+      },
+      "conduct": [
+        {
+          "conduct": "robbing",
+          "trait": "greed",
+          "direction": 1,
+          "at": 1500,
+          "cause": {
+            "fact": "f2"
+          }
+        },
+        {
+          "conduct": "robbing",
+          "trait": "violence",
+          "direction": 1,
+          "at": 1500,
+          "cause": {
+            "fact": "f2"
+          }
+        },
+        {
+          "conduct": "drinking",
+          "trait": "vice",
+          "direction": 1,
+          "at": 1600,
+          "cause": {
+            "item": "bottle"
+          }
+        },
+        {
+          "conduct": "drinking",
+          "trait": "sociability",
+          "direction": -1,
+          "at": 1600,
+          "cause": {
+            "item": "bottle"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rico",
+      "name": "Rico",
+      "attributes": {
+        "str": 16,
+        "agi": 10,
+        "con": 14,
+        "int": 8,
+        "wis": 11,
+        "cha": 12
+      },
+      "training": {
+        "brawling": "expert"
+      },
+      "proficiencyBonus": 3,
+      "startingTemperament": {
+        "greed": 0.5,
+        "violence": 0.8,
+        "ambition": 0.5,
+        "caution": 0.3,
+        "sociability": 0.5,
+        "vice": 0.5,
+        "courage": 0.7,
+        "pride": 0.6,
+        "volatility": 0.75,
+        "agreeable": 0.3,
+        "empathy": 0.3,
+        "loyalty": 0.6,
+        "honesty": 0.5,
+        "cruelty": 0.65
+      },
+      "condition": {
+        "hitPoints": 12,
+        "effects": []
+      },
+      "inventory": {
+        "cash": 50,
+        "items": [
+          {
+            "item": "knife",
+            "state": "carried"
+          }
+        ]
+      },
+      "knowledge": {
+        "f1": {
+          "learnedAt": 1440,
+          "source": "witness",
+          "how": "seen",
+          "knowsActor": true
+        },
+        "f2": {
+          "learnedAt": 1500,
+          "source": "witness",
+          "how": "seen",
+          "knowsActor": false
+        }
+      },
+      "relationships": {
+        "sam": {
+          "trust": 0.25,
+          "respect": 0.5,
+          "affection": 0.5,
+          "grudge": 0.35,
+          "fear": 0.2,
+          "familiarity": 0.02,
+          "lastMet": 1440,
+          "grudgeReason": {
+            "fact": "f1",
+            "at": 1440,
+            "amount": 0.35
+          }
+        }
+      },
+      "conduct": []
+    }
+  ],
+  "transfers": [
+    {
+      "from": "world",
+      "to": "sam",
+      "amount": 100,
+      "why": "opening balance",
+      "at": 0
+    },
+    {
+      "from": "world",
+      "to": "rico",
+      "amount": 20,
+      "why": "opening balance",
+      "at": 0
+    },
+    {
+      "from": "sam",
+      "to": "rico",
+      "amount": 30,
+      "why": "a debt",
+      "at": 1440
+    }
+  ],
+  "facts": [
+    {
+      "id": "f1",
+      "kind": "beating",
+      "actor": "sam",
+      "victim": "rico",
+      "at": 1440,
+      "where": "the docks",
+      "witnesses": []
+    },
+    {
+      "id": "f2",
+      "kind": "robbery",
+      "actor": "sam",
+      "victim": "rico",
+      "amount": 40,
+      "at": 1500,
+      "hiddenActor": true,
+      "cause": "f1",
+      "witnesses": []
+    }
+  ],
+  "nextId": 3
+}

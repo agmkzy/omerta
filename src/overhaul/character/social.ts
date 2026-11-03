@@ -7,6 +7,7 @@ import { OUTCOMES, opposedOdds, resolveOpposed, succeeded, type Modifier, type O
 import type { CastRecord } from './cast';
 import type { CharacterRecord, Id } from './character';
 import { conditionOf, effectParts } from './condition';
+import { currentTemperament, withConduct, type Conduct } from './conduct';
 import { DICE } from './dice';
 import { FACT_KINDS, type Fact, type FactId, type FactKind } from './facts';
 import { ITEM_INFO, WEAPON_THREAT, itemParts, strongestWeapon } from './items';
@@ -16,7 +17,7 @@ import type { Roller } from './random';
 import { allMeet, recordFact, withCharacter } from './records';
 import { feel, feelingModifiers, type Feeling, type SocialAction } from './relationships';
 import { attributeUsed, skillModifiers, type Skill } from './skills';
-import { leaning, temperamentModifiers, type Situation } from './temperament';
+import { HIGH, leaning, temperamentModifiers, type Situation } from './temperament';
 
 export type { SocialAction };
 export const SOCIAL_ACTIONS = ['intimidate', 'persuade', 'deceive'] as const satisfies readonly SocialAction[];
@@ -188,7 +189,7 @@ function skillParts(c: CharacterRecord, skill: Skill, situations: readonly Situa
     ...skillModifiers(c, skill).map((m) => knownBy([c.id], m)),
     ...effectParts(condition, skill, attributeUsed(c, skill)).map((p) => ownPart(p.effect === 'hurt', c.id, p.modifier)),
     ...itemParts(c.inventory, skill).map((p) => ownPart(VISIBLE_ITEMS.includes(p.when), c.id, p.modifier)),
-    ...temperamentModifiers(c.startingTemperament, situations).map((m) => knownBy([c.id], m)),
+    ...temperamentModifiers(currentTemperament(c), situations).map((m) => knownBy([c.id], m)),
   ];
 }
 
@@ -288,7 +289,7 @@ function partsOf(s: SocialSetup): { readonly active: readonly Part[]; readonly p
 const rollOf = (modifiers: readonly Modifier[]): Roll => ({ dice: DICE.d20, edge: 'none', modifiers });
 const seenBy = (parts: readonly Part[], viewer: Id) => parts.flatMap((p) => p.knownTo(viewer) ?? []);
 const truthOf = (parts: readonly Part[]) => parts.flatMap((p) => p.truth ?? []);
-const provokes = (s: SocialSetup) => s.action === 'intimidate' && leaning(s.target.startingTemperament.volatility) === 'high';
+const provokes = (s: SocialSetup) => s.action === 'intimidate' && leaning(currentTemperament(s.target).volatility) === 'high';
 
 /** The modifiers a viewer knows of on each roll. */
 export function explainFor(s: SocialSetup, viewer: Id): Explanation {
@@ -352,6 +353,8 @@ function applySocial(data: CastRecord, s: SocialSetup, ending: Ending, when: { r
   d = recorded.data;
   facts.push(recorded.fact);
   const why = recorded.fact.id;
+  const trusted = (target.relationships[actor.id]?.trust ?? 0) >= HIGH;
+  for (const [who, conduct] of conductOf(action, ending, trusted)) d = withCharacter(d, who === 'actor' ? actor.id : target.id, (c) => withConduct(c, conduct, now, { fact: why }));
   for (const a of AFTERMATH[action][ending] ?? []) {
     const [who, other] = a.whose === 'target' ? [target.id, actor.id] : [actor.id, target.id];
     // (actor and target have just met over the roll's fact, so each has a relationship with the other)
@@ -360,6 +363,19 @@ function applySocial(data: CastRecord, s: SocialSetup, ending: Ending, when: { r
   if (action === 'intimidate' && ending !== 'provoked' && succeeded(ending)) d = withCharacter(d, target.id, (c) => ({ ...c, condition: { ...c.condition, effects: [...c.condition.effects, 'shaken'] } }));
   if (lie && ending !== 'provoked' && succeeded(ending)) d = believe(d, s, about!, now);
   return { data: d, facts };
+}
+
+/** The conduct a social roll is for each of the two: what the actor chose to do, and how the target reacted or what was done to them. */
+function conductOf(action: SocialAction, ending: Ending, trusted: boolean): (readonly [whose: 'actor' | 'target', conduct: Conduct])[] {
+  const gaveIn = ending !== 'provoked' && succeeded(ending);
+  switch (action) {
+    case 'intimidate':
+      return [['actor', 'intimidating'], ['target', gaveIn ? 'giving-in-to-a-threat' : 'standing-up-to-a-threat'], ...(ending === 'provoked' ? [['target', 'losing-their-temper'] as const] : [])];
+    case 'persuade':
+      return [['actor', 'persuading']];
+    case 'deceive':
+      return [['actor', 'lying'], ...(trusted ? [['actor', 'lying-to-the-trusting'] as const] : []), ...(ending === 'critical-failure' ? [['target', 'lied-to'] as const] : [])];
+  }
 }
 
 /** A lie believed: the target's version changes by re-belief, with the liar as its source; feelings follow whom they now believe did it. */

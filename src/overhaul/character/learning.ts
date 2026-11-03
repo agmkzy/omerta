@@ -3,6 +3,7 @@
 // their courage, with less trust either way. A test reads the game's tables from its source, so the two cannot drift apart.
 // See docs/overhaul/plans/character/README.md (Knowledge, Fact kinds).
 import type { CharacterRecord, Id } from './character';
+import { currentTemperament } from './conduct';
 import type { Fact, FactId, FactKind } from './facts';
 import type { Version } from './knowledge';
 import { NEW_RELATIONSHIP, feel, meet, type Feeling, type Relationship } from './relationships';
@@ -102,7 +103,7 @@ export const believedActor = (f: Fact, v: { readonly knowsActor: boolean; readon
  */
 export function learnFact(c: CharacterRecord, f: Fact, v: Version, now: number): CharacterRecord {
   const actor = believedActor(f, v);
-  const learner: Learner = { id: c.id, courage: c.startingTemperament.courage, affectionFor: (id) => c.relationships[id]?.affection };
+  const learner: Learner = { id: c.id, courage: currentTemperament(c).courage, affectionFor: (id) => c.relationships[id]?.affection };
   const relationships: Record<Id, Relationship> = { ...c.relationships };
   for (const id of [actor, f.victim]) if (id !== undefined && id !== c.id) relationships[id] ??= NEW_RELATIONSHIP;
   for (const ch of learningChanges(f, learner, actor)) relationships[ch.towards] = feel(relationships[ch.towards]!, ch.feeling, ch.amount, { now, why: ch.why });

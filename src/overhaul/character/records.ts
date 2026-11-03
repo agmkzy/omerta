@@ -4,6 +4,7 @@
 import type { CastRecord } from './cast';
 import { createCharacter, type CharacterInput, type CharacterRecord, type Id } from './character';
 import { factId, type Fact, type FactInput } from './facts';
+import { withFactConduct } from './conduct';
 import { firstVersions, type Version } from './knowledge';
 import { learnFact, meetPeople, meetings } from './learning';
 
@@ -21,16 +22,21 @@ export interface RecordOptions {
   readonly meets?: ReadonlyMap<Id, readonly Id[]>;
 }
 
-/** The record with a fact added at `now`, an id from the counter, its learners' versions and feelings, and its meetings. */
+/**
+ * The record with a fact added at `now`, an id from the counter, its learners' versions and feelings, its meetings, and the
+ * conduct it is for whoever did it and whoever it was done to.
+ */
 export function recordFact(data: CastRecord, input: FactInput, options: RecordOptions): { readonly data: CastRecord; readonly fact: Fact } {
   const { now, witnesses = [] } = options;
   const fact: Fact = { ...input, id: factId(data.nextId), at: now, witnesses: [...witnesses] };
   const learners = options.learners ?? new Map(firstVersions(fact));
   const meets = options.meets ?? meetings(fact);
   const characters = data.characters.map((c) => {
+    // (conduct comes last, so learning reads the traits the character had before it happened)
     const v = learners.get(c.id);
     const met = meetPeople(c, meets.get(c.id) ?? [], now);
-    return v ? createCharacter(learnFact(met, fact, v, now)) : met === c ? c : createCharacter(met);
+    const after = withFactConduct(v ? learnFact(met, fact, v, now) : met, fact);
+    return after === c ? c : createCharacter(after);
   });
   return { data: { ...data, facts: [...data.facts, fact], nextId: data.nextId + 1, characters }, fact };
 }

@@ -13,6 +13,7 @@ describe('createCharacter', { tags: ['unit'] }, () => {
       training: {},
       proficiencyBonus: 2,
       startingTemperament: temperament({}),
+      conduct: [],
       condition: { hitPoints: 10, effects: [] },
       inventory: { cash: 0, items: [] },
       knowledge: {},

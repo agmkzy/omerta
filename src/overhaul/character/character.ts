@@ -3,6 +3,7 @@
 import type { AttributeScores } from './attributes';
 import type { BackgroundName } from './backgrounds';
 import { conditionRecord, type ConditionRecord } from './condition';
+import { assertConduct, type ConductStep } from './conduct';
 import { inventoryRecord, type HeldItem, type InventoryRecord, type Item } from './items';
 import type { Knowledge } from './knowledge';
 import { assertRelationship, type Relationships } from './relationships';
@@ -18,6 +19,8 @@ export interface CharacterRecord extends Abilities {
   readonly background?: BackgroundName;
   /** The traits the character started with. Their current traits are worked out from these and their conduct. */
   readonly startingTemperament: Temperament;
+  /** The steps by which what they have done, how they reacted and what was done to them have moved their traits, in order. */
+  readonly conduct: readonly ConductStep[];
   readonly condition: ConditionRecord;
   readonly inventory: InventoryRecord;
   /** Their own version of each fact they know about, by fact id. */
@@ -34,6 +37,8 @@ export interface CharacterInput {
   readonly training?: Training;
   readonly proficiencyBonus?: number;
   readonly startingTemperament?: Partial<Temperament>;
+  /** Must agree with the cast's facts, so it comes from what the character does, not from here. */
+  readonly conduct?: readonly ConductStep[];
   readonly condition?: Partial<ConditionRecord>;
   /** Cash must agree with the cast's transfers, so a new character's cash comes from a transfer, not from here. */
   readonly inventory?: { readonly cash?: number; readonly items?: readonly (Item | HeldItem)[] };
@@ -44,10 +49,11 @@ export interface CharacterInput {
 
 /**
  * A complete record: average attributes and temperament, no training, a proficiency bonus of 2, full health, no effects,
- * nothing held, nothing known and no relationships unless given. Throws TypeError for an id that is not a non-empty string, and RangeError for anything out of range.
+ * no conduct, nothing held, nothing known and no relationships unless given. Throws TypeError for an id that is not a non-empty string, and RangeError for anything out of range.
  */
 export function createCharacter(input: CharacterInput): CharacterRecord {
   if (typeof input.id !== 'string' || input.id === '') throw new TypeError('a character needs an id');
+  assertConduct(input.conduct ?? [], `${input.id}'s conduct`);
   const able = abilities({
     ...(input.attributes && { attributes: input.attributes }),
     ...(input.training && { training: input.training }),
@@ -59,6 +65,7 @@ export function createCharacter(input: CharacterInput): CharacterRecord {
     ...(input.background && { background: input.background }),
     ...able,
     startingTemperament: temperament(input.startingTemperament ?? {}),
+    conduct: [...(input.conduct ?? [])],
     condition: conditionRecord(able, input.condition),
     inventory: inventoryRecord(input.inventory),
     knowledge: { ...input.knowledge },
