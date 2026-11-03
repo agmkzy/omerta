@@ -19,7 +19,7 @@ These have caused, or could cause, confusion. Say which one is meant.
 | **Background** | One of eight (fighter, driver, marksman, negotiator, trickster, accountant, shopkeeper, labourer), which shapes how a character is rolled | One of six the player picks at the start (hustler, connected, business, union, bookmaker, wheelman) |
 | **Courage / Nerve** | Courage is a trait: what someone does after failing a nerve check. Nerve is a skill: whether they fail it | The game has both too, as a trait and a skill |
 | **Giving in / surrendering** | Giving in is to a threat (intimidation). Surrendering is in a fight, after a failed nerve check | The game counts the player backing down as `yielded`, without telling the two apart |
-| **Rank / ability** | The overhaul has no rank, and rank is detached from attributes, skills, training and the proficiency bonus (decided 3 November 2026). "Ability" is not a defined term; say attribute, skill, training or proficiency bonus | Rank is civilian, associate, soldier, capo, underboss, boss, and the game rolls higher ranks better skills |
+| **Rank / ability** | The overhaul has no rank, and rank is detached from attributes, skills, training and the proficiency bonus (decided 3 November 2026): it follows what a character does, never their abilities directly. "Ability" is not a defined term; say attribute, skill, training or proficiency bonus | Rank is civilian, associate, soldier, capo, underboss, boss, and the game rolls higher ranks better skills |
 | **Standing / respect** | Respect is one feeling, of one character towards another | Standing is a reputation score, 0 to 100 |
 
 ## The record
