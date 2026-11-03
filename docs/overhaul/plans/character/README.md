@@ -1,6 +1,6 @@
 # Character: one object for every character
 
-**Status:** design agreed in discussion on 2 and 3 November 2026, and revised after two adversarial reviews. Nothing is built. What is still to agree is under [Still to agree](#still-to-agree), and what waits for slotting it into the game is under [Later](#later).
+**Status:** design agreed in discussion on 2 and 3 November 2026, and revised after two adversarial reviews. Nothing is built. What waits for slotting it into the game is under [Later](#later).
 
 ## Purpose
 
@@ -103,11 +103,58 @@ sam.skills.larceny;
 
 Every character's temperament moves with what they do, the player's included, so the player needs no flag.
 
-- **Stored:** each character's starting traits, and their conduct: for each trait, the steps their actions have moved it, each naming the fact that caused it. The current traits are worked out from the two, so there is no second copy of the traits.
+- **Stored:** each character's starting traits, and their conduct: for each trait, the steps that moved it, each naming its cause (a fact, a job's plan, or an item used up). The current traits are worked out by applying the steps in order to the starting traits, so there is no second copy of the traits.
 - **Starting traits:** an NPC's are set when they are made; the player's start neutral, at 0.5 for every trait.
 - **Used:** the current traits give modifiers on the character's own rolls and decide their response to a failed nerve check. For the player this is a deliberate difference from the game, where the player's temperament never limits what they can do.
 
-How each kind of conduct moves each trait is a table [still to agree](#still-to-agree).
+A person is a product of their experiences, so three things move traits: what a character chooses to do, how they react when a roll decides their response, and what is done to them.
+
+- **Slowly:** every step is 0.01. A step raises a trait by `0.01 × (1 − value)` and lowers it by `0.01 × value`, so a trait never leaves 0 to 1 and the extremes are hardest to reach.
+- **Once a week:** each row below moves a character's traits at most once a week, however often it happens. Different rows add together.
+- **So it takes about a year:** someone who runs from trouble every week goes from neutral (0.5) to timid (0.3) in about 51 weeks. These are starting values, checked with simulated runs once built.
+- **A way out:** temperament never decides a nerve check, only what someone does after failing one. A timid character who passes stands their ground and gains courage from it, so no one becomes more timid by rule.
+
+**What they choose to do:**
+
+| Conduct | Recorded by | Traits moved |
+| --- | --- | --- |
+| Starting a real fight | A `beating` or `fight`, as attacker | Violence + |
+| Starting one against a bigger squad, or against a weapon that outclasses theirs | The same | Courage + |
+| Starting one while Hurt, or against a bigger squad | The same | Caution − |
+| Setting an ambush | The same, started as an ambush | Caution + |
+| Beating someone who could not fight back: set upon by more than one, or unarmed against a weapon that outclasses theirs | A `beating` | Cruelty +, Empathy − |
+| Starting a fight with someone who provoked them, the same day | A `beating` or `fight` caused by a provoking `threat` | Volatility + |
+| Intimidating someone | A `threat` | Violence + |
+| Persuading someone | A `persuasion` | Agreeable + |
+| Lying | A `lie` | Honesty − |
+| Lying to someone whose trust in them is high | A `lie` | Loyalty − |
+| Robbery | A `robbery` | Greed +, Violence + |
+| Theft, burglary or a scam | A `theft`, `burglary` or `scam` | Greed +, Honesty − |
+| Drinking a bottle | The bottle used up | Vice +; and Sociability + with others present, Sociability − alone |
+| Planning a job | The plan on its job | Caution +, Ambition + |
+| Taking part in a hard job (DC 20) | The job | Ambition + |
+
+**How they react:**
+
+| Reaction | When | Traits moved |
+| --- | --- | --- |
+| Holding their nerve | Passing a nerve check in a fight and fighting on | Courage + |
+| Standing by their squad | Holding their nerve when a member of their squad is down | Loyalty + |
+| Running | Failing a nerve check and trying to flee, whether or not they get away | Courage −, Caution + |
+| Leaving their squad | Running while the rest of their squad fights on | Loyalty − |
+| Giving in during a fight | Failing a nerve check and giving in | Courage −, Pride − |
+| Giving in to a threat | Being intimidated: partial success or better for the actor | Courage −, Pride − |
+| Standing up to a threat | Resisting intimidation: failure or critical failure for the actor | Courage +, Pride + |
+| Losing their temper | Being provoked | Volatility + |
+
+**What is done to them:**
+
+| Experience | When | Traits moved |
+| --- | --- | --- |
+| Being beaten | The victim of a `beating`, knocked out or not | A brave victim (courage high): Volatility +. Anyone else: Caution + |
+| Finding out they were lied to | Seeing through a lie, or later learning the truth | Agreeable − |
+
+A risk to check with long simulated runs: an NPC's choices follow their temperament, so a violent NPC chooses violence and grows more violent. Small steps, the weekly limit and the way out above slow this; the runs should confirm that traits do not all drift to the ends.
 
 ## Condition and temporary effects
 
@@ -469,16 +516,13 @@ Where it would be used once this is slotted into the game, which now uses `brain
 
 Both belong to the game's books, so both wait for slotting it in (see [Later](#later)).
 
-## Still to agree
-
-- **How conduct moves temperament:** which kinds of conduct move which traits, and by how much. This is the next table to settle, before building.
-
 ## Later
 
 Left until the character is slotted into the game:
 
 - **Replacing the game's records:** the game's `Character` has about 60 fields this does not hold (rank, family, crew, debts, memos and more). Each system moves over with its fields, its tests and a save migration, one at a time, and the one writer goes once nothing is left.
-- **Fading:** feelings fading when nothing feeds them, as the game's `feelingsWeek` does; it needs the game's clock.
+- **Fading:** feelings fading when nothing feeds them, as the game's `feelingsWeek` does, and traits easing back towards a character's starting traits; both need the game's clock.
+- **What really drives loyalty, ambition and sociability:** keeping or breaking one's word, rank and standing, and a social life. For now they move only with the small signals in [Temperament moves with conduct](#temperament-moves-with-conduct).
 - **Healing over time,** and how much a shorter rest heals.
 - **Lies told in front of others:** what witnesses to a deception believe.
 - **Clearing a name:** whether learning someone was falsely blamed repairs the feelings the lie caused.
