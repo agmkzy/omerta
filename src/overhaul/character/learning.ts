@@ -3,6 +3,7 @@
 // their courage, with less trust either way. A test reads the game's tables from its source, so the two cannot drift apart.
 // See docs/overhaul/plans/character/README.md (Knowledge, Fact kinds).
 import type { CharacterRecord, Id } from './character';
+import { maxHitPoints } from './condition';
 import { currentTemperament } from './conduct';
 import type { Fact, FactId, FactKind } from './facts';
 import type { Version } from './knowledge';
@@ -60,6 +61,8 @@ export interface FeelingChange {
 export interface Learner {
   readonly id: Id;
   readonly courage: number;
+  /** Their maximum hit points, against which the share of them a beating took is measured. */
+  readonly maxHitPoints: number;
   /** Their affection for someone, or undefined for a stranger. */
   affectionFor(id: Id): number | undefined;
 }
@@ -85,13 +88,29 @@ export function learningChanges(f: Fact, learner: Learner, actor: Id | undefined
   if (!grudge) return out;
   if (f.victim === learner.id) {
     // done to them: a brave one answers it with a grudge, a timid one with fear, and either way they trust the one who did it less
-    out.push(change(actor, 'grudge', violent !== undefined ? grudge * (0.4 + 0.6 * brave) : grudge));
-    if (violent !== undefined) out.push(change(actor, 'fear', grudge * (1 - brave) * 0.8));
-    out.push(change(actor, 'trust', -grudge * 0.5));
+    const victim: FeelingChange[] = [change(actor, 'grudge', violent !== undefined ? grudge * (0.4 + 0.6 * brave) : grudge)];
+    if (violent !== undefined) victim.push(change(actor, 'fear', grudge * (1 - brave) * 0.8));
+    victim.push(change(actor, 'trust', -grudge * 0.5));
+    out.push(...(f.amount !== undefined && kind === 'beating' ? scaledByDamage(victim, f, learner) : victim));
   } else if (f.victim !== undefined && (learner.affectionFor(f.victim) ?? 0) > 0.5) {
     out.push(change(actor, 'grudge', grudge * 0.3));
   }
   return out;
+}
+
+/**
+ * A fight's changes for whoever it was done to, scaled by the share of their hit points that attacker took (the fact's
+ * amount). A beating's are never less than a successful intimidation's; a fled fight's have no minimum.
+ */
+export const BEATING_AT_LEAST: Readonly<Partial<Record<Feeling, number>>> = { fear: 0.1, grudge: 0.05, trust: -0.05 };
+
+function scaledByDamage(changes: readonly FeelingChange[], f: Fact, learner: Learner): FeelingChange[] {
+  const share = Math.min(1, f.amount! / learner.maxHitPoints);
+  return changes.map((ch) => {
+    const scaled = ch.amount * share;
+    const least = f.kind === 'beating' ? BEATING_AT_LEAST[ch.feeling] : undefined;
+    return { ...ch, amount: least === undefined ? scaled : least < 0 ? Math.min(scaled, least) : Math.max(scaled, least) };
+  });
 }
 
 /** Whom a learner believes did a fact: whoever did it if they know, otherwise whom they blame. */
@@ -103,7 +122,7 @@ export const believedActor = (f: Fact, v: { readonly knowsActor: boolean; readon
  */
 export function learnFact(c: CharacterRecord, f: Fact, v: Version, now: number): CharacterRecord {
   const actor = believedActor(f, v);
-  const learner: Learner = { id: c.id, courage: currentTemperament(c).courage, affectionFor: (id) => c.relationships[id]?.affection };
+  const learner: Learner = { id: c.id, courage: currentTemperament(c).courage, maxHitPoints: maxHitPoints(c), affectionFor: (id) => c.relationships[id]?.affection };
   const relationships: Record<Id, Relationship> = { ...c.relationships };
   for (const id of [actor, f.victim]) if (id !== undefined && id !== c.id) relationships[id] ??= NEW_RELATIONSHIP;
   for (const ch of learningChanges(f, learner, actor)) relationships[ch.towards] = feel(relationships[ch.towards]!, ch.feeling, ch.amount, { now, why: ch.why });

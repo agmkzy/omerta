@@ -9,6 +9,8 @@ import { conditionOf, effectModifiers, type Condition, type StoredEffect } from 
 import { currentTemperament, withConduct, type ConductStep } from './conduct';
 import { DICE } from './dice';
 import { auditFacts, type Fact, type FactId, type FactInput } from './facts';
+import { assertFight, fight, type FightKind, type FightResult, type FightStart } from './fight';
+import { applyFight, type FightRecordOptions } from './fight-record';
 import { DRINK_DC, ITEM_INFO, itemModifiers, type InventoryRecord, type Item, type ItemOptions, type ItemState } from './items';
 import { auditKnowledge, toldVersion, type Knowledge, type Version } from './knowledge';
 import { learnFact } from './learning';
@@ -131,12 +133,66 @@ export interface Character {
    * DRINK_DC, and on a failure the character is drunk.
    */
   drink(roller: Roller, when: { readonly now: number; readonly with?: readonly Character[] }): { readonly result: CheckResult; readonly drunk: boolean; readonly cast: Cast };
+  /** A fight with another character in the cast: one against one, as `squad(this).fight(squad(other), options)`. */
+  fight(other: Character, options: FightOptions): FightCheck;
   /** Social actions on another character in the cast, each a check to inspect, then roll. */
   readonly social: {
     intimidate(target: Character): SocialCheck<Cast>;
     persuade(target: Character): SocialCheck<Cast>;
     /** A lie needs its claim before it can be rolled. */
     deceive(target: Character): { claim(claim: Claim): SocialCheck<Cast> };
+  };
+}
+
+export interface FightOptions {
+  readonly kind: FightKind;
+  /** How a real fight starts. Default an ordinary fight. */
+  readonly start?: FightStart;
+}
+
+/** A fight before it is fought. Rolling it is refused if the cast it came from has been replaced. */
+export interface FightCheck {
+  roll(roller: Roller, when: FightRecordOptions): { readonly result: FightResult; readonly facts: readonly Fact[]; readonly cast: Cast };
+}
+
+/** One or more characters of a cast who fight together. */
+export interface Squad {
+  readonly members: readonly Character[];
+  /** This squad attacking the other: refused for a squad from another cast, or a fight that cannot be fought. */
+  fight(other: Squad, options: FightOptions): FightCheck;
+}
+
+/** Each handle's way of making a change to its cast, for squads, which are made of handles. */
+const commits = new WeakMap<Character, Commit>();
+
+/** A squad of characters from one cast. Throws RangeError for none, or for characters from different casts. */
+export function squad(...members: Character[]): Squad {
+  const [first] = members;
+  if (first === undefined) throw new RangeError('a squad needs at least one member');
+  if (members.some((m) => m.cast !== first.cast)) throw new RangeError('a squad’s members must be from one cast');
+  return {
+    members,
+    fight(other, { kind, start }) {
+      if (other.members[0]!.cast !== first.cast) throw new RangeError('the other squad is from another cast');
+      const spec = (d: CastRecord) => {
+        const of = (s: readonly Character[]) => s.map((m) => d.characters.find((c) => c.id === m.id)!);
+        return { attackers: of(members), defenders: of(other.members), kind, ...(start && { start }) };
+      };
+      assertFight(spec(first.cast.data));
+      return {
+        roll(roller, when) {
+          let result: FightResult | undefined;
+          let facts: readonly Fact[] = [];
+          const next = commits.get(first)!((d) => {
+            result = fight(spec(d), roller);
+            const applied = applyFight(d, result, when);
+            facts = applied.facts;
+            return applied.data;
+          });
+          return { result: result!, facts, cast: next };
+        },
+      };
+    },
   };
 }
 
@@ -230,6 +286,12 @@ export function castOf(data: CastRecord): Cast {
 export type Commit = (next: (data: CastRecord) => CastRecord) => Cast;
 
 function characterHandle(data: CharacterRecord, owner: Cast, commit: Commit): Character {
+  const handle = characterHandleOf(data, owner, commit);
+  commits.set(handle, commit);
+  return handle;
+}
+
+function characterHandleOf(data: CharacterRecord, owner: Cast, commit: Commit): Character {
   /** A change to this character, or another, whose new record is checked as any other. */
   const update = (id: Id, next: (c: CharacterRecord) => CharacterInput) => commit((d) => withCharacter(d, id, next));
   const condition = conditionOf(data, data.condition);
@@ -246,7 +308,7 @@ function characterHandle(data: CharacterRecord, owner: Cast, commit: Commit): Ch
       return items.map((h, j) => (j === i ? { item, state: to } : h));
     });
   const status = (skill: Skill, options: ItemOptions = {}): SkillStatus => skillStatus(data, condition, skill, options);
-  return {
+  const self: Character = {
     id: data.id,
     name: data.name,
     data,
@@ -330,6 +392,9 @@ function characterHandle(data: CharacterRecord, owner: Cast, commit: Commit): Ch
       });
       return { result, drunk, cast: next };
     },
+    fight(other, options) {
+      return squad(self).fight(squad(other), options);
+    },
     get social() {
       const check = (action: SocialAction, target: Character, claim?: Claim) => {
         if (target.cast !== owner) throw new RangeError(`${target.name} is from another cast`);
@@ -342,6 +407,7 @@ function characterHandle(data: CharacterRecord, owner: Cast, commit: Commit): Ch
       };
     },
   };
+  return self;
 }
 
 function skillStatus(c: CharacterRecord, condition: Condition, skill: Skill, options: ItemOptions): SkillStatus {

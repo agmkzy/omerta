@@ -163,7 +163,7 @@ describe('the learning tables', { tags: ['unit'] }, () => {
 
 describe('learningChanges', { tags: ['unit'] }, () => {
   const beating: Fact = { id: 'f1', kind: 'beating', actor: 'sam', victim: 'rico', at: 0, witnesses: ['joe'] };
-  const learner = (id: string, courage = 0.5, fond: Record<string, number> = {}): Learner => ({ id, courage, affectionFor: (other) => fond[other] });
+  const learner = (id: string, courage = 0.5, fond: Record<string, number> = {}): Learner => ({ id, courage, maxHitPoints: 10, affectionFor: (other) => fond[other] });
   const list = (f: Fact, l: Learner, actor: string | undefined = f.actor) => learningChanges(f, l, actor).map((c) => [c.towards, c.feeling, Math.round(c.amount * 10000) / 10000, c.why]);
 
   test('one who hears of a beating respects the one who did it more, the one beaten less, and fears the one who did it, more if timid', () => {
