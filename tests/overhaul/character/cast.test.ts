@@ -96,7 +96,7 @@ describe('what a character can see of another', { tags: ['unit'] }, () => {
   const everyone = cast({ characters: [sam, rico] });
 
   test('is only what anyone present can see: none of their private state', () => {
-    assert.deepEqual(everyone.character('rico').seenBy(everyone.character('sam')), { id: 'rico', name: 'Rico' });
+    assert.deepEqual(everyone.character('rico').seenBy(everyone.character('sam')), { id: 'rico', name: 'Rico', looks: 'unhurt' });
   });
 
   test('is refused for a viewer from another cast', () => {

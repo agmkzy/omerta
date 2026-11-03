@@ -5,7 +5,7 @@ import { createCharacter } from '../../../src/overhaul/character/character';
 import { temperament } from '../../../src/overhaul/character/temperament';
 
 describe('createCharacter', { tags: ['unit'] }, () => {
-  test('defaults to average attributes and temperament, no training and proficiency bonus 2', () => {
+  test('defaults to average attributes and temperament, no training, proficiency bonus 2 and full health', () => {
     assert.deepEqual(createCharacter({ id: 'sam', name: 'Sam' }), {
       id: 'sam',
       name: 'Sam',
@@ -13,6 +13,7 @@ describe('createCharacter', { tags: ['unit'] }, () => {
       training: {},
       proficiencyBonus: 2,
       startingTemperament: temperament({}),
+      condition: { hitPoints: 10, effects: [] },
     });
   });
 
@@ -38,5 +39,6 @@ describe('createCharacter', { tags: ['unit'] }, () => {
     assert.throws(() => createCharacter({ id: 'x', name: 'X', proficiencyBonus: 7 }), RangeError);
     assert.throws(() => createCharacter({ id: 'x', name: 'X', training: { driving: 'master' } as never }), RangeError);
     assert.throws(() => createCharacter({ id: 'x', name: 'X', startingTemperament: { greed: 2 } }), RangeError);
+    assert.throws(() => createCharacter({ id: 'x', name: 'X', condition: { hitPoints: 11 } }), RangeError);
   });
 });

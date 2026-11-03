@@ -1,0 +1,29 @@
+{
+  "format": 2,
+  "characters": [
+    {
+      "id": "sam",
+      "name": "Sam",
+      "attributes": { "str": 10, "agi": 14, "con": 10, "int": 12, "wis": 10, "cha": 13 },
+      "training": { "larceny": "trained" },
+      "proficiencyBonus": 2,
+      "startingTemperament": {
+        "greed": 0.5, "violence": 0.5, "ambition": 0.5, "caution": 0.8, "sociability": 0.5, "vice": 0.5, "courage": 0.5,
+        "pride": 0.5, "volatility": 0.5, "agreeable": 0.5, "empathy": 0.5, "loyalty": 0.5, "honesty": 0.5, "cruelty": 0.5
+      },
+      "condition": { "hitPoints": 4, "effects": ["drunk"] }
+    },
+    {
+      "id": "rico",
+      "name": "Rico",
+      "attributes": { "str": 16, "agi": 10, "con": 14, "int": 8, "wis": 11, "cha": 12 },
+      "training": { "brawling": "expert" },
+      "proficiencyBonus": 3,
+      "startingTemperament": {
+        "greed": 0.5, "violence": 0.8, "ambition": 0.5, "caution": 0.3, "sociability": 0.5, "vice": 0.5, "courage": 0.7,
+        "pride": 0.6, "volatility": 0.75, "agreeable": 0.3, "empathy": 0.3, "loyalty": 0.6, "honesty": 0.5, "cruelty": 0.65
+      },
+      "condition": { "hitPoints": 12, "effects": [], "rest": { "from": 1440, "until": 1920 } }
+    }
+  ]
+}

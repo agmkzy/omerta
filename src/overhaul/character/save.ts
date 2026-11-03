@@ -7,6 +7,7 @@ import { ATTRIBUTES, attributeScores } from './attributes';
 import { BACKGROUNDS, type BackgroundName } from './backgrounds';
 import { CAST_FORMAT, castOf, type Cast } from './cast';
 import { createCharacter, type CharacterRecord } from './character';
+import { STORED_EFFECTS, type ConditionRecord, type StoredEffect } from './condition';
 import { PROFICIENCIES, SKILLS, type Proficiency, type Skill, type Training } from './skills';
 import { TRAITS } from './temperament';
 
@@ -14,7 +15,13 @@ import { TRAITS } from './temperament';
 export type Migration = (data: Record<string, unknown>) => void;
 
 /** MIGRATIONS[0] takes format 1 to 2, MIGRATIONS[1] format 2 to 3, and so on: one for each format after the first. */
-export const MIGRATIONS: readonly Migration[] = [];
+export const MIGRATIONS: readonly Migration[] = [
+  // 1 to 2: characters gained a condition. Format 1 had none, so each character starts with an empty one: full health, no effects.
+  (d) => {
+    for (const c of Array.isArray(d.characters) ? d.characters : [])
+      if (typeof c === 'object' && c !== null && !('condition' in c)) (c as Record<string, unknown>).condition = {};
+  },
+];
 
 /** Brings data saved in format `from` up to the newest of `migrations`, in order. */
 export function migrate(data: Record<string, unknown>, from: number, migrations: readonly Migration[] = MIGRATIONS): void {
@@ -33,8 +40,10 @@ export interface ReadCast {
 
 /** Every field of a saved character; the type check fails if one is missing or misspelt. */
 const CHARACTER_FIELDS: readonly string[] = Object.keys({
-  id: true, name: true, background: true, attributes: true, training: true, proficiencyBonus: true, startingTemperament: true,
+  id: true, name: true, background: true, attributes: true, training: true, proficiencyBonus: true, startingTemperament: true, condition: true,
 } satisfies Record<keyof CharacterRecord, true>);
+
+const CONDITION_FIELDS: readonly string[] = Object.keys({ hitPoints: true, effects: true, rest: true } satisfies Record<keyof ConditionRecord, true>);
 
 const CAST_FIELDS: readonly string[] = ['format', 'characters'];
 
@@ -71,7 +80,31 @@ function readCharacter(data: unknown, path: string, ignored: string[]): Characte
     ...(d.training !== undefined && { training: training(d.training, `${path}.training`, ignored) }),
     ...(d.proficiencyBonus !== undefined && { proficiencyBonus: d.proficiencyBonus }),
     ...(d.startingTemperament !== undefined && { startingTemperament: numbers(d.startingTemperament, `${path}.startingTemperament`, TRAITS, ignored) }),
+    ...(d.condition !== undefined && { condition: condition(d.condition, `${path}.condition`, ignored) }),
   });
+}
+
+function condition(value: unknown, path: string, ignored: string[]): Partial<ConditionRecord> {
+  const d = object(value, path);
+  ignored.push(...Object.keys(d).filter((k) => !CONDITION_FIELDS.includes(k)).map((k) => `${path}.${k}`));
+  if (d.hitPoints !== undefined && typeof d.hitPoints !== 'number') throw new TypeError(`${path}.hitPoints must be a number`);
+  if (d.effects !== undefined && !Array.isArray(d.effects)) throw new TypeError(`${path}.effects must be a list`);
+  const effects: StoredEffect[] = [];
+  for (const e of (d.effects ?? []) as unknown[]) {
+    if (STORED_EFFECTS.includes(e as StoredEffect)) effects.push(e as StoredEffect);
+    else ignored.push(`${path}.effects.${String(e)}`);
+  }
+  return {
+    ...(d.hitPoints !== undefined && { hitPoints: d.hitPoints }),
+    effects,
+    ...(d.rest !== undefined && { rest: rest(d.rest, `${path}.rest`, ignored) }),
+  };
+}
+
+function rest(value: unknown, path: string, ignored: string[]): { from: number; until: number } {
+  const { from, until } = numbers(value, path, ['from', 'until'] as const, ignored);
+  if (from === undefined || until === undefined) throw new TypeError(`${path} needs a start and an end`);
+  return { from, until };
 }
 
 function object(value: unknown, what: string): Record<string, unknown> {

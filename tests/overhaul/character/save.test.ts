@@ -16,7 +16,8 @@ const everyone = cast({
   ],
 });
 const throughJson = (data: unknown): unknown => JSON.parse(JSON.stringify(data));
-const one = (character: Record<string, unknown>) => ({ format: 1, characters: [character] });
+const one = (character: Record<string, unknown>) => ({ format: CAST_FORMAT, characters: [character] });
+const fixture = (name: string): unknown => JSON.parse(readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'));
 
 describe('loadCast', { tags: ['unit'] }, () => {
   test('restores a saved cast through JSON', () => {
@@ -84,19 +85,50 @@ describe('loadCast', { tags: ['unit'] }, () => {
     assert.throws(() => loadCast({ format: 1, characters: [{ id: 'x', name: 'X' }, { id: 'x', name: 'Y' }] }), RangeError);
   });
 
-  test('loads a cast saved in format 1, which must keep loading', () => {
-    const saved: unknown = JSON.parse(readFileSync(new URL('./fixtures/cast-format1.json', import.meta.url), 'utf8'));
-    const { cast: loaded, ignored } = readCast(saved);
+  test('loads a cast saved in format 1, which must keep loading: its characters are at full health', () => {
+    const { cast: loaded, ignored } = readCast(fixture('cast-format1.json'));
     assert.deepEqual(ignored, []);
     assert.deepEqual(loaded.characters.map((c) => c.name), ['Sam', 'Rico']);
     assert.equal(loaded.character('sam').skills.deception.bonus, 2 + 4);
     assert.equal(loaded.character('rico').temperament.volatility, 0.75);
+    assert.deepEqual(loaded.characters.map((c) => [c.condition.hitPoints, c.condition.maxHitPoints, c.condition.effects]), [[10, 10, []], [12, 12, []]]);
+  });
+
+  test('loads a cast saved in format 2, which must keep loading', () => {
+    const { cast: loaded, ignored } = readCast(fixture('cast-format2.json'));
+    assert.deepEqual(ignored, []);
+    assert.deepEqual(loaded.character('sam').condition, { hitPoints: 4, effects: ['drunk'], maxHitPoints: 10, hurt: true, unconscious: false });
+    assert.equal(loaded.character('rico').restingAt(1500), true);
+  });
+
+  test('restores a character’s condition, and leaves out effects and fields it does not recognise', () => {
+    const hurt = loadCast(throughJson(everyone.data)).character('sam').damage(6).character('sam').affect('shaken').character('sam').rest({ now: 60, hours: 1 }).character('sam').damage(2);
+    assert.deepEqual(loadCast(throughJson(hurt.data)).data, hurt.data);
+    const { cast: loaded, ignored } = readCast(one({ id: 'x', name: 'X', condition: { hitPoints: 3, effects: ['sober', 'shaken'], mood: 'bad' } }));
+    assert.deepEqual(loaded.character('x').data.condition, { hitPoints: 3, effects: ['shaken'] });
+    assert.deepEqual([...ignored].sort(), ['characters[0].condition.effects.sober', 'characters[0].condition.mood']);
+  });
+
+  test('rejects a condition of the wrong shape or out of range', () => {
+    for (const condition of [[], { hitPoints: '3' }, { effects: 'shaken' }, { rest: { from: 0 } }, { rest: 5 }])
+      assert.throws(() => loadCast(one({ id: 'x', name: 'X', condition })), TypeError, JSON.stringify(condition));
+    for (const condition of [{ hitPoints: 99 }, { rest: { from: 9, until: 3 } }])
+      assert.throws(() => loadCast(one({ id: 'x', name: 'X', condition })), RangeError, JSON.stringify(condition));
   });
 });
 
 describe('migrations', { tags: ['unit'] }, () => {
   test('there is one for each format after the first', () => {
     assert.equal(MIGRATIONS.length, CAST_FORMAT - 1);
+  });
+
+  test('1 to 2 gives each character an empty condition, which loads as full health with no effects', () => {
+    const d: Record<string, unknown> = { format: 1, characters: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B', condition: { hitPoints: 2 } }, null] };
+    migrate(d, 1);
+    assert.deepEqual(d.characters, [{ id: 'a', name: 'A', condition: {} }, { id: 'b', name: 'B', condition: { hitPoints: 2 } }, null]);
+    const notAList: Record<string, unknown> = { format: 1, characters: 'none' };
+    migrate(notAList, 1);
+    assert.equal(notAList.characters, 'none');
   });
 
   test('run in order from the saved format to the newest', () => {
