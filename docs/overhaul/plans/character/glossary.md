@@ -72,7 +72,8 @@ These have caused, or could cause, confusion. Say which one is meant.
 - **Skill** — one of eighteen, each read from an attribute (Brawling from Strength, Persuasion from Charisma, Nerve from
   Wisdom or Constitution, and so on).
 - **Training** — untrained, trained or expert in a skill. Trained adds the proficiency bonus; expert adds it twice.
-- **Proficiency bonus** — 2 to 6: how much training adds. Every character has one; it is 2 unless set.
+- **Proficiency bonus** — 2 to 6: how much training adds. Every character has one; it is 2 unless set, and will rise
+  with level once advancement is built.
 - **Bonus** — everything a skill adds to a roll: the attribute modifier, training, effects, items and anything else, each
   listed.
 

@@ -522,10 +522,10 @@ How a character gets better over time (direction decided 3 November 2026; not ye
   attribute order that placed their rolled scores), taking turns through the top three: a fighter's go to Strength, then
   Constitution, then Charisma, then Strength again. An attribute already at 20 is passed over for the next in the order.
   The player chooses their own.
+- **The proficiency bonus rises with level,** as in D&D: 2 at the start, rising a step every few levels to 6. How many
+  levels each step takes is decided with the levels themselves.
 
-Open: whether the
-proficiency bonus rises with level, what unlocks each skill's training, and whether expert is unlocked the same way as
-trained. These replace the game's skills growing with use (`people.ts` `grow`).
+Open: what unlocks each skill's training, and whether expert is unlocked the same way as trained. These replace the game's skills growing with use (`people.ts` `grow`).
 
 ## Planning
 
