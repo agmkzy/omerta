@@ -1,7 +1,8 @@
 # Typecheck, build and run every regression suite on each push and pull request.
 # Free for public repositories on GitHub-hosted runners. The tests (Vitest) run in three parallel jobs of roughly equal work,
-# so the wall-clock time is that of one job; failures are annotated on the pull request. Coverage is not measured here (it
-# slows every test by about a quarter); run `make test-cov` locally to check the thresholds. See docs/05-testing.md.
+# so the wall-clock time is that of one job; failures are annotated on the pull request. The game's coverage is not measured
+# here (it slows every test by about a quarter); run `make test-cov` locally to check the thresholds. The overhaul has its own
+# job, which does measure its coverage. See docs/05-testing.md.
 name: CI
 
 on:
@@ -43,6 +44,22 @@ jobs:
           name: omerta-html
           path: dist/omerta.html
           retention-days: 14
+
+  overhaul:
+    # The overhaul (src/overhaul/, tests/overhaul/) is checked on its own: its stricter typecheck, its tests (including the
+    # boundary test that keeps it apart from the game) and its 100% coverage threshold, which is quick to measure here.
+    name: Overhaul
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run overhaul:typecheck
+      - run: npm run overhaul:cov
 
   suite:
     name: ${{ matrix.name }}

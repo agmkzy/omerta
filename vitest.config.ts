@@ -22,7 +22,8 @@ export default defineConfig({
       provider: 'v8',
       include: ['src/**/*.ts'],
       // The simulation is what the suites test. The browser UI, the terminal UI and the bots are entry points with no tests of their own.
-      exclude: ['src/tests/**', 'src/web.ts', 'src/ui/**', 'src/cli.ts', 'src/bot.ts', 'src/stress.ts'],
+      // The overhaul (src/overhaul/) has its own tests and its own 100% threshold (vitest.overhaul.config.ts).
+      exclude: ['src/tests/**', 'src/web.ts', 'src/ui/**', 'src/cli.ts', 'src/bot.ts', 'src/stress.ts', 'src/overhaul/**'],
       reporter: ['text-summary', 'html'],
       // About a point below what `npm run test:cov` measured when these were set (lines 59.05, statements 55.95, branches 53.96,
       // functions 62.57), so coverage can only go up. The margin absorbs small differences between Node versions. Raise them as
