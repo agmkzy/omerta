@@ -38,12 +38,14 @@ sam.data;                       // the plain record
 const check = sam.social.intimidate(rico)
   .with({ value: -3, reason: 'Rico has the police outside' });
 
-check.odds();                   // the chance of each outcome
-check.explain();                // every modifier, with its reason
+check.odds({ for: sam });       // the chance of each outcome, as Sam can judge it
+check.explain({ for: sam });    // the modifiers Sam can know about, with their reasons
 const outcome = check.roll(dice);
 outcome.result;                 // what happened
 outcome.cast;                   // a new cast, with Sam, Rico and any new events updated
 ```
+
+**Odds and explanations never leak private state.** They are always given to someone. The viewer's own modifiers are exact; another character's modifiers (their feelings, their knowledge, their effects) count only where the viewer knows them, and anything the viewer does not know counts as zero. So asking the odds of lying to Rico does not reveal whether Rico saw the event, unless Sam knows Rico was a witness. The true numbers are used only by the roll itself, and by tests.
 
 **Nothing changes in place.** A roll returns a new cast; `everyone`, `sam` and `rico` above are as they were. When this is slotted into the game, a new cast is written back to the world through one function, so nothing else edits characters directly.
 
@@ -72,7 +74,7 @@ sam.skills.brawling;
 
 ### Temperament of the player
 
-The player's temperament starts neutral (0.5 for every trait) and moves with what the player does, as the game's `conduct` record does now.
+The player's temperament starts neutral (0.5 for every trait) and moves with what the player does. It works exactly as any character's does: it gives modifiers on the player's own rolls and decides their response to a failed nerve check. This is a deliberate difference from the game, where the player's temperament never limits what they can do. The traits are stored like anyone's; the player's conduct is the record of what moved them, so it is the recorded cause of each change, not a second copy of the traits.
 
 ## Condition and temporary effects
 
@@ -92,16 +94,27 @@ An effect does not stack with itself; different effects add together. Each is na
 
 | Item | Effect |
 | --- | --- |
-| Knife | Can be drawn for armed intimidation: nerve DC 12 |
-| Pistol | Can be drawn for armed intimidation: nerve DC 15 |
+| Knife | A weapon: see [Weapons](#weapons) |
+| Pistol | A weapon: see [Weapons](#weapons) |
 | Lockpicks | +2 to Larceny for locks, when used |
 | Toolkit | +2 to Mechanics, when used |
 | Good suit | +1 to Persuasion, while worn |
 | Bottle of spirits | Drinking it means a Carousing check against DC 12; failing it makes the character Drunk |
 
-Armed intimidation works as it does in the lab: the target makes a nerve check against the weapon first, and the actor rolls with advantage. With an inventory, a character can intimidate armed only if they carry a weapon, and the weapon sets the nerve DC.
+### Weapons
 
-### Weapons in fights
+A weapon only frightens someone who has nothing to answer it with.
+
+**In social checks,** a weapon the actor carries and shows is a modifier on intimidation, by how far it outclasses what the target carries:
+
+| Actor's weapon | Target unarmed | Target has a knife | Target has a pistol |
+| --- | --- | --- | --- |
+| Knife | +2 | None | None |
+| Pistol | +4 | +2 | None |
+
+This replaces the lab's armed intimidation (a nerve check before the roll, and advantage for the actor).
+
+#### In fights
 
 | Weapon | Skill | Damage |
 | --- | --- | --- |
@@ -109,7 +122,7 @@ Armed intimidation works as it does in the lab: the target makes a nerve check a
 | Knife | Brawling | 1d6 + Strength |
 | Pistol | Firearms | 2d6, with no Strength |
 
-Drawing a weapon during a fight makes each opponent take one nerve check against the weapon's DC (12 for a knife, 15 for a pistol), using the lab's existing "weapon drawn" trigger. These numbers change fight balance, so they are a starting point, checked and tuned with statistical tests on simulated fights once built.
+Weapons are part of a fight from the start: there are no choices made mid-fight. Each armed character's attacks use their weapon's skill and damage. At the start, each unarmed fighter facing an armed opponent makes one nerve check against the strongest weapon they face (DC 12 for a knife, 15 for a pistol); an armed fighter does not. These numbers change fight balance, so they are a starting point, checked and tuned with statistical tests on simulated fights once built.
 
 ## Relationships
 
@@ -150,7 +163,7 @@ A social result changes how the target feels about the actor. Values run from 0 
 | Intimidation: the target is provoked | Grudge +0.1 |
 | Persuasion: succeeds | Trust +0.02 |
 | Persuasion: fails | None |
-| Deception: succeeds | None: the target does not know they were lied to. The lie is recorded as an event only the actor knows about, so it can come out later. |
+| Deception: succeeds | None: the target does not know they were lied to. Their version of the fact now has the actor as its source, so the lie can come out later. |
 | Deception: caught lying | Trust −0.15, grudge +0.05 |
 
 Intimidation also changes how the actor feels about the target:
@@ -169,7 +182,14 @@ Follows the game's model (`Fact` and `Knowledge` in `src/types.ts`, `addFact` an
 
 ### As modifiers on Deception
 
-A lie names the event it is about: `sam.social.deceive(rico).about(eventId)`. The modifier comes from the target's own version of that event.
+A lie is a claim, in the same shape as a character's version of a fact. It is either a different version of a real fact (who did it, how big it was) or a fact that never happened. A fact that never happened is still recorded, marked false, so the simulation always knows the truth; only the liar knows it is false.
+
+```ts
+sam.social.deceive(rico).claim({ about: factId, blame: 'joe' });   // a different version of a real fact
+sam.social.deceive(rico).claim({ invented: { kind: 'theft', actor: 'joe' } });   // a fact that never happened
+```
+
+When a lie succeeds, the target's version is updated with "told by the actor" as its source. If they later learn the truth, that is how the lie comes out. The modifier comes from the target's own version of the fact the claim is about:
 
 | What the target knows of the event | Modifier |
 | --- | --- |
@@ -201,25 +221,27 @@ sam.fight(rico, { kind: 'sparring' });
 squad(sam, joe).fight(squad(rico), { kind: 'real' });
 ```
 
-### Beatings
+### How a fight ends for the losers
 
-A beating is not a separate kind: it is a real fight that the attackers start by setting on the target, and whether the target fights back is decided by their nerve and temperament, as with any nerve check.
+A real fight ends with each loser in one state:
 
-1. **The attackers have advantage on their attacks in the first round,** because the target is caught or held. After that the normal rules apply, including advantage for ganging up.
-2. **The target makes a nerve check when set upon:** DC 10, plus 2 for each attacker beyond the first. Nerve includes temperament, as it does in the lab.
-   - **Pass:** they fight back, and it is an ordinary real fight.
-   - **Fail:** temperament decides, by the lab's nerve rules: low courage or high caution flees; high volatility fights back anyway; anyone else takes it. Someone taking it does not attack, and the attackers keep their advantage against them.
-3. **The usual nerve checks still apply,** at half health and when half a side is down, so someone who fought back can still give in.
-4. **Someone taking it can snap:** at half health they make another nerve check, and on failing it a volatile character fights back.
-5. **The recorded event comes from what happened.** If the target took it, it is a beating, and the target's feelings towards each attacker change by their courage: a brave target bears a grudge, a timid one becomes afraid, and trust drops either way.
+| State | Meaning | Recorded as |
+| --- | --- | --- |
+| Beaten | Gave in while still conscious, whenever that happened, including straight away with no damage taken | A beating |
+| Knocked out | Dropped to 0 hit points | A beating |
+| Fled | Got away (see [Fleeing](#fleeing)) | A fight |
 
-| Change | Amount |
-| --- | --- |
-| Grudge | +0.15 × (0.4 + 0.6 × courage) |
-| Fear | +0.15 × (1 − courage) × 0.8 |
-| Trust | −0.075 |
+How badly a beaten character was hurt shows in their hit points. Killing is out of scope until it is decided whether weapons can kill.
 
-If the target fought back, it is recorded as a fight.
+The victim's feelings towards the attackers change once, through learning the recorded fact, as in the game's `learn`: the plan does not add a separate aftermath for beatings.
+
+### Being set upon
+
+A real fight can start with the attackers setting on a target:
+
+1. The attackers have advantage on their attacks in the first round, because the target is caught or held. After that the normal rules apply, including advantage for ganging up.
+2. The target makes a nerve check: DC 10, plus 2 for each attacker beyond the first. On a pass they fight back. On a failure their temperament decides, by the lab's nerve rules: low courage or high caution flees; anyone else gives in, and is beaten.
+3. The usual nerve checks still apply, at half health and when half a side is down.
 
 ```ts
 squad(sam, joe).fight(squad(rico), { kind: 'real', start: 'set-upon' });
@@ -249,7 +271,7 @@ On their turn, instead of attacking, a fleeing character makes an escape check: 
 
 - **Held:** in the first round of a beating the target is held, so breaking free is Brawling against the holder's Brawling instead.
 - **No one to chase them:** with no enemy still fighting, they get away without a roll.
-- **Choosing to run:** anyone can choose to flee on their turn. The player chooses for themselves; NPCs flee only by the nerve rules, for now.
+- **Only after a failed nerve check:** fights have no mid-fight choices, so everyone, the player included, flees only when a failed nerve check makes them, for now.
 - **Balance:** fleeing characters now stay in the fight longer and can be hit while running, so the numbers are checked with statistical tests on simulated fights once built.
 
 ## Words
