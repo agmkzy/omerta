@@ -448,6 +448,7 @@ On their turn, instead of attacking, a fleeing character makes an escape check: 
 - **While trying to flee,** a character can still be attacked, and does not count as out of the fight (for "half a side is down") until they get away.
 - **Held:** in the first round of being set upon, the target is held, so breaking free is Brawling against the holder's Brawling instead. The holder is the attacker first in initiative order.
 - **No one to chase them:** with no enemy still fighting, they get away without a roll.
+- **Running alone** (decided 3 November 2026): a fighter whose squad has no one else still fighting has lost the moment they run, so they get one try at getting away, the last escape check. With others on their squad still fighting, they try on each of their turns, because the others are what holds the chasers off.
 - **Balance:** fleeing characters now stay in the fight longer and can be hit while running, so the numbers are checked with statistical tests on simulated fights once built.
 
 ## Words
