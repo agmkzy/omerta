@@ -5,6 +5,12 @@ left for a later step, and anything not yet verified. It is updated after every 
 into the plan and is taken off this list. What the plan itself leaves for before the overhaul replaces the game's systems is
 under its [Before the swap](README.md#before-the-swap).
 
+## Decided, to build
+
+| Decision | Still to design |
+| --- | --- |
+| **Persuading and intimidating are always for something** (decided 3 November 2026). Built now, `persuade(rico)` and `intimidate(rico)` are about nothing: the odds are the same whatever is asked, the fact records nothing of what was wanted, and agreeing commits the target to nothing. Each will carry a **request**, as a lie carries its claim: what is asked changes the odds by what it costs the target, worked out from their own situation (the design's "what is at stake for them"); the fact records it, so what people hear and pass on is what was asked; and agreeing becomes a commitment in the game's commitments (promises, favours), which the target keeps or breaks by their own later decisions. Found in the demo. | The kinds of request to start with (such as money, a favour, keeping quiet about a fact, doing a job, staying away from someone); how each one's cost to the target becomes a modifier; how a partial success's "something in return" is set; and how the demo asks for one |
+
 ## For the game's integrity register
 
 Found in the outside review, in the game itself (`docs/architecture/INTEGRITY.md`), not in the overhaul:

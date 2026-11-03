@@ -287,6 +287,8 @@ Intimidation also changes how the actor feels about the target:
 | The target gives in (partial success or better) | Respect −0.05 |
 | The target resists, provoked or not (decided 3 November 2026) | Respect +0.05 |
 
+**A persuasion or a threat is always for something** (decided 3 November 2026, not yet built): it carries a request, what is asked, as a lie carries its claim. What is asked changes the odds by what it costs the target, the fact records it, and agreeing becomes a commitment. See the [revisit list](revisit.md#decided-to-build) for what is still to design.
+
 **Provoked** is returned as an outcome of its own, and the caller decides what follows, such as starting a fight. The roll never starts one itself.
 
 **How a roll looks to anyone but the target** (decided 3 November 2026): only the target knows exactly how it ended. Everyone else there, the actor included, sees what the target says or does, never what they only feel:
