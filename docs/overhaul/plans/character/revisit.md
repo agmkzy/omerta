@@ -19,15 +19,11 @@ Choices made while building that the plan did not settle. Each is built as descr
 
 | Point | Where it came up | Now |
 | --- | --- | --- |
-| **Shaken on giving in.** Any target who gives in to intimidation (partial success or better) is shaken. | Step 7 | Built this way. |
-| **Trying counts as conduct.** Persuading, lying and intimidating move the actor's traits whatever the roll's outcome. | Step 8 | Built this way; the plan says "a persuasion" or "a lie", which every roll records. |
 | **One nerve check at the start.** Every reason to check at the start of a fight (a weapon that outclasses theirs, being set upon, already being at half health) is one check at the highest DC. | Step 9 | Built this way; the plan combines only the weapon and being set upon. |
 | **A lone runner loses at once.** A squad with no one still fighting has lost, so a fighter on their own who fails their nerve and runs makes their one last escape straight away: away, or caught and beaten. | Step 9 | Follows the plan's rule; it means a lone runner has one chance. |
-| **A beating scaled by each attacker's damage.** A fight's fact for each attacker records the hit points that attacker took, and the one beaten feels it by that share, so they resent most whoever hurt them most. | Step 9 | Built this way; the plan says "scaled by the damage they took". |
 | **Who beat a winner who gave in.** A fighter on the winning squad who gave in is beaten by whoever attacked them, or, if no one did, by everyone on the other squad. | Step 9 | Built this way; the plan covers only a knocked-out winner. |
 | **Standing by their squad** counts a squad member as down if they are not fighting, including one who is running. | Step 9 | Built this way. |
 | **Sparring** can knock someone out (a single hit past half health), uses everyone's effects, such as drunk, and makes the fighters meet. | Step 9 | Built this way. |
-| **Beatings recorded directly.** A `beating` recorded with `cast.record` and no amount changes feelings by the game's rows, unscaled. | Step 9 | Built this way. |
 | **Which checks a plan counts on.** Every skill check by a member while the job is open: `check`, both rolls of a social check, drinking, and an ambush's Stealth (the plan's own example of a check around a fight); never a fight's own rolls. A character's `skills` show them as they stand, without any plan. | Step 10 | Built this way. |
 | **The chosen check.** A critical success's advantage is on one check chosen when planning: the first check of a chosen skill by a chosen member. | Step 10 | Built this way; the plan says "one check of the planner's choosing". |
 | **Who believes the plan.** Every member of the job, not only the planner, sees the plan as the planner does: a critical failure as a failure. Anyone outside the job knows nothing of it. | Step 10 | Built this way. |
@@ -78,3 +74,7 @@ These were reported when they were made and stand unless revisited.
 - **Drinking takes a time and whoever else is there** (`drink(roller, { now, with })`), and drinking together, like any telling, makes those there meet (step 8; meeting decided 3 November 2026).
 - **Who knows a modifier** follows from knowledge having a source: a situational modifier added with `.with()` is known to everyone there; anyone but the target judges a shown weapon by the weapons the target shows; anyone who saw a fact with the target knows the target saw it, and whoever told the target knows what they told (step 7).
 - **Witnesses to a lie meet those in it but learn nothing,** and the lie fact records no witnesses, until what they believe is built (the plan's Before the swap, Lies told in front of others) (step 7).
+- **Shaken on giving in:** a target who gives in to intimidation (partial success or better, as the table of how a roll looks has it) is shaken (step 7).
+- **Trying counts as conduct:** persuading, lying and intimidating move the actor's traits whatever the outcome, since every roll records its fact, which is what the conduct table counts (step 8).
+- **A beating is scaled by each attacker's damage:** the fact for each attacker records the hit points that attacker took, so the one beaten resents most whoever hurt them most (step 9).
+- **A beating recorded directly,** with `cast.record` and no amount, changes feelings by the game's rows, unscaled (step 9).
