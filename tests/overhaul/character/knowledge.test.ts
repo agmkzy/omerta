@@ -5,8 +5,11 @@ import { describe, test } from 'vitest';
 import { ReplacedCastError, cast, castOf } from '../../../src/overhaul/character/cast';
 import { createCharacter } from '../../../src/overhaul/character/character';
 import { ADDED_FACT_KINDS, FACT_KINDS, GAME_FACT_KINDS, assertFact, auditFacts, type Fact } from '../../../src/overhaul/character/facts';
-import { auditKnowledge, firstVersions, rebelieve, toldVersion, type Version } from '../../../src/overhaul/character/knowledge';
+import { auditKnowledge, firstVersions, partOf, passOn, rebelieve, toldVersion, type Version } from '../../../src/overhaul/character/knowledge';
+import { SUSPECT_GRUDGE } from '../../../src/overhaul/character/learning';
+import { NEW_RELATIONSHIP } from '../../../src/overhaul/character/relationships';
 import { DAY } from '../../../src/overhaul/character/time';
+import { scripted } from './support';
 
 const people = () => cast({ characters: ['sam', 'rico', 'joe', 'vic'].map((id) => ({ id, name: id[0]!.toUpperCase() + id.slice(1) })) });
 const fact = (over: Partial<Fact> = {}): Fact => ({ id: 'f1', kind: 'beating', actor: 'sam', victim: 'rico', at: 0, witnesses: [], ...over });
@@ -82,15 +85,28 @@ describe('toldVersion and rebelieve', { tags: ['unit'] }, () => {
     assert.deepEqual(second, { learnedAt: 90, source: 'told', teller: 'vic', how: 'heard', knowsActor: false, blame: 'joe', exaggerated: true });
   });
 
-  test('naming who did it turns knowing into believing, with the teller as the source', () => {
-    assert.deepEqual(rebelieve(seen('witness', true, 10), { teller: 'joe', blame: 'vic' }), { learnedAt: 10, source: 'told', teller: 'joe', how: 'told', knowsActor: false, blame: 'vic' });
+  test('a part passed on keeps how the teller came by it: a guess stays a guess', () => {
+    const guessing: Version = { learnedAt: 60, source: 'witness', how: 'seen', knowsActor: false, blame: 'joe', who: { how: 'guessed' } };
+    assert.deepEqual(toldVersion('vic', guessing, 90), { learnedAt: 90, source: 'told', teller: 'vic', how: 'told', knowsActor: false, blame: 'joe', who: { how: 'guessed', teller: 'vic' } });
+    assert.deepEqual(passOn({ how: 'heard', teller: 'joe' }, 'vic'), { how: 'heard', teller: 'vic' });
   });
 
-  test('saying how big it was changes only that, keeping whom they blame', () => {
-    const blaming: Version = { learnedAt: 10, source: 'witness', how: 'seen', knowsActor: false, blame: 'joe' };
-    assert.deepEqual(rebelieve(blaming, { teller: 'vic', exaggerated: true }), { learnedAt: 10, source: 'told', teller: 'vic', how: 'told', knowsActor: false, blame: 'joe', exaggerated: true });
-    assert.deepEqual(rebelieve({ ...seen('witness'), exaggerated: true }, { teller: 'vic', exaggerated: false }), { learnedAt: 0, source: 'told', teller: 'vic', how: 'told', knowsActor: true });
-    assert.deepEqual(rebelieve({ ...seen('witness'), exaggerated: true }, { teller: 'vic' }).exaggerated, true);
+  test('naming who did it turns knowing into believing, with only that part’s provenance changed', () => {
+    const changed = rebelieve(seen('witness', true, 10), { part: 'who', knowsActor: false, blame: 'vic', from: { how: 'told', teller: 'joe' } });
+    assert.deepEqual(changed, { learnedAt: 10, source: 'witness', how: 'seen', knowsActor: false, blame: 'vic', who: { how: 'told', teller: 'joe' } });
+    assert.deepEqual(partOf(changed, 'size'), { how: 'seen' });
+    assert.deepEqual(partOf(changed, 'who'), { how: 'told', teller: 'joe' });
+  });
+
+  test('saying how big it was changes only that, keeping whom they blame and how they came by it', () => {
+    const blaming: Version = { learnedAt: 10, source: 'told', teller: 'joe', how: 'told', knowsActor: false, blame: 'joe' };
+    assert.deepEqual(rebelieve(blaming, { part: 'size', exaggerated: true, from: { how: 'told', teller: 'vic' } }), { ...blaming, exaggerated: true, size: { how: 'told', teller: 'vic' } });
+    assert.deepEqual(rebelieve({ ...seen('witness'), exaggerated: true }, { part: 'size', exaggerated: false, from: { how: 'seen' } }), seen('witness'));
+  });
+
+  test('a part with no belief of its own has no provenance; one recorded where it differs is kept', () => {
+    assert.equal(partOf(seen('witness', false), 'who'), undefined);
+    assert.deepEqual(partOf({ ...seen('witness', false), blame: 'joe' }, 'who'), { how: 'seen' });
   });
 });
 
@@ -164,38 +180,47 @@ describe('telling', { tags: ['unit'] }, () => {
 
   test('passes on what the teller believes, as told by a witness or heard second-hand', () => {
     const c = beaten();
-    const toldVic = c.character('joe').tell(c.character('vic'), 'f1', { now: 60 });
+    const toldVic = c.character('joe').social.tell(c.character('vic'), 'f1').roll(scripted(), { now: 60 }).cast;
     assert.deepEqual(toldVic.character('vic').versionOf('f1'), { learnedAt: 60, source: 'told', teller: 'joe', how: 'told', knowsActor: true });
   });
 
   test('a teller who does not know who did it passes that on too', () => {
     const c = beaten();
-    const told = c.character('rico').tell(c.character('vic'), 'f1', { now: 60 });
+    const told = c.character('rico').social.tell(c.character('vic'), 'f1').roll(scripted(), { now: 60 }).cast;
     assert.equal(told.character('vic').versionOf('f1')!.knowsActor, false);
-    const second = told.character('vic').tell(told.character('joe'), 'f1', { now: 90 });
+    const second = told.character('vic').social.tell(told.character('joe'), 'f1').roll(scripted(), { now: 90 }).cast;
     assert.deepEqual(second.character('joe').versionOf('f1'), seen('witness'));
   });
 
   test('a second-hand telling is heard', () => {
     const c = beaten();
-    const once = c.character('joe').tell(c.character('vic'), 'f1', { now: 60 });
+    const once = c.character('joe').social.tell(c.character('vic'), 'f1').roll(scripted(), { now: 60 }).cast;
     const twice = once.add({ id: 'al', name: 'Al' });
-    assert.equal(twice.character('vic').tell(twice.character('al'), 'f1', { now: 90 }).character('al').versionOf('f1')!.how, 'heard');
+    assert.equal(twice.character('vic').social.tell(twice.character('al'), 'f1').roll(scripted(), { now: 90 }).cast.character('al').versionOf('f1')!.how, 'heard');
   });
 
-  test('a listener who already knows keeps their own version', () => {
+  test('a listener who knows of it but not who did it has the gap filled, with no roll', () => {
     const c = beaten();
-    assert.deepEqual(c.character('joe').tell(c.character('rico'), 'f1', { now: 60 }).character('rico').versionOf('f1'), seen('witness', false));
+    const out = c.character('joe').social.tell(c.character('rico'), 'f1').roll(scripted(), { now: 60 });
+    assert.deepEqual(out.cast.character('rico').versionOf('f1'), { ...seen('witness', true), who: { how: 'told', teller: 'joe' } });
+    assert.deepEqual(out.truth, { roll: null, changed: ['who'], exposed: [] });
+  });
+
+  test('a listener who already believes it changes nothing', () => {
+    const c = beaten();
+    const out = c.character('joe').social.tell(c.character('sam'), 'f1').roll(scripted(), { now: 60 });
+    assert.deepEqual(out.truth, { roll: null, changed: [], exposed: [] });
+    assert.deepEqual(out.cast.character('sam').versionOf('f1'), seen('self'));
   });
 
   test('refuses telling what the teller does not know, before they knew it, themselves, or someone from another cast', () => {
     const c = beaten();
-    assert.throws(() => c.character('vic').tell(c.character('sam'), 'f1', { now: 60 }), RangeError);
-    assert.throws(() => c.character('joe').tell(c.character('joe'), 'f1', { now: 60 }), RangeError);
-    assert.throws(() => c.character('joe').tell(people().character('vic'), 'f1', { now: 60 }), RangeError);
+    assert.throws(() => c.character('vic').social.tell(c.character('sam'), 'f1').roll(scripted(), { now: 60 }).cast, RangeError);
+    assert.throws(() => c.character('joe').social.tell(c.character('joe'), 'f1').roll(scripted(), { now: 60 }).cast, RangeError);
+    assert.throws(() => c.character('joe').social.tell(people().character('vic'), 'f1'), RangeError);
     const late = people().record({ kind: 'theft', actor: 'sam' }, { now: DAY }).cast;
-    assert.throws(() => late.character('sam').tell(late.character('vic'), 'f1', { now: 0 }), RangeError);
-    assert.throws(() => late.character('sam').tell(late.character('vic'), 'f1', { now: -1 }), RangeError);
+    assert.throws(() => late.character('sam').social.tell(late.character('vic'), 'f1').roll(scripted(), { now: 0 }).cast, RangeError);
+    assert.throws(() => late.character('sam').social.tell(late.character('vic'), 'f1').roll(scripted(), { now: -1 }).cast, RangeError);
   });
 
   test('refuses telling a fact the teller knows is false: that would be a lie', () => {
@@ -206,7 +231,7 @@ describe('telling', { tags: ['unit'] }, () => {
       nextId: 2,
       characters: data.characters.map((c) => (c.id === 'sam' ? createCharacter({ ...c, knowledge: { f1: { ...seen('self'), knownFalse: true } } }) : c)),
     });
-    assert.throws(() => invented.character('sam').tell(invented.character('vic'), 'f1', { now: 10 }), RangeError);
+    assert.throws(() => invented.character('sam').social.tell(invented.character('vic'), 'f1').roll(scripted(), { now: 10 }).cast, RangeError);
   });
 });
 
@@ -221,15 +246,95 @@ describe('knowledge', { tags: ['property'] }, () => {
         tellings.forEach((t, i) => {
           const from = c.character(order[t.from]!);
           if (t.from !== t.to && from.versionOf('f1')) {
-            c = from.tell(c.character(order[t.to]!), 'f1', { now: i + 1 });
+            c = from.social.tell(c.character(order[t.to]!), 'f1').roll(scripted(), { now: i + 1 }).cast;
             knew.add(order[t.to]!);
           }
         });
         assert.doesNotThrow(() => auditKnowledge(c.data.characters, c.data.facts));
         assert.deepEqual(order.filter((id) => c.character(id).versionOf('f1')), order.filter((id) => knew.has(id)));
-        // (the victim of a hidden hand keeps their own version, so they never learn who did it by being told it again)
-        if (hidden) assert.equal(c.character('rico').versionOf('f1')!.knowsActor, false);
+        // (passing on the truth never needs a roll, and never makes anyone believe someone else did it)
+        for (const id of order) {
+          const v = c.character(id).versionOf('f1');
+          if (v?.knowsActor || v?.blame) assert.ok(v.knowsActor && v.blame === undefined, id);
+        }
       }),
     );
+  });
+});
+
+describe('guessing a hidden actor', { tags: ['unit'] }, () => {
+  /** Rico saw Joe beat Vic, and holds a grudge against Joe and against Al. */
+  const suspicious = (grudges: Record<string, number>) => {
+    const base = cast({
+      characters: ['sam', 'rico', 'joe', 'vic', 'al'].map((id) => ({
+        id,
+        name: id[0]!.toUpperCase() + id.slice(1),
+        ...(id === 'rico' && { relationships: Object.fromEntries(Object.entries(grudges).map(([who, grudge]) => [who, { ...NEW_RELATIONSHIP, grudge }])) }),
+      })),
+    });
+    return base.record({ kind: 'beating', actor: 'joe', victim: 'vic' }, { now: 0, witnesses: ['rico'] }).cast;
+  };
+
+  test('the victim blames whoever they hold the biggest grudge against, of those they know to be violent, as a guess', () => {
+    const c = suspicious({ joe: 0.4, al: 0.6 }).record({ kind: 'robbery', actor: 'sam', victim: 'rico', hiddenActor: true }, { now: 10 }).cast;
+    const v = c.character('rico').versionOf('f2')!;
+    assert.deepEqual([v.knowsActor, v.blame, v.who], [false, 'joe', { how: 'guessed' }]);
+    assert.ok(c.character('rico').towards(c.character('joe'))!.grudge > 0.4);
+  });
+
+  test('no one is guessed below the grudge that makes a suspect, on a tie, or for a kind that changes no feelings', () => {
+    const blame = (c: ReturnType<typeof suspicious>, kind: 'robbery' | 'poach' | 'theft') => c.record({ kind, actor: 'sam', victim: 'rico', hiddenActor: true }, { now: 10 }).cast.character('rico').versionOf('f2')!.blame;
+    assert.equal(SUSPECT_GRUDGE, 0.3);
+    assert.equal(blame(suspicious({ joe: 0.29 }), 'robbery'), undefined);
+    assert.equal(blame(suspicious({ joe: 0.5 }), 'theft'), undefined);
+    assert.equal(blame(suspicious({ joe: 0.5, al: 0.5 }), 'poach'), undefined);
+    // a kind that is not violent needs no one known to be violent
+    assert.equal(blame(suspicious({ al: 0.5 }), 'poach'), 'al');
+    assert.equal(blame(suspicious({ al: 0.5 }), 'robbery'), undefined);
+  });
+
+  test('a guess passed on is heard as a guess, and a witness can correct it with a roll, against no knowledge modifier', () => {
+    const c = suspicious({ joe: 0.5 }).record({ kind: 'robbery', actor: 'sam', victim: 'rico', hiddenActor: true }, { now: 10, witnesses: ['al'] }).cast;
+    const told = c.character('rico').social.tell(c.character('vic'), 'f2').roll(scripted(), { now: 20 }).cast;
+    assert.deepEqual(partOf(told.character('vic').versionOf('f2')!, 'who'), { how: 'guessed', teller: 'rico' });
+    const correcting = told.character('al').social.tell(told.character('rico'), 'f2');
+    assert.deepEqual(correcting.explain({ for: told.character('rico') }), []);
+    const out = correcting.roll(scripted(12), { now: 30 });
+    assert.deepEqual([out.truth.changed, out.cast.character('rico').versionOf('f2')!.knowsActor], [['who'], true]);
+  });
+});
+
+describe('public facts', { tags: ['unit'] }, () => {
+  test('are heard by those they are made public to, who know who did it unless the actor is hidden, and do not guess', () => {
+    const c = people().record({ kind: 'beating', actor: 'sam', victim: 'rico' }, { now: 5, public: ['vic'] }).cast;
+    assert.deepEqual(c.character('vic').versionOf('f1'), { learnedAt: 5, source: 'public', how: 'heard', knowsActor: true });
+    assert.deepEqual(c.fact('f1').witnesses, []);
+    assert.equal(c.character('vic').towards(c.character('sam'))!.lastMet, undefined);
+    const hidden = people().record({ kind: 'beating', actor: 'sam', victim: 'rico', hiddenActor: true }, { now: 5, public: ['vic'] }).cast;
+    assert.deepEqual(hidden.character('vic').versionOf('f1'), { learnedAt: 5, source: 'public', how: 'heard', knowsActor: false });
+  });
+
+  test('are refused for anyone named in the fact, named twice, or not in the cast', () => {
+    for (const heard of [['sam'], ['vic', 'vic'], ['nobody'], ['joe']])
+      assert.throws(() => people().record({ kind: 'beating', actor: 'sam', victim: 'rico' }, { now: 0, witnesses: ['joe'], public: heard }), RangeError, JSON.stringify(heard));
+  });
+});
+
+describe('who can be there', { tags: ['unit'] }, () => {
+  test('a witness or whoever did it must be conscious and not resting; whoever it was done to need not be there', () => {
+    const out = people().character('joe').damage(10);
+    assert.throws(() => out.record({ kind: 'theft', actor: 'sam' }, { now: 0, witnesses: ['joe'] }), RangeError);
+    const resting = () => people().character('joe').rest({ now: 0, hours: 8 });
+    assert.throws(() => resting().record({ kind: 'theft', actor: 'sam' }, { now: 60, witnesses: ['joe'] }), RangeError);
+    assert.throws(() => resting().record({ kind: 'theft', actor: 'joe' }, { now: 60 }), RangeError);
+    assert.doesNotThrow(() => resting().record({ kind: 'theft', actor: 'sam', victim: 'joe' }, { now: 60 }));
+    assert.doesNotThrow(() => resting().record({ kind: 'theft', actor: 'sam' }, { now: 8 * 60, witnesses: ['joe'] }));
+  });
+
+  test('in a social roll, the two in it and any witnesses must be there', () => {
+    const out = people().character('joe').damage(10);
+    assert.throws(() => out.character('sam').social.persuade(out.character('rico')).roll(scripted(10, 10), { now: 0, witnesses: ['joe'] }), RangeError);
+    const resting = people().character('rico').rest({ now: 0, hours: 8 });
+    assert.throws(() => resting.character('sam').social.persuade(resting.character('rico')).roll(scripted(10, 10), { now: 60 }), RangeError);
   });
 });

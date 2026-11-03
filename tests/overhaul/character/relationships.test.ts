@@ -18,6 +18,7 @@ import {
   type Relationship,
 } from '../../../src/overhaul/character/relationships';
 import { DAY } from '../../../src/overhaul/character/time';
+import { scripted } from './support';
 
 const close = (actual: number | undefined, expected: number) => assert.ok(actual !== undefined && Math.abs(actual - expected) < 1e-9, `${actual} is not ${expected}`);
 const at = (over: Partial<Relationship> = {}): Relationship => ({ ...NEW_RELATIONSHIP, ...over });
@@ -182,9 +183,9 @@ describe('learningChanges', { tags: ['unit'] }, () => {
     assert.deepEqual(list(missed, learner('joe')), [['sam', 'respect', -0.005, 'f2']]);
   });
 
-  test('one fond of whoever it was done to resents the one who did it a little', () => {
-    assert.deepEqual(list(beating, learner('joe', 0.5, { rico: 0.6 })).at(-1), ['sam', 'grudge', 0.15, 'f1']);
-    assert.equal(list(beating, learner('joe', 0.5, { rico: 0.5 })).length, 3);
+  test('one fond of whoever it was done to (affection high) resents the one who did it a little', () => {
+    assert.deepEqual(list(beating, learner('joe', 0.5, { rico: 0.7 })).at(-1), ['sam', 'grudge', 0.15, 'f1']);
+    assert.equal(list(beating, learner('joe', 0.5, { rico: 0.69 })).length, 3);
   });
 
   test('follows whom the learner believes did it, and changes nothing if no one, or themselves', () => {
@@ -252,7 +253,7 @@ describe('relationships in a cast', { tags: ['unit'] }, () => {
 
   test('begin, and change, for someone told of a fact, towards whom they are told did it', () => {
     const recorded = people().record({ kind: 'beating', actor: 'sam', victim: 'rico' }, { now: 60 }).cast;
-    const told = recorded.character('rico').tell(recorded.character('vic'), 'f1', { now: 120 });
+    const told = recorded.character('rico').social.tell(recorded.character('vic'), 'f1').roll(scripted(), { now: 120 }).cast;
     const vic = told.character('vic');
     close(vic.towards(told.character('sam'))!.fear, 0.02);
     assert.equal(vic.towards(told.character('rico'))!.lastMet, undefined);

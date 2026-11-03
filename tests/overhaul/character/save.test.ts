@@ -117,20 +117,22 @@ describe('loadCast', { tags: ['unit'] }, () => {
     assert.deepEqual(ignored, []);
     assert.deepEqual(loaded.characters.map((c) => c.cash), [70, 50]);
     assert.deepEqual(loaded.character('sam').seenBy(loaded.character('rico')).items, [{ item: 'good-suit', state: 'worn' }]);
-    assert.equal(loaded.data.transfers.length, 3);
+    assert.equal(loaded.data.transfers.filter((t) => t.item === undefined).length, 3);
+    assert.deepEqual(loaded.data.transfers.filter((t) => t.item !== undefined).map((t) => [t.to, t.item, t.amount, t.at]), [['sam', 'lockpicks', 1, 0], ['sam', 'good-suit', 1, 0], ['sam', 'pistol', 1, 0], ['rico', 'knife', 1, 0]]);
   });
 
   test('restores cash, items and transfers, and leaves out items and fields it does not recognise', () => {
     const funded = loadCast(throughJson(everyone.data)).transfer({ from: WORLD, to: 'sam', amount: 40, why: 'opening balance', now: 0 });
     const paid = funded.character('sam').pay(funded.character('rico'), 15, { why: 'a debt', now: 30 });
     assert.deepEqual(loadCast(throughJson(paid.data)).data, paid.data);
+    // (format 7, before items had transfers: the migration gives them from the world)
     const { cast: loaded, ignored } = readCast({
-      format: CAST_FORMAT,
-      characters: [{ id: 'x', name: 'X', inventory: { cash: 5, items: [{ item: 'crowbar' }, { item: 'knife', state: 'shown', polish: 1 }, { item: 'bottle' }], wallet: 'brown' } }],
+      format: 7,
+      characters: [{ id: 'x', name: 'X', inventory: { cash: 5, items: [{ item: 'knife', state: 'shown', polish: 1 }, { item: 'bottle' }], wallet: 'brown' } }],
       transfers: [{ from: WORLD, to: 'x', amount: 5, why: 'found it', at: 0, note: 'lucky' }],
     });
     assert.deepEqual(loaded.character('x').inventory, { cash: 5, items: [{ item: 'knife', state: 'shown' }, { item: 'bottle', state: 'carried' }] });
-    assert.deepEqual([...ignored].sort(), ['characters[0].inventory.items[0]', 'characters[0].inventory.items[1].polish', 'characters[0].inventory.wallet', 'transfers[0].note']);
+    assert.deepEqual([...ignored].sort(), ['characters[0].inventory.items[0].polish', 'characters[0].inventory.wallet', 'transfers[2].note']);
   });
 
   test('rejects inventories and transfers of the wrong shape, and cash that disagrees with the transfers', () => {
@@ -157,7 +159,7 @@ describe('loadCast', { tags: ['unit'] }, () => {
 
   test('restores facts and knowledge, and leaves out fields it does not recognise', () => {
     const recorded = loadCast(throughJson(everyone.data)).record({ kind: 'beating', actor: 'sam', victim: 'rico', amount: 3, where: 'the docks', story: 's1', hiddenActor: true }, { now: 10 });
-    const told = recorded.cast.character('sam').tell(recorded.cast.character('rico'), 'f1', { now: 20 });
+    const told = recorded.cast.character('sam').social.tell(recorded.cast.character('rico'), 'f1').roll(scripted(), { now: 20 }).cast;
     const caused = told.record({ kind: 'threat', actor: 'rico', victim: 'sam', cause: 'f1', business: 'b1' }, { now: 30 }).cast;
     assert.deepEqual(loadCast(throughJson(caused.data)).data, caused.data);
     const { cast: loaded, ignored } = readCast({

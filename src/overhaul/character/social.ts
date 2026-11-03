@@ -6,12 +6,13 @@
 import { OUTCOMES, opposedOdds, resolveOpposed, succeeded, type Modifier, type OpposedResult, type Outcome } from './check';
 import type { CastRecord } from './cast';
 import type { CharacterRecord, Id } from './character';
+import { assertAvailable } from './condition';
 import { currentTemperament, withConduct, type Conduct } from './conduct';
-import { FACT_KINDS, type Fact, type FactId, type FactKind } from './facts';
+import { FACT_KINDS, type Fact, type FactId, type FactKind, type LieClaim } from './facts';
 import { ITEM_INFO, WEAPON_THREAT, strongestWeapon } from './items';
 import { usingAdvantage } from './jobs';
-import { rebelieve, toldVersion, type Version } from './knowledge';
-import { LEARNED_AS, VIOLENT, believedActor, learnFact } from './learning';
+import { partOf, rebelieve, toldVersion, type Part as KnowledgePartName, type Version } from './knowledge';
+import { believedActor, isViolent, learnFact } from './learning';
 import type { Roller } from './random';
 import { allMeet, recordFact, withCharacter } from './records';
 import { feel, feelingModifiers, type Feeling, type SocialAction } from './relationships';
@@ -187,14 +188,15 @@ function violencePart(data: CastRecord, actor: CharacterRecord, target: Characte
   let best: { modifier: Modifier; fact: Fact; version: Version } | undefined;
   for (const f of data.facts) {
     const v = target.knowledge[f.id];
-    if (!v || !VIOLENT[LEARNED_AS[f.kind] ?? f.kind] || believedActor(f, v) !== actor.id) continue;
-    const value = v.how === 'seen' ? 2 : 1;
+    if (!v || !isViolent(f) || believedActor(f, v) !== actor.id) continue;
+    const value = partOf(v, 'who')!.how === 'seen' ? 2 : 1;
     if (!best || value > best.modifier.value)
       best = { fact: f, version: v, modifier: { value, reason: `${target.name} ${value === 2 ? 'has seen' : 'has heard of'} ${actor.name} being violent` } };
   }
   if (!best) return [];
   const { modifier, fact, version } = best;
-  return [{ truth: modifier, knownTo: (v) => (v === target.id || v === version.teller || (modifier.value === 2 && sawWith(data, v, fact, target.id)) ? modifier : null) }];
+  const told = partOf(version, 'who')!.teller;
+  return [{ truth: modifier, knownTo: (v) => (v === target.id || v === told || (modifier.value === 2 && sawWith(data, v, fact, target.id)) ? modifier : null) }];
 }
 
 /** Throws RangeError for a claim that is not a lie the liar can tell: about a fact they know, differing from what they believe. */
@@ -218,27 +220,40 @@ function assertClaim(data: CastRecord, liar: CharacterRecord, claim: Claim): voi
  * told them, −2 if they heard it second-hand, nothing if they do not know it, and +2 if the lie matches what they believe.
  */
 function claimPart(data: CastRecord, target: CharacterRecord, claim: Claim): Part[] {
-  const t = target.name;
   if ('invented' in claim) {
     const { actor, victim } = claim.invented;
-    return actor === target.id || victim === target.id ? [everyone({ value: IMPOSSIBLE, reason: `${t} would know: it would have been them` })] : [];
+    return actor === target.id || victim === target.id ? [everyone({ value: IMPOSSIBLE, reason: `${target.name} would know: it would have been them` })] : [];
   }
   const f = data.facts.find((x) => x.id === claim.about)!;
-  const v = target.knowledge[f.id];
+  return 'blame' in claim ? knowledgePart(data, target, f, 'who', claim.blame, 'The lie') : knowledgePart(data, target, f, 'size', claim.exaggerated, 'The lie');
+}
+
+/**
+ * What a listener knows of one part of a fact, against what they are told of it: impossible if they saw it themselves, −4 if
+ * a witness told them, −2 if they heard it second-hand, nothing if they do not know it or only guessed, and +2 if what they
+ * are told matches what they believe. Known to the listener, to whoever told them that part, and, where they saw it, to anyone
+ * who saw it with them.
+ */
+export function knowledgePart(data: CastRecord, listener: CharacterRecord, f: Fact, part: KnowledgePartName, claimed: Id | boolean, what: string): Part[] {
+  const t = listener.name;
+  const v = listener.knowledge[f.id];
   if (v === undefined) return [];
-  const belief = 'blame' in claim ? believedActor(f, v) : v.exaggerated === true;
-  const claimed = 'blame' in claim ? claim.blame : claim.exaggerated;
+  const belief = part === 'who' ? believedActor(f, v) : v.exaggerated === true;
   if (belief === undefined) return [];
-  const what = 'blame' in claim ? 'who did it' : 'how big it was';
-  const modifier: Modifier =
+  const from = partOf(v, part)!;
+  const about = part === 'who' ? 'who did it' : 'how big it was';
+  const modifier: Modifier | null =
     belief === claimed
-      ? { value: 2, reason: `The lie matches what ${t} believes` }
-      : v.how === 'seen'
+      ? { value: 2, reason: `${what} matches what ${t} believes` }
+      : from.how === 'seen'
         ? { value: IMPOSSIBLE, reason: `${t} saw it themselves` }
-        : v.how === 'told'
-          ? { value: -4, reason: `A witness told ${t} ${what}` }
-          : { value: -2, reason: `${t} heard ${what}` };
-  return [{ truth: modifier, knownTo: (viewer) => (viewer === target.id || viewer === v.teller || (modifier.value === IMPOSSIBLE && sawWith(data, viewer, f, target.id)) ? modifier : null) }];
+        : from.how === 'told'
+          ? { value: -4, reason: `A witness told ${t} ${about}` }
+          : from.how === 'heard'
+            ? { value: -2, reason: `${t} heard ${about}` }
+            : null;
+  if (modifier === null) return [];
+  return [{ truth: modifier, knownTo: (viewer) => (viewer === listener.id || viewer === from.teller || (modifier.value === IMPOSSIBLE && sawWith(data, viewer, f, listener.id)) ? modifier : null) }];
 }
 
 /** Every part of the two rolls, with who can know each, and each roll's advantage from a plan. */
@@ -320,7 +335,7 @@ function applySocial(data: CastRecord, s: SocialSetup, ending: Ending, when: { r
   const seenIt: Version = { learnedAt: now, source: 'witness', how: 'seen', knowsActor: true };
   const recorded = recordFact(
     d,
-    { kind: SOCIAL_ACTION_INFO[action].fact, actor: actor.id, victim: target.id, ...(about !== undefined && { cause: about }) },
+    { kind: SOCIAL_ACTION_INFO[action].fact, actor: actor.id, victim: target.id, ending, ...(about !== undefined && { cause: about }), ...(s.claim && { claim: claimOf(s.claim) }) },
     lie
       ? {
           now,
@@ -361,16 +376,22 @@ function conductOf(action: SocialAction, ending: Ending, trusted: boolean): (rea
 function believe(data: CastRecord, s: SocialSetup, about: FactId, now: number): CastRecord {
   const claim = s.claim!;
   const f = data.facts.find((x) => x.id === about)!;
-  const liars = data.characters.find((c) => c.id === s.actor.id)!.knowledge[about]!;
+  const liar = s.actor.id;
+  const liars = data.characters.find((c) => c.id === liar)!.knowledge[about]!;
+  // a lie is told as something the liar saw, so the part it changes comes from them as from a witness
+  const from = { how: 'told' as const, teller: liar };
   return withCharacter(data, s.target.id, (c) => {
-    const before = c.knowledge[about];
     // (toldVersion passes on what the liar says, never that they know it is false)
-    if ('invented' in claim) return learnFact(c, f, toldVersion(s.actor.id, liars, now), now);
-    const change = 'blame' in claim ? { teller: s.actor.id, blame: claim.blame } : { teller: s.actor.id, exaggerated: claim.exaggerated };
-    const after = rebelieve(before ?? toldVersion(s.actor.id, liars, now), change);
-    const changed = before === undefined || believedActor(f, before) !== believedActor(f, after);
-    return changed ? learnFact(c, f, after, now) : { ...c, knowledge: { ...c.knowledge, [about]: after } };
+    if ('invented' in claim) return learnFact(c, f, toldVersion(liar, liars, now), now);
+    const base = c.knowledge[about] ?? toldVersion(liar, liars, now);
+    const after = rebelieve(base, 'blame' in claim ? { part: 'who', knowsActor: false, blame: claim.blame, from } : { part: 'size', exaggerated: claim.exaggerated, from });
+    return learnFact(c, f, after, now);
   });
+}
+
+/** What a lie fact records of its claim. */
+function claimOf(claim: Claim): LieClaim {
+  return 'invented' in claim ? { invented: true } : 'blame' in claim ? { blame: claim.blame } : { exaggerated: claim.exaggerated };
 }
 
 /** A social check before it is rolled: given more modifiers, asked its odds and explanation for a viewer, then rolled. */
@@ -425,6 +446,9 @@ export function socialCheck<C extends CastLike>(setup: SocialSetup, owner: C, co
     odds: ({ for: v }) => oddsFor(setup, viewerIn(v, owner)),
     explain: ({ for: v }) => explainFor(setup, viewerIn(v, owner)),
     roll(roller, when) {
+      // everyone in it must be there: the two of them and any witnesses, conscious and not resting
+      const there = [setup.actor.id, setup.target.id, ...(when.witnesses ?? [])].map((id) => setup.data.characters.find((c) => c.id === id));
+      for (const c of there) if (c) assertAvailable(c, when.now, 'be there');
       const { truth, next } = rollSocial(setup, roller, when);
       let facts: Fact[] = [];
       const cast = commit((d) => {

@@ -5,7 +5,7 @@
 import type { Attribute } from './attributes';
 import { bonusOf, passes, resolveCheck, type CheckResult, type Modifier } from './check';
 import { createCharacter, type CharacterInput, type CharacterRecord, type Id } from './character';
-import { conditionOf, effectModifiers, type Condition, type StoredEffect } from './condition';
+import { assertAvailable, conditionOf, effectModifiers, type Condition, type StoredEffect } from './condition';
 import { currentTemperament, withConduct, type ConductStep } from './conduct';
 import { DICE } from './dice';
 import { auditFacts, type Fact, type FactId, type FactInput } from './facts';
@@ -13,22 +13,22 @@ import { HARD_JOB_DC, assertJobs, jobId, openJobOf, planEffect, usingAdvantage, 
 import { rollParts, truthOf } from './parts';
 import { assertFight, fight, type FightKind, type FightResult, type FightStart } from './fight';
 import { applyFight, type FightRecordOptions } from './fight-record';
-import { DRINK_DC, ITEM_INFO, itemModifiers, type InventoryRecord, type Item, type ItemOptions, type ItemState } from './items';
-import { auditKnowledge, toldVersion, type Knowledge, type Version } from './knowledge';
-import { learnFact } from './learning';
+import { DRINK_DC, ITEMS, ITEM_INFO, itemModifiers, type InventoryRecord, type Item, type ItemOptions, type ItemState } from './items';
+import { auditKnowledge, type Knowledge, type Version } from './knowledge';
 import { recordFact, withCharacter } from './records';
 import type { Roller } from './random';
 import type { Relationship, Relationships } from './relationships';
 import { SKILLS, attributeUsed, skillModifiers, type Proficiency, type Skill } from './skills';
 import { socialCheck, type Claim, type SocialAction, type SocialCheck } from './social';
 import { jobIn, planCheck, skillCheck, type PlanCheck, type SkillCheck } from './checks';
+import { tellCheck, type TellCheck } from './tell';
 import type { Temperament } from './temperament';
 import { HOUR, assertTime } from './time';
 import { WORLD, auditCash, type Party, type Transfer } from './transfers';
 import { seen, type Seen } from './view';
 
 /** Increment when the saved shape changes, and add a migration in save.ts. */
-export const CAST_FORMAT = 7;
+export const CAST_FORMAT = 8;
 
 export interface CastRecord {
   readonly format: number;
@@ -52,22 +52,26 @@ export interface Cast {
   has(id: Id): boolean;
   /** Throws RangeError for an id not in the cast. */
   character(id: Id): Character;
-  /** A new cast with the character added. Throws RangeError for an id already in the cast. */
-  add(input: CharacterInput): Cast;
+  /**
+   * A new cast with the character added, and any items they start with given them by the world at `now` (needed only then).
+   * Throws RangeError for an id already in the cast.
+   */
+  add(input: CharacterInput, when?: { readonly now: number }): Cast;
   /**
    * A new cast with the cash moved and the transfer recorded. Throws RangeError for an amount the payer does not have, a
    * party not in the cast, or a time before the last transfer.
    */
-  transfer(t: { readonly from: Party; readonly to: Party; readonly amount: number; readonly why: string; readonly now: number }): Cast;
+  transfer(t: { readonly from: Party; readonly to: Party; readonly amount: number; readonly why: string; readonly now: number; readonly cause?: FactId }): Cast;
   readonly facts: readonly Fact[];
   /** Throws RangeError for an id not recorded. */
   fact(id: FactId): Fact;
   /**
    * Records a fact at `now`. Everyone it names meets, and whoever did it, whoever it was done to and the witnesses learn it,
-   * their feelings changing by the learning tables. Throws RangeError for a fact that names someone not in the cast, or a
-   * time before the last fact.
+   * their feelings changing by the learning tables; the victim of a hidden actor may guess who did it. Anyone it is made
+   * `public` to hears of it. Throws RangeError for a fact that names someone not in the cast, whoever did it or a witness
+   * not able to be there (unconscious or resting), anyone made public to who is named in it, or a time before the last fact.
    */
-  record(fact: Omit<FactInput, 'invented'>, when: { readonly now: number; readonly witnesses?: readonly Id[] }): { readonly fact: Fact; readonly cast: Cast };
+  record(fact: Omit<FactInput, 'invented'>, when: { readonly now: number; readonly witnesses?: readonly Id[]; readonly public?: readonly Id[] }): { readonly fact: Fact; readonly cast: Cast };
   readonly jobs: readonly Job[];
   /** Throws RangeError for an id not recorded. */
   job(id: JobId): Job;
@@ -130,19 +134,18 @@ export interface Character {
    */
   rest(when: { readonly now: number; readonly hours: number }): Cast;
   /** A new cast in which the character has paid `amount` to another character in the cast, or to the world. */
-  pay(to: Character | typeof WORLD, amount: number, record: { readonly why: string; readonly now: number }): Cast;
+  pay(to: Character | typeof WORLD, amount: number, record: { readonly why: string; readonly now: number; readonly cause?: FactId }): Cast;
+  /**
+   * A new cast in which the character has given one of an item they carry to another character in the cast, recorded as a
+   * transfer; it arrives carried. A shown weapon or worn clothing must be put away first.
+   */
+  give(to: Character, item: Item, record: { readonly why: string; readonly now: number; readonly cause?: FactId }): Cast;
   /** Shows a carried weapon, which anyone present can then see. */
   show(item: Item): Cast;
   /** Puts a shown weapon away. */
   hide(item: Item): Cast;
   wear(item: Item): Cast;
   takeOff(item: Item): Cast;
-  /**
-   * A new cast in which the character has told the listener what they believe of a fact, at `now`, and the listener's
-   * feelings have changed by the learning tables. A listener who already knows it keeps their own version. Throws RangeError
-   * for a fact the character does not know, or one they know is false (telling it would be a lie).
-   */
-  tell(listener: Character, fact: FactId, when: { readonly now: number }): Cast;
   /**
    * Drinks a bottle of spirits at `now`, with anyone else there, and the bottle is used up: a Carousing check against
    * DRINK_DC, and on a failure the character is drunk.
@@ -160,6 +163,11 @@ export interface Character {
     persuade(target: Character): SocialCheck<Cast>;
     /** A lie needs its claim before it can be rolled. */
     deceive(target: Character): { claim(claim: Claim): SocialCheck<Cast> };
+    /**
+     * Telling the listener what they believe of a fact: a check, since telling someone something that contradicts what they
+     * believe is a roll. Throws RangeError for a fact they do not know, or one they know is false (telling it would be a lie).
+     */
+    tell(listener: Character, fact: FactId): TellCheck<Cast>;
   };
 }
 
@@ -205,6 +213,10 @@ export function squad(...members: Character[]): Squad {
       assertFight(spec(first.cast.data));
       return {
         roll(roller, when) {
+          // everyone in it must be there: the fighters and any witnesses, conscious and not resting
+          // (a witness not in the cast is refused with the fight's facts)
+          const there = [...members, ...other.members].map((m) => m.id).concat(when.witnesses ?? []);
+          for (const c of first.cast.data.characters) if (there.includes(c.id)) assertAvailable(c, when.now, 'be in the fight');
           let result: FightResult | undefined;
           let facts: readonly Fact[] = [];
           const next = commits.get(first)!((d) => {
@@ -228,7 +240,16 @@ export class ReplacedCastError extends Error {}
 
 /** A cast of the given characters. Throws as createCharacter does, and RangeError for an id given twice. */
 export function cast(given: { readonly characters?: readonly CharacterInput[] } = {}): Cast {
-  return castOf({ format: CAST_FORMAT, characters: (given.characters ?? []).map(createCharacter), transfers: [], facts: [], jobs: [], nextId: 1 });
+  const characters = (given.characters ?? []).map(createCharacter);
+  return castOf({ format: CAST_FORMAT, characters, transfers: characters.flatMap((c) => startingItems(c, 0)), facts: [], jobs: [], nextId: 1 });
+}
+
+/** The transfers from the world that give a character the items they start with, at `at`: items, like cash, have a recorded source. */
+function startingItems(c: CharacterRecord, at: number): Transfer[] {
+  return ITEMS.flatMap((item) => {
+    const amount = c.inventory.items.filter((h) => h.item === item).length;
+    return amount ? [{ from: WORLD, to: c.id, amount, item, why: 'starting items', at }] : [];
+  });
 }
 
 /**
@@ -248,6 +269,8 @@ export function castOf(data: CastRecord): Cast {
   const jobs = new Map(data.jobs.map((j) => [j.id, j]));
   auditKnowledge(data.characters, data.facts);
   const facts = new Map(data.facts.map((f) => [f.id, f]));
+  for (const t of data.transfers)
+    if (t.cause !== undefined && !((facts.get(t.cause)?.at ?? Infinity) <= t.at)) throw new RangeError(`a transfer names ${t.cause} as its cause, which is not recorded before it`);
   for (const c of data.characters) {
     for (const id of Object.keys(c.relationships)) if (!records.has(id)) throw new RangeError(`${c.id} has a relationship with ${id}, who is not in the cast`);
     for (const s of c.conduct) {
@@ -282,8 +305,14 @@ export function castOf(data: CastRecord): Cast {
       if (handle === undefined) handles.set(id, (handle = characterHandle(record, self, change)));
       return handle;
     },
-    add: (input) => change((d) => ({ ...d, characters: [...d.characters, createCharacter(input)] })),
-    transfer: ({ from, to, amount, why, now }) =>
+    add: (input, when) =>
+      change((d) => {
+        const c = createCharacter(input);
+        const items = startingItems(c, when?.now ?? 0);
+        if (items.length && when === undefined) throw new RangeError(`${c.name} starts with items, which the world gives them at a time: pass now`);
+        return { ...d, characters: [...d.characters, c], transfers: [...d.transfers, ...items] };
+      }),
+    transfer: ({ from, to, amount, why, now, cause }) =>
       change((d) => {
         const has = records.get(from)?.inventory.cash;
         if (has !== undefined && has < amount) throw new RangeError(`${from} has ${has} in cash, so cannot pay ${amount}`);
@@ -291,7 +320,7 @@ export function castOf(data: CastRecord): Cast {
         return {
           ...d,
           characters: d.characters.map((c) => (moved(c) ? createCharacter({ ...c, inventory: { ...c.inventory, cash: c.inventory.cash + moved(c) } }) : c)),
-          transfers: [...d.transfers, { from, to, amount, why, at: now }],
+          transfers: [...d.transfers, { from, to, amount, why, at: now, ...(cause !== undefined && { cause }) }],
         };
       }),
     facts: data.facts,
@@ -325,6 +354,12 @@ export function castOf(data: CastRecord): Cast {
       return change((d) => ({ ...d, jobs: d.jobs.map((x) => (x.id === id ? { ...x, endedAt: now } : x)) }));
     },
     record(input, when) {
+      const there = [input.actor, ...(when.witnesses ?? [])].flatMap((id) => (id === undefined ? [] : [records.get(id)]));
+      for (const c of there) if (c) assertAvailable(c, when.now, 'be there');
+      const named = [input.actor, input.victim, ...(when.witnesses ?? [])];
+      const heard = when.public ?? [];
+      if (new Set(heard).size !== heard.length || heard.some((id) => named.includes(id) || !records.has(id)))
+        throw new RangeError('a fact is made public to others in the cast, each named once, who are not named in it');
       let made: Fact | undefined;
       const next = change((d) => {
         const recorded = recordFact(d, input, when);
@@ -407,24 +442,28 @@ function characterHandleOf(data: CharacterRecord, owner: Cast, commit: Commit): 
       if (!Number.isInteger(minutes) || minutes < 1) throw new RangeError(`a rest lasts a whole number of minutes from 1, got ${hours} hours`);
       return withCondition(() => ({ hitPoints: condition.maxHitPoints, effects: [], rest: { from: now, until: now + minutes } }));
     },
-    pay(to, amount, { why, now }) {
+    pay(to, amount, { why, now, cause }) {
       if (to !== WORLD && to.cast !== owner) throw new RangeError(`${to.name} is from another cast`);
-      return owner.transfer({ from: data.id, to: to === WORLD ? WORLD : to.id, amount, why, now });
+      for (const c of to === WORLD ? [data] : [data, to.data]) assertAvailable(c, now, 'pay or be paid in person');
+      return owner.transfer({ from: data.id, to: to === WORLD ? WORLD : to.id, amount, why, now, ...(cause !== undefined && { cause }) });
+    },
+    give(to, item, { why, now, cause }) {
+      if (to.cast !== owner || to.id === data.id) throw new RangeError(`${to.name} is not someone else in this cast`);
+      for (const c of [data, to.data]) assertAvailable(c, now, 'hand over an item');
+      if (!data.inventory.items.some((h) => h.item === item && h.state === 'carried')) throw new RangeError(`${data.name} carries no ${ITEM_INFO[item].name.toLowerCase()} to give`);
+      return commit((d) => {
+        const handed: CastRecord = { ...d, transfers: [...d.transfers, { from: data.id, to: to.id, amount: 1, item, why, at: now, ...(cause !== undefined && { cause }) }] };
+        const without = withCharacter(handed, data.id, (c) => {
+          const i = c.inventory.items.findIndex((h) => h.item === item && h.state === 'carried');
+          return { ...c, inventory: { ...c.inventory, items: c.inventory.items.filter((_, j) => j !== i) } };
+        });
+        return withCharacter(without, to.id, (c) => ({ ...c, inventory: { ...c.inventory, items: [...c.inventory.items, { item, state: 'carried' }] } }));
+      });
     },
     show: (item) => move(item, 'carried', 'shown'),
     hide: (item) => move(item, 'shown', 'carried'),
     wear: (item) => move(item, 'carried', 'worn'),
     takeOff: (item) => move(item, 'worn', 'carried'),
-    tell(listener, fact, { now }) {
-      if (listener.cast !== owner) throw new RangeError(`${listener.name} is from another cast`);
-      if (listener.id === data.id) throw new RangeError(`${data.name} cannot tell themselves`);
-      const theirs = data.knowledge[fact];
-      if (theirs === undefined) throw new RangeError(`${data.name} does not know ${fact}`);
-      if (theirs.knownFalse) throw new RangeError(`${data.name} knows ${fact} is false, so telling it would be a lie`);
-      assertTime(now);
-      if (now < theirs.learnedAt) throw new RangeError(`${data.name} cannot tell ${fact} at ${now}, before learning it at ${theirs.learnedAt}`);
-      return update(listener.id, (c) => (c.knowledge[fact] ? c : learnFact(c, owner.fact(fact), toldVersion(data.id, theirs, now), now)));
-    },
     drink(roller, { now, with: company = [] }) {
       if (condition.unconscious) throw new RangeError(`${data.name} is unconscious`);
       for (const other of company) if (other.cast !== owner || other.id === data.id) throw new RangeError(`${other.name} is not someone else in this cast`);
@@ -433,7 +472,8 @@ function characterHandleOf(data: CharacterRecord, owner: Cast, commit: Commit): 
       const result = resolveCheck({ dice: DICE.d20, edge: carousing.advantage.truth ? 'advantage' : 'none', modifiers: truthOf(carousing.parts), dc: DRINK_DC }, roller);
       const drunk = !passes(result.margin) || condition.effects.includes('drunk');
       const job = carousing.advantage.truth ? carousing.advantage.job : undefined;
-      const next = commit((d) => withCharacter(job ? { ...d, jobs: usingAdvantage(d.jobs, job) } : d, data.id, (c) => {
+      const spent = (d: CastRecord): CastRecord => ({ ...d, transfers: [...d.transfers, { from: data.id, to: WORLD, amount: 1, item: 'bottle', why: 'drunk', at: now }] });
+      const next = commit((d) => withCharacter(spent(job ? { ...d, jobs: usingAdvantage(d.jobs, job) } : d), data.id, (c) => {
         const i = c.inventory.items.findIndex((h) => h.item === 'bottle');
         return withConduct(
           {
@@ -465,6 +505,10 @@ function characterHandleOf(data: CharacterRecord, owner: Cast, commit: Commit): 
         intimidate: (target: Character) => check('intimidate', target),
         persuade: (target: Character) => check('persuade', target),
         deceive: (target: Character) => ({ claim: (claim: Claim) => check('deceive', target, claim) }),
+        tell: (listener: Character, fact: FactId) => {
+          if (listener.cast !== owner) throw new RangeError(`${listener.name} is from another cast`);
+          return tellCheck({ data: owner.data, teller: data, listener: listener.data, fact }, owner, commit);
+        },
       };
     },
   };

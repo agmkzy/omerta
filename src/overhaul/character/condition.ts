@@ -42,6 +42,20 @@ export interface ConditionRecord {
   readonly rest?: { readonly from: number; readonly until: number };
 }
 
+/** Whether a character with this condition is resting at `now`. */
+export function restingAt(c: ConditionRecord, now: number): boolean {
+  return c.rest !== undefined && c.rest.from <= now && now < c.rest.until;
+}
+
+/**
+ * Throws RangeError unless a character can take part in something at `now`: conscious, and not resting. `what` says how
+ * they would take part, for the message.
+ */
+export function assertAvailable(c: { readonly name: string; readonly condition: ConditionRecord }, now: number, what = 'take part'): void {
+  if (c.condition.hitPoints === 0) throw new RangeError(`${c.name} is unconscious, so cannot ${what}`);
+  if (restingAt(c.condition, now)) throw new RangeError(`${c.name} is resting at ${now}, so cannot ${what}`);
+}
+
 /** A condition as it stands. */
 export interface Condition extends ConditionRecord {
   readonly maxHitPoints: number;

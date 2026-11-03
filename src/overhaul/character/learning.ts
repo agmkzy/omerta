@@ -8,6 +8,7 @@ import { currentTemperament } from './conduct';
 import type { Fact, FactId, FactKind } from './facts';
 import type { Version } from './knowledge';
 import { NEW_RELATIONSHIP, feel, meet, type Feeling, type Relationship } from './relationships';
+import { HIGH } from './temperament';
 
 /** What a deed does to the respect of those who hear of it: for whoever did it, and for whoever it was done to (src/core.ts DEED). */
 export const DEED: Readonly<Partial<Record<FactKind, readonly [actor: number, victim: number]>>> = {
@@ -82,7 +83,7 @@ export function learningChanges(f: Fact, learner: Learner, actor: Id | undefined
   if (deed && f.victim !== learner.id) {
     if (deed[0]) out.push(change(actor, 'respect', deed[0] * HEARD));
     if (deed[1] && f.victim !== undefined && f.victim !== actor) out.push(change(f.victim, 'respect', deed[1] * HEARD));
-    if (violent) out.push(change(actor, 'fear', violent * (1 - brave)));
+    if (violent && isViolent(f)) out.push(change(actor, 'fear', violent * (1 - brave)));
   }
   const grudge = GRUDGE[kind];
   if (!grudge) return out;
@@ -92,7 +93,7 @@ export function learningChanges(f: Fact, learner: Learner, actor: Id | undefined
     if (violent !== undefined) victim.push(change(actor, 'fear', grudge * (1 - brave) * 0.8));
     victim.push(change(actor, 'trust', -grudge * 0.5));
     out.push(...(f.amount !== undefined && kind === 'beating' ? scaledByDamage(victim, f, learner) : victim));
-  } else if (f.victim !== undefined && (learner.affectionFor(f.victim) ?? 0) > 0.5) {
+  } else if (f.victim !== undefined && (learner.affectionFor(f.victim) ?? 0) >= HIGH) {
     out.push(change(actor, 'grudge', grudge * 0.3));
   }
   return out;
@@ -113,6 +114,31 @@ function scaledByDamage(changes: readonly FeelingChange[], f: Fact, learner: Lea
   });
 }
 
+/** Whether a fact is violence by its actor: of a violent kind, and, for a beating or a fight, with a blow struck (its amount is the damage done). */
+export function isViolent(f: Fact): boolean {
+  const kind = LEARNED_AS[f.kind] ?? f.kind;
+  return VIOLENT[kind] !== undefined && !(kind === 'beating' && f.amount === 0);
+}
+
+/** The least grudge that makes someone a suspect. */
+export const SUSPECT_GRUDGE = 0.3;
+
+/**
+ * Whom the victim of a hidden actor guesses did it, with no randomness: among those they hold a grudge of at least
+ * SUSPECT_GRUDGE against (and, for a violent kind, believe to have been violent before), the one they hold the biggest grudge
+ * against. A tie, or no one, is no guess. Only a kind that changes how its victim feels (GRUDGE) is guessed at.
+ */
+export function guessActor(c: CharacterRecord, f: Fact, facts: readonly Fact[]): Id | undefined {
+  const kind = LEARNED_AS[f.kind] ?? f.kind;
+  if (!f.hiddenActor || f.victim !== c.id || !GRUDGE[kind]) return undefined;
+  const violent = (id: Id) => facts.some((x) => x.id !== f.id && isViolent(x) && c.knowledge[x.id] !== undefined && believedActor(x, c.knowledge[x.id]!) === id);
+  const suspects = Object.entries(c.relationships)
+    .filter(([id, r]) => r.grudge >= SUSPECT_GRUDGE && id !== c.id && (VIOLENT[kind] === undefined || violent(id)))
+    .sort(([, a], [, b]) => b.grudge - a.grudge);
+  const [first, second] = suspects;
+  return first && (second === undefined || second[1].grudge < first[1].grudge) ? first[0] : undefined;
+}
+
 /** Whom a learner believes did a fact: whoever did it if they know, otherwise whom they blame. */
 export const believedActor = (f: Fact, v: { readonly knowsActor: boolean; readonly blame?: Id }): Id | undefined => (v.knowsActor ? f.actor : v.blame);
 
@@ -125,8 +151,23 @@ export function learnFact(c: CharacterRecord, f: Fact, v: Version, now: number):
   const learner: Learner = { id: c.id, courage: currentTemperament(c).courage, maxHitPoints: maxHitPoints(c), affectionFor: (id) => c.relationships[id]?.affection };
   const relationships: Record<Id, Relationship> = { ...c.relationships };
   for (const id of [actor, f.victim]) if (id !== undefined && id !== c.id) relationships[id] ??= NEW_RELATIONSHIP;
-  for (const ch of learningChanges(f, learner, actor)) relationships[ch.towards] = feel(relationships[ch.towards]!, ch.feeling, ch.amount, { now, why: ch.why });
-  return { ...c, knowledge: { ...c.knowledge, [f.id]: v }, relationships };
+  // the tables hold someone responsible for a fact once only, however often this character changes their mind about it
+  const before = blamedFor(f, c.knowledge[f.id]);
+  const counts = actor !== undefined && !before.includes(actor);
+  if (counts) for (const ch of learningChanges(f, learner, actor)) relationships[ch.towards] = feel(relationships[ch.towards]!, ch.feeling, ch.amount, { now, why: ch.why });
+  const blamed = counts ? [...before, actor] : before;
+  // (recorded only where it holds more than whom they now believe did it, which it otherwise is)
+  const extra = blamed.some((id) => id !== actor);
+  const { blamed: _old, ...version } = v;
+  return { ...c, knowledge: { ...c.knowledge, [f.id]: extra ? { ...version, blamed } : version }, relationships };
+}
+
+/** Everyone the learning tables have already held responsible for a fact, for a character who holds this version of it. */
+export function blamedFor(f: Fact, v: Version | undefined): readonly Id[] {
+  if (v === undefined) return [];
+  if (v.blamed) return v.blamed;
+  const actor = believedActor(f, v);
+  return actor === undefined ? [] : [actor];
 }
 
 /** A character after meeting each of `others` at `now`. */

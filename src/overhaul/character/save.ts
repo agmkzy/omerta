@@ -10,10 +10,10 @@ import { CAST_FORMAT, castOf, type Cast } from './cast';
 import { createCharacter, type CharacterRecord } from './character';
 import { STORED_EFFECTS, type ConditionRecord, type StoredEffect } from './condition';
 import { CONDUCT, type Cause, type Conduct, type ConductStep } from './conduct';
-import { FACT_KINDS, type Fact, type FactKind } from './facts';
+import { FACT_ENDINGS, FACT_KINDS, type Fact, type FactEnding, type FactKind, type LieClaim } from './facts';
 import { ITEMS, type HeldItem, type InventoryRecord, type Item } from './items';
 import type { Job, Plan } from './jobs';
-import type { How, Knowledge, Source, Version } from './knowledge';
+import type { How, Knowledge, PartHow, PartSource, Source, Version } from './knowledge';
 import { FEELINGS, NEW_RELATIONSHIP, type Reason, type Relationship, type Relationships } from './relationships';
 import type { Transfer } from './transfers';
 import { PROFICIENCIES, SKILLS, type Proficiency, type Skill, type Training } from './skills';
@@ -56,6 +56,19 @@ export const MIGRATIONS: readonly Migration[] = [
   (d) => {
     d.jobs ??= [];
   },
+  // 7 to 8: items came to change hands only by recorded transfers, as cash does. Whatever a format-7 character held, the world
+  // gave them at the start. (Versions gained each part's provenance, and social facts their ending; both may be absent.)
+  (d) => {
+    const given: unknown[] = [];
+    for (const c of Array.isArray(d.characters) ? (d.characters as unknown[]) : []) {
+      const items = (c as { id?: unknown; inventory?: { items?: unknown } } | null)?.inventory?.items;
+      if (!Array.isArray(items)) continue;
+      const counts = new Map<unknown, number>();
+      for (const h of items) counts.set((h as { item?: unknown } | null)?.item, (counts.get((h as { item?: unknown } | null)?.item) ?? 0) + 1);
+      for (const [item, amount] of counts) given.push({ from: 'world', to: (c as { id: unknown }).id, amount, item, why: 'starting items', at: 0 });
+    }
+    d.transfers = [...given, ...(Array.isArray(d.transfers) ? d.transfers : [])];
+  },
 ];
 
 /** Brings data saved in format `from` up to the newest of `migrations`, in order. */
@@ -83,19 +96,25 @@ const STEP_FIELDS: readonly string[] = Object.keys({ conduct: true, trait: true,
 const CONDITION_FIELDS: readonly string[] = Object.keys({ hitPoints: true, effects: true, rest: true } satisfies Record<keyof ConditionRecord, true>);
 
 const INVENTORY_FIELDS: readonly string[] = Object.keys({ cash: true, items: true } satisfies Record<keyof InventoryRecord, true>);
-const TRANSFER_FIELDS: readonly string[] = Object.keys({ from: true, to: true, amount: true, why: true, at: true } satisfies Record<keyof Transfer, true>);
+const TRANSFER_FIELDS: readonly string[] = Object.keys({ from: true, to: true, amount: true, item: true, why: true, at: true, cause: true } satisfies Record<keyof Transfer, true>);
 const FACT_FIELDS: readonly string[] = Object.keys({
   id: true, kind: true, actor: true, victim: true, business: true, amount: true, at: true, where: true, cause: true, story: true,
-  hiddenActor: true, invented: true, witnesses: true,
+  hiddenActor: true, invented: true, witnesses: true, ending: true, claim: true,
 } satisfies Record<keyof Fact, true>);
 const VERSION_FIELDS: readonly string[] = Object.keys({
   learnedAt: true, source: true, teller: true, how: true, knowsActor: true, blame: true, exaggerated: true, knownFalse: true,
+  who: true, size: true, blamed: true,
 } satisfies Record<keyof Version, true>);
 const RELATIONSHIP_FIELDS: readonly string[] = Object.keys({
   trust: true, respect: true, affection: true, grudge: true, fear: true, familiarity: true, lastMet: true, grudgeReason: true, regardReason: true,
 } satisfies Record<keyof Relationship, true>);
 const SOURCES: readonly Source[] = ['self', 'witness', 'public', 'told'];
 const HOWS: readonly How[] = ['seen', 'told', 'heard'];
+const PART_HOWS: readonly PartHow[] = [...HOWS, 'guessed'];
+const ending = (value: unknown, path: string): FactEnding => {
+  if (!FACT_ENDINGS.includes(value as FactEnding)) throw new TypeError(`${path} must be an ending`);
+  return value as FactEnding;
+};
 const JOB_FIELDS: readonly string[] = Object.keys({ id: true, kind: true, members: true, dc: true, startedAt: true, endedAt: true, plan: true } satisfies Record<keyof Job, true>);
 const PLAN_FIELDS: readonly string[] = Object.keys({ planner: true, helper: true, outcome: true, margin: true, at: true, advantageOn: true, advantageUsed: true } satisfies Record<keyof Plan, true>);
 const CAST_FIELDS: readonly string[] = ['format', 'characters', 'transfers', 'facts', 'jobs', 'nextId'];
@@ -269,6 +288,8 @@ function readFact(value: unknown, path: string, ignored: string[]): Fact {
     ...(d.hiddenActor === true && { hiddenActor: true }),
     ...text('invented'),
     witnesses: d.witnesses as string[],
+    ...(d.ending !== undefined && { ending: ending(d.ending, `${path}.ending`) }),
+    ...(d.claim !== undefined && { claim: claim(d.claim, `${path}.claim`) }),
   };
 }
 
@@ -294,7 +315,30 @@ function version(value: unknown, path: string, ignored: string[]): Version {
     ...(d.blame !== undefined && { blame: d.blame as string }),
     ...(d.exaggerated === true && { exaggerated: true }),
     ...(d.knownFalse === true && { knownFalse: true }),
+    ...(d.who !== undefined && { who: partSource(d.who, `${path}.who`) }),
+    ...(d.size !== undefined && { size: partSource(d.size, `${path}.size`) }),
+    ...(d.blamed !== undefined && { blamed: ids(d.blamed, `${path}.blamed`) }),
   };
+}
+
+function partSource(value: unknown, path: string): PartSource {
+  const d = object(value, path);
+  if (!PART_HOWS.includes(d.how as PartHow)) throw new TypeError(`${path}.how must be one of ${PART_HOWS.join(', ')}`);
+  if (d.teller !== undefined && typeof d.teller !== 'string') throw new TypeError(`${path}.teller must be text`);
+  return { how: d.how as PartHow, ...(d.teller !== undefined && { teller: d.teller }) };
+}
+
+function ids(value: unknown, path: string): string[] {
+  if (!Array.isArray(value) || !value.every((v) => typeof v === 'string')) throw new TypeError(`${path} must be a list of ids`);
+  return value as string[];
+}
+
+function claim(value: unknown, path: string): LieClaim {
+  const d = object(value, path);
+  if (typeof d.blame === 'string') return { blame: d.blame };
+  if (typeof d.exaggerated === 'boolean') return { exaggerated: d.exaggerated };
+  if (d.invented === true) return { invented: true };
+  throw new TypeError(`${path} must claim who did it, how big it was, or a fact invented`);
 }
 
 function inventory(value: unknown, path: string, ignored: string[]): { cash?: number; items: HeldItem[] } {
@@ -317,7 +361,17 @@ function readTransfer(value: unknown, path: string, ignored: string[]): Transfer
   ignored.push(...Object.keys(d).filter((k) => !TRANSFER_FIELDS.includes(k)).map((k) => `${path}.${k}`));
   for (const k of ['from', 'to', 'why'] as const) if (typeof d[k] !== 'string') throw new TypeError(`${path}.${k} must be text`);
   for (const k of ['amount', 'at'] as const) if (typeof d[k] !== 'number') throw new TypeError(`${path}.${k} must be a number`);
-  return { from: d.from as string, to: d.to as string, amount: d.amount as number, why: d.why as string, at: d.at as number };
+  if (d.item !== undefined && !ITEMS.includes(d.item as Item)) throw new TypeError(`${path}.item must be an item`);
+  if (d.cause !== undefined && typeof d.cause !== 'string') throw new TypeError(`${path}.cause must be a fact id`);
+  return {
+    from: d.from as string,
+    to: d.to as string,
+    amount: d.amount as number,
+    ...(d.item !== undefined && { item: d.item as Item }),
+    why: d.why as string,
+    at: d.at as number,
+    ...(d.cause !== undefined && { cause: d.cause as string }),
+  };
 }
 
 function condition(value: unknown, path: string, ignored: string[]): Partial<ConditionRecord> {

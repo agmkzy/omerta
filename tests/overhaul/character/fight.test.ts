@@ -57,7 +57,7 @@ describe('a real fight', { tags: ['unit'] }, () => {
     assert.deepEqual(of(r, 'nerve').map((e) => [e.id, e.trigger, e.check.passed]), [['rico', 'hurt', false]]);
     assert.equal(r.winner, 'attacker');
     assert.deepEqual(statuses(r), { sam: 'fighting', rico: 'beaten' });
-    assert.deepEqual(fighter(r, 'rico'), { id: 'rico', side: 'defender', weapon: 'none', startHp: 8, hp: 4, maxHp: 8, status: 'beaten', attackedBy: [{ id: 'sam', damage: 4 }], lostNerve: true, reactions: ['giving-in-in-a-fight'] });
+    assert.deepEqual(fighter(r, 'rico'), { id: 'rico', side: 'defender', weapon: 'none', startHp: 8, hp: 4, maxHp: 8, status: 'beaten', attackedBy: [{ id: 'sam', damage: 4 }], endedAt: 3, lostNerve: true, reactions: ['giving-in-in-a-fight'] });
   });
 
   test('puts defenders first on a tied initiative', () => {
@@ -282,6 +282,20 @@ describe('what a real fight leaves behind', { tags: ['unit'] }, () => {
     const after = castOf(data);
     assert.deepEqual([after.character('rico').condition.hitPoints, after.character('rico').condition.effects], [3, ['shaken']]);
     assert.ok(after.character('vic').versionOf('f1'));
+  });
+
+  test('a fighter witnesses what happens to a loser only if not yet knocked out or gone; someone beaten is still there', () => {
+    const { facts } = applyFight(
+      four().data,
+      result([
+        { id: 'sam' },
+        { id: 'joe', status: 'beaten', endedAt: 1, attackedBy: [{ id: 'vic', damage: 1 }] },
+        { id: 'rico', side: 'defender', status: 'knocked-out', hp: 0, endedAt: 2, goneAt: 2, attackedBy: [{ id: 'sam', damage: 10 }], droppedBy: 'sam' },
+        { id: 'vic', side: 'defender', status: 'fled', endedAt: 4, goneAt: 4, attackedBy: [{ id: 'sam', damage: 0 }] },
+      ]),
+      { now: 0 },
+    );
+    assert.deepEqual(facts.map((f) => [f.victim, f.witnesses]), [['joe', ['sam', 'rico']], ['rico', ['joe', 'vic']], ['vic', ['joe']]]);
   });
 
   test('everyone there meets once, however many facts the fight records', () => {

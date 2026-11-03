@@ -153,7 +153,7 @@ describe('what the target knows on intimidation', { tags: ['unit'] }, () => {
 
   test('having heard of it is +1, known to the target and to whoever told them', () => {
     const recorded = people().record({ kind: 'beating', actor: 'sam', victim: 'vic' }, { now: 0, witnesses: ['joe'] }).cast;
-    const told = recorded.character('joe').tell(recorded.character('rico'), 'f1', { now: 10 });
+    const told = recorded.character('joe').social.tell(recorded.character('rico'), 'f1').roll(scripted(), { now: 10 }).cast;
     const { sam, rico, joe, vic } = who(told);
     const check = sam.social.intimidate(rico);
     assert.ok(reasons(check.explain({ for: rico }).actor).includes('Rico has heard of Sam being violent 1'));
@@ -188,7 +188,7 @@ describe('rolling an intimidation', { tags: ['unit'] }, () => {
     close(ricoOnSam.trust, 0.45);
     close(sam.towards(rico)!.respect, 0.45);
     assert.deepEqual(ricoOnSam.grudgeReason, { fact: 'f1', at: 60, amount: ricoOnSam.grudge });
-    assert.deepEqual(out.truth.facts, [{ kind: 'threat', actor: 'sam', victim: 'rico', id: 'f1', at: 60, witnesses: ['joe'] }]);
+    assert.deepEqual(out.truth.facts, [{ kind: 'threat', actor: 'sam', victim: 'rico', ending: 'success', id: 'f1', at: 60, witnesses: ['joe'] }]);
     assert.deepEqual(joe.versionOf('f1'), { learnedAt: 60, source: 'witness', how: 'seen', knowsActor: true });
     close(joe.towards(sam)!.respect, 0.5 + 0.002 * 0.5);
   });
@@ -286,7 +286,7 @@ describe('a lie about who did it', { tags: ['unit'] }, () => {
   test('records the lie, known only to the liar, as caused by the fact it is about; witnesses learn nothing from it', () => {
     const out = lie(robbed(), 15, 5);
     const [made] = out.truth.facts;
-    assert.deepEqual(made, { kind: 'lie', actor: 'sam', victim: 'rico', cause: 'f1', id: 'f2', at: 30, witnesses: [] });
+    assert.deepEqual(made, { kind: 'lie', actor: 'sam', victim: 'rico', ending: out.truth.ending, cause: 'f1', claim: { blame: 'joe' }, id: 'f2', at: 30, witnesses: [] });
     const { sam, rico, vic } = who(out.cast);
     assert.ok(sam.versionOf('f2'));
     assert.equal(rico.versionOf('f2'), undefined);
@@ -326,11 +326,11 @@ describe('a lie about who did it', { tags: ['unit'] }, () => {
 
   test('is −4 against what a witness told them, −2 against what they heard, and +2 for matching what they believe', () => {
     const c = people().record({ kind: 'robbery', actor: 'sam', victim: 'vic' }, { now: 0, witnesses: ['joe'] }).cast;
-    const told = c.character('joe').tell(c.character('rico'), 'f1', { now: 5 });
+    const told = c.character('joe').social.tell(c.character('rico'), 'f1').roll(scripted(), { now: 5 }).cast;
     const { sam, rico, joe } = who(told);
     assert.deepEqual(reasons(sam.social.deceive(rico).claim({ about: 'f1', blame: 'joe' }).explain({ for: joe }).actor), ['A witness told Rico who did it -4']);
     const withAl = told.add({ id: 'al', name: 'Al' });
-    const heard = withAl.character('rico').tell(withAl.character('al'), 'f1', { now: 6 });
+    const heard = withAl.character('rico').social.tell(withAl.character('al'), 'f1').roll(scripted(), { now: 6 }).cast;
     const h = heard.character('sam').social.deceive(heard.character('al')).claim({ about: 'f1', blame: 'joe' });
     assert.deepEqual(reasons(h.explain({ for: heard.character('al') }).actor).at(-1), 'Al heard who did it -2');
     const blaming = lie(robbed(), 15, 5).cast;

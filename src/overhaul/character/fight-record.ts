@@ -37,11 +37,17 @@ export function applyFight(data: CastRecord, result: FightResult, options: Fight
 
   const facts: Fact[] = [];
   const story = `fight:${d.nextId}`;
-  const record = (input: Omit<FactInput, 'story'>) => {
+  /** Who saw what happened to a fighter: every other fighter still there then (not knocked out or gone), and the named witnesses. */
+  const sawIt = (at: number | undefined) =>
+    everyone.filter((id) => {
+      const f = result.fighters.find((x) => x.id === id);
+      return f === undefined || f.goneAt === undefined || (at !== undefined && f.goneAt > at);
+    });
+  const record = (input: Omit<FactInput, 'story'>, at: number | undefined) => {
     const named = [input.actor, input.victim];
     const recorded = recordFact(d, { ...input, story, ...(options.cause !== undefined && { cause: options.cause }) }, {
       now,
-      witnesses: everyone.filter((id) => !named.includes(id)),
+      witnesses: sawIt(at).filter((id) => !named.includes(id)),
       meets: facts.length === 0 ? allMeet(everyone) : new Map(),
     });
     d = recorded.data;
@@ -63,13 +69,13 @@ export function applyFight(data: CastRecord, result: FightResult, options: Fight
           : (others.some((o) => o.status === 'fighting') ? others.filter((o) => o.status === 'fighting') : others).map((o) => o.id);
     for (const actor of attackers) {
       const amount = f.attackedBy.find((a) => a.id === actor)?.damage ?? 0;
-      const made = record({ kind: f.status === 'fled' ? 'fight' : 'beating', actor, victim: f.id, amount });
+      const made = record({ kind: f.status === 'fled' ? 'fight' : 'beating', actor, victim: f.id, amount }, f.endedAt);
       if (made.kind === 'beating' && helpless(byId.get(actor)!, f)) d = withCharacter(d, actor, (c) => withConduct(c, 'beating-the-helpless', now, { fact: made.id }));
     }
   }
   if (result.winner === null) {
     const [a, b] = [result.fighters.find((f) => f.side === 'attacker')!, result.fighters.find((f) => f.side === 'defender')!];
-    record({ kind: 'fight', actor: a.id, victim: b.id });
+    record({ kind: 'fight', actor: a.id, victim: b.id }, undefined);
   }
 
   // conduct: starting the fight, for the attacking squad, and how each fighter reacted

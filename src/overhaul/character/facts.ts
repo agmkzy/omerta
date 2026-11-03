@@ -1,6 +1,7 @@
 // Facts: every event, recorded once in the cast, as in the game (Fact in src/types.ts). What each character knows of a fact is
 // their own version of it (knowledge.ts). A fact that never happened, invented by a lie, is still recorded, marked invented,
 // so the simulation always knows the truth. See docs/overhaul/plans/character/README.md (Knowledge).
+import { OUTCOMES, type Outcome } from './check';
 import type { Id } from './character';
 import { assertTime } from './time';
 
@@ -42,7 +43,18 @@ export interface Fact {
   readonly invented?: Id;
   /** Who saw it, besides whoever did it and whoever it was done to. */
   readonly witnesses: readonly Id[];
+  /** A social roll's fact: how it ended. The simulation's truth; only its target knows it exactly. */
+  readonly ending?: FactEnding;
+  /** A lie's fact: what it claimed. */
+  readonly claim?: LieClaim;
 }
+
+/** How a social roll ended: one of the check's outcomes, or provoked. */
+export type FactEnding = Outcome | 'provoked';
+export const FACT_ENDINGS: readonly FactEnding[] = [...OUTCOMES, 'provoked'];
+
+/** What a lie claimed: who did a real fact, how big it was, or that a fact it invented happened. */
+export type LieClaim = { readonly blame: Id } | { readonly exaggerated: boolean } | { readonly invented: true };
 
 /** What a caller gives to record a fact; the cast adds the id and the time. */
 export type FactInput = Omit<Fact, 'id' | 'at' | 'witnesses'>;
@@ -61,6 +73,9 @@ export function assertFact(f: Fact, characters: ReadonlySet<Id>, earlier: Readon
   if (f.amount !== undefined && !(Number.isInteger(f.amount) && f.amount >= 0)) throw new RangeError(`an amount is a whole number from 0, got ${f.amount}`);
   if (f.hiddenActor && f.actor === undefined) throw new RangeError(`fact ${f.id} hides an actor it does not have`);
   if (f.invented !== undefined && f.witnesses.length) throw new RangeError(`fact ${f.id} never happened, so no one witnessed it`);
+  if (f.ending !== undefined && !FACT_ENDINGS.includes(f.ending)) throw new RangeError(`unknown ending ${String(f.ending)}`);
+  if (f.claim !== undefined && f.kind !== 'lie') throw new RangeError(`only a lie records a claim, not ${f.kind}`);
+  if (f.claim !== undefined && 'blame' in f.claim && !characters.has(f.claim.blame)) throw new RangeError(`fact ${f.id}'s claim names ${f.claim.blame}, who is not in the cast`);
 }
 
 /** A fact's id, made from the cast's counter. */

@@ -81,6 +81,10 @@ export interface FighterResult {
   readonly attackedBy: readonly { readonly id: Id; readonly damage: number }[];
   /** Who dropped them to 0 hit points. */
   readonly droppedBy?: Id;
+  /** When, as an index into the fight's events, they stopped fighting (beaten, knocked out or fled). */
+  readonly endedAt?: number;
+  /** When, likewise, they stopped seeing the fight: knocked out, or got away. Someone beaten is still there. */
+  readonly goneAt?: number;
   /** They failed a nerve check, so they are shaken afterwards. */
   readonly lostNerve: boolean;
   /** How they reacted, as conduct: holding their nerve, running, giving in, losing their temper. */
@@ -126,6 +130,8 @@ interface State {
   lostNerve: boolean;
   readonly attackedBy: Map<Id, number>;
   droppedBy?: Id;
+  endedAt?: number;
+  goneAt?: number;
   readonly reactions: Conduct[];
 }
 
@@ -171,6 +177,8 @@ export function fight(spec: FightSpec, roller: Roller): FightResult {
 
   const setStatus = (f: State, status: Exclude<FighterStatus, 'fighting'>) => {
     f.status = status;
+    if (status !== 'fleeing') f.endedAt = events.length;
+    if (status === 'knocked-out' || status === 'fled') f.goneAt = events.length;
     events.push({ kind: 'status', round, id: f.c.id, status });
   };
 
@@ -339,6 +347,8 @@ export function fight(spec: FightSpec, roller: Roller): FightResult {
         status: f.status,
         attackedBy: [...f.attackedBy].map(([id, damage]) => ({ id, damage })),
         ...(f.droppedBy !== undefined && { droppedBy: f.droppedBy }),
+        ...(f.endedAt !== undefined && { endedAt: f.endedAt }),
+        ...(f.goneAt !== undefined && { goneAt: f.goneAt }),
         lostNerve: f.lostNerve,
         reactions: f.reactions,
       })),
