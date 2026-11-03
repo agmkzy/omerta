@@ -8,6 +8,7 @@ import { NERVE_DC, WEAPON_USE, assertFight, fight, outclasses, type FightEvent, 
 import { applyFight } from '../../../src/overhaul/character/fight-record';
 import { BEATING_AT_LEAST } from '../../../src/overhaul/character/learning';
 import { roller, seeded } from '../../../src/overhaul/character/random';
+import { DAY } from '../../../src/overhaul/character/time';
 import { labelled, type FightRolls } from './support';
 
 const close = (actual: number | undefined, expected: number) => assert.ok(actual !== undefined && Math.abs(actual - expected) < 1e-9, `${actual} is not ${expected}`);
@@ -360,6 +361,39 @@ describe('what a real fight leaves behind', { tags: ['unit'] }, () => {
     assert.ok(!conduct(result([{ id: 'sam' }, beaten], { start: 'set-upon' }), 'sam').includes('beating-the-helpless'));
   });
 
+  test('of beating the helpless is only for the squad that set upon them, and only for whoever struck them or started the fight', () => {
+    const conduct = (r: FightResult, id: string) => castOf(applyFight(four().data, r, { now: 0 }).data).character(id).conduct.map((s) => s.conduct);
+    // set upon by two, Rico beats one of them: being set upon made no one helpless but Rico
+    const turned = result([{ id: 'sam', status: 'beaten', attackedBy: [{ id: 'rico', damage: 3 }] }, { id: 'joe' }, { id: 'rico', side: 'defender' }], { start: 'set-upon', winner: null });
+    assert.ok(!conduct(turned, 'rico').includes('beating-the-helpless'));
+    // Sam, unarmed, gives in to Rico's pistol without being struck: Rico struck no one and did not start it
+    const gaveIn = result([{ id: 'sam', status: 'beaten' }, { id: 'rico', side: 'defender', weapon: 'pistol' }], { winner: 'defender' });
+    assert.ok(!conduct(gaveIn, 'rico').includes('beating-the-helpless'));
+    const struck = result([{ id: 'sam', status: 'beaten', attackedBy: [{ id: 'rico', damage: 1 }] }, { id: 'rico', side: 'defender', weapon: 'pistol' }], { winner: 'defender' });
+    assert.ok(conduct(struck, 'rico').includes('beating-the-helpless'));
+    // an attacker who started it counts, struck or not
+    const joined = result([{ id: 'sam' }, { id: 'joe' }, { id: 'rico', side: 'defender', status: 'beaten', attackedBy: [{ id: 'sam', damage: 2 }, { id: 'joe', damage: 0 }] }], { start: 'set-upon' });
+    assert.ok(conduct(joined, 'joe').includes('beating-the-helpless'));
+  });
+
+  test('of fighting when provoked: starting a fight within a day with the one whose threat provoked them', () => {
+    const provoking = (ending: 'provoked' | 'failure') => four().record({ kind: 'threat', actor: 'rico', victim: 'sam', ending }, { now: 0 }).cast;
+    const fought = result([{ id: 'sam' }, { id: 'rico', side: 'defender', status: 'beaten', attackedBy: [{ id: 'sam', damage: 1 }] }]);
+    const conduct = (c: ReturnType<typeof four>, r: FightResult, now: number, id = 'sam') => castOf(applyFight(c.data, r, { now, cause: 'f1' }).data).character(id).conduct.map((s) => s.conduct);
+    assert.ok(conduct(provoking('provoked'), fought, DAY).includes('fighting-when-provoked'));
+    assert.ok(!conduct(provoking('provoked'), fought, DAY + 1).includes('fighting-when-provoked'));
+    assert.ok(!conduct(provoking('failure'), fought, 10).includes('fighting-when-provoked'));
+    // Rico started it: the one provoked is not on the attacking squad
+    const reversed = result([{ id: 'rico' }, { id: 'sam', side: 'defender', status: 'beaten', attackedBy: [{ id: 'rico', damage: 1 }] }]);
+    assert.ok(!conduct(provoking('provoked'), reversed, 10).includes('fighting-when-provoked'));
+    assert.ok(!conduct(provoking('provoked'), reversed, 10, 'rico').includes('fighting-when-provoked'));
+    // a fight with someone else
+    const other = result([{ id: 'sam' }, { id: 'vic', side: 'defender', status: 'beaten', attackedBy: [{ id: 'sam', damage: 1 }] }]);
+    assert.ok(!conduct(provoking('provoked'), other, 10).includes('fighting-when-provoked'));
+    const notThreat = four().record({ kind: 'theft', actor: 'rico', victim: 'sam' }, { now: 0 }).cast;
+    assert.ok(!conduct(notThreat, fought, 10).includes('fighting-when-provoked'));
+  });
+
   test('a sparring match leaves nothing but the fighters having met', () => {
     const c = four();
     const { data, facts } = applyFight(c.data, result([{ id: 'sam', hp: 4 }, { id: 'rico', side: 'defender', hp: 5 }], { kind: 'sparring' }), { now: 30 });
@@ -418,6 +452,27 @@ describe('fights', { tags: ['statistical'] }, () => {
         assert.notEqual(f.status, 'fleeing');
       }
       assert.doesNotThrow(() => castOf(out.cast.data));
+    }
+  });
+
+  test('pins the measured balance of an average fighter armed against one bare-handed: who wins, and how often the other gives in unhurt', () => {
+    // measured on 3 November 2026 and kept as a starting point (plan: Weapons); a change to fight balance shows here
+    const rates = { pistol: { won: 0.95, unhurt: 0.7 }, knife: { won: 0.83, unhurt: 0.56 } } as const;
+    for (const weapon of ['pistol', 'knife'] as const) {
+      const r = roller(seeded(5));
+      const c = cast({ characters: [{ id: 'sam', name: 'Sam', inventory: { items: [weapon] } }, { id: 'rico', name: 'Rico' }] });
+      const spec = { attackers: [c.character('sam').data], defenders: [c.character('rico').data], kind: 'real' as const };
+      let won = 0;
+      let unhurt = 0;
+      const n = 5000;
+      for (let i = 0; i < n; i++) {
+        const out = fight(spec, r);
+        const rico = out.fighters.find((f) => f.id === 'rico')!;
+        if (out.winner === 'attacker') won++;
+        if (rico.status !== 'fighting' && rico.hp === rico.maxHp) unhurt++;
+      }
+      assert.ok(Math.abs(won / n - rates[weapon].won) < 0.02, `${weapon} won ${won / n}`);
+      assert.ok(Math.abs(unhurt / n - rates[weapon].unhurt) < 0.02, `${weapon} unhurt ${unhurt / n}`);
     }
   });
 

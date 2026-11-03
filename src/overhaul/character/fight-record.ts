@@ -15,6 +15,7 @@ import type { Fact, FactId, FactInput } from './facts';
 import { outclasses, type FightResult, type FighterResult } from './fight';
 import { meetPeople } from './learning';
 import { allMeet, recordFact, withCharacter } from './records';
+import { DAY } from './time';
 
 export interface FightRecordOptions {
   readonly now: number;
@@ -55,8 +56,11 @@ export function applyFight(data: CastRecord, result: FightResult, options: Fight
     return recorded.fact;
   };
 
-  const helpless = (actor: FighterResult, victim: FighterResult) =>
-    (result.start === 'set-upon' && result.fighters.filter((f) => f.side === 'attacker').length > 1) || (victim.weapon === 'none' && outclasses(actor.weapon, 'none'));
+  /** Whether the victim could not fight back: set upon by more than one (for the squad that set upon them), or unarmed against a weapon that outclasses theirs; only for whoever struck them or started the fight. */
+  const helpless = (actor: FighterResult, victim: FighterResult, amount: number) =>
+    (amount > 0 || actor.side === 'attacker') &&
+    ((result.start === 'set-upon' && actor.side === 'attacker' && result.fighters.filter((f) => f.side === 'attacker').length > 1) ||
+      (victim.weapon === 'none' && outclasses(actor.weapon, 'none')));
   const byId = new Map(result.fighters.map((f) => [f.id, f]));
   for (const f of result.fighters) {
     if (f.status === 'fighting' || f.status === 'fleeing') continue;
@@ -70,7 +74,7 @@ export function applyFight(data: CastRecord, result: FightResult, options: Fight
     for (const actor of attackers) {
       const amount = f.attackedBy.find((a) => a.id === actor)?.damage ?? 0;
       const made = record({ kind: f.status === 'fled' ? 'fight' : 'beating', actor, victim: f.id, amount }, f.endedAt);
-      if (made.kind === 'beating' && helpless(byId.get(actor)!, f)) d = withCharacter(d, actor, (c) => withConduct(c, 'beating-the-helpless', now, { fact: made.id }));
+      if (made.kind === 'beating' && helpless(byId.get(actor)!, f, amount)) d = withCharacter(d, actor, (c) => withConduct(c, 'beating-the-helpless', now, { fact: made.id }));
     }
   }
   if (result.winner === null) {
@@ -80,6 +84,11 @@ export function applyFight(data: CastRecord, result: FightResult, options: Fight
 
   // conduct: starting the fight, for the attacking squad, and how each fighter reacted
   const cause = { fact: facts[0]!.id };
+  const threat = options.cause === undefined ? undefined : d.facts.find((x) => x.id === options.cause);
+  const provoked =
+    threat?.kind === 'threat' && threat.ending === 'provoked' && now - threat.at <= DAY && result.fighters.some((f) => f.side === 'defender' && f.id === threat.actor)
+      ? threat.victim
+      : undefined;
   const attackers = result.fighters.filter((f) => f.side === 'attacker');
   const defenders = result.fighters.filter((f) => f.side === 'defender');
   for (const f of result.fighters) {
@@ -90,6 +99,7 @@ export function applyFight(data: CastRecord, result: FightResult, options: Fight
       if (outnumbered || defenders.some((o) => outclasses(o.weapon, f.weapon))) conduct.push('starting-a-fight-outmatched');
       if (outnumbered || f.startHp * 2 <= f.maxHp) conduct.push('starting-a-fight-rashly');
       if (result.start === 'ambush') conduct.push('setting-an-ambush');
+      if (f.id === provoked) conduct.push('fighting-when-provoked');
     }
     conduct.push(...f.reactions);
     for (const k of conduct) d = withCharacter(d, f.id, (c) => withConduct(c, k, now, cause));
