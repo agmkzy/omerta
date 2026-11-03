@@ -121,7 +121,8 @@ These have caused, or could cause, confusion. Say which one is meant.
 ## Knowledge
 
 - **Fact** — something that happened, recorded once, with its kind, who did it, to whom, when, and its witnesses
-  (`kind`, `actor`, `victim`, `at`).
+  (`kind`, `actor`, `victim`, `at`). A fact is always something that happened. When someone says something, the saying is
+  the fact; what they said may be true or false, and only the simulation knows which (a false one is a lie).
 - **Version** — one character's own belief about a fact: what they think happened and how they came to know it. Two
   characters can hold different versions of one fact.
 - **Part** — a piece of a fact a version can get wrong on its own: **who** did it, and **size**, how big it was.
