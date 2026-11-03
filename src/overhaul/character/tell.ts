@@ -2,9 +2,10 @@
 // in what they know (they know of it, but not who did it), is accepted as any telling is. Telling them what they already
 // believe changes nothing. Telling them something that contradicts what they believe is a roll: the teller's Persuasion
 // against TELL_DC, with what the listener knows of that part of the fact and how they feel about the teller as modifiers. If
-// the belief it overturns came from a lie, told as something the liar saw, the lie comes out. However it goes, the two have
-// met: telling someone anything means being with them. Asking the odds reveals nothing more of the listener's version than a
-// lie's odds would. See docs/overhaul/plans/character/README.md (Knowledge).
+// the belief it overturns came from a lie, told as something the liar saw, the lie comes out; if it came from someone honestly
+// mistaken, the listener trusts them a little less. However it goes, the two have met: telling someone anything means being
+// with them. Asking the odds reveals nothing more of the listener's version than a lie's odds would. See
+// docs/overhaul/plans/character/README.md (Knowledge).
 import type { CastRecord } from './cast';
 import { checkOdds, resolveCheck, succeeded, type CheckResult, type Modifier, type Odds } from './check';
 import type { CharacterRecord, Id } from './character';
@@ -26,6 +27,9 @@ export const TELL_DC = 10;
 
 /** The aftermath of a lie coming out: as for a lie seen through. */
 const LIE_FOUND_OUT = [{ feeling: 'trust', amount: -0.15 }, { feeling: 'grudge', amount: 0.05 }] as const;
+
+/** Trust lost in whoever told someone a version that turns out wrong, though they believed it: an honest mistake. */
+export const MISLED_TRUST = -0.05;
 
 interface CastLike {
   readonly data: CastRecord;
@@ -145,12 +149,21 @@ export function tellCheck<C extends CastLike>(setup: TellSetup, owner: C, commit
         for (const part of changed) after = teach(after, mine, teller.id, part);
         let next = changed.length ? withCharacter(d, listener.id, (c) => learnFact(c, f, after, now)) : d;
         next = met(next);
+        const misledBy = new Set<Id>();
         for (const part of overturned) {
           const lie = lieBehind(next, f, theirs, listener.id, part);
-          if (lie === undefined) continue;
-          exposed.push(lie.id);
-          next = foundOut(next, lie, listener.id, now);
+          if (lie !== undefined) {
+            exposed.push(lie.id);
+            next = foundOut(next, lie, listener.id, now);
+            continue;
+          }
+          // an honest mistake: whoever told them it trusted a little less, unless they only passed it on as a guess
+          const from = partOf(theirs, part)!;
+          if (from.how !== 'guessed' && from.teller !== undefined && from.teller !== teller.id) misledBy.add(from.teller);
         }
+        // (they met whoever told them it, so already have a relationship with them)
+        for (const by of misledBy)
+          next = withCharacter(next, listener.id, (c) => ({ ...c, relationships: { ...c.relationships, [by]: feel(c.relationships[by]!, 'trust', MISLED_TRUST, { now, why: f.id }) } }));
         return next;
       });
       return { cast, truth: { roll: result, changed, exposed } };

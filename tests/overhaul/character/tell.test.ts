@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'vitest';
 import { cast, type Cast } from '../../../src/overhaul/character/cast';
 import { partOf } from '../../../src/overhaul/character/knowledge';
-import { NEW_RELATIONSHIP } from '../../../src/overhaul/character/relationships';
-import { TELL_DC } from '../../../src/overhaul/character/tell';
+import { NEW_RELATIONSHIP, feel } from '../../../src/overhaul/character/relationships';
+import { MISLED_TRUST, TELL_DC } from '../../../src/overhaul/character/tell';
 import { scripted } from './support';
 
 const close = (actual: number | undefined, expected: number) => assert.ok(actual !== undefined && Math.abs(actual - expected) < 1e-9, `${actual} is not ${expected}`);
@@ -66,6 +66,24 @@ describe('telling someone something that contradicts what they believe', { tags:
     assert.deepEqual(reasons(check.explain({ for: toRico.character('rico') })), ['Rico heard who did it -2']);
     const out = check.roll(scripted(19), { now: 20 });
     assert.deepEqual([out.truth.changed, out.truth.exposed], [['who'], []]);
+    // Vic believed it, so is trusted a little less, with no grudge; Sam, whose lie it was, told Rico nothing
+    const before = toRico.character('rico').towards(toRico.character('vic'))!;
+    const after = out.cast.character('rico').towards(out.cast.character('vic'))!;
+    assert.equal(MISLED_TRUST, -0.05);
+    close(after.trust, feel(before, 'trust', MISLED_TRUST, { now: 20 }).trust);
+    assert.equal(after.grudge, before.grudge);
+    assert.deepEqual(out.cast.character('rico').conduct, []);
+  });
+
+  test('costs no trust in someone who passed it on only as a guess', () => {
+    const c = cast({ characters: ['sam', 'rico', 'joe', 'vic'].map((id) => ({ id, name: id[0]!.toUpperCase() + id.slice(1), ...(id === 'rico' && { relationships: { joe: { ...NEW_RELATIONSHIP, grudge: 0.5 } } }) })) })
+      .record({ kind: 'poach', actor: 'sam', victim: 'rico', hiddenActor: true }, { now: 0, witnesses: ['joe'] }).cast;
+    // Rico guesses it was Joe, and tells Vic so, as a guess; Joe, who saw it, then corrects Vic
+    const told = c.character('rico').social.tell(c.character('vic'), 'f1').roll(scripted(), { now: 10 }).cast;
+    const before = told.character('vic').towards(told.character('rico'))!.trust;
+    const out = told.character('joe').social.tell(told.character('vic'), 'f1').roll(scripted(19), { now: 20 });
+    assert.deepEqual(out.truth.changed, ['who']);
+    assert.equal(out.cast.character('vic').towards(out.cast.character('rico'))!.trust, before);
   });
 
   test('brings no lie out when the part overturned is not the part the lie claimed', () => {
