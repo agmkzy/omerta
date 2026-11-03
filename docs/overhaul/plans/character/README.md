@@ -143,7 +143,7 @@ A person is a product of their experiences, so three things move traits: what a 
 | Reaction | When | Traits moved |
 | --- | --- | --- |
 | Holding their nerve | Passing a nerve check in a fight and fighting on | Courage + |
-| Standing by their squad | Holding their nerve when a member of their squad is down | Loyalty + |
+| Standing by their squad | Holding their nerve when a member of their squad is not fighting: beaten, knocked out, fled or still running (decided 3 November 2026) | Loyalty + |
 | Running | Failing a nerve check and trying to flee, whether or not they get away | Courage −, Caution + |
 | Leaving their squad | Running while the rest of their squad fights on | Loyalty − |
 | Giving in during a fight | Failing a nerve check and giving in | Courage −, Pride − |
