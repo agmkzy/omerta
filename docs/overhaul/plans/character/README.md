@@ -1,12 +1,12 @@
 # Character: one object for every character
 
-**Status:** design agreed in discussion on 2 and 3 November 2026, and revised after two adversarial reviews. Being built, step by step; what building has left open is in [Points to revisit](revisit.md). What waits for slotting it into the game is under [Later](#later).
+**Status:** design agreed in discussion on 2 and 3 November 2026, and revised after two adversarial reviews. Built step by step; what building has left open is in [Points to revisit](revisit.md), and the decisions taken on it after building (3 November 2026) are written into the sections below. What must still be built before it replaces the game's systems is under [Before the swap](#before-the-swap).
 
 ## Purpose
 
 One character object that can represent any character in the game, the player included. It is built up from the [character lab](../../../../lab/character/README.md) (attributes, skills, temperament, checks, social actions, fights), extended with inventory, condition, relationships and knowledge, and written so that it can later be slotted into the game.
 
-Until it is slotted in, the game's own `Character` (`src/types.ts`) stays the game's record, and this is not modelled on it. Where the game already has a concept that this needs, such as knowledge or relationships, the design follows the game's meaning so the two can be joined. How they join is under [One record](#one-record).
+Until the swap, the game's own `Character` (`src/types.ts`) stays the game's record, and this is not modelled on it. Where the game already has a concept that this needs, such as knowledge or relationships, the design follows the game's meaning so the two can be joined. How they join is under [One record](#one-record).
 
 ## Where it lives and how it is built
 
@@ -57,11 +57,15 @@ outcome.cast;                   // a new cast, with Sam, Rico and any new facts 
 - **No lost changes:** each handle and check is tied to the cast it came from, and rolling a check made from an older cast is refused, so one roll can never silently undo another.
 - **Sharing what did not change:** a new cast shares every unchanged character with the old one. Adding to a list still copies the list, so the cost of a roll is measured with benchmarks once built rather than promised here.
 - **Growth:** facts and transfers are kept for as long as the game keeps them: a fact while anything still refers to it, routine ones expiring, as in `src/retain.ts`; transfers for the ledger's window. A record that can outlive its fact (a character's version of it, a grudge's reason, a step in their conduct) keeps a short summary of the fact (its kind, who did it to whom as they believe it, and when), not only its id, so it still makes sense after the fact is pruned.
-- **Cash moves only by recorded transfers:** a character's cash is a stored number, and every transfer that changes it is in the cast's log; a check verifies that the two agree, as the game's `audit` does. A transfer names who paid whom, how much, why and when, as the game's ledger does. Money entering or leaving the cast comes from or goes to a `world` party, and opening balances are transfers from it, so all cash has a recorded source. When old transfers are pruned, the log keeps each character's balance at that point. Cash is never set directly.
+- **Cash and items move only by recorded transfers** (items: see [Inventory](#inventory)): a character's cash is a stored number, and every transfer that changes it is in the cast's log; a check verifies that the two agree, as the game's `audit` does. A transfer names who paid whom, how much, why and when, as the game's ledger does. Money entering or leaving the cast comes from or goes to a `world` party, and opening balances are transfers from it, so all cash has a recorded source. When old transfers are pruned, the log keeps each character's balance at that point. Cash is never set directly.
 
 ### One record
 
-While both exist, the game's world stays the record. A cast is built from it when one is needed, and the cast's results are written back through one function, the only writer, so the two never disagree. Eventually the cast replaces the game's characters and facts, one system at a time, and the writer goes once nothing is left to write: see [Later](#later). So one record is the goal, not a claim about the first version.
+The overhaul replaces the game's systems in one sweep, not one system at a time, so there is never a time when both hold characters, and no writer between two records. Until then the overhaul stays apart from the game, as it is.
+
+1. **Everything first:** what the swap needs is built in the overhaul first: see [Before the swap](#before-the-swap).
+2. **A shadow run:** the overhaul runs alongside the game on the same seeds and actions in a test harness, and what each records is compared. The swap waits until they agree, or differ only where it has been decided they should.
+3. **The swap:** every game system that reads or writes characters moves to the cast at once, with one save migration from the game's format to the cast's.
 
 **The player and NPCs are the same type.** There is no player flag in the character. Every character has an id.
 
@@ -122,8 +126,8 @@ A person is a product of their experiences, so three things move traits: what a 
 | Starting one against a bigger squad, or against a weapon that outclasses theirs | The same | Courage + |
 | Starting one while Hurt, or against a bigger squad | The same | Caution − |
 | Setting an ambush | The same, started as an ambush | Caution + |
-| Beating someone who could not fight back: set upon by more than one, or unarmed against a weapon that outclasses theirs | A `beating` | Cruelty +, Empathy − |
-| Starting a fight with someone who provoked them, the same day | A `beating` or `fight` caused by a provoking `threat` | Volatility + |
+| Beating someone who could not fight back: set upon by more than one (for the squad that set upon them), or unarmed against a weapon that outclasses theirs; only for whoever struck them or started the fight | A `beating` | Cruelty +, Empathy − |
+| Starting a fight with someone who provoked them, within 24 hours: the fight's cause is a `threat` that ended provoked, the one provoked is on the attacking squad and the one who provoked them among the defenders | A `beating` or `fight` caused by a provoking `threat` | Volatility + |
 | Intimidating someone | A `threat` | Violence + |
 | Persuading someone | A `persuasion` | Agreeable + |
 | Lying | A `lie` | Honesty − |
@@ -167,17 +171,24 @@ A risk to check with long simulated runs: an NPC's choices follow their temperam
 
 An effect does not stack with itself; different effects add together. Each is named in explanations, for example "Hurt −2". Where a skill can use either of two attributes, Hurt and Drunk follow the attribute actually used.
 
-**Resting** restores hit points to full and clears Shaken and Drunk. It takes time, and returns a new cast like a roll: the call gives when it starts and how long it lasts, `sam.rest({ now, hours: 8 })`, and the cast records it, so the character is known to be resting for that time. Healing over time, and how much a shorter rest heals, are under [Later](#later).
+**Resting** takes time, and returns a new cast like a roll: the call gives when it starts and how long it lasts, `sam.rest({ now, hours: 8 })`, and the cast records it. A full night, 8 hours or more, restores hit points to full and clears Shaken and Drunk; a shorter rest heals a share of the missing hit points in proportion to its length (4 hours heals half, rounded down) and clears no effects. While resting, a character is unavailable: nothing they do (checks, social actions, fights, drinking, planning, telling, paying) and nothing that needs them there (being the target of a social action, in a fight, told something or given an item) can happen at a `now` within their rest; a plain transfer between them and the world can. Attacking someone asleep, and healing over time without resting, are [before the swap](#before-the-swap).
 
 ## Inventory
 
 **Cash is a separate number,** not an item, and changes only by [recorded transfers](#shape).
 
+**Items change hands only by recorded transfers too,** in the same log as cash: a transfer of an item names it, with its count as the amount, who from and to, why and when, and optionally the fact that caused it (such as a robbery). A check counts each kind of item each character holds against the log, as cash is checked.
+
+- **Starting items** are transfers from the world, as starting cash is; adding a character with items records them.
+- **An item used up** (a drunk bottle) is a transfer to the world.
+- **Giving:** `sam.give(rico, 'knife', { why, now })`. A carried one goes first; a shown weapon or a worn suit must be put away first; it arrives carried.
+- **Taking by force** (robbery, disarming a beaten fighter) and **buying** (paying and receiving in one change) are [before the swap](#before-the-swap).
+
 **An item** has a name and a list of effects. Each effect names the skill it applies to, optionally a situation within that skill, a value, and when it applies:
 
 - **Situations:** `locks` (Larceny), `repairs` (Mechanics), and so on: a short, fixed list kept with the rules tables. An effect with no situation applies to every check of that skill.
 - **When it applies:** while carried, while shown, while worn, or when used.
-- **State:** a carried weapon is hidden unless it is shown, and the inventory records which items are shown or worn. An item used up (a drunk bottle) leaves the inventory.
+- **State:** a carried weapon is hidden unless it is shown, and the inventory records which items are shown or worn. An item used up (a drunk bottle) leaves the inventory, by a transfer to the world.
 
 | Item | Effect |
 | --- | --- |
@@ -209,7 +220,7 @@ This replaces the lab's armed intimidation (a nerve check before the roll, and a
 | Knife | Brawling | 1d6 + Strength |
 | Pistol | Firearms | 2d6, with no Strength |
 
-Weapons are part of a real fight from the start: there are no choices made mid-fight. Each armed character's attacks use their weapon's skill and damage. At the start, each fighter facing a weapon that outclasses theirs, by the same rule as the table above (a knife outclasses bare hands; a pistol outclasses bare hands and a knife), makes one nerve check against the strongest such weapon: DC 12 for a knife, 15 for a pistol. A fighter whose weapon answers everything they face does not check. These numbers change fight balance, so they are a starting point, checked and tuned with statistical tests on simulated fights once built.
+Weapons are part of a real fight from the start: there are no choices made mid-fight. Each armed character's attacks use their weapon's skill and damage. At the start, each fighter facing a weapon that outclasses theirs, by the same rule as the table above (a knife outclasses bare hands; a pistol outclasses bare hands and a knife), makes one nerve check against the strongest such weapon: DC 12 for a knife, 15 for a pistol. A fighter whose weapon answers everything they face does not check. These numbers change fight balance, so they are a starting point. They are kept for now (3 November 2026), with the measured rates pinned in a statistical test so that any change shows; a direction for retuning is to make the start check opposed to the armed fighter's Intimidation rather than a fixed DC.
 
 ## Relationships
 
@@ -225,7 +236,7 @@ rico.towards(sam);   // { trust: 0.4, respect: 0.7, affection: 0.2, grudge: 0.1,
 
 **Familiarity** grows by 0.02 each time the two meet, as above. This is a starting value, tuned once built.
 
-**One function changes feelings,** modelled on the game's `feelOn` (`src/core.ts`), and everything uses it, grudges included (the game has a separate `bear`). A gain shrinks as the value nears 1, and gains in trust and affection are smaller between people who barely know each other; losses are not damped. The amounts in the tables below are before damping. Feelings fading with time is under [Later](#later).
+**One function changes feelings,** modelled on the game's `feelOn` (`src/core.ts`), and everything uses it, grudges included (the game has a separate `bear`). A gain shrinks as the value nears 1, and gains in trust and affection are smaller between people who barely know each other; losses are not damped. The amounts in the tables below are before damping. Feelings fading with time is [before the swap](#before-the-swap).
 
 ### As modifiers on social checks
 
@@ -282,9 +293,13 @@ Follows the game's model (`Fact` and `Knowledge` in `src/types.ts`, `addFact` an
 
 - **A fact is recorded once,** in the cast's list of facts: what kind of fact, who did it, who it was done to, any business or amount, when, where, the fact that caused it, and whether who did it is hidden.
 - **Each character holds their own version** of the facts they know about: when they learned it; where it came from (they did it, they witnessed it, it was public, or who told them); whether they know who did it; how they came by it (seen, told by a witness, heard second-hand); who they believe did it when they don't know, which can be wrong; and whether they heard it exaggerated.
-- **Who learns a fact when it is recorded:** whoever did it, whoever it was done to, and the witnesses named at the call, who are recorded on the fact.
-- **Learning a fact changes feelings,** by the game's own tables, carried over from `learn`: respect for what someone has done, fear of someone violent (more for the less brave), and for the victim a grudge or fear by their courage, with less trust either way. Apart from the aftermath of social rolls, this is the only way facts change feelings, so nothing is counted twice: a beating changes the victim's feelings because they learn of it.
-- **Re-belief:** when a character's version of a fact they already know changes (they are lied to, or learn the truth), their feelings follow the actor they now believe did it: the learning tables apply towards that actor as if they had learned the fact with them as its actor. Feelings towards whoever they believed before are not undone.
+- **Each part of a version has its own provenance:** how they came by who did it, and how they came by how big it was, each seen, told by a witness, heard second-hand, or guessed. Whatever reads what someone knows of a part (such as a lie's modifier) reads that part's provenance.
+- **Who learns a fact when it is recorded:** whoever did it, whoever it was done to, and the witnesses named at the call, who are recorded on the fact. A witness must be there and conscious: naming one who is unconscious, or resting, is refused. In a fight, a fighter witnesses what happens to a loser only if they had not been knocked out or gone when that loser was beaten, knocked out or fled; someone who gave in is still there and sees. A fighter knocked out can still be the actor of a later fact, and learns it as their own act.
+- **Public facts:** a fact can also be made public to others named at the call (`public: [...]`), as the game's `broadcast` does. They learn it as public and heard; they know who did it unless the actor is hidden, and then they do not guess. They are not witnesses, and they do not meet those in it, though they are no longer strangers to them.
+- **Guessing a hidden actor:** the victim of a hidden actor, of a kind that changes feelings (`GRUDGE`), guesses who did it, with no randomness: among those they hold a grudge of at least 0.3 against (and, for a violent kind, know to have been violent), the one they hold the biggest grudge against; on a tie, no one. The guess is their belief, marked guessed, so a telling or a lie can change it; their feelings change towards the one they suspect through the learning tables, with the fact as the cause. Only the victim guesses; anyone they tell hears it as their guess. A player can frame someone by raising a victim's grudge against them first; that is accepted.
+- **Learning a fact changes feelings,** by the game's own tables, carried over from `learn`: respect for what someone has done, fear of someone violent (more for the less brave), and for the victim a grudge or fear by their courage, with less trust either way; and a grudge for anyone fond of the victim (affection high, 0.7 or more, since a new relationship here starts at 0.5, not the game's 0.1). Apart from the aftermath of social rolls, this is the only way facts change feelings, so nothing is counted twice: a beating changes the victim's feelings because they learn of it.
+- **Re-belief:** when a character's version of a fact they already know changes (they are lied to, or learn the truth), their feelings follow the actor they now believe did it: the learning tables apply towards that actor as if they had learned the fact with them as its actor. They apply only once for each fact and each character held responsible for it, so changing one's mind back and forth counts nothing twice. Feelings towards whoever they believed before are not undone.
+- **Telling someone who already knows:** a telling that fills a gap (they know the fact, but not the part being told) is accepted, as any new telling is. One that agrees with them changes nothing. One that contradicts them is a roll: the teller's Persuasion against DC 10, with the knowledge modifiers of [Deception](#as-modifiers-on-deception) and the persuasion feelings; on a success their belief changes, with the teller's provenance (corrected by a witness, they know who did it; by someone who heard it, they heard it). The roll makes the two meet, and moves no traits. Asking the odds reveals nothing more of the listener's version than a lie's odds would. If the part overturned is the part a lie changed, and the lie was told as something the liar saw, the lie comes out: they learn the `lie` fact, with the change of a lie seen through and "finding out they were lied to".
 
 ### Fact kinds
 
@@ -299,7 +314,9 @@ The game's kinds are used where the meaning matches, with their rows in the lear
 | `lie` (added) | Any deception roll | None; the aftermath table only. See below for who learns it |
 | Any other game kind | A lie invents it, or the game records it | The game's rows; a kind with none, such as `theft`, changes no feelings |
 
-A `lie` fact is known to the liar. The target learns it only when they see through the lie (a critical failure) or later learn the truth; witnesses to a deception learn nothing from it for now (see [Later](#later)).
+A `lie` fact is known to the liar, and records what it claimed. The target learns it only when they see through the lie (a critical failure) or later learn the truth; witnesses to a deception learn nothing from it for now. A `beating` in which no blow was struck (its amount is 0) is still a beating, but not violence by its actor: it gives witnesses no fear of them, and does not count as having seen them be violent.
+
+**Social facts record how they ended** (`ending`: the outcome, or provoked). That is the simulation's truth: anything that reads it on a character's behalf sees only how it looked to them, unless they were the target. A liar knows their lie fact, but not, through it, whether they were believed.
 
 ### As modifiers on Intimidation
 
@@ -321,7 +338,7 @@ sam.social.deceive(rico).claim({ about: factId, blame: 'joe' });                
 sam.social.deceive(rico).claim({ invented: { kind: 'robbery', actor: 'joe' } });   // a fact that never happened
 ```
 
-When a lie succeeds, the target's version changes by [re-belief](#knowledge), with "told by the actor" as its source. If they later learn the truth, that is re-belief again, and because their version names the liar as its source, they learn the `lie` fact and know who lied to them, with the change of a lie seen through (trust −0.15, grudge +0.05).
+When a lie succeeds, the target's version changes by [re-belief](#knowledge), with "told by the actor" as its source. If they later learn the truth, that is re-belief again, by the rules of [telling someone who already knows](#knowledge).
 
 The modifier comes from what the target knows of the part of the fact the claim changes: who did it, how big it was, or, for an invented fact, whether it happened at all. So a victim who never knew who robbed them can be told the wrong name.
 
@@ -524,19 +541,24 @@ Where it would be used once this is slotted into the game, which now uses `brain
 - **Skimming:** reporting less than was earned to a superior (`src/books.ts`).
 - **Running a business, a loan book or a numbers game well:** in place of `brains` in a business's management quality (`src/econ.ts`).
 
-Both belong to the game's books, so both wait for slotting it in (see [Later](#later)).
+Both belong to the game's books, so both are [before the swap](#before-the-swap).
 
-## Later
+## Before the swap
 
-Left until the character is slotted into the game:
+What must be built in the overhaul before it replaces the game's systems in one sweep (see [One record](#one-record)):
 
-- **Replacing the game's records:** the game's `Character` has about 60 fields this does not hold (rank, family, crew, debts, memos and more). Each system moves over with its fields, its tests and a save migration, one at a time, and the one writer goes once nothing is left.
-- **Fading:** feelings fading when nothing feeds them, as the game's `feelingsWeek` does, and traits easing back towards a character's starting traits; both need the game's clock.
+- **The rest of the game's characters:** the game's `Character` has about 60 fields this does not hold (rank, family, crew, debts, memos and more), each with the systems that read and write it.
+- **Families,** and with them family as closeness to a victim, which the game's `learn` counts as it counts affection.
+- **Minor facts,** which change no one's respect, and stay out of gossip and history.
+- **The clock:** feelings fading when nothing feeds them, as the game's `feelingsWeek` does, traits easing back towards a character's starting traits, and healing over time without resting.
+- **Attacking someone asleep,** a kind of ambush on someone resting.
+- **Taking by force and buying** items.
 - **What really drives loyalty, ambition and sociability:** keeping or breaking one's word, rank and standing, and a social life. For now they move only with the small signals in [Temperament moves with conduct](#temperament-moves-with-conduct).
-- **Healing over time,** and how much a shorter rest heals.
 - **Lies told in front of others:** what witnesses to a deception believe.
 - **Clearing a name:** whether learning someone was falsely blamed repairs the feelings the lie caused.
+- **Retention:** pruning old facts and transfers, with the summaries and balances they leave.
+- **The shadow run,** and the save migration from the game's format.
 
 - **Skimming:** an opposed Bookkeeping check between the skimmer and their superior. The chance of the superior catching it must scale with the gap they can see, as the game's own check does now. Running a check only when someone is skimming would leak who is, and a suspicion must be recorded as an inferred fact, not as a change in trust with no recorded cause.
-- **Running a business** with Bookkeeping, in place of `brains` in the game's management quality. This changes the game's economy, and this work stays separate from the game until then.
-- **Joining the game's records:** mapping the game's five skills onto the six attributes and eighteen skills; which courage to keep (the game has two); hit points against the game's `hurtUntil`; the player's `conduct`; cash against the ledger; and the save migration from the game's current format.
+- **Running a business** with Bookkeeping, in place of `brains` in the game's management quality. This changes the game's economy.
+- **Mapping the game's records:** the game's five skills onto the six attributes and eighteen skills; which courage to keep (the game has two); hit points against the game's `hurtUntil`; the player's `conduct`; cash against the ledger; and the save migration from the game's current format.
