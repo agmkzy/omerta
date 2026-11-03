@@ -1,0 +1,28 @@
+{
+  "format": 1,
+  "characters": [
+    {
+      "id": "sam",
+      "name": "Sam",
+      "background": "trickster",
+      "attributes": { "str": 9, "agi": 14, "con": 11, "int": 12, "wis": 10, "cha": 15 },
+      "training": { "larceny": "trained", "carousing": "trained", "streetwise": "trained", "deception": "expert" },
+      "proficiencyBonus": 2,
+      "startingTemperament": {
+        "greed": 0.62, "violence": 0.41, "ambition": 0.55, "caution": 0.33, "sociability": 0.58, "vice": 0.71, "courage": 0.5,
+        "pride": 0.47, "volatility": 0.52, "agreeable": 0.6, "empathy": 0.44, "loyalty": 0.49, "honesty": 0.24, "cruelty": 0.38
+      }
+    },
+    {
+      "id": "rico",
+      "name": "Rico",
+      "attributes": { "str": 16, "agi": 10, "con": 14, "int": 8, "wis": 11, "cha": 12 },
+      "training": { "brawling": "expert", "intimidation": "trained" },
+      "proficiencyBonus": 3,
+      "startingTemperament": {
+        "greed": 0.5, "violence": 0.8, "ambition": 0.5, "caution": 0.3, "sociability": 0.5, "vice": 0.5, "courage": 0.7,
+        "pride": 0.6, "volatility": 0.75, "agreeable": 0.3, "empathy": 0.3, "loyalty": 0.6, "honesty": 0.5, "cruelty": 0.65
+      }
+    }
+  ]
+}
