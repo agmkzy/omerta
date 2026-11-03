@@ -10,7 +10,14 @@ into the plan and is taken off this list. What the plan itself leaves for slotti
 | Point | Where it came up | Now |
 | --- | --- | --- |
 | **Guessing a hidden actor.** The game's `suspect` has a victim of a hidden actor guess who did it, and they can guess wrong. | Step 5 | Not ported: it needs randomness and rules we have not agreed. A victim of a hidden actor blames no one. |
-| **When the truth replaces a belief.** A listener who already knows a fact keeps their own version, as in the game's `learn`, so a victim who never saw the hidden actor cannot learn who it was just by being told. | Step 5 | Re-belief exists as a rule; when it applies (being lied to, learning the truth) is to be settled with deception in step 7. |
+| **When the truth replaces a belief.** A listener who already knows a fact keeps their own version, as in the game's `learn`, so a victim who never saw the hidden actor cannot learn who it was just by being told, and someone who believed a lie keeps believing it when a witness tells them otherwise. | Steps 5 and 7 | A believed lie changes the target's version by re-belief. Learning the truth (and so finding out who lied, with the change of a lie seen through) is not built: when the truth should win over a belief, and whether that takes a roll, is to be decided. |
+| **Inventing a fact about the target.** A lie inventing a fact that names the target (as whoever did it, or whoever it was done to) cannot succeed: "Rico would know: it would have been them". | Step 7 | Built this way; the plan only says an invented fact's modifier comes from whether it happened at all. |
+| **How a social roll looks to others.** Only the target knows exactly how it went. Anyone else sees: for intimidation, gives in, resists or provoked; for persuasion, agrees or declines; for deception, no sign, unless the target sees through it. So a liar cannot tell whether a lie was believed. | Step 7 | Built this way. |
+| **Who knows a modifier.** Situational modifiers added with `.with()` are known to everyone present. Anyone but the target judges a shown weapon by the weapons the target shows. Anyone who saw a fact with the target knows the target saw it; whoever told the target knows what they told. | Step 7 | Built this way. |
+| **Lies and witnesses.** Witnesses to a deception meet those in it but learn nothing, and the lie fact records no witnesses. | Step 7 | As the plan has it for now; what witnesses believe is under the plan's Later. |
+| **Lies the liar may tell.** A claim must differ from what the liar believes (otherwise it is telling, not lying), and a lie about a fact the liar invented is refused: a new lie invents a new fact. | Step 7 | Built this way. |
+| **Provoked counts as resisting.** A provoked target holds a grudge (+0.1), and the actor's respect for them rises as for any target who resists (+0.05). | Step 7 | Built this way; the plan's two tables do not say which applies. |
+| **Shaken on giving in.** Any target who gives in to intimidation (partial success or better) is shaken. | Step 7 | Built this way. |
 | **Telling.** A character telling another what they believe is an operation the plan implies (versions record who told them; Deception depends on told or heard) but does not name. | Step 5 | Built as `tell`. |
 | **Items changing hands.** There is no giving or taking items: they come from a character's input and leave only when used up. | Step 4 | Moving an item should be recorded, as cash transfers are; how is to be decided. |
 | **What resting stops.** A rest is recorded with its time, but nothing yet reads it except `restingAt`. | Step 3 | What a resting character cannot do is for when jobs and the game's clock arrive. |
@@ -28,8 +35,8 @@ into the plan and is taken off this list. What the plan itself leaves for slotti
 | Point | Where it came up | Waits for |
 | --- | --- | --- |
 | **Pruning old facts and transfers.** Nothing is pruned yet. The short summary a version keeps once its fact is gone, and the balance kept when old transfers go, are not built, since keeping them now would copy facts and balances that still exist. | Steps 4 and 5 | Retention |
-| **Results given to a viewer.** Drinking returns the plain check result. | Step 4 | Social checks (step 7) |
-| **Feelings as modifiers on social checks.** The plan's tables are built (`feelingModifiers`) but nothing rolls a social check yet. | Step 6 | Social checks (step 7) |
+| **Results given to a viewer for drinking.** Social checks give their odds, explanations and results to a viewer; drinking still returns the plain check result. | Steps 4 and 7 | Undecided: drinking has no one else in it yet |
+| **Conduct from social rolls.** Intimidating, persuading, lying, giving in and standing up to a threat move traits by the plan's conduct tables. | Step 7 | Conduct (step 8) |
 | **A beating's change scaled by damage.** The plan scales the victim's change by the share of hit points lost, never below a successful intimidation's, and a fled fight's with no minimum. For now a `beating` or `fight` fact changes feelings by the game's rows unscaled. | Step 6 | Fights (step 9) |
 | **Courage from current traits.** Learning uses the learner's starting courage. | Step 6 | Conduct (step 8), which works out current traits |
 | **The lab's playground.** It still runs on the lab's code. | Step 1 | Fights in the overhaul (step 9), then it can be pointed at the overhaul and the lab's code removed |
@@ -52,3 +59,5 @@ These were reported when they were made and stand unless revisited.
 - **Time is in minutes,** as in the game (step 3).
 - **The game's fact kinds and learning tables are read from its source as text** by tests, so they cannot drift apart without the overhaul importing the game (steps 5 and 6).
 - **Learning about someone makes them no longer a stranger,** even for a fact whose kind changes no feelings, such as a theft (step 6).
+- **Social checks roll a d20,** as the plan's other checks do; the lab's choice of dice (2d10, 3d6) is not carried over (step 7).
+- **"Impossible" is a modifier of −100,** large enough that no roll can succeed, explained with its reason (step 7).

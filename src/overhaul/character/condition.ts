@@ -89,9 +89,14 @@ export interface EffectOptions {
 
 /** The effects' modifiers on a skill roll made with `attribute`, in EFFECT_RULES order. */
 export function effectModifiers(c: Condition, skill: Skill, attribute: Attribute, options: EffectOptions = {}): Modifier[] {
+  return effectParts(c, skill, attribute, options).map((p) => p.modifier);
+}
+
+/** The same, each with the effect it comes from, for anything that needs to know which are visible (only hurt is). */
+export function effectParts(c: Condition, skill: Skill, attribute: Attribute, options: EffectOptions = {}): { readonly effect: Effect; readonly modifier: Modifier }[] {
   const active = (e: Effect) => (e === 'hurt' ? c.hurt && !options.inFight : c.effects.includes(e));
   return EFFECT_RULES.filter((r) => active(r.effect) && (r.attributes?.includes(attribute) || r.skills?.includes(skill))).map((r) => ({
-    value: r.value,
-    reason: EFFECT_INFO[r.effect].name,
+    effect: r.effect,
+    modifier: { value: r.value, reason: EFFECT_INFO[r.effect].name },
   }));
 }

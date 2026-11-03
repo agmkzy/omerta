@@ -41,6 +41,24 @@ export const ITEM_INFO: { readonly [I in Item]: ItemInfo } = {
   bottle: { name: 'Bottle of spirits', effects: [], usedUp: true },
 };
 
+/** Weapons from weakest to strongest; a stronger one outclasses a weaker one. */
+export const WEAPONS = ['knife', 'pistol'] as const satisfies readonly Item[];
+export type Weapon = (typeof WEAPONS)[number];
+
+/**
+ * What a weapon shown adds to intimidation, by the strongest weapon the target carries: a weapon only frightens someone who
+ * has nothing to answer it with.
+ */
+export const WEAPON_THREAT: { readonly [W in Weapon]: { readonly [T in Weapon | 'none']: number } } = {
+  knife: { none: 2, knife: 0, pistol: 0 },
+  pistol: { none: 4, knife: 2, pistol: 0 },
+};
+
+/** The strongest weapon among the items, counting only those in the given states; 'none' if there is none. */
+export function strongestWeapon(inventory: InventoryRecord, states: readonly ItemState[]): Weapon | 'none' {
+  return [...WEAPONS].reverse().find((w) => inventory.items.some((h) => h.item === w && states.includes(h.state))) ?? 'none';
+}
+
 /** Drinking a bottle means a Carousing check against this DC; failing it makes the character drunk. */
 export const DRINK_DC = 12;
 
@@ -84,6 +102,11 @@ export interface ItemOptions {
  * counts once. Throws RangeError for a situation of another skill, or for using an item not held.
  */
 export function itemModifiers(inventory: InventoryRecord, skill: Skill, options: ItemOptions = {}): Modifier[] {
+  return itemParts(inventory, skill, options).map((p) => p.modifier);
+}
+
+/** The same, each with when it applies, for anything that needs to know which are visible (those shown or worn). */
+export function itemParts(inventory: InventoryRecord, skill: Skill, options: ItemOptions = {}): { readonly when: When; readonly modifier: Modifier }[] {
   const { situation, using = [] } = options;
   if (situation !== undefined && SKILL_SITUATIONS[situation] !== skill) throw new RangeError(`${situation} is not a situation of ${skill}`);
   for (const item of using) if (!inventory.items.some((h) => h.item === item)) throw new RangeError(`${ITEM_INFO[item].name} is not held, so it cannot be used`);
@@ -93,6 +116,6 @@ export function itemModifiers(inventory: InventoryRecord, skill: Skill, options:
   return [...best.values()].flatMap((h) =>
     ITEM_INFO[h.item].effects
       .filter((e) => e.skill === skill && (e.situation === undefined || e.situation === situation) && applies(h, e.when))
-      .map((e) => ({ value: e.value, reason: ITEM_INFO[h.item].name })),
+      .map((e) => ({ when: e.when, modifier: { value: e.value, reason: ITEM_INFO[h.item].name } })),
   );
 }

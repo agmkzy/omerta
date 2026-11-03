@@ -7,13 +7,15 @@ import { bonusOf, passes, resolveCheck, type CheckResult, type Modifier } from '
 import { createCharacter, type CharacterInput, type CharacterRecord, type Id } from './character';
 import { conditionOf, effectModifiers, type Condition, type StoredEffect } from './condition';
 import { DICE } from './dice';
-import { auditFacts, factId, type Fact, type FactId, type FactInput } from './facts';
+import { auditFacts, type Fact, type FactId, type FactInput } from './facts';
 import { DRINK_DC, ITEM_INFO, itemModifiers, type InventoryRecord, type Item, type ItemOptions, type ItemState } from './items';
-import { auditKnowledge, firstVersions, toldVersion, type Knowledge, type Version } from './knowledge';
-import { learnFact, meetPeople, meetings } from './learning';
+import { auditKnowledge, toldVersion, type Knowledge, type Version } from './knowledge';
+import { learnFact } from './learning';
+import { recordFact, withCharacter } from './records';
 import type { Roller } from './random';
 import type { Relationship, Relationships } from './relationships';
 import { SKILLS, attributeUsed, skillModifiers, type Proficiency, type Skill } from './skills';
+import { socialCheck, type Claim, type SocialAction, type SocialCheck } from './social';
 import type { Temperament } from './temperament';
 import { HOUR, assertTime } from './time';
 import { WORLD, auditCash, type Party, type Transfer } from './transfers';
@@ -123,6 +125,13 @@ export interface Character {
   tell(listener: Character, fact: FactId, when: { readonly now: number }): Cast;
   /** Drinks a bottle of spirits, which is used up: a Carousing check against DRINK_DC, and on a failure the character is drunk. */
   drink(roller: Roller): { readonly result: CheckResult; readonly drunk: boolean; readonly cast: Cast };
+  /** Social actions on another character in the cast, each a check to inspect, then roll. */
+  readonly social: {
+    intimidate(target: Character): SocialCheck<Cast>;
+    persuade(target: Character): SocialCheck<Cast>;
+    /** A lie needs its claim before it can be rolled. */
+    deceive(target: Character): { claim(claim: Claim): SocialCheck<Cast> };
+  };
 }
 
 /** Thrown for a change made from a cast that has already been replaced by a change. */
@@ -154,9 +163,9 @@ export function castOf(data: CastRecord): Cast {
   let current = true;
 
   /** Makes a change: refused if this cast is replaced; otherwise this cast is replaced by the one the change returns. */
-  const change = (next: () => CastRecord): Cast => {
+  const change: Commit = (next) => {
     if (!current) throw new ReplacedCastError('this cast has been replaced by a change; make changes from the newest cast');
-    const replacement = castOf(next());
+    const replacement = castOf(next(data));
     current = false;
     return replacement;
   };
@@ -174,19 +183,19 @@ export function castOf(data: CastRecord): Cast {
       const record = records.get(id);
       if (record === undefined) throw new RangeError(`no character has the id ${id}`);
       let handle = handles.get(id);
-      if (handle === undefined) handles.set(id, (handle = characterHandle(record, self, update)));
+      if (handle === undefined) handles.set(id, (handle = characterHandle(record, self, change)));
       return handle;
     },
-    add: (input) => change(() => ({ ...data, characters: [...data.characters, createCharacter(input)] })),
+    add: (input) => change((d) => ({ ...d, characters: [...d.characters, createCharacter(input)] })),
     transfer: ({ from, to, amount, why, now }) =>
-      change(() => {
+      change((d) => {
         const has = records.get(from)?.inventory.cash;
         if (has !== undefined && has < amount) throw new RangeError(`${from} has ${has} in cash, so cannot pay ${amount}`);
         const moved = (c: CharacterRecord) => (c.id === from ? -amount : c.id === to ? amount : 0);
         return {
-          ...data,
-          characters: data.characters.map((c) => (moved(c) ? createCharacter({ ...c, inventory: { ...c.inventory, cash: c.inventory.cash + moved(c) } }) : c)),
-          transfers: [...data.transfers, { from, to, amount, why, at: now }],
+          ...d,
+          characters: d.characters.map((c) => (moved(c) ? createCharacter({ ...c, inventory: { ...c.inventory, cash: c.inventory.cash + moved(c) } }) : c)),
+          transfers: [...d.transfers, { from, to, amount, why, at: now }],
         };
       }),
     facts: data.facts,
@@ -195,34 +204,25 @@ export function castOf(data: CastRecord): Cast {
       if (f === undefined) throw new RangeError(`no fact has the id ${id}`);
       return f;
     },
-    record(input, { now, witnesses = [] }) {
-      const made: Fact = { ...input, id: factId(data.nextId), at: now, witnesses: [...witnesses] };
-      const learners = new Map(firstVersions(made));
-      const meets = meetings(made);
-      const next = change(() => ({
-        ...data,
-        facts: [...data.facts, made],
-        nextId: data.nextId + 1,
-        characters: data.characters.map((c) => {
-          // (everyone who learns a fact as it is recorded is named in it, so meets the others it names)
-          const v = learners.get(c.id);
-          return v ? createCharacter(learnFact(meetPeople(c, meets.get(c.id)!, now), made, v, now)) : c;
-        }),
-      }));
-      return { fact: made, cast: next };
+    record(input, when) {
+      let made: Fact | undefined;
+      const next = change((d) => {
+        const recorded = recordFact(d, input, when);
+        made = recorded.fact;
+        return recorded.data;
+      });
+      return { fact: made!, cast: next };
     },
   };
-
-  /** A change to one character, whose new record is checked as any other. */
-  function update(id: Id, next: (c: CharacterRecord) => CharacterInput): Cast {
-    return change(() => ({ ...data, characters: data.characters.map((c) => (c.id === id ? createCharacter(next(c)) : c)) }));
-  }
   return self;
 }
 
-type Update = (id: Id, next: (c: CharacterRecord) => CharacterInput) => Cast;
+/** Makes one change to a cast's record, as cast.ts's own `change` does; handed only to the overhaul's own modules. */
+export type Commit = (next: (data: CastRecord) => CastRecord) => Cast;
 
-function characterHandle(data: CharacterRecord, owner: Cast, update: Update): Character {
+function characterHandle(data: CharacterRecord, owner: Cast, commit: Commit): Character {
+  /** A change to this character, or another, whose new record is checked as any other. */
+  const update = (id: Id, next: (c: CharacterRecord) => CharacterInput) => commit((d) => withCharacter(d, id, next));
   const condition = conditionOf(data, data.condition);
   let skills: Character['skills'] | undefined;
   const withCondition = (next: (c: CharacterRecord['condition']) => CharacterRecord['condition']) =>
@@ -312,6 +312,17 @@ function characterHandle(data: CharacterRecord, owner: Cast, update: Update): Ch
         };
       });
       return { result, drunk, cast: next };
+    },
+    get social() {
+      const check = (action: SocialAction, target: Character, claim?: Claim) => {
+        if (target.cast !== owner) throw new RangeError(`${target.name} is from another cast`);
+        return socialCheck({ action, data: owner.data, actor: data, target: target.data, extra: [], ...(claim && { claim }) }, owner, commit);
+      };
+      return {
+        intimidate: (target: Character) => check('intimidate', target),
+        persuade: (target: Character) => check('persuade', target),
+        deceive: (target: Character) => ({ claim: (claim: Claim) => check('deceive', target, claim) }),
+      };
     },
   };
 }
